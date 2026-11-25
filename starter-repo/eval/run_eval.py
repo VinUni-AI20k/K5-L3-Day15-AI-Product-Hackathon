@@ -24,6 +24,7 @@ import os
 import re
 import sys
 import time
+import unicodedata
 
 for _stream in (sys.stdout, sys.stderr):
     try:
@@ -319,7 +320,8 @@ def check_teams():
     print("Kiểm TEAMS.md")
     if not os.path.exists(TEAMS):
         return ["Chưa có TEAMS.md ở thư mục gốc repo (chép từ starter-repo, điền đúng mẫu)."]
-    text = read_text(TEAMS)
+    # NFC: chữ có dấu chép từ một số trình soạn / macOS có thể ở dạng tổ hợp (NFD), nhìn giống hệt nhưng so chuỗi sai
+    text = unicodedata.normalize("NFC", read_text(TEAMS))
     warn = []
     fields = {}
     for line in text.splitlines():
@@ -336,17 +338,21 @@ def check_teams():
         warn.append("TEAMS.md: Lớp ghi đúng L3A hoặc L3B (đang ghi %r)." % fields["Lớp"])
     if fields.get("Track") and "____" not in fields["Track"] and fields["Track"] not in ("A", "B", "C", "D", "E", "F"):
         warn.append("TEAMS.md: Track ghi một chữ A, B, C, D, E hoặc F (đang ghi %r)." % fields["Track"])
-    rows, header = [], None
+    # Gom các bảng markdown; dùng bảng có tiêu đề đúng mẫu (nhóm có thể thêm bảng khác trên / dưới).
+    tables, cur = [], None
     for line in text.splitlines():
         if not line.strip().startswith("|"):
+            cur = None
             continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if header is None:
-            header = cells
-            continue
-        if all(set(c) <= set("-: ") for c in cells):
-            continue
-        rows.append(cells)
+        # tách ô theo "|" nhưng giữ "\|" (dấu | trong nội dung ô)
+        cells = [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
+        if cur is None:
+            cur = {"header": cells, "rows": []}
+            tables.append(cur)
+        elif not all(set(c) <= set("-: ") for c in cells):
+            cur["rows"].append(cells)
+    table = next((t for t in tables if t["header"] == TEAMS_HEADER), tables[0] if tables else None)
+    header, rows = (table["header"], table["rows"]) if table else (None, [])
     if header != TEAMS_HEADER:
         warn.append("TEAMS.md: tiêu đề bảng phải đúng là | %s | (đang là | %s |)."
                     % (" | ".join(TEAMS_HEADER), " | ".join(header or [])))
@@ -454,6 +460,16 @@ def check():
 
 # ================================================================ chạy
 
+def _where(e):
+    """File (trong codebase/) gây lỗi khi nạp: SyntaxError có e.filename, lỗi khác lấy khung cuối của traceback."""
+    import traceback
+    path = getattr(e, "filename", None) or (traceback.extract_tb(e.__traceback__)[-1].filename if e.__traceback__ else "")
+    if not path:
+        return "codebase/"
+    p = os.path.abspath(path)
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.relpath(p, base).replace(os.sep, "/") if p.startswith(base) else path
+
 def load_answer():
     """Nạp codebase/agent.py và tracing. Lỗi thì in lời nhắn dễ hiểu và thoát."""
     if CODEBASE not in sys.path:
@@ -462,8 +478,8 @@ def load_answer():
         import tracing  # noqa: E402
         import agent  # noqa: E402
     except Exception as e:
-        sys.exit("Không nạp được codebase/agent.py: %s: %s\nSửa lỗi rồi chạy lại. Cách nối model: %s"
-                 % (type(e).__name__, e, DOC))
+        sys.exit("Không nạp được codebase/ — lỗi ở %s: %s: %s\nSửa lỗi rồi chạy lại. Cách nối model: %s"
+                 % (_where(e), type(e).__name__, e, DOC))
     if not hasattr(agent, "answer"):
         sys.exit("codebase/agent.py chưa có hàm answer(text). Xem hợp đồng ở đầu file agent.py.")
     return agent.answer, tracing
@@ -511,10 +527,10 @@ def looks_mock(rows):
 
 
 def next_numbered(folder, stem, ext):
-    n = 1
-    while os.path.exists(os.path.join(folder, "%s-%d%s" % (stem, n, ext))):
-        n += 1
-    return n
+    """Số lượt tiếp theo = số lớn nhất đang có + 1. Không lấp chỗ trống: lượt đã xoá vẫn để lại dấu (run-1, run-3…)."""
+    pat = re.compile(r"%s-(\d+)%s$" % (re.escape(stem), re.escape(ext)))
+    nums = [int(m.group(1)) for f in (os.listdir(folder) if os.path.isdir(folder) else []) for m in [pat.match(f)] if m]
+    return max(nums) + 1 if nums else 1
 
 
 def write_csv(path, cols, rows):
@@ -524,11 +540,14 @@ def write_csv(path, cols, rows):
         w.writerows(rows)
 
 
-def write_trace(name, run_id, cases):
-    """cases: [(case_id, events)] → traces/<name>.jsonl, mỗi dòng một sự kiện."""
+def write_trace(name, run_id, cases, header=None):
+    """cases: [(case_id, events)] → traces/<name>.jsonl, mỗi dòng một sự kiện.
+    header: sự kiện đầu file (vd danh sách id của bộ câu thử lúc chạy) — `score` dùng để kiểm lượt đủ bộ."""
     os.makedirs(TRACES, exist_ok=True)
     path = os.path.join(TRACES, name + ".jsonl")
     with open(path, "w", encoding="utf-8") as f:
+        if header:
+            f.write(json.dumps(dict({"run_id": run_id, "case": ""}, **header), ensure_ascii=False) + "\n")
         for case_id, events in cases:
             for e in events:
                 f.write(json.dumps(dict({"run_id": run_id, "case": case_id}, **e), ensure_ascii=False, default=str) + "\n")
@@ -548,6 +567,11 @@ def run(mode="real", wait=0.0, try_n=TRY_DEFAULT):
     if mode != "fake" and sample_ids(items):
         print("⚠️ eval/benchmark.csv còn dòng mẫu \"(ví dụ)\": %s. Vẫn chạy, nhưng nhớ thay bằng câu thử của nhóm."
               % ", ".join(sample_ids(items)))
+    ids = [it.get("id", "").strip() for it in items]
+    dup = sorted({i for i in ids if i and ids.count(i) > 1})
+    if dup and mode != "fake":
+        sys.exit("eval/benchmark.csv có id bị trùng: %s — mỗi câu thử một id. Sửa rồi chạy lại "
+                 "(chưa gọi model, chưa ghi file nào). Kiểm: python run.py check" % ", ".join(dup))
     answer = tracing = None
     if mode != "fake":
         answer, tracing = load_answer()
@@ -583,7 +607,11 @@ def run(mode="real", wait=0.0, try_n=TRY_DEFAULT):
         row.update({"run_id": run_id, "id": it.get("id", ""), "type": it.get("type", ""), "input": it.get("input", ""),
                     "expected": it.get("expected", ""), "pass_criterion": it.get("pass_criterion", ""),
                     "pass": "", "ghi_chu": ""})
+        if not row["error"] and not row["output"].strip():
+            row["ghi_chu"] = "output rỗng"
         rows.append(row)
+        if mode != "fake":  # kết quả cuối đưa cho người dùng — để đối chiếu cột output với trace
+            events = list(events) + [{"kind": "final", "output": row["output"], "error": row["error"]}]
         cases.append((row["id"], events))
         if mode == "try" and not row["error"]:
             mark = "xong · model %s · gọi model %d · công cụ %d · token vào %s · ra %s" % (
@@ -603,7 +631,10 @@ def run(mode="real", wait=0.0, try_n=TRY_DEFAULT):
             r["run_id"] = rid
         path = os.path.join(eval_dir, fname + ".csv")
         write_csv(path, OUT_COLS, rows)
-        trace_path = write_trace(fname, rid, cases) if mode != "fake" else None
+        # đầu trace: danh sách id của bộ câu thử LÚC CHẠY → `score` kiểm lượt đủ bộ theo đúng bộ này,
+        # nên thêm câu thử về sau (được phép) không làm lượt cũ hết chấm được
+        header = {"kind": "bench", "ids": ids} if mode == "real" else None
+        trace_path = write_trace(fname, rid, cases, header) if mode != "fake" else None
         return path, trace_path
 
     if stopped:
@@ -647,6 +678,10 @@ def run(mode="real", wait=0.0, try_n=TRY_DEFAULT):
     print("Run ID: %s" % rows[0]["run_id"])
     if n_err:
         print("Xem cột error trong %s. Lượt có câu lỗi kỹ thuật: ghi rõ trong eval/report.md, có thể chạy lại thành lượt mới." % rel(path))
+    empty = [r["id"] for r in rows if r.get("ghi_chu") == "output rỗng"]
+    if empty:
+        print("⚠️ %d câu model trả về RỖNG (không báo lỗi): %s — thường do hết số token ra tối đa hoặc bộ lọc an toàn. "
+              "Đã ghi \"output rỗng\" ở cột ghi_chu. Xem %s mục \"Lỗi hay gặp\"." % (len(empty), ", ".join(empty[:15]), DOC))
     ok = [r for r in rows if not r["error"]]
     if ok:
         print("Trung bình mỗi câu: gọi model %.1f lần · công cụ %.1f lần · token vào %.0f · ra %.0f"
@@ -670,15 +705,15 @@ def grade(path):
     if dup:
         return "ID LẶP: %s — mỗi id giữ đúng một dòng." % ", ".join(dup[:15])
     name = os.path.basename(path)
-    if re.fullmatch(r"run-\d+\.csv", name):
-        bench = [r.get("id", "").strip() for r in read_csv(BENCH)[1]] if os.path.exists(BENCH) else []
+    if name != "run-try.csv":  # run-try chỉ chạy vài câu đầu, cố ý không đủ bộ
+        bench, where = bench_at_run_time(path)
         missing = [i for i in bench if i and i not in set(ids)]
         if missing:
-            return ("CHƯA ĐỦ BỘ: file thiếu %d câu của eval/benchmark.csv (%s). Một lượt phải chạy đủ cả bộ."
-                    % (len(missing), ", ".join(missing[:15])))
+            return ("CHƯA ĐỦ BỘ: file thiếu %d câu của %s (%s). Một lượt phải chạy đủ cả bộ."
+                    % (len(missing), where, ", ".join(missing[:15])))
     graded, blank, odd = [], [], []
     for r in rows:
-        v = r.get("pass", "").strip().lower()
+        v = unicodedata.normalize("NFC", r.get("pass", "")).strip().lower()
         if v in PASS_YES:
             graded.append((r, 1))
         elif v in PASS_NO:
@@ -699,11 +734,73 @@ def grade(path):
         t = r.get("type", "")
         a, b = by_type.get(t, (0, 0))
         by_type[t] = (a + p, b + 1)
+    # câu lỗi kỹ thuật / output rỗng mà vẫn chấm đạt: không đổi số, nhưng nêu rõ để nhóm và giám khảo thấy
+    odd_pass = [r.get("id", "?") for r, p in graded
+                if p and (r.get("error", "").strip() or not r.get("output", "").strip())]
     return {"path": path, "name": name, "passed": sum(p for _, p in graded), "total": len(rows),
             "by_type": by_type, "run_id": next((r.get("run_id") for r in rows if r.get("run_id")), ""),
             "model": next((r.get("model") for r in rows if r.get("model")), ""),
             "models": sorted({m for r in rows for m in (r.get("model") or "").split(", ") if m}),
-            "errors": sum(1 for r in rows if r.get("error", "").strip())}
+            "errors": sum(1 for r in rows if r.get("error", "").strip()),
+            "odd_pass": odd_pass, "trace_mismatch": trace_mismatch(path, rows)}
+
+
+def trace_mismatch(path, rows):
+    """Câu có output / token trong file lượt KHÁC với trace của chính lượt đó (file bị sửa tay sau khi chạy).
+    Chỉ kiểm được lượt có sự kiện "final" trong trace (bộ chạy ghi từ bản này trở đi). → danh sách id."""
+    stem = os.path.splitext(os.path.basename(path))[0]
+    trace = os.path.join(TRACES, stem + ".jsonl")
+    if not os.path.exists(trace):
+        return []
+    final, tok = {}, {}
+    with open(trace, encoding="utf-8") as f:
+        for line in f:
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            c = e.get("case")
+            if e.get("kind") == "final":
+                final[c] = e.get("output") or ""
+            elif e.get("kind") == "model" and not e.get("error"):
+                t = tok.setdefault(c, [0, 0])
+                t[0] += e.get("tokens_in") or 0
+                t[1] += e.get("tokens_out") or 0
+    if not final:
+        return []
+    bad = []
+    for r in rows:
+        i = r.get("id", "").strip()
+        if i not in final:
+            bad.append(i)
+            continue
+        norm = lambda s: re.sub(r"\s+", " ", (s or "").replace("\r\n", "\n")).strip()  # noqa: E731 — Excel đổi xuống dòng / khoảng trắng
+        same_out = norm(r.get("output")) == norm(final[i])
+        try:
+            same_tok = [int(r.get("tokens_in") or 0), int(r.get("tokens_out") or 0)] == tok.get(i, [0, 0])
+        except ValueError:
+            same_tok = False
+        if not (same_out and same_tok):
+            bad.append(i)
+    return bad
+
+
+def bench_at_run_time(path):
+    """Danh sách id của bộ câu thử lúc chạy lượt này. → (ids, mô tả nguồn).
+    Lấy từ dòng đầu traces/<tên lượt>.jsonl (bộ chạy ghi từ bản này trở đi); lượt cũ không có thì dùng
+    eval/benchmark.csv hiện tại như trước."""
+    stem = os.path.splitext(os.path.basename(path))[0]
+    trace = os.path.join(TRACES, stem + ".jsonl")
+    if os.path.exists(trace):
+        try:
+            with open(trace, encoding="utf-8") as f:
+                first = json.loads(f.readline() or "{}")
+            if first.get("kind") == "bench" and isinstance(first.get("ids"), list):
+                return [str(i).strip() for i in first["ids"]], "bộ câu thử lúc chạy (traces/%s.jsonl)" % stem
+        except ValueError:
+            pass
+    bench = [r.get("id", "").strip() for r in read_csv(BENCH)[1]] if os.path.exists(BENCH) else []
+    return bench, "eval/benchmark.csv"
 
 
 def score(path):
@@ -717,7 +814,7 @@ def score(path):
         print("=" * 70)
         print("Số hiện tại CHƯA dùng được cho báo cáo.")
         return 1
-    print("Run ID: %s · model: %s" % (res["run_id"] or "—", res["model"] or "—"))
+    print("Run ID: %s · model: %s" % (res["run_id"] or "—", ", ".join(res["models"]) or "—"))
     print("Tổng: %d/%d đạt (%.0f%%)" % (res["passed"], res["total"], 100.0 * res["passed"] / res["total"]))
     print("Theo type (đạt / số câu):")
     for t in TYPES + sorted(set(res["by_type"]) - set(TYPES)):
@@ -726,6 +823,13 @@ def score(path):
             print("  %-8s %d/%d (%.0f%%)" % (t or "(trống)", a, b, 100.0 * a / b))
     if res["errors"]:
         print("Lưu ý: %d câu có lỗi khi chạy (cột error) — nói rõ trong eval/report.md." % res["errors"])
+    if res["trace_mismatch"]:
+        print("⚠️ %d câu có output / token KHÁC trace của lượt này (traces/%s.jsonl): %s — file lượt đã bị sửa sau khi chạy? "
+              "Chỉ điền cột pass và ghi_chu, không sửa cột khác." % (len(res["trace_mismatch"]),
+              os.path.splitext(res["name"])[0], ", ".join(res["trace_mismatch"][:15])))
+    if res["odd_pass"]:
+        print("⚠️ %d câu chấm ĐẠT nhưng có lỗi khi chạy hoặc output rỗng: %s — xem lại cách chấm các câu này."
+              % (len(res["odd_pass"]), ", ".join(res["odd_pass"][:15])))
     if res["name"] in NOT_A_RUN:
         print("File này KHÔNG phải một lượt đánh giá — không chép vào báo cáo.")
     else:

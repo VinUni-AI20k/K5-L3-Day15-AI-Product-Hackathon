@@ -4,6 +4,8 @@
   python run.py simulate              chạy đủ số phiên trong personas.yaml (≥50) → cost/simulate-N.csv
                                       + cost/simulate-N-summary.md + traces/simulate-N.jsonl
   python run.py simulate --wait 4     như trên, nghỉ 4 giây giữa hai lượt hỏi (gói miễn phí hay giới hạn lượt / phút)
+  python run.py simulate --rate-from eval/run-2.csv
+                                      lấy tỉ lệ đạt từ đúng lượt này (mặc định: lượt run-N mới nhất đã chấm, cùng model)
 
 Cách tính (guide bước 4.2):
   1. Sinh các phiên theo persona (seed cố định): mỗi phiên chọn một persona theo tỉ lệ `share`,
@@ -17,8 +19,11 @@ Cách tính (guide bước 4.2):
 Chỉ dùng thư viện chuẩn.
 """
 import datetime
+import json
+import math
 import os
 import random
+import re
 import sys
 import time
 
@@ -42,7 +47,8 @@ DEFAULT_TYPES = ["thuong", "kho"]
 USAGE = """Cách dùng:
   python run.py simulate --try [N]    chạy thử N phiên (mặc định 10) → cost/simulate-try.csv
   python run.py simulate              chạy đủ số phiên trong cost/personas.yaml → cost/simulate-N.csv + bản tóm tắt
-  python run.py simulate --wait 4     nghỉ 4 giây giữa hai lượt hỏi"""
+  python run.py simulate --wait 4     nghỉ 4 giây giữa hai lượt hỏi
+  python run.py simulate --rate-from eval/run-2.csv   lấy tỉ lệ đạt từ đúng lượt này"""
 
 
 def fail(msg):
@@ -139,7 +145,13 @@ def plan_sessions(cfg, bench, n_sessions):
 def money(usd, rate=None):
     if usd is None:
         return "—"
-    text = ("$%.4f" % usd) if usd < 1 else ("$" + format(usd, ",.2f"))
+    if usd >= 1:
+        text = "$" + format(usd, ",.2f")
+    elif usd <= 0:
+        text = "$0"
+    else:  # số nhỏ: giữ 2 chữ số có nghĩa, không làm tròn về $0.0000
+        decimals = max(4, 1 - math.floor(math.log10(usd)))
+        text = "$%.*f" % (decimals, usd)
     return text + (" (≈ %s ₫)" % format(round(usd * rate), ",").replace(",", ".") if rate else "")
 
 
@@ -179,28 +191,54 @@ def summarize(cfg, rows, graded, other=None):
     else:
         rate_text = "**chưa có** lượt eval nào chấm xong (`python run.py score eval/run-N.csv`) → chưa tính được chi phí / task thành công"
     out.append("Tỉ lệ đạt dùng để tính: %s" % rate_text)
+    if graded and graded.get("why"):
+        out.append("")
+        out.append("- %s" % graded["why"])
     out.append("")
-    head = "| Model (giá) | Chi phí / phiên | Chi phí / task thành công | " + " | ".join(
+    measured = measured_models(rows)
+    turns = sum(r["turns"] for r in ok) / len(ok) if ok else None
+    head = "| Model (giá) | Chi phí / phiên | Chi phí / task thành công | Chi phí / câu hỏi đạt | " + " | ".join(
         "Chi phí / tháng — %s (%s người)" % (SCENARIO_VI[k], format(cfg["users"][k], ",").replace(",", ".")) for k in SCENARIOS) + \
         " | Chi phí / người / tháng (cơ sở) |"
     out.append(head)
-    out.append("|---|" + "---:|" * (3 + len(SCENARIOS)))
-    for pr in cfg["prices"]:
-        def cost(r):
-            return (r["tokens_in"] * pr["input"] + r["tokens_out"] * pr["output"]) / 1e6
+    out.append("|---|" + "---:|" * (4 + len(SCENARIOS)))
+
+    def table_row(label, cost):
         per_session = sum(cost(r) for r in ok) / len(ok) if ok else None
         per_task = per_session / rate if (per_session is not None and rate) else None
+        per_q = per_session / turns / rate if (per_session is not None and rate and turns) else None
         persona_cost = {name: (sum(cost(r) for r in s) / len(s) if s else per_session) for name, s in per.items()}
         monthly = {}
         for k in SCENARIOS:
             monthly[k] = sum(cfg["users"][k] * share[p["name"]] * p["uses_per_month"] * (persona_cost[p["name"]] or 0)
                              for p in cfg["personas"])
         per_user = monthly["base"] / cfg["users"]["base"] if cfg["users"]["base"] else None
-        out.append("| %s (vào %s · ra %s $/1M) | %s | %s | %s | %s |" % (
-            pr["model"], pr["input"], pr["output"], money(per_session, cfg["fx_rate"]), money(per_task, cfg["fx_rate"]),
+        out.append("| %s | %s | %s | %s | %s | %s |" % (
+            label, money(per_session, cfg["fx_rate"]), money(per_task, cfg["fx_rate"]), money(per_q, cfg["fx_rate"]),
             " | ".join(money(monthly[k], cfg["fx_rate"]) for k in SCENARIOS), money(per_user, cfg["fx_rate"])))
+
+    prices = {pr["model"].strip().lower(): pr for pr in cfg["prices"]}
+    if len(measured) > 1:
+        # Bản chạy thử gọi nhiều model: tính mỗi model theo token đo được của chính nó, giá của chính nó.
+        missing = [m for m in measured if m.strip().lower() not in prices]
+        if missing:
+            out.append("| **Thực đo — mỗi model giá riêng** | chưa tính: thiếu giá của %s trong `prices` | — | — | %s — |"
+                       % (", ".join(missing), "— | " * len(SCENARIOS)))
+        else:
+            def mixed(r):
+                return sum((t["in"] * prices[m.strip().lower()]["input"] + t["out"] * prices[m.strip().lower()]["output"]) / 1e6
+                           for m, t in r["by_model"].items())
+            table_row("**Thực đo — mỗi model giá riêng** (%s)" % " + ".join(measured), mixed)
+    for pr in cfg["prices"]:
+        def cost(r, pr=pr):
+            return (r["tokens_in"] * pr["input"] + r["tokens_out"] * pr["output"]) / 1e6
+        label = "%s (vào %s · ra %s $/1M)" % (pr["model"], pr["input"], pr["output"])
+        if len(measured) > 1:
+            label += " — nếu MỌI token tính giá model này"
+        table_row(label, cost)
     out.append("")
-    measured = measured_models(rows)
+    out.append("- Chi phí / task thành công = chi phí / phiên ÷ tỉ lệ đạt. Chi phí / câu hỏi đạt = chi phí / phiên ÷ số lượt hỏi "
+               "trung bình mỗi phiên (%s) ÷ tỉ lệ đạt — tỉ lệ đạt đo theo từng câu thử." % ("%.1f" % turns if turns else "—"))
     out.append("- Token đo trên model: %s. Giá tính theo từng model trong bảng — model khác bộ tách token thì số token "
                "thật có thể lệch; ghi rõ \"đo trên model X, tính giá model Y\" trong cost/cost-estimate.md." % (", ".join(measured) or "—"))
     out.append("- Phiên lỗi (không tính vào trung bình): %d/%d." % (len(rows) - len(ok), len(rows)))
@@ -210,13 +248,46 @@ def summarize(cfg, rows, graded, other=None):
 
 
 SIM_COLS = ["run_id", "session", "persona", "turns", "inputs", "model", "model_calls", "tool_calls",
-            "tokens_in", "tokens_out", "latency_s", "error"]
+            "tokens_in", "tokens_out", "latency_s", "error", "tokens_by_model"]
 
 
-def run(try_n=None, wait=0.0):
+def pick_rate(models, rate_from=None):
+    """Chọn lượt eval đã chấm để lấy tỉ lệ đạt. → (graded | None, other | None).
+    rate_from: đường dẫn một lượt cụ thể (vd eval/run-2.csv). Không có thì lấy lượt run-N mới nhất đã chấm xong,
+    chạy bằng đúng các model đang đo. graded["why"] giải thích đã chọn lượt nào và vì sao."""
+    if rate_from:
+        path = rate_from if os.path.isabs(rate_from) else os.path.join(ROOT, rate_from)
+        res = ev.grade(path)
+        if isinstance(res, str):
+            sys.exit("--rate-from %s chưa dùng được:\n%s" % (rate_from, res))
+        res["why"] = "Tỉ lệ đạt lấy từ lượt nhóm chọn: %s (--rate-from)." % ev.rel(path)
+        if res["models"] != sorted(set(models)):
+            res["why"] += " ⚠️ Lượt này chạy bằng %s, mô phỏng đo trên %s — khác model." % (
+                ", ".join(res["models"]) or "?", ", ".join(models) or "?")
+        return res, None
+    graded = ev.latest_graded_run(models)
+    if graded:
+        eval_dir = os.path.join(ROOT, "eval")
+        n_used = int(re.search(r"run-(\d+)", graded["name"]).group(1))
+        newer = sorted(int(m.group(1)) for f in os.listdir(eval_dir)
+                       for m in [re.fullmatch(r"run-(\d+)\.csv", f)] if m and int(m.group(1)) > n_used)
+        graded["why"] = ("Tự chọn: lượt run-N mới nhất đã chấm xong, chạy bằng đúng model đang đo (%s). "
+                         "Muốn dùng lượt khác (vd lượt 2): thêm `--rate-from eval/run-2.csv`." % graded["name"])
+        if newer:
+            graded["why"] += " Lượt mới hơn nhưng chưa chấm xong hoặc khác model, nên KHÔNG dùng: %s." % ", ".join(
+                "run-%d" % n for n in newer)
+        return graded, None
+    return None, ev.latest_graded_run()
+
+
+def run(try_n=None, wait=0.0, rate_from=None):
     cfg, warn = load_config()
     for w in warn:
         print("⚠️ " + w)
+    if rate_from:  # kiểm trước khi gọi model, để không tốn lượt gọi rồi mới báo lỗi
+        res = ev.grade(rate_from if os.path.isabs(rate_from) else os.path.join(ROOT, rate_from))
+        if isinstance(res, str):
+            sys.exit("--rate-from %s chưa dùng được:\n%s" % (rate_from, res))
     bench = ev.load_items()
     n_sessions = try_n or cfg["sessions"]
     if not try_n and n_sessions < 50:
@@ -231,7 +302,7 @@ def run(try_n=None, wait=0.0):
     rows, cases, stopped, first = [], [], False, True
     for sid, persona, inputs in plan:
         agg = {"model_calls": 0, "tool_calls": 0, "tokens_in": 0, "tokens_out": 0, "latency_s": 0.0}
-        models, errors = set(), []
+        models, errors, by_model = set(), [], {}
         for t, text in enumerate(inputs, start=1):
             if not first and wait > 0:
                 try:
@@ -251,13 +322,19 @@ def run(try_n=None, wait=0.0):
             for k in agg:
                 agg[k] += row[k]
             models.update(m for m in row["model"].split(", ") if m)
+            for e in events:  # token theo từng model (bản chạy thử gọi nhiều model thì mỗi model một giá)
+                if e.get("kind") == "model" and not e.get("error"):
+                    t_m = by_model.setdefault(e.get("model") or "?", {"in": 0, "out": 0})
+                    t_m["in"] += e.get("tokens_in") or 0
+                    t_m["out"] += e.get("tokens_out") or 0
             if row["error"]:
                 errors.append("T%d %s" % (t, row["error"]))
         if stopped:
             break
         rows.append(dict(agg, run_id=run_id, session=sid, persona=persona["name"], turns=len(inputs),
                          inputs=" ‖ ".join(x[:80] for x in inputs), model=", ".join(sorted(models)),
-                         latency_s=round(agg["latency_s"], 3), error="; ".join(errors)))
+                         latency_s=round(agg["latency_s"], 3), error="; ".join(errors),
+                         by_model=by_model, tokens_by_model=json.dumps(by_model, ensure_ascii=False, sort_keys=True)))
         print("  [%d/%d] %s %-12s token vào %d · ra %d%s" % (len(rows), n_sessions, sid, persona["name"],
               agg["tokens_in"], agg["tokens_out"], " · lỗi" if errors else ""))
     if not rows:
@@ -286,8 +363,7 @@ def run(try_n=None, wait=0.0):
         print("   Lượt này KHÔNG được tính. Nối model thật theo %s rồi chạy lại." % ev.DOC)
         return 1
     path = save(name)
-    graded = ev.latest_graded_run(measured_models(rows))
-    other = None if graded else ev.latest_graded_run()
+    graded, other = pick_rate(measured_models(rows), rate_from)
     lines = summarize(cfg, rows, graded, other)
     md_path = os.path.join(COST_DIR, name + "-summary.md")
     with open(md_path, "w", encoding="utf-8") as f:
@@ -307,7 +383,7 @@ def main(args):
     if any(a in ("-h", "--help", "help") for a in args):
         print(USAGE)
         return 0
-    try_n, wait, i = None, 0.0, 0
+    try_n, wait, rate_from, i = None, 0.0, None, 0
     while i < len(args):
         a = args[i]
         if a == "--try":
@@ -331,11 +407,17 @@ def main(args):
                 print("Sau --wait cần một số giây.\n" + USAGE)
                 return 2
             i += 1
+        elif a == "--rate-from":
+            if i + 1 >= len(args) or args[i + 1].startswith("-"):
+                print("Sau --rate-from cần một file lượt đã chấm, vd eval/run-2.csv.\n" + USAGE)
+                return 2
+            rate_from = args[i + 1]
+            i += 1
         else:
             print("Không hiểu tham số: %s\n%s" % (a, USAGE))
             return 2
         i += 1
-    return run(try_n=try_n, wait=wait)
+    return run(try_n=try_n, wait=wait, rate_from=rate_from)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ macOS/Linux có thể phải gõ python3 thay cho python. Windows có thể gõ 
 Nhóm dùng stack khác (Node, Streamlit…): sửa hàm run_app() để `python run.py` vẫn chạy được bản chạy thử.
 """
 import os
+import signal
 import subprocess
 import sys
 
@@ -46,16 +47,38 @@ HELP = """Các lệnh dùng được:
   python run.py simulate --try [N]      thử mô phỏng chi phí N phiên (mặc định 10)
   python run.py simulate                mô phỏng chi phí khi dùng thật → cost/simulate-N.csv
   (thêm --wait 4 sau eval / simulate để nghỉ 4 giây giữa hai lượt gọi)
+  python run.py simulate --rate-from eval/run-2.csv   lấy tỉ lệ đạt từ đúng lượt 2
 (macOS/Linux có thể phải gõ python3; Windows có thể gõ py)"""
 
 
 def py(*args):
-    """Chạy một file Python khác bằng đúng trình Python đang chạy file này."""
+    """Chạy một file Python khác bằng đúng trình Python đang chạy file này.
+    Ctrl+C: tiến trình con tự dừng gọn (ghi run-stopped…) — ở đây chỉ chờ nó xong, không in traceback.
+    Đóng cửa sổ lệnh / bị kill (SIGTERM, SIGHUP): chuyển thành Ctrl+C cho tiến trình con, để nó không chạy tiếp
+    một mình rồi ghi ra một lượt có số."""
     env = dict(os.environ)
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("PYTHONDONTWRITEBYTECODE", "1")
     sys.stdout.flush()
-    return subprocess.call([sys.executable] + list(args), cwd=ROOT, env=env)
+    proc = subprocess.Popen([sys.executable] + list(args), cwd=ROOT, env=env)
+
+    def forward(signum, frame):
+        try:
+            proc.send_signal(signal.SIGINT)
+        except (OSError, ValueError):
+            pass
+
+    for name in ("SIGTERM", "SIGHUP"):
+        if hasattr(signal, name):
+            try:
+                signal.signal(getattr(signal, name), forward)
+            except (OSError, ValueError):
+                pass
+    while True:
+        try:
+            return proc.wait()
+        except KeyboardInterrupt:
+            continue  # tiến trình con cũng nhận Ctrl+C và tự dừng; chờ nó ghi file xong
 
 
 def run_app():

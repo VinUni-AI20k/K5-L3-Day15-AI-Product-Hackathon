@@ -53,8 +53,9 @@ def post_json(url, headers, body, timeout=60):
 
 @model_call
 def call_model(system: str, user: str) -> dict:
-    if MODEL_PROVIDER == "fake":
-        ...                                   # giữ nguyên nhánh fake của khung
+    if MODEL_PROVIDER == "fake":              # nhánh fake của khung — giữ nguyên 3 dòng này
+        last = (user.strip().splitlines() or [""])[-1]
+        return {"text": "[câu trả lời giả — chưa nối model] " + last[:60], "model": "fake", "tokens_in": 0, "tokens_out": 0}
     if MODEL_PROVIDER == "openai":
         r = call_openai(system, user)
     elif MODEL_PROVIDER == "anthropic":
@@ -68,6 +69,8 @@ def call_model(system: str, user: str) -> dict:
 ```
 
 Luồng trong `agent.py` gọi model bao nhiêu lần cũng được: `@model_call` tự ghi từng lần vào trace và tự cộng token.
+
+Luồng gọi **hai model** (vd model rẻ phân loại, model mạnh trả lời): thêm tham số tên model vào `call_model` và trả đúng tên model đã gọi ở khoá `"model"` (không trả chung `MODEL_NAME`). `simulate` dựa vào tên này để tính mỗi model theo giá của nó.
 
 ### 2.1 OpenAI
 
