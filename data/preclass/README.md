@@ -35,7 +35,7 @@
 | File | Số dòng | Một dòng là |
 |---|---:|---|
 | `learners.csv` | 721 | một học viên (`hv`, ngày tạo tài khoản) |
-| `events.csv` | 107.710 | một việc học viên làm, hoặc AI làm cho học viên |
+| `events.csv` | 107.709 | một việc học viên làm, hoặc AI làm cho học viên |
 | `class_events.csv` | 849 | một việc chung của lớp: bộ điều phối lớp học AI quyết định có cho bạn học AI xen vào không |
 | `answers.csv` | 3.776 | một lần học viên trả lời câu hỏi, làm bước thực hành, tự giải thích, hoặc nhắn AI (được chấm theo rubric) |
 | `chat.csv` | 1.260 | một lượt học viên nhắn AI và AI trả lời (độ dài, AI nào, kênh nào) |

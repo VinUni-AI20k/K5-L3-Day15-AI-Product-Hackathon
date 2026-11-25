@@ -22,7 +22,6 @@ agent_message_shown,Hỏi AI,một lời bạn học AI tự xen vào hiện ra 
 lab_opened,Thực hành,"mở một bài thực hành (mini lab); lab_key là mã bài, steps số bước",602,"lab_key, steps"
 lab_completed,Thực hành,"làm xong bài thực hành; steps_done số bước đã làm, skipped = true nếu bấm bỏ qua",453,"lab_key, steps_done, steps, skipped"
 item_completed,Tiến độ,đánh dấu xong một mục trên thanh bài học; item_code là mục,2472,item_code
-feedback_submitted,Tiến độ,gửi phiếu đánh giá cuối ngày,1,"rating_video, rating_quiz, rating_practice, rating_agents"
 so_hieu_bai_opened,Sổ hiểu bài,"mở Sổ hiểu bài (nơi học viên tự viết lại ý chính); y_tong số ý, y_da_viet số ý đã viết",228,"module_code, y_tong, y_da_viet"
 so_hieu_bai_reviewed,Sổ hiểu bài,"AI nhận xét xong một ý học viên viết trong sổ; muc là mức đạt, lan lần nhận xét thứ mấy",56,"y_chinh_id, che_do, muc, lan"
 so_hieu_bai_nghe_lai,Sổ hiểu bài,bấm nghe lại một ý hay một nhận xét trong sổ,20,"y_chinh_id, tu, giay"
