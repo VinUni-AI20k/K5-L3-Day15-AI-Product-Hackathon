@@ -1,48 +1,16 @@
-# Tổng hợp bằng chứng pain
+# Tổng hợp bằng chứng · Track D3
 
-> Điền ở guide bước 1.2, xong trước **CP3 10:00 Thứ Bảy 28/11**. Chấm ở rubric R1.
-> Ba nguồn ngang nhau — tối thiểu **≥1 nguồn đạt ngưỡng**. Mạnh nhất: đào data ra insight → hỏi người dùng để kiểm lại (hoặc ngược lại).
+**Cập nhật 27/11/2026.** Nguồn đã dùng là review Shopee VN trên Google Play. Mẫu, cách đếm, giới hạn và 5 trích đoạn đã bỏ tên nằm trong [báo cáo đào review](data-mining.md).
 
-## 1. Nguồn đã dùng
-
-| Nguồn | Đạt ngưỡng? | File |
+| Mẫu | Kết quả | Dùng để kết luận gì |
 |---|---|---|
-| Đào data (x/N, %, cách đếm chạy lại được, ≥5 ví dụ) | ☐ | `evidence/data-mining.md` |
-| Phỏng vấn (≥3 người ngoài nhóm, đúng người dùng) | ☐ | `evidence/interviews/P1.md`… |
-| Khảo sát (≥20 người ngoài nhóm, đúng người dùng) | ☐ | `evidence/survey/` |
+| 200 review mới nhất mọi mức sao | 0/200 kể đủ cả hàng sai mô tả và vướng mắc xử lý | Mẫu chính chưa đủ tình huống để kiểm giả thuyết 30%. |
+| 1.300 review 1–2★ thăm dò | 5/1.300 được tìm thấy bằng sàng từ khóa và đọc lại (0,38%) | Có các ca D3 cụ thể. Có 1 ca vướng lúc gửi, 3 ca vướng sau khi gửi và 1 ca bị từ chối. |
 
-## 2. Số chính
+Hai mẫu có phần trùng và dùng cách đọc khác nhau. Phân bố trong mẫu thăm dò gợi ý nhiều vướng mắc xảy ra sau khi đã gửi yêu cầu. Hai review cho biết đã chờ 7 hoặc 13 ngày. Nhóm chưa biết số phút người mua trực tiếp bỏ ra, tần suất trong tháng hoặc việc hướng dẫn sớm sẽ giúp bao nhiêu.
 
-- Đào data: __/__ (__%) …
-- Phỏng vấn: __/3 người gặp *(n nhỏ không ghi %)* · số lần / tháng: P1 __, P2 __, P3 __ · mỗi lần mất __–__ phút
-- Khảo sát: n = __ · __/__ (__%) …
+**Kết luận về giả thuyết:** chưa đủ dữ liệu để xác nhận hay bác bỏ ngưỡng 30% đã viết. Giữ lát cắt hướng dẫn bước đầu làm phương án thử vì có một tình huống cụ thể và có thể mô phỏng bằng mô tả lúc đặt, bằng chứng và chính sách. Đối chiếu với các hướng khác khi có ghi chép người mua.
 
-Phỏng vấn nhiều vai thì đếm theo từng vai, không cộng chung.
+## Nguồn kiểm lại dự kiến
 
-| | Vai | Gặp pain? | Số lần / 1 tháng qua | Lần gần nhất mất | Đang xoay xở bằng |
-|---|---|---|---|---|---|
-| P1 | | | | | |
-| P2 | | | | | |
-| P3 | | | | | |
-
-## 3. ≥5 trích dẫn hoặc ví dụ nguyên văn (có nguồn, bỏ tên)
-
-1. "…" — P_ / dòng data __ / phiếu khảo sát __
-2.
-3.
-4.
-5.
-
-## 4. Các nguồn có khớp nhau không
-
-Data nói __; người dùng nói __. Khớp / lệch ở đâu, vì sao: __
-
-## 5. Kết luận
-
-Giả thuyết ở `evidence/hypothesis.md`: **đúng / sai / phải đổi** — vì __. Điều vẫn chưa biết: __
-
-## Lịch hẹn (dùng cho CP2 — chỉ ghi vai và giờ, không tên)
-
-| Vai | Giờ hẹn | Đã xong? |
-|---|---|---|
-| | | |
+Phỏng vấn ít nhất 3 người mua ngoài nhóm từng gặp trường hợp hàng khác mô tả. Repo hiện chưa có biên bản phỏng vấn. Hỏi về lần gần nhất trong tháng qua: người mua làm gì, khâu nào tốn thời gian, mất bao nhiêu **phút thao tác thực tế**, chờ bao lâu và gặp bao nhiêu lần trong tháng. Mỗi buổi ghi một file `evidence/interviews/P1.md`, `P2.md`, `P3.md` theo [mẫu phỏng vấn](interviews/TEMPLATE.md).

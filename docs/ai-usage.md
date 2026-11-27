@@ -8,7 +8,7 @@ README của nhóm có mục "Dùng AI vào việc gì" (2–3 dòng, bắt bu�
 |---|---|---|---|---|
 | Code bản chạy thử | | | | |
 | Prompt / thiết kế lời gọi mô hình | | | | |
-| Đào data (viết script đếm, gợi ý nhãn) | | | Kiểm tay __ dòng, khớp __ | |
+| Đào review Shopee | Codex | Lấy mẫu công khai, đọc mẫu chính, sàng từ khóa rồi rà ứng viên mẫu thăm dò và kiểm trích đoạn theo nguồn | Đạt đối chiếu nhãn và các trích đoạn trước khi dùng để chấm | Nguyễn Tiến Đạt |
 | Rà câu hỏi phỏng vấn / khảo sát | | Chỉ rà câu dẫn dắt | | |
 | Viết câu thử (benchmark) | | | Mỗi câu thử có `source`; câu thử AI viết được ghi rõ | |
 | Sinh data `synthetic` (nếu có) | | | Seed __ · kiểm tay __ dòng | |

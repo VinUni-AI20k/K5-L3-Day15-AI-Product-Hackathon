@@ -14,22 +14,22 @@ Nguồn bằng chứng dự kiến: review công khai và phỏng vấn người
 
 ## §1. Người dùng & bằng chứng *(guide 1.1, 1.2)*
 - Người dùng chính: người mua vừa nhận hàng không đúng mô tả và muốn gửi yêu cầu trả hàng.
-- Việc họ cố làm xong (`động từ + đối tượng + bối cảnh`, không có chữ AI):
-- Hôm nay họ giải bằng gì, hỏng ở đâu, vì sao chưa bỏ:
+- Việc họ cố làm xong: gửi yêu cầu trả hàng kèm bằng chứng đối chiếu sau khi nhận sản phẩm không đúng mô tả.
+- Cách làm hiện tại cần kiểm lại với người mua: mở đơn trên sàn, tìm luồng trả hàng, chọn lý do và gửi bằng chứng. Giả thuyết là người mua tiếp tục dùng luồng này vì yêu cầu gắn với đơn hàng, nhưng có thể mất thời gian xác định chi tiết đối chiếu và bằng chứng cần nộp.
 - Pain dự kiến: Khi nhận hàng không đúng mô tả và muốn trả hàng, người mua trên sàn khó biết chi tiết nào trong mô tả lúc đặt có thể dùng để đối chiếu và cần nộp bằng chứng gì, nên có thể phải bổ sung nhiều lần hoặc lỡ hạn gửi yêu cầu.
-- Bằng chứng — số chính + kết luận (chi tiết: `evidence/summary.md`): __
+- Bằng chứng: mẫu chính 0/200. Mẫu thăm dò 1–2★ tìm được 5/1.300 ca D3 theo cách lọc, gồm một ca không gửi được yêu cầu. Mẫu chính chưa kiểm được [giả thuyết 30%](evidence/hypothesis.md). Xem [bản tổng hợp](evidence/summary.md).
 
 ## §2. Impact & quyết định chọn *(guide 1.3)*
 
 | Hướng | Bao nhiêu người gặp | Bao nhiêu lần / tháng | Mỗi lần tốn gì | Impact / tháng | Làm kịp không | Chọn? |
 |---|---|---|---|---|---|---|
-|  |  |  |  |  |  |  |
-|  |  |  |  |  |  |  |
-|  |  |  |  |  |  |  |
+| Chuẩn bị yêu cầu khi hàng không đúng mô tả | 1 review thăm dò, chưa đo số người | Chưa đo | Cần đo phút đối chiếu và bổ sung bằng chứng | Chờ số | Có thể mô phỏng bằng đơn và chính sách mẫu | Chọn tạm để kiểm chứng |
+| Theo dõi trạng thái và thời hạn sau khi gửi yêu cầu | 3 review thăm dò, chưa đo số người | Chưa đo | Có ca báo chờ 7 hoặc 13 ngày, cần đo phút thao tác | Chờ số | Cần dữ liệu về các mốc sau khi gửi | Để so sánh |
+| Chuẩn bị yêu cầu xem xét lại sau khi bị từ chối | 1 review ghi yêu cầu bị từ chối, chưa đo số người | Chưa đo | Cần đo phút đọc lý do, gom và gửi lại căn cứ | Chờ số | Cần ví dụ quyết định và quy trình xem xét lại | Để so sánh |
 
-- **Impact / tháng** của hướng chọn = __ người × __ lần × __ phút = __ — nguồn từng thừa số: __ (không có nguồn thì ghi rõ *(tự ước tính)*)
-- Hướng ĐÃ LOẠI + vì sao (giữ lại, đừng xoá):
-- Số lần / tháng của từng kiểu người dùng (dùng cho persona ở §8):
+- **Impact / tháng** = số người gặp × số lần/người/tháng × số phút thao tác/lần. Chưa tính được từ review. Phỏng vấn để đo hai thừa số cuối và cần nguồn riêng để ước tính quy mô nhóm người dùng gặp vấn đề.
+- Lý do chọn tạm: có thể thử một quyết định cụ thể với mô tả lúc đặt, bằng chứng và chính sách giả lập. Mẫu thăm dò có nhiều ca sau khi gửi hơn. Nhóm sẽ so ba hướng bằng cùng công thức khi có số phù hợp. Quyết định loại hướng nào sẽ ghi lại cùng căn cứ.
+- Tần suất để dựng persona ở §8: sẽ ghi theo người được phỏng vấn, rồi xác nhận hoặc đánh dấu phần tự ước tính.
 
 ## §3. Giải pháp tương tự *(guide 2.1)*
 - [sản phẩm / tính năng gần giống]: một điều đáng học · một điều đáng né · mình khác gì
