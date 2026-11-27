@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chơi — AI Lab</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/style.css">
+<style>
+/* Trang chơi: một cột dọc cao 100vh — không dùng calc(100vh - Npx) để không tràn khi thanh trên xuống dòng trên màn nhỏ. */
+.ail-play-page{display:flex;flex-direction:column;height:100vh;min-height:0;background:var(--jl-au-ground);color:var(--jl-text-default)}
+/* Thanh trên: cuộn xuống dòng khi hẹp (flex-wrap), không bao giờ ép khung chơi tràn màn hình. */
+.ail-play-bar{flex:none;display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:8px 12px;background:var(--jl-surface-default);color:var(--jl-text-default);border-bottom:1px solid var(--jl-au-hair)}
+.ail-play-bar .ail-btn{color:var(--jl-text-default);background:var(--jl-surface-default);border:1px solid var(--jl-border-strong)}
+.ail-play-bar .ail-btn:hover:not(:disabled){background:var(--jl-au-soft)}
+.ail-play-bar .ail-btn.pri{color:var(--jl-brand-on);background:var(--jl-brand-600);border-color:var(--jl-brand-600)}
+.ail-play-bar #title{flex:1;min-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;font-size:var(--jl-font-size-ui);color:var(--jl-text-default)}
+.ail-play-bar .ail-chip{flex:none}
+.ail-play-status{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--jl-font-size-sm);color:var(--jl-text-secondary)}
+/* Khung chơi chiếm phần còn lại của cột; sandbox allow-scripts giữ nguyên (không bao giờ nới). */
+.ail-play-stage{flex:1;min-height:0;width:100%;border:0;background:var(--jl-surface-default)}
+/* Vùng lỗi chiếm chỗ khung chơi khi tải lỗi / chưa chơi được. */
+.ail-play-error{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;color:var(--jl-text-default)}
+.ail-play-error p{margin:0;max-width:560px;color:var(--jl-text-secondary);overflow-wrap:anywhere}
+.ail-play-error-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+/* ail-btn / ail-chip đặt display riêng, đè thuộc tính [hidden] của trình duyệt — phải ghi rõ để ẩn đúng. */
+[hidden]{display:none!important}
+</style></head>
+<body><div class="ail-play-page">
+<div class="ail-play-bar">
+  <a class="ail-btn sm" href="/">Về AI Lab</a>
+  <b id="title">Đang nạp trò chơi…</b>
+  <span class="ail-chip ok" title="Camera hỏng hoặc bị chặn vẫn chơi được trọn vẹn bằng chuột">Chuột luôn sẵn sàng</span>
+  <span id="status" class="ail-play-status" role="status" aria-live="polite"></span>
+  <button id="cam" type="button" class="ail-btn pri sm" hidden>Bật camera</button>
+</div>
+<div id="play-error" class="ail-play-error" hidden>
+  <h2>Chưa mở được trò chơi</h2>
+  <p id="play-error-msg"></p>
+  <div class="ail-play-error-row">
+    <button id="retry" type="button" class="ail-btn pri sm">Thử lại</button>
+    <a class="ail-btn sm" href="/">Về AI Lab</a>
+  </div>
+</div>
+<iframe id="stage" class="ail-play-stage" sandbox="allow-scripts" title="Khu vực chơi trò chơi"></iframe>
+</div><script src="/play.js"></script></body></html>

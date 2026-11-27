@@ -1,0 +1,10 @@
+diff --git a/codebase/agent.py b/codebase/agent.py
+--- a/codebase/agent.py
++++ b/codebase/agent.py
+@@ -44,3 +44,6 @@
+ def answer(text: str) -> dict:
++    if os.environ.get("AGENT_MODE") == "t06_mock":
++        from t06_entrypoint_adapter import answer_t06
++        return answer_t06(text)
+     user, last_err = text, None
+     for step in range(1, MAX_STEPS + 1):

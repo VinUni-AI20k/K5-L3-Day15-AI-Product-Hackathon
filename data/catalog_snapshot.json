@@ -1,0 +1,124 @@
+{
+  "exams": [
+    {
+      "content": "Đạo hàm của hàm số y = x³ − 3x² + 2 là | y′ = 3x² − 6x | y′ = 3x² − 3x | y′ = x² − 6x | y′ = 3x² − 6x + 2 | =A\nHàm số y = x³ − 3x đồng biến trên khoảng nào sau đây? | (−1; 1) | (−2; 0) | (−1; 0) | (−∞; −1) | =D\nHàm số y = x³ − 3x² + 1 đạt cực đại tại x bằng | 1 | 2 | 0 | 3 | =C\nGiá trị lớn nhất của hàm số y = −x² + 4x + 1 trên R là | 3 | 5 | 4 | 6 | =B\nĐường tiệm cận đứng của đồ thị hàm số y = (2x + 1)/(x − 3) là | x = 3 | x = 2 | y = 2 | y = 3 | =A\nĐường tiệm cận ngang của đồ thị hàm số y = (2x + 1)/(x − 3) là | y = 3 | x = 2 | y = −3 | y = 2 | =D\nSố điểm cực trị của hàm số y = x⁴ − 2x² + 1 là | 1 | 2 | 3 | 4 | =C\nĐồ thị hàm số y = x³ − 3x + 2 cắt trục tung tại điểm | (2; 0) | (0; 2) | (0; −2) | (1; 0) | =B\nGiá trị nhỏ nhất của hàm số y = x + 4/x trên khoảng (0; +∞) là | 4 | 2 | 8 | Không tồn tại | =A\nHàm số y = (x − 1)/(x + 1) trên mỗi khoảng xác định của nó | nghịch biến | không đơn điệu | là hàm hằng | đồng biến | =D\nĐạo hàm của hàm số y = sin 2x là | y′ = cos 2x | y′ = −2cos 2x | y′ = 2cos 2x | y′ = 2sin 2x | =C\nĐạo hàm của hàm số y = ln(x² + 1) là | y′ = 1/(x² + 1) | y′ = 2x/(x² + 1) | y′ = 2x | y′ = x/(x² + 1) | =B\nĐạo hàm của hàm số y = e^(3x) là | y′ = 3e^(3x) | y′ = e^(3x) | y′ = 3x·e^(3x−1) | y′ = e^(3x)/3 | =A\nHệ số góc của tiếp tuyến của đồ thị hàm số y = x² tại điểm (1; 1) bằng | 1 | 3 | 0 | 2 | =D\nHàm số y = x³ + 3x² + mx + 1 đồng biến trên R khi và chỉ khi | m ≤ 3 | m ≥ 9 | m ≥ 3 | m ≥ 1 | =C",
+      "count": 15,
+      "description": "15 câu trắc nghiệm về đạo hàm, cực trị, tiệm cận, đơn điệu. Bản mẫu do AI soạn, thầy cô nên kiểm lại trước khi dùng.",
+      "id": 1,
+      "name": "Toán 12: Đạo hàm và khảo sát hàm số"
+    },
+    {
+      "content": "Nguyên hàm của hàm số f(x) = x² là | x³ + C | x³/3 + C | 2x + C | x²/2 + C | =B\nNguyên hàm của hàm số f(x) = cos x là | sin x + C | −sin x + C | cos x + C | −cos x + C | =A\nVới x > 0, ∫ (1/x) dx bằng | 1/x² + C | −1/x² + C | eˣ + C | ln x + C | =D\n∫ eˣ dx bằng | x·eˣ + C | eˣ/x + C | eˣ + C | ln x + C | =C\n∫ (2x + 1) dx bằng | 2x² + x + C | x² + x + C | x² + C | 2 + C | =B\n∫₀¹ 2x dx bằng | 1 | 0 | 2 | 1/2 | =A\n∫₀^π sin x dx bằng | 0 | 1 | π | 2 | =D\n∫₁^e (1/x) dx bằng | 0 | e | 1 | e − 1 | =C\n∫₀² x² dx bằng | 8 | 8/3 | 4 | 4/3 | =B\nBiết ∫₀³ f(x) dx = 5 và ∫₀³ g(x) dx = 2. Khi đó ∫₀³ [f(x) − g(x)] dx bằng | 3 | 7 | 10 | −3 | =A\n∫₀¹ eˣ dx bằng | e | e + 1 | 1 | e − 1 | =D\n∫₀^(π/2) cos x dx bằng | 0 | 2 | 1 | π/2 | =C\nDiện tích hình phẳng giới hạn bởi y = x², trục Ox và hai đường thẳng x = 0, x = 3 bằng | 27 | 9 | 3 | 9/2 | =B\n∫ 3x² dx bằng | x³ + C | 3x³ + C | 6x + C | x² + C | =A\nMột nguyên hàm của hàm số f(x) = 2x trên R là | F(x) = 2 | F(x) = x²/2 | F(x) = x | F(x) = x² | =D",
+      "count": 15,
+      "description": "15 câu trắc nghiệm về nguyên hàm, tích phân và diện tích hình phẳng. Bản mẫu do AI soạn, thầy cô nên kiểm lại trước khi dùng.",
+      "id": 2,
+      "name": "Toán 12: Nguyên hàm và tích phân"
+    },
+    {
+      "content": "If I ___ more time, I would travel around the world. | have | would have | had | will have | =C\nThe book ___ by millions of people since it was published. | is read | has been read | was read | reads | =B\nShe said that she ___ the film the day before. | had seen | sees | saw | has seen | =A\nNeither Tom nor his parents ___ at home now. | is | was | be | are | =D\nHe is ___ than his brother. | tall | the tallest | taller | more tall | =C\nWe have lived in this city ___ 2015. | for | since | during | from | =B\nThe man ___ lives next door is a doctor. | who | whom | which | whose | =A\nI look forward to ___ you again soon. | see | saw | seen | seeing | =D\nBy the time we arrived, the film ___. | already started | has already started | had already started | was already starting | =C\nIf she ___ harder, she would have passed the exam. | studied | had studied | has studied | would study | =B\nThe teacher made the students ___ the text again. | read | to read | reading | reads | =A\nThis is the house ___ I was born. | which | who | whose | where | =D\nShe asked me ___. | where was I going | where am I going | where I was going | to where I going | =C\nNot only ___ the exam, but he also won a scholarship. | he passed | did he pass | he did pass | passed he | =B\nThe new bridge ___ next year. | will be completed | will complete | is completing | has completed | =A",
+      "count": 15,
+      "description": "15 câu Grammar: câu điều kiện, bị động, tường thuật, mệnh đề quan hệ, đảo ngữ. Bản mẫu do AI soạn, thầy cô nên kiểm lại trước khi dùng.",
+      "id": 3,
+      "name": "Tiếng Anh 12: Ngữ pháp (Grammar)"
+    },
+    {
+      "content": "Choose the word closest in meaning to \"enormous\". | tiny | narrow | quiet | huge | =D\nChoose the word opposite in meaning to \"increase\". | grow | rise | decrease | expand | =C\n\"Can I borrow your pen?\" — \"___\" | Yes, I borrow it. | Sure, here you are. | You are welcome. | It doesn't matter. | =B\n\"Thank you for the lovely gift!\" — \"___\" | You're welcome. | Never mind. | Don't thank. | It's nothing to say. | =A\nThe phrasal verb \"give up\" means | start | continue | return | stop trying | =D\nThe phrasal verb \"look after\" means | search for | look at | take care of | wait for | =C\nThe cost of living has ___ rapidly in big cities. | raised | risen | arisen | rose | =B\nWe should protect the ___ for future generations. | environment | environmental | environmentally | environs | =A\nShe is very ___ in learning English; she studies every day. | interest | interesting | interestingly | interested | =D\n\"How about going to the cinema tonight?\" — \"___\" | Yes, I am going. | No, I don't how. | That's a good idea. | I like the cinema ticket. | =C\nHe ___ a decision to study abroad. | did | made | gave | put | =B\n\"Artificial intelligence\" có nghĩa tiếng Việt là | trí tuệ nhân tạo | thực tế ảo | dữ liệu lớn | mạng xã hội | =A\nChoose the word opposite in meaning to \"ancient\". | old | historic | traditional | modern | =D\nA \"scholarship\" is money given to a student to | pay a fine | repay a loan | support his or her studies | open a business | =C\nShe is the ___ student in our class. | more intelligent | most intelligent | intelligentest | intelligent | =B",
+      "count": 15,
+      "description": "15 câu từ vựng, cụm động từ, hội thoại giao tiếp và trái nghĩa. Bản mẫu do AI soạn, thầy cô nên kiểm lại trước khi dùng.",
+      "id": 4,
+      "name": "Tiếng Anh 12: Từ vựng và giao tiếp"
+    },
+    {
+      "content": "Cơ sở dữ liệu là | tập hợp dữ liệu có tổ chức, lưu trữ trên thiết bị nhớ | một phần mềm soạn thảo văn bản | một loại mạng máy tính | một ngôn ngữ lập trình | =A\nHệ quản trị cơ sở dữ liệu là | thiết bị lưu trữ dữ liệu | cáp kết nối mạng | phần mềm diệt vi rút | phần mềm dùng để tạo lập, cập nhật và khai thác cơ sở dữ liệu | =D\nTrong cơ sở dữ liệu quan hệ, mỗi bảng gồm | chỉ các cột | chỉ các hàng | các hàng (bản ghi) và các cột (trường) | các tệp âm thanh | =C\nKhoá chính của một bảng là | trường có nhiều giá trị nhất | trường (hoặc nhóm trường) xác định duy nhất mỗi bản ghi | trường đầu tiên của bảng | trường kiểu văn bản | =B\nCâu lệnh SQL dùng để truy vấn (lấy) dữ liệu từ bảng là | SELECT | INSERT | DELETE | CREATE | =A\nĐể thêm một bản ghi mới vào bảng, ta dùng | SELECT FROM | DROP TABLE | ORDER BY | INSERT INTO | =D\nĐể xoá các bản ghi thoả điều kiện, ta dùng | DROP DATABASE | SELECT ... WHERE ... | DELETE FROM ... WHERE ... | UPDATE ... SET ... | =C\nMệnh đề dùng để lọc bản ghi theo điều kiện trong câu lệnh SELECT là | ORDER BY | WHERE | GROUP BY | VALUES | =B\nĐể sắp xếp kết quả theo cột diem giảm dần, ta viết | ORDER BY diem DESC | ORDER diem DOWN | SORT BY diem DESC | GROUP BY diem DESC | =A\nCâu lệnh SELECT COUNT(*) FROM hocsinh; trả về | tổng điểm của học sinh | điểm cao nhất | tên các cột | số bản ghi của bảng hocsinh | =D\nHàm SQL dùng để tính giá trị trung bình của một cột là | SUM | MAX | AVG | COUNT | =C\nĐể sửa dữ liệu đã có trong bảng, ta dùng | INSERT | UPDATE ... SET ... | SELECT | CREATE VIEW | =B\nRàng buộc NOT NULL trên một cột có nghĩa là | không được để trống giá trị | giá trị phải là số | giá trị không được trùng nhau | giá trị phải là chữ | =A\nLiên kết giữa hai bảng trong cơ sở dữ liệu quan hệ thường thông qua | tên bảng | số hàng của bảng | màu sắc của bảng | khoá ngoài (tham chiếu tới khoá chính) | =D\nƯu điểm của cơ sở dữ liệu so với lưu dữ liệu rải rác trong nhiều tệp là | luôn nhanh hơn trong mọi trường hợp | không cần sao lưu | giảm dư thừa, dễ bảo đảm nhất quán và dễ chia sẻ | không cần bảo mật | =C",
+      "count": 15,
+      "description": "15 câu về cơ sở dữ liệu quan hệ, khoá, các lệnh SQL cơ bản. Bản mẫu do AI soạn, thầy cô nên kiểm lại trước khi dùng.",
+      "id": 5,
+      "name": "Tin học 12: Cơ sở dữ liệu và SQL"
+    },
+    {
+      "content": "Mạng máy tính là | một máy tính có cấu hình rất mạnh | tập hợp các máy tính và thiết bị được nối với nhau để trao đổi dữ liệu | một phần mềm diệt vi rút | một loại cáp điện | =B\nĐịa chỉ IP dùng để | xác định một thiết bị trên mạng | đặt tên cho tệp | nén dữ liệu | mã hoá mật khẩu | =A\nGiao thức dùng để truyền các trang web là | FTP | SMTP | POP3 | HTTP | =D\nHệ thống tên miền (DNS) có chức năng | gửi thư điện tử | quét vi rút | chuyển tên miền thành địa chỉ IP | nén ảnh | =C\nThiết bị thường dùng để kết nối nhiều máy tính trong một mạng LAN là | màn hình | bộ chuyển mạch (switch) | chuột | máy quét | =B\nMạng LAN là mạng | cục bộ, phạm vi nhỏ như một toà nhà | diện rộng nối nhiều quốc gia | chỉ dùng cho điện thoại | không dùng dây dẫn hay sóng | =A\nPhishing (lừa đảo trực tuyến) là hành vi | một loại cáp mạng | một cách nén tệp | một phần mềm soạn thảo | giả mạo trang web hoặc tin nhắn để đánh cắp thông tin | =D\nMật khẩu an toàn nên | là ngày sinh của mình | giống nhau cho mọi tài khoản | dài, có chữ hoa, chữ thường, số và ký tự đặc biệt | được chia sẻ cho bạn bè | =C\nTường lửa (firewall) có tác dụng | tăng tốc độ bộ vi xử lý | kiểm soát lưu lượng vào ra, chặn truy cập trái phép | lưu trữ ảnh | soạn thảo văn bản | =B\nĐiện toán đám mây cho phép | thuê và dùng tài nguyên (lưu trữ, tính toán) qua Internet | chỉ dùng khi không có mạng | thay thế hoàn toàn mọi máy tính | chỉ chạy trên điện thoại | =A\nĐịa chỉ trang web bắt đầu bằng https cho biết | trang chỉ có chữ | trang không có quảng cáo | trang chỉ chạy trên điện thoại | trang dùng giao thức có mã hoá | =D\nGiao thức dùng để gửi thư điện tử là | HTTP | DNS | SMTP | JPEG | =C\nHành vi nào sau đây vi phạm đạo đức khi dùng mạng xã hội? | chia sẻ bài học hữu ích | phát tán thông tin sai sự thật về người khác | bình luận lịch sự | báo cáo nội dung xấu | =B\nVề bản quyền phần mềm, em nên | dùng phần mềm có bản quyền hoặc mã nguồn mở theo đúng giấy phép | sao chép lậu để chia sẻ | bẻ khoá để dùng miễn phí | tải bản crack | =A\nInternet vạn vật (IoT) là | chỉ máy tính để bàn | mạng chỉ dành cho trò chơi | một ngôn ngữ lập trình | các thiết bị vật lý có cảm biến, kết nối Internet để thu thập và trao đổi dữ liệu | =D",
+      "count": 15,
+      "description": "15 câu về mạng máy tính, giao thức, an toàn thông tin và đạo đức số. Bản mẫu do AI soạn, thầy cô nên kiểm lại trước khi dùng.",
+      "id": 6,
+      "name": "Tin học 12: Mạng máy tính và Internet"
+    }
+  ],
+  "limits": {
+    "exam_max_questions": 200,
+    "mouse_fallback_required": true,
+    "player_max_bytes": 2097152,
+    "supported_model_kinds": [
+      "hands",
+      "image",
+      "pose"
+    ],
+    "unsupported_runtime_kinds": [
+      "audio"
+    ]
+  },
+  "models": [
+    {
+      "description": "Nhận diện bàn tay: nắm tay, xòe tay và vị trí tay. Không cần huấn luyện.",
+      "id": 1,
+      "kind": "hands",
+      "name": "Bàn tay (MediaPipe)",
+      "outputs": [
+        {
+          "key": "fist",
+          "role": "action"
+        },
+        {
+          "key": "open",
+          "role": "action"
+        },
+        {
+          "key": "none",
+          "role": "empty"
+        }
+      ],
+      "url": "jl:builtin/hands/mediapipe",
+      "visibility": "public"
+    }
+  ],
+  "players": [
+    {
+      "content": null,
+      "description": "Trả lời câu hỏi bằng cử chỉ A, B, C, D.",
+      "id": 1,
+      "inputs": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "kinds": [
+        "image",
+        "pose"
+      ],
+      "name": "Quiz ABCD bằng cử chỉ",
+      "questions": "exam",
+      "source": "sample",
+      "status": "approved",
+      "visibility": "public"
+    },
+    {
+      "content": {
+        "kind": "texts",
+        "label": "Danh sách",
+        "max": 100,
+        "min": 2
+      },
+      "description": "Quay để chọn ngẫu nhiên một mục trong danh sách.",
+      "id": 2,
+      "inputs": [],
+      "kinds": null,
+      "name": "Vòng quay chọn tên",
+      "questions": null,
+      "source": "sample",
+      "status": "approved",
+      "visibility": "public"
+    }
+  ],
+  "schema_version": "1.0",
+  "source": "ailab/store.py (init + seed_exams.json)"
+}
