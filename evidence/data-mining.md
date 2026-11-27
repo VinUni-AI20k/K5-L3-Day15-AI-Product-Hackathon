@@ -18,7 +18,7 @@ tra ?hang|hang ?tra|hoan ?tien|khieu ?nai|doi ?tra|doi ?hang|tra ?tien|lay ?hang
 ```
 
 4. **Công thức:** `x = số dòng được xác nhận nhãn D3`, `N = số review trong mẫu, kể cả review không liên quan`, `% = 100 × x/N`. Đối với giả thuyết 30%, mẫu số riêng là số review 1–2★ trong mẫu chính có kể việc khiếu nại do hàng không đúng mô tả, kể cả khi xử lý thuận lợi. Nếu mẫu số này bằng 0, ghi **chưa đủ dữ liệu để kiểm**.
-5. **Lấy lại mẫu theo phương pháp:** dùng `google-play-scraper==1.2.7`, gọi `reviews("com.shopee.vn", lang="vi", country="vn", sort=Sort.NEWEST, count=200)` cho mẫu chính. Mẫu thăm dò dùng thêm `filter_score_with=1, count=1000` và `filter_score_with=2, count=300` trong hai lần gọi riêng. Nguồn sắp xếp theo thời gian thực nên lấy lại vào ngày khác sẽ ra mẫu mới. Repo công khai lưu số đếm và trích đoạn ngắn đã bỏ tên.
+5. **Lấy lại mẫu theo phương pháp:** chạy script [count_reviews.py](count_reviews.py) (dùng `google-play-scraper==1.2.7`, gọi `reviews("com.shopee.vn", lang="vi", country="vn", sort=Sort.NEWEST, count=200)` cho mẫu chính; mẫu thăm dò gọi riêng `filter_score_with=1, count=1000` và `filter_score_with=2, count=300`). Nguồn sắp xếp theo thời gian thực nên lấy lại vào ngày khác sẽ ra mẫu mới. Repo công khai lưu số đếm và trích đoạn ngắn đã bỏ tên.
 
 ## Kết quả
 
@@ -48,3 +48,36 @@ Các trích đoạn ngắn giữ nguyên chữ của review. Bối cảnh là t�
 ## Giới hạn
 
 Review là lời tự thuật. Hai mẫu không đại diện cho người mua Shopee. Số ngày chờ là thời gian xử lý theo lời người viết. Để ước tính tác động theo tháng, cần hỏi thêm tần suất và số phút người mua trực tiếp chuẩn bị bằng chứng, kiểm trạng thái hoặc gửi lại yêu cầu.
+
+---
+
+## Nguồn bổ sung · Kaggle ABSA Vietnamese (`cthng123/absa-vietnamese`)
+
+- **Nguồn:** tập dữ liệu [ABSA Vietnamese trên Kaggle](https://www.kaggle.com/datasets/cthng123/absa-vietnamese) gồm 3 file CSV (`train_data.csv` 8.424 dòng, `val_data.csv` 936 dòng, `test_data.csv` 2.340 dòng; tổng **11.700** review giày dép Shopee bằng tiếng Việt). Ngày tải và kiểm tra: 27/11/2026.
+- **Mục đích:** bổ sung bằng chứng về tần suất người mua gặp sản phẩm không khớp kỳ vọng về chất lượng (`Quality`), kích cỡ (`Size`) hoặc ngoại hình (`Outlook`).
+- **Cách đếm — viết trước khi chạy ([count_absa.py](count_absa.py)):**
+  - Bộ nhãn có 4 giá trị: `-1` (không nhắc), `0` (`Negative`), `1` (`Positive`), `2` (`Neutral`).
+  - Đếm số dòng mang nhãn `0` ở từng cột `Quality`, `Size`, `Outlook` và số dòng mang nhãn `0` ở **ít nhất 1 trong 3 cột** này.
+  - Tính theo 2 mẫu số để tránh lệch: (a) **toàn bộ tập** `N = 11.700` và (b) **tập review có nhắc đến khía cạnh** (`label != -1`).
+
+### Kết quả đếm (`count_absa.py`)
+
+| Khía cạnh | Negative / Toàn tập (`N = 11.700`) | % toàn tập | Negative / Có nhắc khía cạnh | % trong nhóm có nhắc |
+|---|---:|---:|---:|---:|
+| `Quality == 0` | 463 / 11.700 | 3,96% | 463 / 3.487 | 13,28% |
+| `Size == 0` | 662 / 11.700 | 5,66% | 662 / 1.975 | **33,52%** |
+| `Outlook == 0` | 459 / 11.700 | 3,92% | 459 / 6.339 | 7,24% |
+| **Gộp ≥1 khía cạnh (`Quality` / `Size` / `Outlook` = 0)** | **1.462 / 11.700** | **12,50%** | **1.462 / 8.519** | **17,16%** |
+
+### 5 ví dụ cụ thể (trích ≤2 câu, bỏ tên)
+
+1. `train_data.csv:L5` (`Size: 0`): “Mình đặt size 39 nhưng chật k đeo nổi.”
+2. `train_data.csv:L280` (`Quality: 0`): “có hai thứ khiến mình khó chịu thứ nhất giày hong giống hình Thứ hai cứng quá mang khiến chân đau”
+3. `train_data.csv:L543` (`Outlook: 0`): “Có vài chổ bẩn, vài đốm mốc, gói sơ sài vài chổ bị móp, đc đúng cái kích thước chuẩn ko đáng mua cho lắm 😌”
+4. `train_data.csv:L601` (`Outlook: 0`): “ko dc đẹp lắm thô mới cả là ko giống trong hình nx hơi thất vọng giày lại còn hai màu trắng khác nhau”
+5. `train_data.csv:L659` (`Quality: 0`): “Hàng bị móp méo chữ ny màu vàng bị mờ, còn bị xước xước nữa kh hài lòng”
+
+### Giới hạn của dataset bổ sung
+
+- Tập dữ liệu chỉ phủ **ngành hàng giày dép** trên Shopee và gán nhãn cảm xúc theo khía cạnh sản phẩm, **không ghi nhận bước khiếu nại trả hàng/hoàn tiền**.
+- Vì vậy, số liệu `12,50%` (`1.462/11.700`) chỉ dùng làm bằng chứng bổ trợ cho thấy tỷ lệ phản hồi tiêu cực về sai size / ngoại hình khác hình / chất lượng sản phẩm khá phổ biến; quy trình vướng mắc khi trả hàng vẫn phải kiểm bằng review app và phỏng vấn người mua.
