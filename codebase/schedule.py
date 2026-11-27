@@ -25,6 +25,12 @@ def next_free_slot(page, taken, at=None):
     return None
 
 
+def iso_z(dt):
+    """datetime → '2026-11-28T02:00:00.000Z'. Giao diện VPOST kiểm bằng zod z.iso.datetime(): chỉ nhận hậu tố Z."""
+    u = dt.astimezone(timezone.utc)
+    return u.strftime("%Y-%m-%dT%H:%M:%S.") + "%03dZ" % (u.microsecond // 1000)
+
+
 def parse_when(s):
     """Giờ người duyệt tự chọn ('2026-11-28T09:00' hoặc ISO có múi) → datetime giờ VN."""
     t = datetime.fromisoformat(s)

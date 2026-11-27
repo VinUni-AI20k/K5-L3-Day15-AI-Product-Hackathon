@@ -8,7 +8,32 @@
 
 ---
 
-## Chạy bản chạy thử (web app)
+## Chạy VPOST (giao diện mới + backend Python)
+
+Backend Python (`codebase/server.py`) phục vụ API theo đúng hợp đồng của giao diện VPOST trong `vpost/` (bản dựa trên MYSP nhánh `dev`). Giao diện chỉ chạy phần Next.js: không Docker, không Postgres/Redis, mọi `/api/*` chuyển sang Python.
+
+```bash
+python codebase/server.py                       # backend: http://127.0.0.1:8020 (lần đầu tự nạp data/demo_products.xlsx)
+cd vpost
+# tạo vpost/.env.local với 4 dòng:
+#   DEV_FAKE_SESSION=1
+#   AUTH_URL=http://localhost:3010
+#   SESSION_SECRET=<chuỗi ngẫu nhiên 64 ký tự hex>
+#   VPOST_API_URL=http://127.0.0.1:8020
+npx pnpm@11.21.0 install
+npx pnpm@11.21.0 dev -p 3010                    # giao diện: http://localhost:3010/products
+```
+
+- **Sản phẩm** (`/products`): các dòng của file đã tải; dòng bị chặn có lý do (thiếu giá/size, mâu thuẫn, hết hàng, thiếu ảnh).
+- **Chạy hàng loạt** (`/bulk`) và **Soạn bài** (`/compose?code=…`): làm theo thứ tự sau.
+  - `compose`: code kiểm dòng, kiểm tồn và ảnh.
+  - `captions`: AI viết bài hoặc đánh dấu dòng.
+  - Người duyệt, rồi `batches`: lên lịch.
+- **Bài đăng** (`/posts`): bài đã hẹn (đổi giờ, huỷ) và nhật ký.
+- Tải file sản phẩm mới: `POST /api/vpost/catalog` (multipart, field `file`). Giao diện chưa có nút cho bước này.
+- API nằm ở `codebase/vpost_api.py`. Test: `python -m pytest tests -q`.
+
+## Chạy bản chạy thử (web app cũ)
 
 ```bash
 python -m pip install -r requirements.txt

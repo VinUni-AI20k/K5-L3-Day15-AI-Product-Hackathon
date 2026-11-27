@@ -9,14 +9,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import uuid  # noqa: E402
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile  # noqa: E402
-from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.exceptions import RequestValidationError  # noqa: E402
+from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
+from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
 
 import agent  # noqa: E402
 import rules  # noqa: E402
 import schedule  # noqa: E402
 import store  # noqa: E402
 import tools  # noqa: E402
+import vpost_api  # noqa: E402
 from ai import MODEL_NAME, MODEL_PROVIDER, call_model  # noqa: E402
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
@@ -25,8 +28,32 @@ MAX_BYTES = 10 * 1024 * 1024
 MODEL = call_model      # test thay bằng model giả
 SYNC = False            # test: xử lý ngay trong request
 pool = ThreadPoolExecutor(max_workers=4)
-app = FastAPI(title="Soạn bài Fanpage")
+app = FastAPI(title="VPOST")
 store.init()
+app.include_router(vpost_api.router)
+if not store.catalog_rows():  # máy mới: nạp sẵn file demo để giao diện có dữ liệu
+    vpost_api.load_catalog(rules.read_table(open(os.path.join(rules.DATA, "demo_products.xlsx"), "rb").read(), "demo.xlsx"))
+
+ERROR_CODES = {400: "INVALID_INPUT", 404: "NOT_FOUND", 405: "INVALID_INPUT", 409: "CONFLICT", 413: "INVALID_INPUT",
+               422: "INVALID_INPUT", 502: "UPSTREAM_ERROR"}
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request, exc):
+    """Mọi lỗi trả {code, message} như giao diện VPOST chờ; giữ thêm `detail` cho giao diện cũ (codebase/web)."""
+    d = exc.detail
+    body = dict(d) if isinstance(d, dict) and "code" in d else \
+        {"code": ERROR_CODES.get(exc.status_code, "ERROR"), "message": str(d or "Lỗi")}
+    body["detail"] = body["message"]
+    return JSONResponse(body, status_code=exc.status_code)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request, exc):
+    issues = [{"path": ".".join(str(p) for p in e["loc"] if p not in ("body", "query", "path")), "message": e["msg"]}
+              for e in exc.errors()]
+    msg = "Dữ liệu gửi lên không hợp lệ: " + "; ".join("%s %s" % (i["path"], i["message"]) for i in issues)
+    return JSONResponse({"code": "INVALID_INPUT", "message": msg, "issues": issues, "detail": msg}, status_code=400)
 
 
 def _process(row_id, default_page):

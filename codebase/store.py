@@ -22,6 +22,15 @@ create table if not exists rows(
   tokens_in integer default 0, tokens_out integer default 0,
   slot text default '', schedule_mode text default '', fb_post_id text default '', updated_at text);
 create index if not exists rows_batch on rows(batch_id);
+-- VPOST: file sản phẩm đã tải (1 dòng / mã) và bài đăng theo mô hình post_batch / post_job của giao diện
+create table if not exists catalog(code text primary key, idx integer, data text);
+create table if not exists post_batch(id text primary key, product_code text, color text, format text, created_at text);
+create table if not exists post_job(
+  id text primary key, batch_id text, product_code text, color text, format text, channel_id text,
+  caption text, media text default '[]', status text, scheduled_at text, fb_post_id text, published_url text,
+  published_at text, error_code text, user_message text default '', attempt_count integer default 0,
+  created_at text, updated_at text);
+create index if not exists job_batch on post_job(batch_id);
 """
 
 
@@ -120,3 +129,60 @@ def scheduled_between(start_iso, end_iso):
     with _conn() as c:
         return [_row(r) for r in c.execute(
             "select * from rows where status='scheduled' and slot>=? and slot<? order by slot", (start_iso, end_iso))]
+
+
+# ---------------- VPOST: catalog + post_batch + post_job ----------------
+def replace_catalog(rows):
+    """Thay toàn bộ catalog bằng file mới (mỗi mã một dòng)."""
+    with _lock, _conn() as c:
+        c.execute("delete from catalog")
+        c.executemany("insert into catalog(code, idx, data) values(?,?,?)",
+                      [(r["ma_sp"], i, json.dumps(r, ensure_ascii=False)) for i, r in enumerate(rows)])
+
+
+def catalog_rows():
+    with _conn() as c:
+        return [json.loads(r[0]) for r in c.execute("select data from catalog order by idx")]
+
+
+def catalog_row(code):
+    with _conn() as c:
+        r = c.execute("select data from catalog where code=?", (code,)).fetchone()
+    return json.loads(r[0]) if r else None
+
+
+def create_post_batch(batch, jobs):
+    with _lock, _conn() as c:
+        c.execute("insert into post_batch(id, product_code, color, format, created_at) "
+                  "values(:id, :product_code, :color, :format, :created_at)", batch)
+        for j in jobs:
+            row = dict(j, media=json.dumps(j["media"], ensure_ascii=False))
+            c.execute("insert into post_job(%s) values(%s)" % (", ".join(row), ", ".join(":" + k for k in row)), row)
+
+
+def _job(r):
+    d = dict(r)
+    d["media"] = json.loads(d.get("media") or "[]")
+    return d
+
+
+def post_jobs(where="1=1", params=(), order="created_at desc"):
+    with _conn() as c:
+        return [_job(r) for r in c.execute("select * from post_job where %s order by %s" % (where, order), params)]
+
+
+def post_job(job_id):
+    rows = post_jobs("id=?", (job_id,))
+    return rows[0] if rows else None
+
+
+def post_batch(batch_id):
+    with _conn() as c:
+        r = c.execute("select * from post_batch where id=?", (batch_id,)).fetchone()
+    return dict(r) if r else None
+
+
+def update_post_job(job_id, updated_at, **fields):
+    fields["updated_at"] = updated_at
+    with _lock, _conn() as c:
+        c.execute("update post_job set %s where id=?" % ", ".join("%s=?" % k for k in fields), (*fields.values(), job_id))

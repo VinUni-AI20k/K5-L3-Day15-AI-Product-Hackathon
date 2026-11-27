@@ -143,20 +143,34 @@ def local_image(url):
     return os.path.join(UPLOADS, m.group(1)) if m else None
 
 
-@tool
-def schedule_post(text: str, when_ts: int, images: list) -> dict:
-    """schedule_post · input: bài đã DUYỆT + thời điểm (unix) + danh sách ảnh · output: {"mode": "app"|"facebook", "fb_post_id"}
-    · CÓ tác động ra ngoài khi .env có FB_PAGE_ID + FB_PAGE_TOKEN: tải ảnh lên Fanpage thử ở dạng chưa đăng, rồi tạo
-    bài HẸN GIỜ (published=false) kèm các ảnh đó, huỷ được. Chỉ được gọi từ nút Duyệt của người, agent không tự gọi."""
+def fb_page():
+    """(page_id, token) của Fanpage thử nếu .env có đủ, ngược lại None."""
     page_id, token = os.environ.get("FB_PAGE_ID", "").strip(), os.environ.get("FB_PAGE_TOKEN", "").strip()
-    if not (page_id and token):
+    return (page_id, token) if page_id and token else None
+
+
+def _graph():
+    return "https://graph.facebook.com/" + os.environ.get("FB_GRAPH_VERSION", "v23.0")
+
+
+@tool
+def schedule_post(text: str, when_ts, images: list) -> dict:
+    """schedule_post · input: bài đã DUYỆT + thời điểm (unix; None = đăng ngay) + danh sách ảnh
+    · output: {"mode": "app"|"facebook", "fb_post_id"}
+    · CÓ tác động ra ngoài khi .env có FB_PAGE_ID + FB_PAGE_TOKEN: tải ảnh lên Fanpage thử ở dạng chưa đăng, rồi tạo
+    bài HẸN GIỜ (published=false, huỷ được) hoặc đăng ngay khi when_ts=None. Chỉ được gọi từ nút Duyệt của người."""
+    fb = fb_page()
+    if not fb:
         return {"mode": "app", "fb_post_id": None}
+    page_id, token = fb
     import httpx
-    base = "https://graph.facebook.com/%s/%s" % (os.environ.get("FB_GRAPH_VERSION", "v23.0"), page_id)
+    base = "%s/%s" % (_graph(), page_id)
     media = []
     with httpx.Client(timeout=60) as c:
         for url in images:
-            data = {"published": "false", "temporary": "true", "access_token": token}
+            data = {"published": "false", "access_token": token}
+            if when_ts:  # ảnh cho bài hẹn giờ phải là ảnh tạm, Facebook gắn vào bài lúc đăng
+                data["temporary"] = "true"
             path = local_image(url)
             if path:
                 with open(path, "rb") as f:
@@ -165,9 +179,23 @@ def schedule_post(text: str, when_ts: int, images: list) -> dict:
                 r = c.post(base + "/photos", data=dict(data, url=url))
             r.raise_for_status()
             media.append(r.json()["id"])
-        body = {"message": text, "published": "false", "scheduled_publish_time": str(when_ts), "access_token": token}
+        body = {"message": text, "access_token": token}
+        if when_ts:
+            body.update(published="false", scheduled_publish_time=str(when_ts))
         for i, mid in enumerate(media):
             body["attached_media[%d]" % i] = json.dumps({"media_fbid": mid})
         r = c.post(base + "/feed", data=body)
         r.raise_for_status()
         return {"mode": "facebook", "fb_post_id": r.json().get("id")}
+
+
+@tool
+def delete_fb_post(post_id: str) -> bool:
+    """delete_fb_post · input: id bài trên Fanpage thử · output: True nếu Facebook xoá được
+    · CÓ tác động ra ngoài: xoá bài (dùng khi người bấm Huỷ lịch một bài đã hẹn giờ trên Facebook)."""
+    fb = fb_page()
+    if not fb or not post_id:
+        return False
+    import httpx
+    r = httpx.delete("%s/%s" % (_graph(), post_id), params={"access_token": fb[1]}, timeout=30)
+    return r.status_code == 200 and r.json().get("success") is True
