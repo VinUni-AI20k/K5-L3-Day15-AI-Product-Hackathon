@@ -19,7 +19,7 @@ function channel(overrides: Partial<BatchChannelStatus> = {}): BatchChannelStatu
     attemptCount: 1,
     publishedPostId: "123",
     publishedUrl: "https://facebook.com/a",
-    publishedAt: new Date(2026, 7, 13, 10, 0).toISOString(),
+    publishedAt: new Date(2054, 7, 13, 10, 0).toISOString(),
     lastErrorCode: null,
     userMessage: "Đã đăng.",
     progress: null,

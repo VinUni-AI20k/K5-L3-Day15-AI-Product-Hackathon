@@ -48,8 +48,8 @@ function recordingLogger(lines: LogLine[]): Logger {
 }
 
 const CLOCK: Clock = {
-  now: () => new Date("2026-08-13T02:00:00.000Z"),
-  nowMs: () => Date.parse("2026-08-13T02:00:00.000Z"),
+  now: () => new Date("2054-08-13T02:00:00.000Z"),
+  nowMs: () => Date.parse("2054-08-13T02:00:00.000Z"),
 };
 
 /** Callers hand over ASSETS; the usecase mints the URL (E3.6). */
@@ -745,7 +745,7 @@ describe("createPostBatch — fan-out (business rule 6)", () => {
     const { createPostBatch, queue } = harness();
     await createPostBatch({
       ...BASE_INPUT,
-      scheduledAt: new Date("2026-08-13T03:00:00.000Z"),
+      scheduledAt: new Date("2054-08-13T03:00:00.000Z"),
     });
     // E8.6: T is one hour away, so the worker wakes at T-30 and hands the post
     // to Facebook there — waiting the full hour would leave nothing to hand.
@@ -797,8 +797,8 @@ describe("createPostBatch — logging", () => {
 });
 
 describe("createPostBatch — scheduling (E8.1)", () => {
-  const IN_ONE_HOUR = new Date(Date.parse("2026-08-13T03:00:00.000Z"));
-  const IN_TWO_HOURS = new Date(Date.parse("2026-08-13T04:00:00.000Z"));
+  const IN_ONE_HOUR = new Date(Date.parse("2054-08-13T03:00:00.000Z"));
+  const IN_TWO_HOURS = new Date(Date.parse("2054-08-13T04:00:00.000Z"));
 
   it("delays every channel by the batch time and stores it on each job", async () => {
     const { createPostBatch, repo, queue } = harness();
@@ -853,7 +853,7 @@ describe("createPostBatch — scheduling (E8.1)", () => {
       scheduledAtByChannel: {
         "fbpage-a": IN_ONE_HOUR,
         // Yesterday: a typo or a stale form must never mean "post now".
-        "fbpage-b": new Date(Date.parse("2026-08-12T03:00:00.000Z")),
+        "fbpage-b": new Date(Date.parse("2054-08-12T03:00:00.000Z")),
       },
     });
 
