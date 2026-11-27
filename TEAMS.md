@@ -13,8 +13,8 @@
 |---|---|---|---|---|
 | 1 | Phạm Đức Vinh | 2A202603849 | Đội trưởng | Sản phẩm: canvas, spec.md, impact, slide và demo |
 | 2 | Nguyễn Nhật Minh | 2A202603745 | Thành viên | Bằng chứng: gắn nhãn review Chợ Tốt, khảo sát, phỏng vấn (evidence/) |
-| 3 | ____ Hùng | ____ | Thành viên | Bản chạy thử: data Chợ Mẫu, công cụ, luồng, nối model (codebase/, data/) |
-| 4 | ____ Khánh | ____ | Thành viên | Đánh giá và chi phí: bộ câu thử, metric, chạy eval, mô phỏng chi phí (eval/, cost/) |
+| 3 | Phạm Thế Hùng | 2A202603778 | Thành viên | Bản chạy thử: data Chợ Mẫu, công cụ, luồng, nối model (codebase/, data/) |
+| 4 | Ngô Duy Khánh | 2A202603870 | Thành viên | Đánh giá và chi phí: bộ câu thử, metric, chạy eval, mô phỏng chi phí (eval/, cost/) |
 
 **Quy tắc điền**
 - **Lớp:** `L3A` hoặc `L3B`. **Track:** một chữ `A` (EdTech), `B` (Y tế), `C` (Du lịch), `D` (Thương mại điện tử), `E` (Tài chính) hoặc `F` (Làn khác). **Link repo:** link GitHub công khai của nhóm.
