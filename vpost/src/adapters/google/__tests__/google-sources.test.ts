@@ -130,7 +130,7 @@ describe("makeGoogleDriveSource", () => {
             name: "MGKVX6310-KEM (1).jpeg",
             mimeType: "image/jpeg",
             size: "482913",
-            modifiedTime: "2026-08-01T10:00:00.000Z",
+            modifiedTime: "2054-08-01T10:00:00.000Z",
           },
           { name: "no-id.jpg" },
           { id: "2b" },
@@ -149,7 +149,7 @@ describe("makeGoogleDriveSource", () => {
         name: "MGKVX6310-KEM (1).jpeg",
         mimeType: "image/jpeg",
         sizeBytes: 482913,
-        modifiedTime: "2026-08-01T10:00:00.000Z",
+        modifiedTime: "2054-08-01T10:00:00.000Z",
       },
     ]);
   });

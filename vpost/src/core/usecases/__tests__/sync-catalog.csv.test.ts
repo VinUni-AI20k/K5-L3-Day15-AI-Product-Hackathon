@@ -45,7 +45,7 @@ const FILE_CONFIG: CatalogSourceConfig = {
     storageKey: `${TENANT}/catalog_abc`,
     fileName: "bang-gia.csv",
     contentType: "text/csv",
-    uploadedAt: "2026-08-24T10:00:00.000Z",
+    uploadedAt: "2054-08-24T10:00:00.000Z",
   },
 };
 
@@ -87,7 +87,7 @@ function harness(options: HarnessOptions = {}) {
         name: file.name,
         mimeType: "image/jpeg",
         sizeBytes: 1000,
-        modifiedTime: "2026-08-01T00:00:00.000Z",
+        modifiedTime: "2054-08-01T00:00:00.000Z",
       })),
     download: async () => {
       throw new Error("download must not be called by sync-catalog");
@@ -201,7 +201,7 @@ function harness(options: HarnessOptions = {}) {
     },
   };
 
-  const clock: Clock = { now: () => new Date("2026-08-24T12:00:00.000Z"), nowMs: () => 0 };
+  const clock: Clock = { now: () => new Date("2054-08-24T12:00:00.000Z"), nowMs: () => 0 };
 
   return {
     writtenProducts,
@@ -349,7 +349,7 @@ describe("syncCatalog — uploaded CSV: the happy path is the same path", () => 
     const started = h.lines.find((line) => line.message === "Catalog sync started");
     expect(started?.context).toMatchObject({
       text_source_kind: "file",
-      text_source: 'file "bang-gia.csv" (tải lên lúc 2026-08-24T10:00:00.000Z)',
+      text_source: 'file "bang-gia.csv" (tải lên lúc 2054-08-24T10:00:00.000Z)',
     });
   });
 });

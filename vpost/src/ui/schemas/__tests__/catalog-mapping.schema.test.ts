@@ -235,7 +235,7 @@ describe("CatalogProfileReportSchema — a report about an uploaded file", () =>
       kind: "file",
       storageKey: "catalog/t1/abc",
       fileName: "bang-gia-2026.csv",
-      uploadedAt: "2026-08-24T07:32:07.000Z",
+      uploadedAt: "2054-08-24T07:32:07.000Z",
     },
   });
 

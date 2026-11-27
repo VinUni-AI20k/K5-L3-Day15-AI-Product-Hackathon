@@ -379,7 +379,7 @@ describe("updateCatalogSource — happy path", () => {
  * would arrive from the browser and outside data is not trusted.
  */
 describe("updateCatalogSource — the source-access verdict", () => {
-  const NOW = Date.UTC(2026, 7, 19, 4, 0, 0);
+  const NOW = Date.UTC(2054, 7, 19, 4, 0, 0);
   const clock = { now: () => new Date(NOW), nowMs: () => NOW };
 
   function withProbe(options: {
@@ -627,7 +627,7 @@ const FILE_SOURCE: CatalogTextConfig = {
   kind: "file",
   storageKey: `${TENANT}/catalog_abc`,
   fileName: "bang-gia.csv",
-  uploadedAt: "2026-08-24T10:00:00.000Z",
+  uploadedAt: "2054-08-24T10:00:00.000Z",
 };
 
 describe("updateCatalogSource — file source", () => {

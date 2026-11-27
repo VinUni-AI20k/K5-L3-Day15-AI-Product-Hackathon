@@ -22,7 +22,7 @@ function deps(overrides: Record<string, unknown> = {}) {
         postUrl: "https://media.vannt.asia/vpost-media",
         formFields: { key: `staging/${TENANT}/${assetId}` },
         storageKey: `${TENANT}/${assetId}`,
-        expiresAt: new Date("2026-08-26T10:30:00Z"),
+        expiresAt: new Date("2054-08-26T10:30:00Z"),
       })),
     },
     tickets: { createMany: vi.fn(async () => 1) },

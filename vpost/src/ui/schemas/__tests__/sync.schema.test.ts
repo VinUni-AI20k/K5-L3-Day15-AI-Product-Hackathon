@@ -115,7 +115,7 @@ describe("status wording", () => {
   });
 });
 
-const STARTED_AT = "2026-08-13T01:00:00.000Z";
+const STARTED_AT = "2054-08-13T01:00:00.000Z";
 const STARTED_AT_MS = Date.parse(STARTED_AT);
 /** Ten seconds into the run — well inside the fast band. */
 const NOW_MS = STARTED_AT_MS + 10_000;
@@ -132,7 +132,7 @@ function statusWithRun(status: SyncRunStatus, startedAt = STARTED_AT): SyncStatu
       syncRunId: "run-1",
       status,
       startedAt,
-      finishedAt: status === "running" ? null : "2026-08-13T01:02:30.000Z",
+      finishedAt: status === "running" ? null : "2054-08-13T01:02:30.000Z",
       counts: null,
       issues: [],
       issueGroups: null,
@@ -387,8 +387,8 @@ describe("SyncRunSchema — history runs written before this release", () => {
     tenantId: "00000000-0000-0000-0000-000000000001",
     syncRunId: "run-1",
     status: "partial" as const,
-    startedAt: "2026-08-13T01:00:00.000Z",
-    finishedAt: "2026-08-13T01:02:30.000Z",
+    startedAt: "2054-08-13T01:00:00.000Z",
+    finishedAt: "2054-08-13T01:02:30.000Z",
     counts: null,
     issues: [],
     issueGroups: null,
@@ -410,7 +410,7 @@ describe("SyncRunSchema — history runs written before this release", () => {
         {
           syncRunId: "run-0",
           status: "running",
-          startedAt: "2026-08-13T01:00:00.000Z",
+          startedAt: "2054-08-13T01:00:00.000Z",
           finishedAt: null,
           issuesTotal: null,
           errorCode: null,

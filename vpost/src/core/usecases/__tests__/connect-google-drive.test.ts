@@ -24,7 +24,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 
 const TENANT = testTenantId("00000000-0000-0000-0000-000000000001");
 const STATE = "a".repeat(64);
-const NOW = Date.UTC(2026, 7, 19, 3, 0, 0);
+const NOW = Date.UTC(2054, 7, 19, 3, 0, 0);
 
 function makeLogger(): Logger {
   const logger: Logger = {
@@ -399,7 +399,7 @@ describe("getGoogleConnection", () => {
     const connection: GoogleOAuthConnection = {
       email: "shop@gmail.com",
       scopes: ["drive.readonly"],
-      connectedAt: "2026-08-19T03:00:00.000Z",
+      connectedAt: "2054-08-19T03:00:00.000Z",
       connectedByUserId: null,
       status: "error",
       sourceAccess: null,
@@ -409,7 +409,7 @@ describe("getGoogleConnection", () => {
     await expect(build({ repo }).getGoogleConnection({ tenantId: TENANT })).resolves.toEqual({
       state: "expired",
       email: "shop@gmail.com",
-      connectedAt: "2026-08-19T03:00:00.000Z",
+      connectedAt: "2054-08-19T03:00:00.000Z",
       reason: "GOOGLE_AUTH_EXPIRED",
     });
   });
@@ -418,17 +418,17 @@ describe("getGoogleConnection", () => {
     const connection: GoogleOAuthConnection = {
       email: "shop@gmail.com",
       scopes: ["a", "b"],
-      connectedAt: "2026-08-19T03:00:00.000Z",
+      connectedAt: "2054-08-19T03:00:00.000Z",
       connectedByUserId: "user-1",
       status: "active",
-      sourceAccess: { state: "drive_unreadable", checkedAt: "2026-08-19T03:05:00.000Z" },
+      sourceAccess: { state: "drive_unreadable", checkedAt: "2054-08-19T03:05:00.000Z" },
     };
     const { repo } = makeRepo({ findConnection: vi.fn(async () => connection) });
 
     await expect(build({ repo }).getGoogleConnection({ tenantId: TENANT })).resolves.toEqual({
       state: "connected",
       email: "shop@gmail.com",
-      connectedAt: "2026-08-19T03:00:00.000Z",
+      connectedAt: "2054-08-19T03:00:00.000Z",
       scopes: ["a", "b"],
       // Read from the row: /status must never spend a Drive call per poll.
       sourceAccess: "drive_unreadable",

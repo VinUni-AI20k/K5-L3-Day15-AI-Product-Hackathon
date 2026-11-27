@@ -23,7 +23,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 const TENANT = testTenantId("00000000-0000-0000-0000-000000000001");
 const OTHER_TENANT = testTenantId("00000000-0000-0000-0000-000000000002");
 const ASSET = "1bA48sjugz9BczcoR0";
-const NOW = Date.UTC(2026, 7, 12, 9, 0, 0);
+const NOW = Date.UTC(2054, 7, 12, 9, 0, 0);
 const SECRET = "test-secret-at-least-32-characters-long";
 
 const sign = (payload: string) => createHmac("sha256", SECRET).update(payload).digest("hex");

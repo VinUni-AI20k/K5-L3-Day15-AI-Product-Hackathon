@@ -129,7 +129,7 @@ describe("dedupeMediaByName (docs/05 section 1.4)", () => {
       variants: { aiGenerated: false, realPhoto: false, backView: false },
       mimeType: "image/jpeg",
       sizeBytes: 100,
-      modifiedTime: "2026-01-01T00:00:00.000Z",
+      modifiedTime: "2054-01-01T00:00:00.000Z",
       warnings: [],
       needsReview: false,
       ...overrides,
@@ -137,16 +137,16 @@ describe("dedupeMediaByName (docs/05 section 1.4)", () => {
   }
 
   it("keeps the newest file when one name maps to several ids", () => {
-    const older = asset({ driveFileId: "old", modifiedTime: "2026-01-01T00:00:00.000Z" });
-    const newer = asset({ driveFileId: "new", modifiedTime: "2026-08-01T00:00:00.000Z" });
+    const older = asset({ driveFileId: "old", modifiedTime: "2054-01-01T00:00:00.000Z" });
+    const newer = asset({ driveFileId: "new", modifiedTime: "2054-08-01T00:00:00.000Z" });
     const { kept, dropped } = dedupeMediaByName([older, newer]);
     expect(kept.map((item) => item.driveFileId)).toEqual(["new"]);
     expect(dropped.map((item) => item.driveFileId)).toEqual(["old"]);
   });
 
   it("is order-independent", () => {
-    const older = asset({ driveFileId: "old", modifiedTime: "2026-01-01T00:00:00.000Z" });
-    const newer = asset({ driveFileId: "new", modifiedTime: "2026-08-01T00:00:00.000Z" });
+    const older = asset({ driveFileId: "old", modifiedTime: "2054-01-01T00:00:00.000Z" });
+    const newer = asset({ driveFileId: "new", modifiedTime: "2054-08-01T00:00:00.000Z" });
     expect(dedupeMediaByName([newer, older]).kept[0].driveFileId).toBe("new");
   });
 
@@ -158,7 +158,7 @@ describe("dedupeMediaByName (docs/05 section 1.4)", () => {
   });
 
   it("prefers a file that has a timestamp over one that has none", () => {
-    const dated = asset({ driveFileId: "dated", modifiedTime: "2026-02-02T00:00:00.000Z" });
+    const dated = asset({ driveFileId: "dated", modifiedTime: "2054-02-02T00:00:00.000Z" });
     const undated = asset({ driveFileId: "undated", modifiedTime: "not-a-date" });
     expect(dedupeMediaByName([undated, dated]).kept[0].driveFileId).toBe("dated");
   });

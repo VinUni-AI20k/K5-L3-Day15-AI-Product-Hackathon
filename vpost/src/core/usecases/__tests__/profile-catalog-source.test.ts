@@ -61,7 +61,7 @@ function stubDrive(names: string[] | Error): DriveSource {
         name,
         mimeType: "image/jpeg",
         sizeBytes: 1000,
-        modifiedTime: "2026-08-01T00:00:00.000Z",
+        modifiedTime: "2054-08-01T00:00:00.000Z",
       }));
       return maxFiles && maxFiles > 0 ? files.slice(0, maxFiles) : files;
     },

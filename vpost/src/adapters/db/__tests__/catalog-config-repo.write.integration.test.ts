@@ -236,7 +236,7 @@ describe.skipIf(!url)("saveCatalogSource — source kind comes from stored state
     kind: "file" as const,
     storageKey: `${fileTenant}/catalog_abc`,
     fileName: "bang-gia.csv",
-    uploadedAt: "2026-08-24T10:00:00.000Z",
+    uploadedAt: "2054-08-24T10:00:00.000Z",
   };
 
   beforeAll(async () => {
@@ -733,7 +733,7 @@ describe.skipIf(!url)("saveCatalogSource — concurrent saves do not revert each
           kind: "file",
           storageKey: `${tenantId}/catalog_new`,
           fileName: "bang-gia.csv",
-          uploadedAt: "2026-08-24T10:00:00.000Z",
+          uploadedAt: "2054-08-24T10:00:00.000Z",
         },
       },
       actorEmail: "csv@example.com",

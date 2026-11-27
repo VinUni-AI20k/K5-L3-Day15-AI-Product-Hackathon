@@ -40,7 +40,7 @@ function makeLogger(): Logger {
   return logger;
 }
 
-const clock: Clock = { now: () => new Date("2026-08-13T00:00:00.000Z"), nowMs: () => 0 };
+const clock: Clock = { now: () => new Date("2054-08-13T00:00:00.000Z"), nowMs: () => 0 };
 
 function driveFile(name: string, overrides: Partial<DriveFile> = {}): DriveFile {
   return {
@@ -48,7 +48,7 @@ function driveFile(name: string, overrides: Partial<DriveFile> = {}): DriveFile 
     name,
     mimeType: "image/jpeg",
     sizeBytes: 1000,
-    modifiedTime: "2026-08-01T00:00:00.000Z",
+    modifiedTime: "2054-08-01T00:00:00.000Z",
     ...overrides,
   };
 }
@@ -311,8 +311,8 @@ describe("syncCatalog — edge cases first", () => {
     const harness = makeHarness({
       snapshot: sheet([productRow()]),
       files: [
-        driveFile("MGKVX6310-KEM (1).jpg", { id: "old", modifiedTime: "2026-01-01T00:00:00Z" }),
-        driveFile("MGKVX6310-KEM (1).jpg", { id: "new", modifiedTime: "2026-08-01T00:00:00Z" }),
+        driveFile("MGKVX6310-KEM (1).jpg", { id: "old", modifiedTime: "2054-01-01T00:00:00Z" }),
+        driveFile("MGKVX6310-KEM (1).jpg", { id: "new", modifiedTime: "2054-08-01T00:00:00Z" }),
       ],
     });
 
@@ -410,8 +410,8 @@ describe("syncCatalog — issue codes carry the severity", () => {
       snapshot: sheet([productRow({ "Mã sản phẩm": "MG0AD6051" })]),
       files: [
         driveFile("IMG_1664.JPG"),
-        driveFile("MG0AD6051-KEM (1).jpg", { id: "old", modifiedTime: "2026-01-01T00:00:00Z" }),
-        driveFile("MG0AD6051-KEM (1).jpg", { id: "new", modifiedTime: "2026-08-01T00:00:00Z" }),
+        driveFile("MG0AD6051-KEM (1).jpg", { id: "old", modifiedTime: "2054-01-01T00:00:00Z" }),
+        driveFile("MG0AD6051-KEM (1).jpg", { id: "new", modifiedTime: "2054-08-01T00:00:00Z" }),
         driveFile("MG0AD6051-MR0CV6068-AI (1).png"),
       ],
     });
@@ -428,11 +428,11 @@ describe("syncCatalog — issue codes carry the severity", () => {
     const harness = makeHarness({
       snapshot: sheet([productRow()]),
       files: [
-        driveFile("MGKVX6310-KEM (1).jpg", { id: "a1", modifiedTime: "2026-01-01T00:00:00Z" }),
-        driveFile("MGKVX6310-KEM (1).jpg", { id: "a2", modifiedTime: "2026-02-01T00:00:00Z" }),
-        driveFile("MGKVX6310-KEM (1).jpg", { id: "a3", modifiedTime: "2026-03-01T00:00:00Z" }),
-        driveFile("MGKVX6310-HỒNG (2).jpg", { id: "b1", modifiedTime: "2026-01-01T00:00:00Z" }),
-        driveFile("MGKVX6310-HỒNG (2).jpg", { id: "b2", modifiedTime: "2026-02-01T00:00:00Z" }),
+        driveFile("MGKVX6310-KEM (1).jpg", { id: "a1", modifiedTime: "2054-01-01T00:00:00Z" }),
+        driveFile("MGKVX6310-KEM (1).jpg", { id: "a2", modifiedTime: "2054-02-01T00:00:00Z" }),
+        driveFile("MGKVX6310-KEM (1).jpg", { id: "a3", modifiedTime: "2054-03-01T00:00:00Z" }),
+        driveFile("MGKVX6310-HỒNG (2).jpg", { id: "b1", modifiedTime: "2054-01-01T00:00:00Z" }),
+        driveFile("MGKVX6310-HỒNG (2).jpg", { id: "b2", modifiedTime: "2054-02-01T00:00:00Z" }),
       ],
     });
 
@@ -567,8 +567,8 @@ describe("syncCatalog — details are written for the operator", () => {
         driveFile("IMG_1664.JPG"),
         driveFile("DV Huyền Thạch MGAC513 MMQD554.jpg"),
         driveFile("MG0AD6051-MR0CV6068-AI (1).png"),
-        driveFile("MGKVX6310-KEM (1).jpg", { id: "old", modifiedTime: "2026-01-01T00:00:00Z" }),
-        driveFile("MGKVX6310-KEM (1).jpg", { id: "new", modifiedTime: "2026-08-01T00:00:00Z" }),
+        driveFile("MGKVX6310-KEM (1).jpg", { id: "old", modifiedTime: "2054-01-01T00:00:00Z" }),
+        driveFile("MGKVX6310-KEM (1).jpg", { id: "new", modifiedTime: "2054-08-01T00:00:00Z" }),
       ],
     });
 

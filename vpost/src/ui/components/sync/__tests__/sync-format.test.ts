@@ -78,20 +78,20 @@ describe("formatCount", () => {
 
 describe("formatDuration", () => {
   it("has no duration while the run has not finished", () => {
-    expect(formatDuration("2026-08-17T10:24:32.000Z", null)).toBeNull();
+    expect(formatDuration("2054-08-17T10:24:32.000Z", null)).toBeNull();
   });
 
   it("refuses a finish time before the start (clock skew)", () => {
-    expect(formatDuration("2026-08-17T10:24:32.000Z", "2026-08-17T10:24:31.000Z")).toBeNull();
+    expect(formatDuration("2054-08-17T10:24:32.000Z", "2054-08-17T10:24:31.000Z")).toBeNull();
   });
 
   it("refuses an unparsable timestamp instead of printing NaN", () => {
-    expect(formatDuration("not-a-date", "2026-08-17T10:25:03.000Z")).toBeNull();
+    expect(formatDuration("not-a-date", "2054-08-17T10:25:03.000Z")).toBeNull();
   });
 
   it("reads in seconds, then in minutes", () => {
-    expect(formatDuration("2026-08-17T10:24:32.000Z", "2026-08-17T10:25:03.000Z")).toBe("31 giây");
-    expect(formatDuration("2026-08-17T10:24:32.000Z", "2026-08-17T10:26:35.000Z")).toBe(
+    expect(formatDuration("2054-08-17T10:24:32.000Z", "2054-08-17T10:25:03.000Z")).toBe("31 giây");
+    expect(formatDuration("2054-08-17T10:24:32.000Z", "2054-08-17T10:26:35.000Z")).toBe(
       "2 phút 3 giây",
     );
   });

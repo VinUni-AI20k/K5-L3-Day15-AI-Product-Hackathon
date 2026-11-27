@@ -57,7 +57,7 @@ let nowMs: number;
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "vpost-media-cache-"));
   logger = makeLogger();
-  nowMs = Date.UTC(2026, 7, 15, 9, 0, 0);
+  nowMs = Date.UTC(2026, 10, 27, 9, 0, 0);
   cache = makeLocalMediaCache({ root, ttlMs: TTL_MS, logger, now: () => nowMs });
 });
 

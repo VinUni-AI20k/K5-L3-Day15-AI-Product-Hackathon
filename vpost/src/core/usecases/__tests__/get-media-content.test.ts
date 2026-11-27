@@ -33,7 +33,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 const TENANT = testTenantId("00000000-0000-0000-0000-000000000001");
 const OTHER_TENANT = testTenantId("00000000-0000-0000-0000-000000000002");
 const ASSET = "drive-file-1";
-const NOW = Date.UTC(2026, 7, 12, 9, 0, 0);
+const NOW = Date.UTC(2054, 7, 12, 9, 0, 0);
 const SECRET = "media-signing-secret-at-least-32-chars";
 const BYTES = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 
@@ -53,7 +53,7 @@ function asset(overrides: Partial<MediaAsset> = {}): MediaAsset {
     variants: { aiGenerated: false, realPhoto: false, backView: false },
     mimeType: "image/jpeg",
     sizeBytes: BYTES.length,
-    modifiedTime: "2026-08-01T10:00:00.000Z",
+    modifiedTime: "2054-08-01T10:00:00.000Z",
     warnings: [],
     needsReview: false,
     ...overrides,

@@ -287,7 +287,7 @@ describe("CatalogSourceSchema — a tenant reading an uploaded CSV", () => {
       fileName: "bang-gia-2026.csv",
       contentType: "text/csv",
       sizeBytes: 248_000,
-      uploadedAt: "2026-08-24T07:32:07.000Z",
+      uploadedAt: "2054-08-24T07:32:07.000Z",
     },
   };
 
@@ -309,7 +309,7 @@ describe("CatalogSourceSchema — a tenant reading an uploaded CSV", () => {
       expect(stored?.kind).toBe("file");
       if (stored?.kind === "file") {
         expect(stored.fileName).toBe("bang-gia-2026.csv");
-        expect(stored.uploadedAt).toBe("2026-08-24T07:32:07.000Z");
+        expect(stored.uploadedAt).toBe("2054-08-24T07:32:07.000Z");
       }
     }
   });

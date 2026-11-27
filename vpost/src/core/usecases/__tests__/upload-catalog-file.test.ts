@@ -82,7 +82,7 @@ function harness(options: HarnessOptions = {}) {
     },
   };
 
-  const clock: Clock = { now: () => new Date("2026-08-24T10:00:00.000Z"), nowMs: () => 0 };
+  const clock: Clock = { now: () => new Date("2054-08-24T10:00:00.000Z"), nowMs: () => 0 };
 
   return {
     saved,
@@ -210,7 +210,7 @@ describe("uploadCatalogFile — order of operations", () => {
       fileName: "bang-gia.csv",
       contentType: "text/csv",
       sizeBytes: GOOD_CSV.length,
-      uploadedAt: "2026-08-24T10:00:00.000Z",
+      uploadedAt: "2054-08-24T10:00:00.000Z",
     });
     expect(result.source.textSource).toMatchObject({ fileName: "bang-gia.csv" });
   });
