@@ -39,6 +39,8 @@ const appMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "VPOST — Đăng bài tự động",
   description: "Công cụ đăng bài tự động cho Facebook và TikTok",
+  // VPOST: ảnh sản phẩm là link Google (lh3.googleusercontent.com) — Google chặn khi có Referer lạ.
+  referrer: "no-referrer",
 };
 
 /**

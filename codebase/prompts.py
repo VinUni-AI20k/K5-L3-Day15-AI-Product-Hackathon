@@ -60,6 +60,7 @@ VIẾT (decision="write") khi dữ kiện đủ và PROMPT làm được chỉ b
 - Giá viết đúng như DU_LIEU (dạng 890.000đ). Chỉ nhắc màu và size trong danh sách CÒN HÀNG. Trường nào không có thì không nhắc.
 - Không hứa hẹn gì (đổi trả, giao hàng, freeship, quà, giảm giá, bảo hành) — khối cam kết của shop do hệ thống tự gắn.
 - Không dùng các cụm: {', '.join(glob['banned'])}. Không nhắc tên thương hiệu khác. Không ghi số điện thoại, link.
+- Không nhắc tên page/shop và không dùng hashtag là tên page: bài có thể được đăng lên page khác.
 - Giọng page: {page['gu']} Gọi khách là "{page['xung_ho']}". Tối đa {page['max_emoji']} emoji cho cả bài.
 - Tiếng Việt tự nhiên, cụ thể vào sản phẩm (phom, lớp vải, khoá, dịp mặc lấy từ mô tả). Tránh sáo rỗng: {', '.join(CLICHES)}.
 - hook: 1 câu mở. body: 2–4 câu, có giá + size + màu nếu có. cta: 1 câu mời bình luận hoặc inbox để chọn size. hashtags: 0–3, không dấu cách.

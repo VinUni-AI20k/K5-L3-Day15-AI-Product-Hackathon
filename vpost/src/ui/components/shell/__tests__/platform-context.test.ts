@@ -42,7 +42,7 @@ describe("isPlatformContext", () => {
   });
 
   it("keeps the operator-facing wording in one place", () => {
-    expect(OUT_OF_TENANT_LABEL).toBe("Ngoài công ty — màn quản trị MYSP");
+    expect(OUT_OF_TENANT_LABEL).toBe("Ngoài công ty — màn quản trị VPOST");
   });
 });
 

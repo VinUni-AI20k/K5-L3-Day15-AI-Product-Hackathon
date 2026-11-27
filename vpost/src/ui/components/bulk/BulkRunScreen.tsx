@@ -755,16 +755,29 @@ export function BulkRunScreen() {
                             size="lg"
                             disabled={isRunning || gate.isDisabled || hasNoCodes}
                           >
+                            {/* VPOST: bước này chỉ kiểm dữ liệu + AI viết; tạo lô sau khi người duyệt. */}
                             {isRunning
                               ? "Đang chạy lượt này…"
                               : hasNoCodes
-                                ? schedule.mode === "scheduled"
-                                  ? "Hẹn giờ"
-                                  : "Khởi chạy"
-                                : schedule.mode === "scheduled"
-                                  ? `Hẹn giờ ${totalCodesCount} mã (${estimatedTotalPosts} bài)`
-                                  : `Khởi chạy ${totalCodesCount} mã (${estimatedTotalPosts} bài)`}
+                                ? "Soạn bài để duyệt"
+                                : `Soạn bài ${totalCodesCount} mã để duyệt`}
                           </Button>
+
+                          {!isRunning && summary.review > 0 ? (
+                            <Button
+                              type="button"
+                              size="lg"
+                              variant="secondary"
+                              disabled={summary.approved === 0}
+                              onClick={() => void run.publishApproved()}
+                            >
+                              {summary.approved === 0
+                                ? `Duyệt bài trong bảng (${summary.review} bài chờ)`
+                                : schedule.mode === "scheduled"
+                                  ? `Hẹn giờ ${summary.approved} bài đã duyệt`
+                                  : `Đăng ${summary.approved} bài đã duyệt`}
+                            </Button>
+                          ) : null}
 
                           {isRunning ? (
                             <Button
@@ -978,7 +991,15 @@ export function BulkRunScreen() {
                         </div>
 
                         {/* Detail Progress Table */}
-                        <BulkProgressTable rows={filteredRows} />
+                        <BulkProgressTable
+                          rows={filteredRows}
+                          review={{
+                            disabled: isRunning,
+                            onEditCaption: run.editCaption,
+                            onApprove: run.setApproved,
+                            onReject: run.rejectRow,
+                          }}
+                        />
                       </div>
                     )}
                   </section>

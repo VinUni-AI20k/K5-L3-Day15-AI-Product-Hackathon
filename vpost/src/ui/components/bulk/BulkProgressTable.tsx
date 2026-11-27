@@ -4,6 +4,8 @@ import Link from "next/link";
 
 import { TableScrollRegion } from "@/ui/components/posts/TableScrollRegion";
 import { Badge } from "@/ui/components/ui/badge";
+import { Button } from "@/ui/components/ui/button";
+import { Textarea } from "@/ui/components/ui/textarea";
 import {
   BULK_ROW_STATUS_LABELS,
   BULK_ROW_STATUS_TONES,
@@ -30,7 +32,69 @@ import type { BulkRunRow } from "@/ui/hooks/useBulkRun";
  *
  * Presentational: no fetching, no business branching.
  */
-export function BulkProgressTable({ rows }: { rows: readonly BulkRunRow[] }) {
+/** VPOST: thao tác duyệt trên dòng "Chờ duyệt". Không truyền = bảng chỉ đọc như cũ. */
+export interface BulkReviewActions {
+  disabled: boolean;
+  onEditCaption: (index: number, caption: string) => void;
+  onApprove: (index: number, approved: boolean) => void;
+  onReject: (index: number) => void;
+}
+
+function ReviewCell({ row, review }: { row: BulkRunRow; review: BulkReviewActions }) {
+  return (
+    <span className="flex flex-col gap-2">
+      {row.media.length > 0 ? (
+        <span className="flex gap-1.5">
+          {row.media.slice(0, 4).map((m) => (
+            // eslint-disable-next-line @next/next/no-img-element -- ảnh ngoài (Drive), không qua next/image
+            <img
+              key={m.driveFileId}
+              src={m.driveFileId}
+              alt={m.fileName ?? "Ảnh sản phẩm"}
+              className="size-14 rounded-md border border-border object-cover"
+            />
+          ))}
+        </span>
+      ) : null}
+      <Textarea
+        aria-label={`Bài đăng của mã ${row.code}`}
+        value={row.caption ?? ""}
+        disabled={review.disabled}
+        onChange={(event) => review.onEditCaption(row.index, event.target.value)}
+        className="min-h-32 text-xs leading-relaxed"
+      />
+      <span className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={row.approved ? "default" : "outline"}
+          aria-pressed={row.approved}
+          disabled={review.disabled || !row.caption?.trim()}
+          onClick={() => review.onApprove(row.index, !row.approved)}
+        >
+          {row.approved ? "Đã duyệt" : "Duyệt bài này"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={review.disabled}
+          onClick={() => review.onReject(row.index)}
+        >
+          Bỏ bài
+        </Button>
+      </span>
+    </span>
+  );
+}
+
+export function BulkProgressTable({
+  rows,
+  review,
+}: {
+  rows: readonly BulkRunRow[];
+  review?: BulkReviewActions;
+}) {
   return (
     // The SAME scroll frame as the log and the schedule (ruling T3): one
     // pattern for "this table is wider than its box", so an operator learns the
@@ -49,11 +113,11 @@ export function BulkProgressTable({ rows }: { rows: readonly BulkRunRow[] }) {
             fills in WHILE the run walks the list, and columns that resize on
             each row would make the whole table twitch (web-data-table §1). */}
         <colgroup>
-          <col className="w-[6%]" />
-          <col className="w-[16%]" />
-          <col className="w-[20%]" />
-          <col className="w-[14%]" />
-          <col className="w-[30%]" />
+          <col className="w-[5%]" />
+          <col className="w-[13%]" />
+          <col className="w-[13%]" />
+          <col className="w-[12%]" />
+          <col className="w-[45%]" />
           <col className="w-[14%]" />
         </colgroup>
         <thead className="bg-muted/60 text-xs text-foreground font-semibold">
@@ -102,6 +166,7 @@ export function BulkProgressTable({ rows }: { rows: readonly BulkRunRow[] }) {
                 </Badge>
               </td>
               <td className="px-3 py-2.5 text-xs">
+                {review && row.status === "review" ? <ReviewCell row={row} review={review} /> : null}
                 {row.reason ? (
                   <span className="max-w-prose break-words text-foreground leading-relaxed">
                     {row.reason}

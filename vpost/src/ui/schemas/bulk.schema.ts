@@ -260,6 +260,8 @@ export const BULK_ROW_STATUSES = [
   "pending",
   "composing",
   "captioning",
+  // VPOST: AI đã viết xong, chờ người duyệt — chưa tạo lô nào.
+  "review",
   "creating",
   "done",
   "skipped",
@@ -272,6 +274,7 @@ export const BULK_ROW_STATUS_LABELS: Record<BulkRowStatus, string> = {
   pending: "Chờ tới lượt",
   composing: "Đang tra sản phẩm",
   captioning: "Đang lấy caption",
+  review: "Chờ duyệt",
   creating: "Đang tạo lô",
   done: "Đã tạo lô",
   skipped: "Bỏ qua",
@@ -287,6 +290,7 @@ export const BULK_ROW_STATUS_TONES: Record<
   pending: "neutral",
   composing: "info",
   captioning: "info",
+  review: "warning",
   creating: "info",
   done: "success",
   // A rule said no (hết hàng, thiếu ảnh) — not a crash.

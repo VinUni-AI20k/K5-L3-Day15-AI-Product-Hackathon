@@ -22,8 +22,12 @@ import {
 
 function row(overrides: Partial<BulkRunRow> = {}): BulkRunRow {
   return {
+    index: 0,
     code: "MGKVX6310",
     status: "pending",
+    caption: null,
+    approved: false,
+    media: [],
     productName: null,
     reason: null,
     errorCode: null,

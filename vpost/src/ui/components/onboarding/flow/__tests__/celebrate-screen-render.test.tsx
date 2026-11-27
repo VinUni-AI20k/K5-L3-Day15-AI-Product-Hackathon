@@ -115,7 +115,7 @@ describe("CelebrateScreen", () => {
     const html = render({ nextSteps: [] });
     expect(html).not.toContain("<li");
     expect(html).not.toContain("Còn ");
-    expect(html).toContain("Vào MYSP");
+    expect(html).toContain("Vào VPOST");
   });
 
   it("đếm số bước còn lại theo đúng số dòng vẽ ra", () => {

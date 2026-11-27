@@ -41,8 +41,15 @@ import { composePost, createPostBatch, generateCaptions } from "@/ui/services/po
 const BASE_CHANNEL_ID = COMPOSE_CHANNELS[0].id;
 
 export interface BulkRunRow {
+  /** Vị trí trong lượt chạy — khoá ổn định khi bảng đang lọc. */
+  index: number;
   code: string;
   status: BulkRowStatus;
+  /** VPOST: bài AI viết, người duyệt sửa được trước khi duyệt. */
+  caption: string | null;
+  /** VPOST: người duyệt đã bấm Duyệt — chỉ những dòng này được lên lịch. */
+  approved: boolean;
+  media: readonly { driveFileId: string; fileName?: string; kind?: string }[];
   /** Filled in once the product was found — helps recognise the code. */
   productName: string | null;
   /** Vietnamese sentence: why it was skipped or what failed. */
@@ -74,6 +81,10 @@ export type BulkRunPhase = "idle" | "running" | "stopping" | "finished";
 
 export interface BulkRunSummary {
   total: number;
+  /** Đã viết, đang chờ người duyệt. */
+  review: number;
+  /** Trong số đang chờ, đã bấm Duyệt. */
+  approved: number;
   done: number;
   skipped: number;
   failed: number;
@@ -83,9 +94,13 @@ export interface BulkRunSummary {
 }
 
 function initialRows(codes: readonly string[], channelCount: number): BulkRunRow[] {
-  return codes.map((code) => ({
+  return codes.map((code, index) => ({
+    index,
     code,
     status: "pending" as BulkRowStatus,
+    caption: null,
+    approved: false,
+    media: [],
     productName: null,
     reason: null,
     errorCode: null,
@@ -100,13 +115,16 @@ function summarise(rows: readonly BulkRunRow[]): BulkRunSummary {
   const skipped = count("skipped");
   const failed = count("error");
   const cancelled = count("cancelled");
+  const review = count("review");
   return {
     total: rows.length,
+    review,
+    approved: rows.filter((row) => row.status === "review" && row.approved).length,
     done,
     skipped,
     failed,
     cancelled,
-    processed: done + skipped + failed + cancelled,
+    processed: done + skipped + failed + cancelled + review,
   };
 }
 
@@ -149,6 +167,8 @@ export function useBulkRun() {
   const abortRef = useRef<AbortController | null>(null);
   /** Batches this run actually created — the only reason to touch the cache. */
   const createdCountRef = useRef(0);
+  /** VPOST: kênh + giờ của lượt soạn, dùng lại khi lên lịch các bài đã duyệt. */
+  const inputRef = useRef<BulkRunInput | null>(null);
 
   /**
    * The loop writes through the same API the wizard uses, but nothing in it
@@ -226,6 +246,7 @@ export function useBulkRun() {
       const signal = abortRef.current.signal;
 
       setRows(initialRows(input.codes, input.channelIds.length));
+      inputRef.current = input;
       setPhase("running");
 
       try {
@@ -301,38 +322,18 @@ export function useBulkRun() {
             }
 
             if (runId !== runIdRef.current) return;
-            patchRow(runId, index, { status: "creating" });
-
-            const captionByChannel: Record<string, string> = {};
-            for (const channelId of input.channelIds) captionByChannel[channelId] = caption;
-
-            const batch = await createPostBatch(
-              {
-                productCode: composed.content.code,
-                channelIds: input.channelIds,
-                captionByChannel,
-                scheduledAt: input.scheduledAt ?? null,
-                // `?? null` chứ không `||`: 0 là "đăng liên tục", một lựa chọn
-                // thật, không phải "chưa chọn".
-                spacingMs: input.spacingMs ?? null,
-                // Cover first — `composePost` already ordered the album that way.
-                media: composed.media.map((asset) => ({
-                  driveFileId: asset.driveFileId,
-                  fileName: asset.fileName,
-                  kind: asset.kind,
-                })),
-              },
-              signal,
-            );
-
-            // Counted BEFORE the row is patched: the batch exists on the server
-            // from here on, whatever happens to this component next.
-            createdCountRef.current += 1;
-
+            // VPOST: dừng ở đây — chỉ bài người duyệt mới được tạo lô (publishApproved).
             patchRow(runId, index, {
-              status: "done",
-              batchId: batch.batchId,
-              reason: batch.warnings.length > 0 ? batch.warnings.join(" · ") : null,
+              status: "review",
+              caption,
+              approved: false,
+              // Cover first — `composePost` already ordered the album that way.
+              media: composed.media.map((asset) => ({
+                driveFileId: asset.driveFileId,
+                fileName: asset.fileName,
+                kind: asset.kind,
+              })),
+              reason: composed.warnings.length > 0 ? composed.warnings.join(" · ") : null,
             });
           } catch (error) {
             // Never rethrown: the row carries the failure and the run continues.
@@ -353,6 +354,89 @@ export function useBulkRun() {
     [flushJobLogCache, patchRow, phase],
   );
 
+  /** VPOST: người duyệt sửa bài của một dòng đang chờ duyệt. Sửa xong phải bấm Duyệt lại. */
+  const editCaption = useCallback((index: number, caption: string) => {
+    setRows((current) =>
+      current.map((row) =>
+        row.index === index && row.status === "review" ? { ...row, caption, approved: false } : row,
+      ),
+    );
+  }, []);
+
+  /** VPOST: bấm Duyệt / Bỏ duyệt. Bài rỗng không duyệt được. */
+  const setApproved = useCallback((index: number, approved: boolean) => {
+    setRows((current) =>
+      current.map((row) =>
+        row.index === index && row.status === "review"
+          ? { ...row, approved: approved && Boolean(row.caption?.trim()) }
+          : row,
+      ),
+    );
+  }, []);
+
+  /** VPOST: người duyệt bỏ hẳn một dòng — không lên lịch, ghi rõ lý do trên dòng. */
+  const rejectRow = useCallback((index: number) => {
+    setRows((current) =>
+      current.map((row) =>
+        row.index === index && row.status === "review"
+          ? { ...row, status: "cancelled" as BulkRowStatus, approved: false, reason: "Người duyệt đã bỏ bài này." }
+          : row,
+      ),
+    );
+  }, []);
+
+  /**
+   * VPOST: tạo lô cho đúng các dòng đã duyệt, theo kênh + giờ đã chọn lúc soạn.
+   * Dòng chưa duyệt giữ nguyên "Chờ duyệt"; một dòng lỗi không dừng dòng khác.
+   */
+  const publishApproved = useCallback(async () => {
+    const input = inputRef.current;
+    if (!input || phase === "running" || phase === "stopping") return;
+    const targets = rows.filter((row) => row.status === "review" && row.approved && row.caption?.trim());
+    if (targets.length === 0) return;
+
+    const runId = runIdRef.current;
+    stopRef.current = false;
+    abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
+    setPhase("running");
+    try {
+      for (const row of targets) {
+        if (runId !== runIdRef.current || stopRef.current) break;
+        patchRow(runId, row.index, { status: "creating" });
+        try {
+          const captionByChannel: Record<string, string> = {};
+          for (const channelId of input.channelIds) captionByChannel[channelId] = row.caption!.trim();
+          const batch = await createPostBatch(
+            {
+              productCode: row.code,
+              channelIds: input.channelIds,
+              captionByChannel,
+              scheduledAt: input.scheduledAt ?? null,
+              // `?? null` chứ không `||`: 0 là "đăng liên tục", một lựa chọn thật.
+              spacingMs: input.spacingMs ?? null,
+              media: row.media,
+            },
+            signal,
+          );
+          // Đếm TRƯỚC khi sửa dòng: lô đã tồn tại trên máy chủ từ đây.
+          createdCountRef.current += 1;
+          patchRow(runId, row.index, {
+            status: "done",
+            batchId: batch.batchId,
+            reason: batch.warnings.length > 0 ? batch.warnings.join(" · ") : null,
+          });
+        } catch (error) {
+          if (signal.aborted || runId !== runIdRef.current) return;
+          patchRow(runId, row.index, outcomeFromError(error));
+        }
+      }
+    } finally {
+      flushJobLogCache();
+    }
+    if (runId === runIdRef.current) setPhase("finished");
+  }, [flushJobLogCache, patchRow, phase, rows]);
+
   return {
     rows,
     phase,
@@ -362,6 +446,10 @@ export function useBulkRun() {
     start,
     stop,
     reset,
+    editCaption,
+    setApproved,
+    rejectRow,
+    publishApproved,
   };
 }
 
