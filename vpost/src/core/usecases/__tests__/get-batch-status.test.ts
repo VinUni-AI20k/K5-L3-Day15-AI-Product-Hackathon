@@ -21,8 +21,8 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 
 const TENANT = testTenantId("00000000-0000-0000-0000-000000000001");
 const BATCH = "22222222-2222-2222-2222-222222222222";
-const STARTED_AT = new Date("2026-08-13T02:00:00.000Z");
-const FINISHED_AT = new Date("2026-08-13T02:04:00.000Z");
+const STARTED_AT = new Date("2054-08-13T02:00:00.000Z");
+const FINISHED_AT = new Date("2054-08-13T02:04:00.000Z");
 
 interface LogLine {
   level: string;
@@ -285,7 +285,7 @@ describe("getBatchStatus — per-channel table (brief §3/§6)", () => {
 // --- Progress: decoration, and only where the status allows it (design §5.7) -
 
 describe("getBatchStatus — progress, edge cases first", () => {
-  const NOW = new Date("2026-08-13T02:01:00.000Z");
+  const NOW = new Date("2054-08-13T02:01:00.000Z");
 
   const running = (overrides: Partial<PostJob> = {}): PostJob =>
     job({
@@ -441,7 +441,7 @@ describe("getBatchStatus — progress, edge cases first", () => {
   });
 
   it("passes the real deadline through for a waiting stage, and no counts", async () => {
-    const waitUntil = new Date("2026-08-13T02:02:00.000Z");
+    const waitUntil = new Date("2054-08-13T02:02:00.000Z");
     const { store } = fakeProgress({
       "job-1": waitingProgress("waiting_for_spacing", { attempt: 1, waitUntil, now: NOW }),
     });

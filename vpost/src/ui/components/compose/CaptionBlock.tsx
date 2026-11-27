@@ -242,7 +242,7 @@ export function CaptionBlock({
         </p>
       ) : null}
 
-      {/* --- Dòng đầu: công tắc caption riêng (PM, 21/08/2026) ---------- */}
+      {/* --- Dòng đầu: công tắc caption riêng (PM, 21/08/2054) ---------- */}
       <PerChannelSwitch
         id={`${fieldId}-per-channel`}
         /** The model still stores "dùng chung"; the switch shows its opposite,
@@ -515,7 +515,7 @@ const HASHTAG_BUDGET = 10;
 
 /**
  * "Caption riêng từng kênh" — the FIRST thing in the caption block (PM,
- * 21/08/2026), because it decides what everything under it means.
+ * 27/11/2026), because it decides what everything under it means.
  *
  * The switch is the inverse of the stored `shareCaption`: an operator turns ON
  * "riêng", and the model records "not shared". Presenting it the other way

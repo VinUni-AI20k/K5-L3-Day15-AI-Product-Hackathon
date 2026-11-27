@@ -184,7 +184,7 @@ function describe(draft: ComposeDraftState): DraftStatusText {
 }
 
 /**
- * "15:30" today, "20/08/2026 15:30" any other day, in the operator's own zone.
+ * "15:30" today, "27/11/2026 15:30" any other day, in the operator's own zone.
  *
  * The hour alone was a trap on the screen this line lives on: a draft is
  * restored days later, and "Đã lưu nháp lúc 01:31" reads as "a minute ago" —

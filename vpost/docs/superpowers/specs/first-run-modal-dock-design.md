@@ -1,6 +1,6 @@
 # First-run: modal 2 bước + dock 6 bước
 
-Ngày: 2026-08-24 · Trạng thái: đã duyệt (PM duyệt trong phiên brainstorming)
+Ngày: 2026-11-27 · Trạng thái: đã duyệt (PM duyệt trong phiên brainstorming)
 
 ## 1. Vấn đề
 

@@ -1,6 +1,6 @@
 # Tiến độ chi tiết cho màn theo dõi lô đăng
 
-Ngày: 2026-08-17 · Epic: E7.5 (đọc), E5/E7 (ghi), E10 (giao diện)
+Ngày: 2026-11-27 · Epic: E7.5 (đọc), E5/E7 (ghi), E10 (giao diện)
 
 ## 1. Vấn đề
 
@@ -47,7 +47,7 @@ chưa. Tiến độ là dữ liệu bổ trợ, có thể thiếu, có thể cũ
 
 Hệ quả bắt buộc: chỉ vẽ tiến độ khi `status ∈ {queued, publishing, scheduled_on_facebook}`.
 
-`scheduled_on_facebook` được PM bổ sung ngày 19/08/2026. Đây là ca DUY NHẤT hệ thống biết
+`scheduled_on_facebook` được PM bổ sung ngày 27/11/2026. Đây là ca DUY NHẤT hệ thống biết
 chính xác thời gian còn lại — chính giờ người vận hành đã chọn — và giấu nó đi làm mất
 dòng chữ trấn an nhất trên màn hình (xem mục 3.4).
 
@@ -63,7 +63,7 @@ thanh tiến độ — worker chết giữa chừng là tình huống có thật
 
 ### 3.4. Bài đã giao cho Facebook không phụ thuộc vào server này
 
-Yêu cầu của PM ngày 19/08/2026, và là lý do `scheduled_on_facebook` được hiện lên. Đã
+Yêu cầu của PM ngày 27/11/2026, và là lý do `scheduled_on_facebook` được hiện lên. Đã
 kiểm chứng trong code chứ không suy đoán:
 
 - Giao lịch thành công → bài TỒN TẠI trên Meta dưới dạng unpublished kèm
@@ -107,7 +107,7 @@ chuẩn kỹ thuật #5.
 
 ### 4.1. Nơi lưu: Redis nóng + chốt mốc vào Postgres
 
-Đã chốt với PM ngày 17/08/2026.
+Đã chốt với PM ngày 27/11/2026.
 
 | | Redis | `post_job_event` (Postgres) |
 |---|---|---|
@@ -245,7 +245,7 @@ tức là đánh đổi thứ quan trọng lấy thứ không quan trọng. Đâ
 được ghi ngay trong code tại chỗ `catch`, và `reviewer-qa` được báo trước để không đọc
 nhầm thành lỗi lọt lưới.
 
-Ranh giới của ngoại lệ (sửa 17/08/2026 sau khi triển khai phát hiện bản spec đầu tự mâu
+Ranh giới của ngoại lệ (sửa 27/11/2026 sau khi triển khai phát hiện bản spec đầu tự mâu
 thuẫn: §3.3 đòi một `INSERT` sự kiện hỏng cũng không được giết bài đăng, trong khi mục
 này lại giới hạn ngoại lệ ở `report`/`clear`; và §6 đòi test với một store *luôn ném*,
 tức một store vi phạm chính hợp đồng của nó).
@@ -291,8 +291,8 @@ bỏ kèm log warn* chứ không được thay bằng mặc định.
 
 ### 5.3. `adapters/queue/redis-job-progress.ts`
 
-- Key: `mysp:progress:{tenantId}:{postJobId}`, giá trị JSON, `SET ... EX 3600`.
-- **Mọi lệnh Redis phải có timeout (1,5 giây).** Bổ sung 19/08/2026 sau khi chạy thật
+- Key: `vpost:progress:{tenantId}:{postJobId}`, giá trị JSON, `SET ... EX 3600`.
+- **Mọi lệnh Redis phải có timeout (1,5 giây).** Bổ sung 27/11/2026 sau khi chạy thật
   bắt được lỗi: trỏ `REDIS_URL` vào một server chết thì `getBatchStatus` **treo vĩnh
   viễn** chứ không suy giảm. Kết nối được dùng chung với BullMQ, mà BullMQ bắt buộc
   `maxRetriesPerRequest: null` để lệnh blocking của nó không bị huỷ giữa chừng — hệ quả

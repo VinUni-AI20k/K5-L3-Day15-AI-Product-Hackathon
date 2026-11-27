@@ -44,7 +44,7 @@ export const CATALOG_SOURCE_CHOICES: readonly CatalogSourceChoice[] = [
 /**
  * WHY ONLY CSV, said where the operator is about to pick a file.
  *
- * PM decision (24/08/2026): reading `.xlsx` would mean a new dependency and
+ * PM decision (27/11/2026): reading `.xlsx` would mean a new dependency and
  * nobody approved one. The rule is stated BEFORE the picker rather than after a
  * failed upload — somebody who exports the wrong format, waits for the upload
  * and only then reads "hệ thống chỉ đọc CSV" has been told too late, and it is
@@ -108,7 +108,7 @@ export function missingSourceReason(source: CatalogSource | null | undefined): s
 export interface UploadedFileLine {
   /** "bang-gia-2026.csv" — the name as it was uploaded. */
   readonly fileName: string;
-  /** "14:32:07 24/08/2026", or null when the server sent no timestamp. */
+  /** "14:32:07 27/11/2026", or null when the server sent no timestamp. */
   readonly uploadedAt: string | null;
   readonly sizeLabel: string | null;
 }

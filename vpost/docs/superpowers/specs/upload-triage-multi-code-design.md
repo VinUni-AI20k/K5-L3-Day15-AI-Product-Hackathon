@@ -1,7 +1,7 @@
 # Thiết kế — Phân loại ảnh tải lên thành nhiều bài (nhiều mã, nhiều màu)
 
-Ngày: 26/08/2026 · Trạng thái: chờ PM duyệt · Epic: E9 (chế độ B) + E10 (giao diện)
-Phụ thuộc: `2026-08-26-minio-presigned-upload-design.md` — spec này đặt lên trên đường ống upload mới.
+Ngày: 27/11/2026 · Trạng thái: chờ PM duyệt · Epic: E9 (chế độ B) + E10 (giao diện)
+Phụ thuộc: `minio-presigned-upload-design.md` — spec này đặt lên trên đường ống upload mới.
 
 ## 1. Vấn đề
 
@@ -97,7 +97,7 @@ Tách nhóm, theo thứ tự:
 Cảnh báo mang lên nhóm: `MULTIPLE_PRODUCT_CODES` (tên có 2 mã — 739 file thật theo doc 05),
 `REPEATED_PRODUCT_CODE`, `MISSING_SEQUENCE`, `UNKNOWN_COLOR`.
 
-Tên có 2 mã → gán vào mã **đứng đầu**, một bài, kèm cảnh báo và cho sửa trong modal (PM chốt 26/08/2026).
+Tên có 2 mã → gán vào mã **đứng đầu**, một bài, kèm cảnh báo và cho sửa trong modal (PM chốt 27/11/2026).
 
 ## 6. Server
 
@@ -169,7 +169,7 @@ Thao tác mỗi nhóm: sửa mã (dùng lại picker gợi ý mã ở `product-s
 thứ tự và **đặt ảnh bìa** (dùng lại `AlbumArranger`, đã có đường bàn phím) · bỏ ảnh · tách nhóm · kéo ảnh từ khay
 "Chưa gán mã" vào.
 
-**Gộp nhóm** mở khi hai nhóm **cùng mã**, kể cả khác màu (PM chốt 26/08/2026 — xem mục 14):
+**Gộp nhóm** mở khi hai nhóm **cùng mã**, kể cả khác màu (PM chốt 27/11/2026 — xem mục 14):
 
 - gộp lại các nhóm con vừa bị tách vì quá 10 ảnh;
 - gộp nhiều màu của một mã thành một bài, khi operator muốn thế.
@@ -323,7 +323,7 @@ nhưng giữ `colorRaw` là tên màu gốc để truy vết. Rồi `composePost
 `restrictToDominantColor` gom theo `asset.color ?? ""` — tất cả cùng một khoá, ra **một album, không
 cảnh báo**. Chính là đường mà bài upload không màu đang đi hôm nay.
 
-**PM chốt 26/08/2026:** cho gộp. Mở nút "gộp các màu của mã này thành một bài" trong modal,
+**PM chốt 27/11/2026:** cho gộp. Mở nút "gộp các màu của mã này thành một bài" trong modal,
 **mặc định vẫn tách theo màu** như hiện tại.
 
 Phạm vi của quyết định này hẹp đúng như vậy: nó chỉ áp cho lô đang phân loại ở chế độ B. Đường Drive

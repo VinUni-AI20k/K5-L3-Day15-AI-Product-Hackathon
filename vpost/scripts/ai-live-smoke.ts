@@ -42,7 +42,7 @@ import { makeGenerateCaptions } from "@/core/usecases/generate-captions";
  *   A5 token counts / cost / latency are what the cost model assumes;
  *   A6 the 4 validation stages behave on REAL model output, not fixtures.
  *
- * SINGLE PROVIDER (owner decision 15/08/2026): the registry lists OpenAI models
+ * SINGLE PROVIDER (owner decision 27/11/2026): the registry lists OpenAI models
  * only, so this script drives OpenAI only. The Gemini steps (A1 — does Gemini
  * accept `responseJsonSchema`) and the cross-provider fallback steps were
  * removed with that decision; restore them from git history together with the

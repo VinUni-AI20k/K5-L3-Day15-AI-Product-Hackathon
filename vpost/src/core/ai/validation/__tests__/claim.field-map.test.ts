@@ -4,7 +4,7 @@
  * Before the field map, the prompt labels stage 3 knows how to strip were the
  * internal company's four column names. An outside tenant whose sheet says
  * "Nhóm hàng" got its quoted sources rejected as ungrounded — the same false
- * reject that blocked 3 of 4 real generations on 15/08/2026, only permanent.
+ * reject that blocked 3 of 4 real generations on 27/11/2026, only permanent.
  *
  * Edge cases first: a map is external data and may be partial, empty, full of
  * punctuation, or carry regex metacharacters.
@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { validateClaims } from "@/core/ai/validation/claim";
 import { validateGeneratedContent } from "@/core/ai/validation";
 import type { ValidationContext } from "@/core/ai/validation/types";
-import { makeFieldMap, MYSP_FIELD_MAP } from "@/core/domain/catalog-field-map";
+import { makeFieldMap, VPOST_FIELD_MAP } from "@/core/domain/catalog-field-map";
 import type { CaptionContent, CaptionInput } from "@/core/domain/caption";
 
 const product: CaptionInput = {
@@ -109,7 +109,7 @@ describe("stage 3 — prompt labels follow the tenant's field map", () => {
   });
 
   it("survives a tenant header identical to a preset label", () => {
-    const context = { ...baseContext, fieldMap: makeFieldMap({ ...MYSP_FIELD_MAP }) };
+    const context = { ...baseContext, fieldMap: makeFieldMap({ ...VPOST_FIELD_MAP }) };
     expect(rules(context, "- Mô tả sản phẩm: Chất liệu lụa mềm mát")).toEqual([]);
   });
 

@@ -155,7 +155,7 @@ describe("GoogleConnectionSchema", () => {
     const parsed = GoogleConnectionSchema.safeParse({
       state: "connected",
       email: "a@b.com",
-      connectedAt: "2026-08-19T03:00:00.000Z",
+      connectedAt: "2054-08-19T03:00:00.000Z",
       scopes: ["drive.readonly"],
       sourceAccess: "ok",
     });
@@ -178,7 +178,7 @@ describe("GoogleConnectionSchema", () => {
     const parsed = GoogleConnectionSchema.parse({
       state: "connected",
       email: "a@b.com",
-      connectedAt: "2026-08-19T03:00:00.000Z",
+      connectedAt: "2054-08-19T03:00:00.000Z",
       scopes: [],
       sourceAccess: "something_new",
     });
@@ -189,7 +189,7 @@ describe("GoogleConnectionSchema", () => {
     const parsed = GoogleConnectionSchema.parse({
       state: "connected",
       email: "a@b.com",
-      connectedAt: "2026-08-19T03:00:00.000Z",
+      connectedAt: "2054-08-19T03:00:00.000Z",
       scopes: [],
       sourceAccess: "drive_unreadable",
     });
@@ -204,7 +204,7 @@ describe("GoogleConnectionSchema", () => {
     const parsed = GoogleConnectionSchema.parse({
       state: "expired",
       email: "a@b.com",
-      connectedAt: "2026-08-19T03:00:00.000Z",
+      connectedAt: "2054-08-19T03:00:00.000Z",
       reason: "GOOGLE_AUTH_EXPIRED",
     });
     expect(parsed.state).toBe("expired");
@@ -216,7 +216,7 @@ describe("GoogleConnectionSchema", () => {
       GoogleConnectionSchema.parse({
         state: "connected",
         email: "a@b.com",
-        connectedAt: "2026-08-19T03:00:00.000Z",
+        connectedAt: "2054-08-19T03:00:00.000Z",
         scopes: ["drive.readonly"],
         sourceAccess: "ok",
       }).state,
@@ -305,6 +305,6 @@ describe("formatConnectedAt", () => {
   });
 
   it("formats a real ISO timestamp", () => {
-    expect(formatConnectedAt("2026-08-19T03:00:00.000Z")).not.toBeNull();
+    expect(formatConnectedAt("2054-08-19T03:00:00.000Z")).not.toBeNull();
   });
 });

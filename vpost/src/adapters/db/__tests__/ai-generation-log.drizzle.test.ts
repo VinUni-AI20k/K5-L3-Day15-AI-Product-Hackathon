@@ -65,7 +65,7 @@ function entry(overrides: Partial<GenerationLogEntry> = {}): GenerationLogEntry 
     estimatedCostUsd: 0.00136,
     success: true,
     validationPassed: true,
-    createdAt: "2026-08-13T02:00:00.000Z",
+    createdAt: "2054-08-13T02:00:00.000Z",
     ...overrides,
   };
 }
@@ -198,7 +198,7 @@ describe("drizzle ai_generation log", () => {
 });
 
 /**
- * Measured live on 15/08/2026: gpt-4.1-mini returned mojibake containing U+0000.
+ * Measured live on 27/11/2026: gpt-4.1-mini returned mojibake containing U+0000.
  * Postgres refuses that byte in text and jsonb ("unsupported Unicode escape
  * sequence"), so the whole INSERT failed and the row explaining why the post was
  * blocked was lost — the opposite of business rule 5.

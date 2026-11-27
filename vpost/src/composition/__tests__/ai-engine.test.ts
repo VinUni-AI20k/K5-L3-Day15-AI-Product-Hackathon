@@ -1,6 +1,6 @@
 /**
  * Which provider adapters a process ends up with (E4, single-provider decision
- * 15/08/2026). This is the branch that decides whether the system boots at all
+ * 27/11/2026). This is the branch that decides whether the system boots at all
  * without a Google key, so it gets its own test rather than being implied by the
  * gateway tests.
  */
@@ -98,7 +98,7 @@ describe("tierModelsVariant", () => {
 
 /**
  * The tier swap has to reach the YAML store AND the cache key. Losing either
- * half is the bug of 15/08/2026: the model did not change, or another process's
+ * half is the bug of 27/11/2026: the model did not change, or another process's
  * routing was served back. Both halves are asserted here on the REAL registry.
  */
 describe("makeAiPolicyStore", () => {

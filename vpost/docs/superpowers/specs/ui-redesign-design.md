@@ -1,6 +1,6 @@
-# Spec — Redesign toàn bộ giao diện MYSP ("Sổ mẫu vải")
+# Spec — Redesign toàn bộ giao diện VPOST ("Sổ mẫu vải")
 
-Ngày: 2026-08-21 · Trạng thái: chờ PM duyệt spec · Người quyết định: PM (Zan)
+Ngày: 2026-11-27 · Trạng thái: chờ PM duyệt spec · Người quyết định: PM (Zan)
 
 ## 1. Mục tiêu và phạm vi
 
@@ -46,7 +46,7 @@ Hiện thực hoá: toàn bộ qua token semantic trong `src/app/globals.css` + 
 
 | Nhóm | Mục | Thay đổi so với hiện tại |
 |---|---|---|
-| Bàn làm việc | Tổng quan `/` | Nội dung làm lại (mục 3.2); tên nhóm "Bàn làm việc" (PM chốt 22/08 — mọi nhóm đều có tiêu đề) |
+| Bàn làm việc | Tổng quan `/` | Nội dung làm lại (mục 3.2); tên nhóm "Bàn làm việc" (PM chốt 27/11 — mọi nhóm đều có tiêu đề) |
 | Đăng bài | Soạn bài `/compose` · Chạy hàng loạt `/bulk` | Giữ 2 route; thống nhất UI chọn kênh + hẹn giờ |
 | Theo dõi | Bài đăng `/posts` (tab **Đã hẹn** / **Nhật ký**) | Gộp `/scheduled` + `/jobs`; redirect `/scheduled → /posts?tab=scheduled`, `/jobs → /posts?tab=log` (giữ nguyên query còn lại); `/batches/[id]` giữ route, thêm breadcrumb về `/posts` |
 | Dữ liệu | Sản phẩm `/products` · Đồng bộ `/sync` | Giữ |
@@ -101,4 +101,4 @@ Redirect làm ở tầng route (Next.js redirect trong page/`next.config.ts`), k
 
 ## 7. Ngoài phạm vi
 
-- Mọi thay đổi API/endpoint/schema/worker; TikTok/video Phase 2; trang marketing (mode Persuade); đổi tên thương hiệu "MYSP"; endpoint thống kê mới cho Tổng quan (đợt sau nếu PM muốn số thật cho mọi ô).
+- Mọi thay đổi API/endpoint/schema/worker; TikTok/video Phase 2; trang marketing (mode Persuade); đổi tên thương hiệu "VPOST"; endpoint thống kê mới cho Tổng quan (đợt sau nếu PM muốn số thật cho mọi ô).

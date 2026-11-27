@@ -13,7 +13,7 @@ import type { BatchChannelProgress } from "@/ui/schemas/post-batch.schema";
  * is known. Edge cases first (CLAUDE.md technical rule 1).
  */
 
-const STARTED = "2026-08-12T03:00:00.000Z";
+const STARTED = "2054-08-12T03:00:00.000Z";
 const STARTED_MS = Date.parse(STARTED);
 
 function makeProgress(overrides: Partial<BatchChannelProgress> = {}): BatchChannelProgress {

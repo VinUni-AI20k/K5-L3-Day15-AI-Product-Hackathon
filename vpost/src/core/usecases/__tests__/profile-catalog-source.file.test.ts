@@ -29,7 +29,7 @@ const FILE_CONFIG: CatalogTextConfig = {
   kind: "file",
   storageKey: `${TENANT}/catalog_abc`,
   fileName: "bang-gia.csv",
-  uploadedAt: "2026-08-24T10:00:00.000Z",
+  uploadedAt: "2054-08-24T10:00:00.000Z",
 };
 
 function makeLogger(): Logger {

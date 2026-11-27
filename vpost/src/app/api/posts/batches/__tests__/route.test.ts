@@ -195,8 +195,8 @@ describe("POST /api/posts/batches — the fan-out", () => {
     await POST(
       post(
         validBody({
-          scheduledAt: "2026-08-13T02:20:00.000Z",
-          scheduledAtByChannel: { "fbpage-a": "2026-08-13T03:00:00.000Z" },
+          scheduledAt: "2054-08-13T02:20:00.000Z",
+          scheduledAtByChannel: { "fbpage-a": "2054-08-13T03:00:00.000Z" },
         }),
       ),
     );
@@ -205,8 +205,8 @@ describe("POST /api/posts/batches — the fan-out", () => {
       scheduledAt: Date;
       scheduledAtByChannel: Record<string, Date>;
     };
-    expect(input.scheduledAt).toEqual(new Date("2026-08-13T02:20:00.000Z"));
-    expect(input.scheduledAtByChannel["fbpage-a"]).toEqual(new Date("2026-08-13T03:00:00.000Z"));
+    expect(input.scheduledAt).toEqual(new Date("2054-08-13T02:20:00.000Z"));
+    expect(input.scheduledAtByChannel["fbpage-a"]).toEqual(new Date("2054-08-13T03:00:00.000Z"));
   });
 
   // --- Per-run spacing: edge cases first ---------------------------------

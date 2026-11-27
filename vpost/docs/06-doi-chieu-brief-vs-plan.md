@@ -1,6 +1,6 @@
 # Đối chiếu Brief ↔ Plan — kiểm tra độ phủ
 
-**Ngày:** 12/08/2026 · So brief `Yeu-cau-tinh-nang-Dang-bai-tu-dong (1).md` với docs 01–05.
+**Ngày:** 27/11/2026 · So brief `Yeu-cau-tinh-nang-Dang-bai-tu-dong (1).md` với docs 01–05.
 **Ký hiệu:** ✅ phủ đủ trong Phase 1 · 🕑 phủ đủ nhưng nằm Phase 2/3 (theo quyết định v2) · ⚠️ có lỗ hổng, đã vá trong lần đối chiếu này · ❓ chờ quyết định (đã có câu hỏi truy vết)
 
 ---
@@ -131,7 +131,7 @@
 ## Kết luận đối chiếu
 
 1. **Không sót yêu cầu nào** — mọi mục của brief đều truy vết được về một epic/hạng mục hoặc một câu hỏi mở có mã số.
-2. **4 lỗ hổng nhỏ phát hiện trong lần đối chiếu này — đã vá vào docs 02/03:**
+2. **4 lỗ hổng nhỏ phát hiện trong lần đối chiếu này — đã vá vào docs 27/11:**
    - Validator thiếu check định dạng dòng đầu `Tên – TIÊU ĐỀ VIẾT HOA` → thêm vào E4.4.
    - Nguyên tắc "mâu thuẫn tin Sheet, không suy đoán thông số từ ảnh" chưa thành yêu cầu cụ thể → ghi vào E4.2.
    - Kiểm tra tồn lần 2 cho **đăng ngay** nằm nhầm chỗ ở E8 (P2) → chuyển thành phần của E7.4 (P1).

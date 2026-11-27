@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16 App Router · React 19 · `@astryxdesign/core` 0.4.0 · `@astryxdesign/theme-neutral` 0.4.0 · `lucide-react` (icon, đã có sẵn) · Tailwind v4 (chưa nạp bridge Astryx) · vitest (environment `node`)
 
-**Spec:** `docs/superpowers/specs/2026-08-14-redesign-ui-astryx-design.md`
+**Spec:** `docs/superpowers/specs/redesign-ui-astryx-design.md`
 
 ## Global Constraints
 
@@ -286,7 +286,7 @@ export function AppSideNav({ footer }: { footer: ReactNode }) {
   return (
     <SideNav
       collapsible
-      resizable={{ defaultWidth: 256, minWidth: 240, maxWidth: 280, autoSaveId: "mysp-nav" }}
+      resizable={{ defaultWidth: 256, minWidth: 240, maxWidth: 280, autoSaveId: "vpost-nav" }}
       footer={footer}
     >
       {NAV_SECTIONS.map((section) => (

@@ -67,7 +67,7 @@ describe("MeResponseSchema", () => {
       supportSession: {
         tenantId: "00000000-0000-0000-0000-000000000002",
         tenantName: "Nhà Xe An Anh",
-        expiresAt: "2026-08-20T11:00:00.000Z",
+        expiresAt: "2054-08-20T11:00:00.000Z",
       },
     });
     expect(parsed.success && parsed.data.supportSession?.tenantName).toBe("Nhà Xe An Anh");
@@ -148,9 +148,9 @@ describe("labels", () => {
   it("never renders an empty plan or an empty operator name", () => {
     expect(planLabel("pro")).toBe("Pro");
     expect(planLabel("   ")).toBe("Không rõ gói");
-    expect(accountDisplayName(undefined, "a@mysp.vn")).toBe("a@mysp.vn");
+    expect(accountDisplayName(undefined, "a@vpost.vn")).toBe("a@vpost.vn");
     expect(
-      accountDisplayName(MeResponseSchema.parse(LIVE_PAYLOAD), "a@mysp.vn"),
+      accountDisplayName(MeResponseSchema.parse(LIVE_PAYLOAD), "a@vpost.vn"),
     ).toBe("Nguyen Van A");
   });
 });

@@ -24,10 +24,10 @@ const OWNER_ROW = {
   membershipId: "m-owner",
   accountId: "a-owner",
   displayName: "Chị Chủ",
-  email: "owner@mysp.vn",
+  email: "owner@vpost.vn",
   role: "owner" as const,
   status: "active",
-  joinedAt: "2026-08-01T09:00:00+07:00",
+  joinedAt: "2054-08-01T09:00:00+07:00",
   isYou: false,
 };
 
@@ -48,7 +48,7 @@ describe("MemberListResponseSchema", () => {
           email: "dev@localhost",
           role: "owner",
           status: "active",
-          joinedAt: "2026-08-19T10:13:28.916Z",
+          joinedAt: "2054-08-19T10:13:28.916Z",
           isYou: true,
         },
       ],
@@ -66,7 +66,7 @@ describe("MemberListResponseSchema", () => {
     expect(parsed.success).toBe(true);
     // …and the row still has something to call the person.
     expect(memberDisplayName({ displayName: null, email: null })).toBe("(chưa có tên)");
-    expect(memberDisplayName({ displayName: "  ", email: "a@mysp.vn" })).toBe("a@mysp.vn");
+    expect(memberDisplayName({ displayName: "  ", email: "a@vpost.vn" })).toBe("a@vpost.vn");
   });
 
   it("rejects a role the UI cannot render", () => {
@@ -92,7 +92,7 @@ describe("MemberListResponseSchema", () => {
 
   it("rejects an unparseable joinedAt instead of showing an invalid date", () => {
     expect(
-      MemberListResponseSchema.safeParse({ items: [{ ...OWNER_ROW, joinedAt: "01/08/2026" }] })
+      MemberListResponseSchema.safeParse({ items: [{ ...OWNER_ROW, joinedAt: "01/08/2054" }] })
         .success,
     ).toBe(false);
   });

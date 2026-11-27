@@ -51,7 +51,7 @@ import "./onboarding-motion.css";
  * rather than as a new variant nobody else in the app would use. `rounded-lg`
  * IS `--radius` (16px) — the prototype's own corner, and the value the shared
  * `Button` already defaults to; the earlier `rounded-md` (12.8px) came from the
- * Buffer screenshots, which the PM set aside on 26/08/2026.
+ * Buffer screenshots, which the PM set aside on 27/11/2026.
  */
 
 /**

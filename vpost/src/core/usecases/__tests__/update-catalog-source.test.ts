@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_STOCK_POLICY,
   makeFieldMap,
-  MYSP_FIELD_MAP,
+  VPOST_FIELD_MAP,
 } from "@/core/domain/catalog-field-map";
 
 import type { CatalogTextConfig } from "@/core/domain/catalog-text-config";
@@ -55,7 +55,7 @@ function makeHarness(
   const catalogConfig: CatalogConfigRepo = {
     findCatalogConfig: async () => options.previous ?? null,
     findStockPolicy: async () => DEFAULT_STOCK_POLICY,
-    findFieldMap: async () => MYSP_FIELD_MAP,
+    findFieldMap: async () => VPOST_FIELD_MAP,
     findCatalogSource: async () => options.previous ?? null,
     saveCatalogSource: async (input) => {
       if (options.saveError) throw options.saveError;
@@ -246,11 +246,11 @@ describe("updateCatalogSource — edge cases first", () => {
       driveFolder: FOLDER_ID,
       spreadsheet: SHEET_ID,
       sheetName: "Mẫu 2026",
-      actorEmail: "ai-do@mysp.local",
+      actorEmail: "ai-do@vpost.local",
     });
     expect(harness.saved[0]).toMatchObject({
       actorUserId: null,
-      actorEmail: "ai-do@mysp.local",
+      actorEmail: "ai-do@vpost.local",
     });
   });
 });
@@ -305,12 +305,12 @@ describe("updateCatalogSource — happy path", () => {
       driveFolder: FOLDER_ID,
       spreadsheet: SHEET_ID,
       sheetName: "Mẫu 2026",
-      actorEmail: "  Operator@MYSP.local ",
+      actorEmail: "  Operator@VPOST.local ",
     });
     expect(harness.saved[0]).toMatchObject({
       tenantId: TENANT,
       actorUserId: "11111111-1111-1111-1111-111111111111",
-      actorEmail: "operator@mysp.local",
+      actorEmail: "operator@vpost.local",
     });
   });
 
@@ -364,7 +364,7 @@ describe("updateCatalogSource — happy path", () => {
         driveFolder: FOLDER_ID,
         spreadsheet: SHEET_ID,
         sheetName: "Mẫu 2026",
-        actorEmail: "operator@mysp.local",
+        actorEmail: "operator@vpost.local",
       }),
     ).resolves.toMatchObject({ driveFolderId: FOLDER_ID });
     expect(harness.saved[0]?.actorUserId).toBeNull();
@@ -379,7 +379,7 @@ describe("updateCatalogSource — happy path", () => {
  * would arrive from the browser and outside data is not trusted.
  */
 describe("updateCatalogSource — the source-access verdict", () => {
-  const NOW = Date.UTC(2026, 7, 19, 4, 0, 0);
+  const NOW = Date.UTC(2054, 7, 19, 4, 0, 0);
   const clock = { now: () => new Date(NOW), nowMs: () => NOW };
 
   function withProbe(options: {
@@ -627,7 +627,7 @@ const FILE_SOURCE: CatalogTextConfig = {
   kind: "file",
   storageKey: `${TENANT}/catalog_abc`,
   fileName: "bang-gia.csv",
-  uploadedAt: "2026-08-24T10:00:00.000Z",
+  uploadedAt: "2054-08-24T10:00:00.000Z",
 };
 
 describe("updateCatalogSource — file source", () => {

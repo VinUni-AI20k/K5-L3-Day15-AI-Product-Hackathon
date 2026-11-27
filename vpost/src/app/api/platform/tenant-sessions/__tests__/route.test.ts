@@ -45,12 +45,12 @@ const request = (body: unknown) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getOperatorSession.mockResolvedValue({ email: "staff@mysp.vn", accountId: "acc-staff" });
+  getOperatorSession.mockResolvedValue({ email: "staff@vpost.vn", accountId: "acc-staff" });
   requirePlatformAdmin.mockResolvedValue({ accountId: "acc-staff", platformRole: "support" });
   open.mockResolvedValue({
     sessionId: SESSION_ID,
     tenant: { id: TENANT, name: "Khách A", slug: "khach-a" },
-    expiresAt: new Date("2026-08-22T07:00:00Z"),
+    expiresAt: new Date("2054-08-22T07:00:00Z"),
   });
 });
 
@@ -97,7 +97,7 @@ describe("POST /api/platform/tenant-sessions — opening", () => {
       tenantId: TENANT,
       purpose: PURPOSE,
       accountId: "acc-staff",
-      actorEmail: "staff@mysp.vn",
+      actorEmail: "staff@vpost.vn",
     });
 
     const cookie = response.headers.get("set-cookie") ?? "";

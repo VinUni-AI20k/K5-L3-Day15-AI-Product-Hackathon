@@ -3,7 +3,7 @@
 Bối cảnh: công cụ nội bộ, team rất nhỏ (1 người + AI agent), có thể mở bán SaaS về sau.
 Nguyên tắc xuyên suốt: **ít thành phần nhất có thể**, ưu tiên thứ tự-nghiệp-vụ-đúng hơn là hạ tầng đẹp.
 
-> **Cập nhật v2 (12/08/2026):** TikTok chuyển sang Phase 2 (app đã có sẵn, audit theo dõi song song — mục 1.1, 1.2 giữ lại làm tài liệu cho Phase 2). SaaS-ready mức data model đã **chốt**: tenant_id mọi bảng + config theo tenant (xem mục 4). Hai trong ba quyết định ở mục 7 đã đóng, còn B10.
+> **Cập nhật v2 (27/11/2026):** TikTok chuyển sang Phase 2 (app đã có sẵn, audit theo dõi song song — mục 1.1, 1.2 giữ lại làm tài liệu cho Phase 2). SaaS-ready mức data model đã **chốt**: tenant_id mọi bảng + config theo tenant (xem mục 4). Hai trong ba quyết định ở mục 7 đã đóng, còn B10.
 
 ---
 
@@ -52,7 +52,7 @@ Kéo theo: cần một tiến trình chạy nền 24/7 (không phải serverless
 | Giao diện | **Tailwind + shadcn/ui** | Công cụ nội bộ — cần dựng nhanh, không cần design system riêng. |
 | Cơ sở dữ liệu | **PostgreSQL** | Cần transaction thật cho trạng thái bài đăng, và dùng luôn làm hàng đợi. |
 | Truy vấn DB | **Drizzle ORM** | TypeScript-first, migration rõ ràng, không có runtime nặng. (Prisma cũng được nếu quen hơn.) |
-| Hàng đợi + hẹn lịch | **BullMQ + Redis** *(đổi từ pg-boss — quyết định owner 12/08/2026)* | Hẹn giờ, thử lại, repeatable job, rate-limit theo queue, concurrency control. Redis dùng thêm cho: cache nóng model-registry, rate-limit adapter AI/Graph API. Đánh đổi đã chấp nhận: thêm một service phải vận hành + backup. |
+| Hàng đợi + hẹn lịch | **BullMQ + Redis** *(đổi từ pg-boss — quyết định owner 27/11/2026)* | Hẹn giờ, thử lại, repeatable job, rate-limit theo queue, concurrency control. Redis dùng thêm cho: cache nóng model-registry, rate-limit adapter AI/Graph API. Đánh đổi đã chấp nhận: thêm một service phải vận hành + backup. |
 | Tiến trình nền | **Worker Node.js riêng**, cùng repo, khác entrypoint | Upload video mất nhiều phút — không được chạy trong request web. |
 | Xử lý media | **ffmpeg / ffprobe** | Kiểm tra tỉ lệ khung hình, thời lượng, dung lượng, codec **trước khi** upload (brief mục 5 yêu cầu rõ). |
 | AI viết caption | **AI Gateway đa provider** (ADR-001, `docs/ai/`) — primary Google AI Studio/Gemini (**bắt buộc paid tier** — free tier dùng data để training), fallback OpenAI; model theo **registry** YAML+DB, routing cheap→validate→escalate | KHÔNG hardcode model trong business code; SDK AI chỉ trong `adapters/ai/**` |
@@ -64,7 +64,7 @@ Kéo theo: cần một tiến trình chạy nền 24/7 (không phải serverless
 ### Vì sao không chọn các phương án khác
 
 - **Vercel/serverless:** giới hạn thời gian chạy và dung lượng request; upload video theo từng phần và scheduler 24/7 không hợp. Có thể dùng cho giao diện, nhưng vẫn phải nuôi worker riêng ở nơi khác — thành hai chỗ phải vận hành thay vì một.
-- ~~BullMQ + Redis: mạnh hơn nhưng thêm một dịch vụ phải vận hành~~ → **12/08/2026: owner quyết định chuyển sang BullMQ + Redis** (chuẩn bị scale SaaS + tận dụng Redis cho cache/rate-limit). Nhận định cũ về chi phí vận hành vẫn đúng — xử lý bằng: Redis chạy trong Docker Compose cùng stack, AOF persistence, nằm trong kịch bản backup. pg-boss ghi lại ở đây làm phương án thu gọn nếu sau này muốn giảm thành phần.
+- ~~BullMQ + Redis: mạnh hơn nhưng thêm một dịch vụ phải vận hành~~ → **27/11/2026: owner quyết định chuyển sang BullMQ + Redis** (chuẩn bị scale SaaS + tận dụng Redis cho cache/rate-limit). Nhận định cũ về chi phí vận hành vẫn đúng — xử lý bằng: Redis chạy trong Docker Compose cùng stack, AOF persistence, nằm trong kịch bản backup. pg-boss ghi lại ở đây làm phương án thu gọn nếu sau này muốn giảm thành phần.
 - **n8n / Make / Zapier:** dựng nhanh cho luồng đơn giản, nhưng brief có validator caption, quy tắc tồn kho nhiều tầng, upload theo từng phần, và bảng tổng kết lô. Nhồi hết vào công cụ no-code sẽ khó gỡ lỗi và không kiểm thử được.
 
 ---
@@ -114,7 +114,7 @@ Kéo theo: cần một tiến trình chạy nền 24/7 (không phải serverless
 - Chưa làm: UI đăng ký tenant, mời thành viên, billing — Phase sau, thêm được mà không đổi schema.
 
 ```
-tenant             — hiện chỉ 1 dòng (MYSP); mọi bảng dưới đều mang tenant_id
+tenant             — hiện chỉ 1 dòng (VPOST); mọi bảng dưới đều mang tenant_id
 tenant_integration — theo tenant: drive_folder_id, sheet_id, tên tab,
                      credential Google (tham chiếu), cấu hình khác
 user               — thuộc tenant, vai trò
@@ -228,9 +228,9 @@ Không đạt ở bước đầu là dừng ngay và báo lỗi cụ thể (sai 
 
 ## 7. Ba quyết định chặn thiết kế database — trạng thái
 
-1. ✅ **TikTok không nằm trong phase 1** — chốt 12/08/2026. App có sẵn, audit theo dõi song song, code sang Phase 2.
-2. ✅ **Tồn kho theo MÃ** — đóng 12/08/2026 bằng khảo sát dữ liệu thật (`05-data-profile.md` mục 2.4): Sheet mỗi mã một dòng, ô Màu sắc ghi gộp ("KEM, HỒNG"), một số Tồn cho cả mã. Schema không cần bảng tồn-theo-màu. Rủi ro "mã còn hàng nhưng màu cụ thể đã hết" là giới hạn của dữ liệu nguồn — ghi vào rủi ro nghiệp vụ, không xử lý bằng schema.
-3. ✅ **SaaS-ready mức data model** — chốt 12/08/2026. tenant_id mọi bảng + `tenant_integration`; chưa làm UI đăng ký/mời user.
+1. ✅ **TikTok không nằm trong phase 1** — chốt 27/11/2026. App có sẵn, audit theo dõi song song, code sang Phase 2.
+2. ✅ **Tồn kho theo MÃ** — đóng 27/11/2026 bằng khảo sát dữ liệu thật (`05-data-profile.md` mục 2.4): Sheet mỗi mã một dòng, ô Màu sắc ghi gộp ("KEM, HỒNG"), một số Tồn cho cả mã. Schema không cần bảng tồn-theo-màu. Rủi ro "mã còn hàng nhưng màu cụ thể đã hết" là giới hạn của dữ liệu nguồn — ghi vào rủi ro nghiệp vụ, không xử lý bằng schema.
+3. ✅ **SaaS-ready mức data model** — chốt 27/11/2026. tenant_id mọi bảng + `tenant_integration`; chưa làm UI đăng ký/mời user.
 
 **Cả 3 quyết định đã đóng — schema hết bị chặn, E1 bắt đầu được ngay.**
 

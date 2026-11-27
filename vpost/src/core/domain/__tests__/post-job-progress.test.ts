@@ -16,7 +16,7 @@ import {
   type PostJobWorkingStage,
 } from "../post-job-progress";
 
-const NOW = new Date("2026-08-17T09:00:00.000Z");
+const NOW = new Date("2054-08-17T09:00:00.000Z");
 
 // --- Edge cases first (design §6) -------------------------------------------
 

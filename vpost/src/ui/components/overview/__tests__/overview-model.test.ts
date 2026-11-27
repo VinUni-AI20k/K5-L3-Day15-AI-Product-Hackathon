@@ -30,7 +30,7 @@ function upcoming(id: string, overrides: Partial<UpcomingJobInput> = {}): Upcomi
     id,
     code: `MGK${id}`,
     channelName: "Page A",
-    scheduledAt: "2026-08-21T10:00:00.000Z",
+    scheduledAt: "2054-08-21T10:00:00.000Z",
     ...overrides,
   };
 }
@@ -73,9 +73,9 @@ describe("pickAttentionItems", () => {
     const items = pickAttentionItems({
       failedJobs: [],
       upcoming: [
-        upcoming("late", { scheduledAt: "2026-08-21T18:00:00.000Z" }),
+        upcoming("late", { scheduledAt: "2054-08-21T18:00:00.000Z" }),
         upcoming("broken", { scheduledAt: "khong-phai-gio" }),
-        upcoming("soon", { scheduledAt: "2026-08-21T09:00:00.000Z" }),
+        upcoming("soon", { scheduledAt: "2054-08-21T09:00:00.000Z" }),
       ],
     });
     expect(items.map((item) => item.id)).toEqual(["soon", "late", "broken"]);
@@ -86,11 +86,11 @@ describe("pickAttentionItems", () => {
     const items = pickAttentionItems({
       failedJobs: [failed("f1"), failed("f2")],
       upcoming: [
-        upcoming("u1", { scheduledAt: "2026-08-21T09:00:00.000Z" }),
-        upcoming("u2", { scheduledAt: "2026-08-21T10:00:00.000Z" }),
-        upcoming("u3", { scheduledAt: "2026-08-21T11:00:00.000Z" }),
-        upcoming("u4", { scheduledAt: "2026-08-21T12:00:00.000Z" }),
-        upcoming("u5", { scheduledAt: "2026-08-21T13:00:00.000Z" }),
+        upcoming("u1", { scheduledAt: "2054-08-21T09:00:00.000Z" }),
+        upcoming("u2", { scheduledAt: "2054-08-21T10:00:00.000Z" }),
+        upcoming("u3", { scheduledAt: "2054-08-21T11:00:00.000Z" }),
+        upcoming("u4", { scheduledAt: "2054-08-21T12:00:00.000Z" }),
+        upcoming("u5", { scheduledAt: "2054-08-21T13:00:00.000Z" }),
       ],
     });
 
@@ -206,15 +206,15 @@ describe("pickAttentionItems", () => {
     const items = pickAttentionItems({
       failedJobs: [],
       upcoming: [
-        upcoming("u1", { code: "MGKVX6310", scheduledAt: "2026-08-21T10:00:00.000Z" }),
-        upcoming("u2", { code: "MGKVX6310", scheduledAt: "2026-08-21T11:00:00.000Z" }),
+        upcoming("u1", { code: "MGKVX6310", scheduledAt: "2054-08-21T10:00:00.000Z" }),
+        upcoming("u2", { code: "MGKVX6310", scheduledAt: "2054-08-21T11:00:00.000Z" }),
       ],
     });
     // The head is the SOONEST hour — the upcoming side is sorted before folding.
     expect(items[0]).toMatchObject({
       jobCount: 2,
       isUniform: false,
-      scheduledAt: "2026-08-21T10:00:00.000Z",
+      scheduledAt: "2054-08-21T10:00:00.000Z",
     });
   });
 
@@ -285,9 +285,9 @@ describe("pickRunningBatches", () => {
     // nothing is moving. `publishing` means the worker holds it RIGHT NOW, so
     // an hour on that row changes nothing.
     const lots = pickRunningBatches([
-      running("waiting", { status: "queued", scheduledAt: "2026-08-21T18:00:00.000Z" }),
+      running("waiting", { status: "queued", scheduledAt: "2054-08-21T18:00:00.000Z" }),
       running("now", { status: "queued", scheduledAt: null }),
-      running("held", { status: "publishing", scheduledAt: "2026-08-21T18:00:00.000Z" }),
+      running("held", { status: "publishing", scheduledAt: "2054-08-21T18:00:00.000Z" }),
     ]);
     expect(lots.map((lot) => lot.batchId)).toEqual(["now", "held"]);
   });

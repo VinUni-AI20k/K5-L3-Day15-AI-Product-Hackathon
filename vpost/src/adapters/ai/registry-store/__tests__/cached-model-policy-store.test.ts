@@ -69,7 +69,7 @@ function overrideRepo(
         task,
         override,
         note: null,
-        updatedAt: "2026-08-13T02:00:00.000Z",
+        updatedAt: "2054-08-13T02:00:00.000Z",
       };
     },
   };
@@ -194,7 +194,7 @@ describe("cached model policy store — caching", () => {
   });
 
   /**
-   * Measured on 15/08/2026 before `variant` existed: a dev server started with
+   * Measured on 27/11/2026 before `variant` existed: a dev server started with
    * a deliberately INVALID AI_MODEL_MID served captions happily, because it read
    * the resolved policy another process had cached — so neither the swap nor its
    * load-time validation ever ran. Web and worker share one Redis, so this is a

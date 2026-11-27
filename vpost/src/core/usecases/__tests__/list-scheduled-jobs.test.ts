@@ -20,7 +20,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 /** E8.4 "bài đã hẹn": filters, ordering by time, and the overdue signal. */
 
 const TENANT = testTenantId("00000000-0000-0000-0000-000000000001");
-const NOW = Date.parse("2026-08-13T02:00:00.000Z");
+const NOW = Date.parse("2054-08-13T02:00:00.000Z");
 const CLOCK: Clock = { now: () => new Date(NOW), nowMs: () => NOW };
 
 function silentLogger(): Logger {
@@ -150,13 +150,13 @@ describe("listScheduledJobs — query building", () => {
     await listScheduledJobs({
       tenantId: TENANT,
       filter: {
-        from: "2026-08-13T00:00:00.000Z",
-        to: "2026-08-14T00:00:00.000Z",
+        from: "2054-08-13T00:00:00.000Z",
+        to: "2054-08-14T00:00:00.000Z",
         channelId: " fbpage-b ",
       },
     });
-    expect(queries[0].from?.toISOString()).toBe("2026-08-13T00:00:00.000Z");
-    expect(queries[0].to?.toISOString()).toBe("2026-08-14T00:00:00.000Z");
+    expect(queries[0].from?.toISOString()).toBe("2054-08-13T00:00:00.000Z");
+    expect(queries[0].to?.toISOString()).toBe("2054-08-14T00:00:00.000Z");
     expect(queries[0].channelId).toBe("fbpage-b");
   });
 

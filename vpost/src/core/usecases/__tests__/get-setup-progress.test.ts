@@ -58,7 +58,7 @@ function harness(options: HarnessOptions = {}) {
         ? {
             email: "shop@gmail.com",
             scopes: [],
-            connectedAt: "2026-08-01T00:00:00.000Z",
+            connectedAt: "2054-08-01T00:00:00.000Z",
             connectedByUserId: null,
             status: googleStatus,
             sourceAccess: null,

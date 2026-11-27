@@ -175,7 +175,7 @@ describe("the caption editor reads the published string", () => {
 });
 
 /**
- * The order of the left card (PM, 21/08/2026): a caption is written per
+ * The order of the left card (PM, 27/11/2026): a caption is written per
  * Page, so "đăng lên đâu" is asked BEFORE there is anything to write.
  */
 describe("channels are chosen before the caption is written", () => {

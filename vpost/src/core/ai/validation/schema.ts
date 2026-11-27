@@ -22,7 +22,7 @@ export interface SchemaValidationResult {
  * real copy uses them. DEL and C1 are left alone too: Postgres accepts them, and
  * stage 2/4 own what the text may actually say.
  *
- * Observed live on 15/08/2026: gpt-4.1-mini answered with mojibake full of NUL
+ * Observed live on 27/11/2026: gpt-4.1-mini answered with mojibake full of NUL
  * and other C0 controls. The old pipeline let it through stage 1, failed it
  * at stage 3 with a confusing "source not found", then lost the audit row.
  */

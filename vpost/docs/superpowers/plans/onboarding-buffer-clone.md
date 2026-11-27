@@ -12,8 +12,8 @@ tự động khi tài khoản chưa có tổ chức lần đầu vào app, dùng
 **Tech Stack:** Next.js 16 App Router · React 19 · TypeScript · Drizzle + PostgreSQL ·
 TanStack Query · Astryx · Tailwind v4 · framer-motion · Vitest (`environment: "node"`, KHÔNG jsdom)
 
-**Spec:** `docs/superpowers/specs/2026-08-26-onboarding-buffer-clone-design.md`
-**Tham chiếu hệ thống:** `docs/superpowers/specs/2026-08-26-buffer-system-analysis.md`
+**Spec:** `docs/superpowers/specs/onboarding-buffer-clone-design.md`
+**Tham chiếu hệ thống:** `docs/superpowers/specs/buffer-system-analysis.md`
 
 ---
 
@@ -25,8 +25,8 @@ TanStack Query · Astryx · Tailwind v4 · framer-motion · Vitest (`environment
   ảnh bắt đúng lúc chuyển bước.
 - **Chuyển bước là CROSSFADE, không trượt ngang** (spec §2.5, ảnh `05-…`). Bản năng sẽ
   dựng slideshow trượt ngang; đó là sai.
-- **Buffer giữ MỘT URL cho cả luồng; MYSP thì KHÔNG** (spec §0c). Cả sáu ảnh tham chiếu đều
-  chụp ở `publish.buffer.com/onboarding` — họ giữ vị trí trong state React. MYSP **cố ý**
+- **Buffer giữ MỘT URL cho cả luồng; VPOST thì KHÔNG** (spec §0c). Cả sáu ảnh tham chiếu đều
+  chụp ở `publish.buffer.com/onboarding` — họ giữ vị trí trong state React. VPOST **cố ý**
   đặt bước lên URL (`?step=`) để F5 không mất chỗ, nút Back lùi một bước, và gửi link chỉ
   được đúng bước. Clone phần **nhìn thấy được**, không clone phần điều hướng.
 - **Mọi giá trị thị giác lấy từ spec §2**, đo từ Buffer thật. Không ước lượng, không bịa.
@@ -35,7 +35,7 @@ TanStack Query · Astryx · Tailwind v4 · framer-motion · Vitest (`environment
 - **Skill bắt buộc khi dựng UI:** chạy `/ui-ux-pro-max` trước khi viết component. Kèm nhóm 1
   SKILL-MAP: `core/web-component-reuse`, `-accessibility`, `-feedback-states`, `-design-tokens`;
   theo chủ đề: `core/web-onboarding`, `core/web-wizard`, `core/web-motion`, `core/web-form-architecture`.
-- **KHÔNG ĐỤNG `src/ui/components/compose/**` VÀ ROUTE `/compose`.** PM chốt 26/08/2026:
+- **KHÔNG ĐỤNG `src/ui/components/compose/**` VÀ ROUTE `/compose`.** PM chốt 27/11/2026:
   màn soạn bài giữ nguyên. Thấy mình đang sửa file trong `compose/` là đã đi sai phạm vi.
 - **Test không có DOM.** `environment: "node"`, không jsdom, không testing-library. Render
   test dùng `renderToStaticMarkup`. Cấm thêm jsdom.
@@ -60,7 +60,7 @@ TanStack Query · Astryx · Tailwind v4 · framer-motion · Vitest (`environment
 3. `pnpm typecheck`/`pnpm test` có thể đỏ vì file dở dang của họ. Chạy `git status` xác
    nhận rồi ghi rõ trong báo cáo, đừng nhận là lỗi mình, đừng sửa file của họ.
 4. **Dev server của worktree ở cổng 3010** (`DEV_FAKE_SESSION=1`). Cần cookie
-   `mysp_active_tenant=00000000-0000-0000-0000-000000000001` mới vào được onboarding, không
+   `vpost_active_tenant=00000000-0000-0000-0000-000000000001` mới vào được onboarding, không
    có thì ra màn chọn công ty. Cổng 3000 là cây chính, code khác. Đừng dựng thêm server,
    đừng giết, cấm `pkill`.
 5. **BẪY: `pnpm build` ghi đè `.next` của dev server và giết hydration ÂM THẦM.** Sau khi
@@ -247,7 +247,7 @@ và **giới hạn chống lạm dụng** đếm trong transaction của repo. T
 tuyệt đối không viết bản tạo tenant thứ hai.
 
 **Quyết định thiết kế — đọc kỹ, đây là chỗ dễ làm sai:**
-Buffer tạo tổ chức ngay lúc đăng ký. MYSP **cấp lười** — tạo ở lần đầu tài khoản vào app mà
+Buffer tạo tổ chức ngay lúc đăng ký. VPOST **cấp lười** — tạo ở lần đầu tài khoản vào app mà
 chưa thuộc tổ chức nào. Kết quả người dùng nhìn thấy là y hệt (không bao giờ gặp màn "tạo
 công ty"), nhưng không phải đụng vào tầng xác thực, và giữ nguyên mọi giới hạn chống lạm
 dụng đã có. Đăng ký rồi không bao giờ mở app thì không có tổ chức — điều đó không hại ai.
@@ -375,7 +375,7 @@ export function OnboardingFrame({
 Bố cục theo spec §3: mũi tên lùi + logo góc trái trên, `StepDots` giữa đỉnh (ẩn ở màn chào),
 nút đổi sáng/tối góc phải trên, nội dung căn giữa cả ngang lẫn dọc.
 
-**Nút đổi sáng/tối:** MYSP **đã có** cơ chế theme (`src/ui/theme/mysp-theme.ts`, màn
+**Nút đổi sáng/tối:** VPOST **đã có** cơ chế theme (`src/ui/theme/vpost-theme.ts`, màn
 `platform/appearance`). **Dùng lại cơ chế sẵn có**, cấm dựng bộ chuyển theme thứ hai.
 Đọc `src/ui/hooks/useAppearance.ts` trước.
 
@@ -661,7 +661,7 @@ Ngoài ba chỗ đó, lệch so với ảnh là lỗi cần sửa.
   sẽ trông to hơn trong ảnh ~10% — đó là đúng.
 - Không kết luận đạt khi chỉ nhìn `/onboarding-preview`; trang đó render ngoài scope `Theme`.
 
-### Task 11: Superadmin xem được số liệu khảo sát (PM giao 26/08)
+### Task 11: Superadmin xem được số liệu khảo sát (PM giao 27/11)
 
 Chủ: `data-pipeline` (phần dữ liệu) + `ui-web` (phần bảng). Phụ thuộc Task 2.
 
@@ -675,7 +675,7 @@ Nối `tenant_profile` vào `listTenants()` bằng LEFT JOIN, mở rộng `Platf
 thêm bốn trường khảo sát + `completedAt`. Cộng một phép tổng hợp: đếm theo `seller_kind`,
 xếp hạng `focus_channels`, phân bố `current_tools`.
 
-**Phần B — bảng (`ui-web`) — PM HOÃN 26/08, KHÔNG vào trước `stg`.**
+**Phần B — bảng (`ui-web`) — PM HOÃN 27/11, KHÔNG vào trước `stg`.**
 Thêm cột vào `PlatformTenantTable` sẵn có và một dải tổng hợp phía trên. Chỉ đụng
 `src/ui/components/platform/**`.
 
@@ -693,7 +693,7 @@ chuyển đổi từ công cụ cũ. Hiện ta **chỉ lưu đáp án cuối**, 
 lúc nào". Muốn có phễu thật thì phải ghi thêm sự kiện — đó là quyết định riêng, không gói
 vào task này.
 
-### Task 13: Backfill `completed_at` cho tenant cũ (PM quyết 26/08)
+### Task 13: Backfill `completed_at` cho tenant cũ (PM quyết 27/11)
 
 Chủ: `data-pipeline`. Phải xong **trước** khi nhánh này lên `dev`.
 
@@ -775,7 +775,7 @@ việc riêng.
 
 ## Thủ tục gộp nhánh này vào `dev` — đọc trước khi merge
 
-Tình hình sau khi epic MinIO merge vào `dev` (`e3a655a`, 26/08): `dev` đi trước nhánh này
+Tình hình sau khi epic MinIO merge vào `dev` (`e3a655a`, 27/11): `dev` đi trước nhánh này
 **23 commit**, nhánh này đi trước `dev` **12 commit**. Ba việc phải làm đúng thứ tự.
 
 **1. Journal migration — conflict văn bản, nhưng ngữ nghĩa đơn giản.**

@@ -8,8 +8,8 @@
 
 **Tech Stack:** Next.js App Router · TypeScript · Drizzle/Postgres · zod v4 · vitest · React Hook Form · TanStack Query · Tailwind + shadcn/ui
 
-**Spec:** `docs/superpowers/specs/audit-compose-generate.md` (27/08/2026)
-**Spec liên quan (chồng lấn, ĐỢT SAU):** `docs/superpowers/specs/2026-08-26-upload-triage-multi-code-design.md`
+**Spec:** `docs/superpowers/specs/audit-compose-generate.md` (27/11/2026)
+**Spec liên quan (chồng lấn, ĐỢT SAU):** `docs/superpowers/specs/upload-triage-multi-code-design.md`
 
 ---
 
@@ -27,7 +27,7 @@
 - **Giới hạn đã có, giữ nguyên:** `MAX_UPLOADS_PER_POST = 10`, `MAX_UPLOAD_BYTES = 25MB`, `MAX_UPLOAD_FILES = 10` (UI).
 - **Lệnh kiểm chứng:** `pnpm exec vitest run <path>` · `pnpm exec tsc --noEmit` · `pnpm lint`.
 
-## Quyết định PM đã chốt (27/08/2026)
+## Quyết định PM đã chốt (27/11/2026)
 
 | Câu | Chốt |
 |---|---|
@@ -611,7 +611,7 @@ import type { ProductRepo } from "@/core/ports/product-repo";
  *
  * KHÔNG tự chọn khi một lô có hai mã (rule nghiệp vụ 5): trả `conflict` kèm
  * danh sách để màn hình bắt người quyết. Gom nhóm đa mã thành nhiều bài là
- * việc của đợt sau (spec 2026-08-26-upload-triage-multi-code-design.md).
+ * việc của đợt sau (spec upload-triage-multi-code-design.md).
  */
 
 export interface DetectUploadCodeInput {
@@ -1835,7 +1835,7 @@ Ghi một mục vào `docs/08-tien-do-du-an.md` cho E9: đã có nhận diện m
 | §18 5 upload + 10 Drive → 5 | — | đã đúng sẵn: `compose-post.ts:325` lọc theo `origin` |
 | §19 nhiều mã | T3 `conflict` | đợt này **báo ra**, chưa tách nhiều bài |
 | §23 không tạo Product / không ghi Drive / Sheet | T3 | usecase chỉ đọc |
-| Xem trước ảnh (PM bổ sung 27/08) | T6 + T8 | |
+| Xem trước ảnh (PM bổ sung 27/11) | T6 + T8 | |
 | §10 vision caption | — | **PM bỏ khỏi phạm vi** |
 | §6 gom nhóm đa mã → nhiều bài | — | **đợt sau** |
 | §12 retention · §17 data model | — | **đợt sau** |

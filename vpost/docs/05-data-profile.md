@@ -1,10 +1,10 @@
 # Khảo sát dữ liệu thật — Drive "Ảnh AI" & Sheet "Mẫu 2026"
 
-**Ngày khảo sát:** 12/08/2026 · **Người thực hiện:** PM + AI agent (query trực tiếp, không ước đoán)
+**Ngày khảo sát:** 27/11/2026 · **Người thực hiện:** PM + AI agent (query trực tiếp, không ước đoán)
 **Phương pháp:** thư mục Drive và Sheet đang ở chế độ chia sẻ công khai theo link → đọc qua `embeddedfolderview` (Drive) và CSV export theo tab (Sheet). Dữ liệu thô lưu tại `sample-data/`.
 
 > ⚠️ **Hai giới hạn của phương pháp:**
-> 1. Thư mục gốc trả về đúng **5.500 entry** — con số tròn nên nghi bị cắt, nhưng **3 lần fetch cách nhau (12/08) trả về cùng chính xác một bộ 5.500 file ID**, và các mã "cuối dải" (MRKVX6383, MR0VX6217) đều có mặt → không có bằng chứng truncation; vẫn nên xác nhận lần cuối bằng Service Account khi có.
+> 1. Thư mục gốc trả về đúng **5.500 entry** — con số tròn nên nghi bị cắt, nhưng **3 lần fetch cách nhau (27/11) trả về cùng chính xác một bộ 5.500 file ID**, và các mã "cuối dải" (MRKVX6383, MR0VX6217) đều có mặt → không có bằng chứng truncation; vẫn nên xác nhận lần cuối bằng Service Account khi có.
 > 2. Thư mục con **"Hàng Thiết Kế" trả về 0 entry** (không share công khai hoặc rỗng). Đây có thể là nơi chứa ảnh của 236 mã "có trên Sheet nhưng không thấy ảnh" (xem mục 4). **Cần được share để khảo sát bổ sung.**
 > 3. Dữ liệu công khai theo link đồng nghĩa **ai có link đều xem được toàn bộ ảnh và Sheet (kể cả giá, tồn kho)** — nên báo stakeholder cân nhắc lại chế độ chia sẻ.
 
@@ -19,7 +19,7 @@
 | Entry ở thư mục gốc | 5.500 (5.497 file + 3 thư mục con) |
 | Thư mục con | "Hàng Thiết Kế" (❌ không đọc được), "Nghệ sĩ" (66 file), "Ảnh hiển thị tiktok và shopee" (84 file) |
 | Cấu trúc | KHÔNG phẳng hoàn toàn như brief mô tả |
-| Mã sản phẩm parse được từ tên file | **186 mã** *(hiệu chỉnh 12/08 chiều: 164 là số khi bắt buộc có đuôi file; nhận thêm 606 file không có đuôi → 186)* |
+| Mã sản phẩm parse được từ tên file | **186 mã** *(hiệu chỉnh 27/11 chiều: 164 là số khi bắt buộc có đuôi file; nhận thêm 606 file không có đuôi → 186)* |
 | Đuôi file (parse được) | png 2.745 · jpeg 783 · jpg 490 · video 19 (mp4 + mov) · **606 file KHÔNG có đuôi** |
 | File **video** | **chỉ 19 file** trên toàn thư mục, đa số KHÔNG có "(số)", có cả `.mov` (brief chỉ nói `.mp4`) |
 
@@ -135,7 +135,7 @@ Chỉ **3 giá trị distinct** — sạch hơn dự đoán:
 
 ## 4. Đối chiếu chéo Drive ↔ Sheet
 
-*(số liệu đã hiệu chỉnh sau lần rà soát thứ hai 12/08 — regex nhận cả file không đuôi)*
+*(số liệu đã hiệu chỉnh sau lần rà soát thứ hai 27/11 — regex nhận cả file không đuôi)*
 
 | Chỉ số | Giá trị |
 |---|---:|

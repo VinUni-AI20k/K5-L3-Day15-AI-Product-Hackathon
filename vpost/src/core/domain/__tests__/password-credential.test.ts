@@ -11,7 +11,7 @@ import {
   weakPasswordError,
 } from "../password-credential";
 
-const NOW = new Date(Date.UTC(2026, 7, 24, 9, 0, 0));
+const NOW = new Date(Date.UTC(2054, 7, 24, 9, 0, 0));
 
 // --- Refusals / edge cases first ----------------------------------------------
 
@@ -72,7 +72,7 @@ describe("formatUnlockTime", () => {
   it("speaks Vietnamese in Vietnamese time, not in the server's zone", () => {
     // 09:00 UTC is 16:00 in Asia/Ho_Chi_Minh. A UTC hour in an error message is
     // an invitation to come back at the wrong time.
-    expect(formatUnlockTime(NOW)).toBe("16:00 ngày 24/08/2026");
+    expect(formatUnlockTime(NOW)).toBe("16:00 ngày 24/08/2054");
   });
 });
 
@@ -91,7 +91,7 @@ describe("the refusals", () => {
   it("puts the unlock time in the locked message", () => {
     const error = accountLockedError(new Date(NOW.getTime() + LOCKOUT_MS));
     expect(error.code).toBe("AUTH_ACCOUNT_LOCKED");
-    expect(error.userMessage).toContain("16:15 ngày 24/08/2026");
+    expect(error.userMessage).toContain("16:15 ngày 24/08/2054");
   });
 
   it("returns null for a password that satisfies the policy", () => {

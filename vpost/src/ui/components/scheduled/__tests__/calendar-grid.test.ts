@@ -53,7 +53,7 @@ function entry(overrides: Partial<ScheduledJobEntry> = {}): ScheduledJobEntry {
     channelId: "fbpage-a",
     format: "image_post",
     status: "queued",
-    scheduledAt: new Date(2026, 7, 13, 9, 0).toISOString(),
+    scheduledAt: new Date(2054, 7, 13, 9, 0).toISOString(),
     startsInMs: 3_600_000,
     overdue: false,
     captionPreview: "Váy hoa mùa hè…",
@@ -61,7 +61,7 @@ function entry(overrides: Partial<ScheduledJobEntry> = {}): ScheduledJobEntry {
     userMessage: "Chờ tới giờ đăng.",
     canReschedule: true,
     canCancel: true,
-    createdAt: new Date(2026, 7, 12, 9, 0).toISOString(),
+    createdAt: new Date(2054, 7, 12, 9, 0).toISOString(),
     ...overrides,
   };
 }
@@ -88,9 +88,9 @@ describe("monthKeyOfDayKey / monthKeyOfMs / todayKeyOfMs", () => {
   });
 
   it("reads the LOCAL month and day of an instant", () => {
-    const now = new Date(2026, 7, 13, 23, 30).getTime();
-    expect(monthKeyOfMs(now)).toBe("2026-08");
-    expect(todayKeyOfMs(now)).toBe("2026-08-13");
+    const now = new Date(2054, 7, 13, 23, 30).getTime();
+    expect(monthKeyOfMs(now)).toBe("2054-08");
+    expect(todayKeyOfMs(now)).toBe("2054-08-13");
   });
 });
 
@@ -98,29 +98,29 @@ describe("shiftMonthKey", () => {
   it("returns junk unchanged instead of inventing a plausible month", () => {
     expect(shiftMonthKey("nope", 1)).toBe("nope");
     expect(shiftMonthKey("2026-13", 1)).toBe("2026-13");
-    expect(shiftMonthKey("2026-08", Number.NaN)).toBe("2026-08");
+    expect(shiftMonthKey("2054-08", Number.NaN)).toBe("2054-08");
   });
 
   it("crosses the year boundary in both directions", () => {
-    expect(shiftMonthKey("2026-12", 1)).toBe("2027-01");
-    expect(shiftMonthKey("2026-01", -1)).toBe("2025-12");
-    expect(shiftMonthKey("2026-01", -13)).toBe("2024-12");
-    expect(shiftMonthKey("2026-08", 0)).toBe("2026-08");
+    expect(shiftMonthKey("2054-12", 1)).toBe("2055-01");
+    expect(shiftMonthKey("2054-01", -1)).toBe("2053-12");
+    expect(shiftMonthKey("2054-01", -13)).toBe("2052-12");
+    expect(shiftMonthKey("2054-08", 0)).toBe("2054-08");
   });
 });
 
 describe("shiftDayKey", () => {
   it("returns junk unchanged", () => {
     expect(shiftDayKey("2026-02-31", 1)).toBe("2026-02-31");
-    expect(shiftDayKey("2026-08-13", 1.5)).toBe("2026-08-13");
+    expect(shiftDayKey("2054-08-13", 1.5)).toBe("2054-08-13");
   });
 
   it("crosses month, year and the leap day", () => {
-    expect(shiftDayKey("2026-08-31", 1)).toBe("2026-09-01");
-    expect(shiftDayKey("2026-01-01", -1)).toBe("2025-12-31");
-    expect(shiftDayKey("2028-02-28", 1)).toBe("2028-02-29");
-    expect(shiftDayKey("2026-02-28", 1)).toBe("2026-03-01");
-    expect(shiftDayKey("2026-08-13", -7)).toBe("2026-08-06");
+    expect(shiftDayKey("2054-08-31", 1)).toBe("2054-09-01");
+    expect(shiftDayKey("2054-01-01", -1)).toBe("2053-12-31");
+    expect(shiftDayKey("2056-02-28", 1)).toBe("2056-02-29");
+    expect(shiftDayKey("2054-02-28", 1)).toBe("2054-03-01");
+    expect(shiftDayKey("2054-08-13", -7)).toBe("2054-08-06");
   });
 });
 
@@ -141,12 +141,12 @@ describe("edgeNavigationDayKey", () => {
    * columns and silently lands on the wrong day everywhere else.
    */
 
-  // 01/08/2026 is a Saturday -> row 0 is [27/7 … 01/8 (col 5), 02/8 (col 6)].
-  const SATURDAY_START = "2026-08";
-  // 01/06/2026 is a Monday -> row 0 starts exactly on the 1st, no borrowed days.
-  const MONDAY_START = "2026-06";
-  // 01/11/2026 is a Sunday -> row 0 borrows six days from October.
-  const SUNDAY_START = "2026-11";
+  // 27/11/2026 is a Saturday -> row 0 is [27/7 … 01/8 (col 5), 02/8 (col 6)].
+  const SATURDAY_START = "2054-08";
+  // 27/11/2026 is a Monday -> row 0 starts exactly on the 1st, no borrowed days.
+  const MONDAY_START = "2054-06";
+  // 27/11/2026 is a Sunday -> row 0 borrows six days from October.
+  const SUNDAY_START = "2054-11";
 
   it("refuses a month that is not a month, and an offset it has no contract for", () => {
     expect(edgeNavigationDayKey("2026-13", "before", 0, 7)).toBeNull();
@@ -170,10 +170,10 @@ describe("edgeNavigationDayKey", () => {
         shiftDayKey(firstRow[column], -7),
       );
     }
-    // The regression the coordinator caught: 01/08 sits in column 5, and one
-    // row up is 25/07 — not 20/07, which is what "first cell - 7" produces.
-    expect(edgeNavigationDayKey(SATURDAY_START, "before", 5, CALENDAR_COLUMNS)).toBe("2026-07-25");
-    expect(edgeNavigationDayKey(SATURDAY_START, "before", 0, CALENDAR_COLUMNS)).toBe("2026-07-20");
+    // The regression the coordinator caught: 27/11 sits in column 5, and one
+    // row up is 27/11 — not 27/11, which is what "first cell - 7" produces.
+    expect(edgeNavigationDayKey(SATURDAY_START, "before", 5, CALENDAR_COLUMNS)).toBe("2054-07-25");
+    expect(edgeNavigationDayKey(SATURDAY_START, "before", 0, CALENDAR_COLUMNS)).toBe("2054-07-20");
   });
 
   it("ArrowDown from the last row stays in its own column — every column", () => {
@@ -184,7 +184,7 @@ describe("edgeNavigationDayKey", () => {
         shiftDayKey(lastRow[column], 7),
       );
     }
-    expect(edgeNavigationDayKey(SATURDAY_START, "after", 2, CALENDAR_COLUMNS)).toBe("2026-09-09");
+    expect(edgeNavigationDayKey(SATURDAY_START, "after", 2, CALENDAR_COLUMNS)).toBe("2054-09-09");
   });
 
   it("works the same when the 1st is a Monday and when it is a Sunday", () => {
@@ -200,10 +200,10 @@ describe("edgeNavigationDayKey", () => {
         );
       }
     }
-    // 01/06/2026 is a Monday: one row above the first cell is 25/05.
-    expect(edgeNavigationDayKey(MONDAY_START, "before", 0, CALENDAR_COLUMNS)).toBe("2026-05-25");
-    // 01/11/2026 is a Sunday, drawn in column 6 of row 0; one row up is 25/10.
-    expect(edgeNavigationDayKey(SUNDAY_START, "before", 6, CALENDAR_COLUMNS)).toBe("2026-10-25");
+    // 27/11/2026 is a Monday: one row above the first cell is 27/11.
+    expect(edgeNavigationDayKey(MONDAY_START, "before", 0, CALENDAR_COLUMNS)).toBe("2054-05-25");
+    // 27/11/2026 is a Sunday, drawn in column 6 of row 0; one row up is 27/11.
+    expect(edgeNavigationDayKey(SUNDAY_START, "before", 6, CALENDAR_COLUMNS)).toBe("2054-10-25");
   });
 
   it("ArrowLeft off [0][0] is the day before the grid, whatever column the hook reports", () => {
@@ -212,7 +212,7 @@ describe("edgeNavigationDayKey", () => {
     // day arithmetic already lands there, so the column must not be applied.
     expect(edgeNavigationDayKey(SATURDAY_START, "before", 6, 1)).toBe(shiftDayKey(first, -1));
     expect(edgeNavigationDayKey(SATURDAY_START, "before", 0, 1)).toBe(shiftDayKey(first, -1));
-    expect(edgeNavigationDayKey(SATURDAY_START, "before", 6, 1)).toBe("2026-07-26");
+    expect(edgeNavigationDayKey(SATURDAY_START, "before", 6, 1)).toBe("2054-07-26");
   });
 
   it("ArrowRight off [5][6] is the day after the grid, whatever column the hook reports", () => {
@@ -220,7 +220,7 @@ describe("edgeNavigationDayKey", () => {
     const last = weeks[weeks.length - 1][CALENDAR_COLUMNS - 1];
     expect(edgeNavigationDayKey(SATURDAY_START, "after", 0, 1)).toBe(shiftDayKey(last, 1));
     expect(edgeNavigationDayKey(SATURDAY_START, "after", 3, 1)).toBe(shiftDayKey(last, 1));
-    expect(edgeNavigationDayKey(SATURDAY_START, "after", 0, 1)).toBe("2026-09-07");
+    expect(edgeNavigationDayKey(SATURDAY_START, "after", 0, 1)).toBe("2054-09-07");
   });
 
   it("always lands on a day the grid it moves to actually contains", () => {
@@ -242,15 +242,15 @@ describe("edgeNavigationDayKey", () => {
 
 describe("sameDayInMonth", () => {
   it("refuses junk on either side", () => {
-    expect(sameDayInMonth("nope", "2026-08")).toBeNull();
-    expect(sameDayInMonth("2026-08-13", "2026-13")).toBeNull();
+    expect(sameDayInMonth("nope", "2054-08")).toBeNull();
+    expect(sameDayInMonth("2054-08-13", "2026-13")).toBeNull();
   });
 
   it("clamps to the last day instead of rolling into the next month", () => {
-    expect(sameDayInMonth("2026-03-31", "2026-02")).toBe("2026-02-28");
-    expect(sameDayInMonth("2028-03-31", "2028-02")).toBe("2028-02-29");
-    expect(sameDayInMonth("2026-08-31", "2026-09")).toBe("2026-09-30");
-    expect(sameDayInMonth("2026-08-13", "2026-09")).toBe("2026-09-13");
+    expect(sameDayInMonth("2054-03-31", "2054-02")).toBe("2054-02-28");
+    expect(sameDayInMonth("2056-03-31", "2056-02")).toBe("2056-02-29");
+    expect(sameDayInMonth("2054-08-31", "2054-09")).toBe("2054-09-30");
+    expect(sameDayInMonth("2054-08-13", "2054-09")).toBe("2054-09-13");
   });
 });
 
@@ -261,11 +261,11 @@ describe("resolveMonthKey", () => {
   });
 
   it("prefers the URL, then the open day, then the clock", () => {
-    const now = new Date(2026, 7, 13).getTime();
-    expect(resolveMonthKey("2026-03", "2026-11-02", now)).toBe("2026-03");
+    const now = new Date(2054, 7, 13).getTime();
+    expect(resolveMonthKey("2054-03", "2054-11-02", now)).toBe("2054-03");
     // A shared `?ngay=` link must land on the month that contains that day.
-    expect(resolveMonthKey(null, "2026-11-02", now)).toBe("2026-11");
-    expect(resolveMonthKey(null, null, now)).toBe("2026-08");
+    expect(resolveMonthKey(null, "2054-11-02", now)).toBe("2054-11");
+    expect(resolveMonthKey(null, null, now)).toBe("2054-08");
   });
 });
 
@@ -275,8 +275,8 @@ describe("formatMonthHeading", () => {
   });
 
   it("drops the leading zero the way a person says it", () => {
-    expect(formatMonthHeading("2026-08")).toBe("Tháng 8 năm 2026");
-    expect(formatMonthHeading("2026-12")).toBe("Tháng 12 năm 2026");
+    expect(formatMonthHeading("2054-08")).toBe("Tháng 8 năm 2054");
+    expect(formatMonthHeading("2054-12")).toBe("Tháng 12 năm 2054");
   });
 });
 
@@ -287,7 +287,7 @@ describe("buildMonthMatrix", () => {
   });
 
   it("is always six rows of seven, whatever the month", () => {
-    for (const monthKey of ["2026-02", "2026-08", "2026-11", "2028-02"]) {
+    for (const monthKey of ["2054-02", "2054-08", "2054-11", "2056-02"]) {
       const weeks = buildMonthMatrix(monthKey);
       expect(weeks).toHaveLength(CALENDAR_ROWS);
       for (const week of weeks) expect(week).toHaveLength(CALENDAR_COLUMNS);
@@ -295,7 +295,7 @@ describe("buildMonthMatrix", () => {
   });
 
   it("starts every row on a Monday", () => {
-    for (const weeks of [buildMonthMatrix("2026-02"), buildMonthMatrix("2026-11")]) {
+    for (const weeks of [buildMonthMatrix("2054-02"), buildMonthMatrix("2054-11")]) {
       for (const week of weeks) {
         const [year, month, day] = week[0].split("-").map(Number);
         expect(new Date(year, month - 1, day).getDay()).toBe(1);
@@ -312,8 +312,8 @@ describe("buildMonthMatrix", () => {
     // re-reads `process.env.TZ` on the next `Date` operation, so the zone is
     // pinned per case and restored afterwards (see the `afterEach` above).
     //
-    //   America/New_York  spring forward 08/03/2026, back 01/11/2026
-    //   Australia/Sydney  back 05/04/2026, forward 04/10/2026 (southern half)
+    //   America/New_York  spring forward 27/11/2026, back 27/11/2026
+    //   Australia/Sydney  back 27/11/2026, forward 27/11/2026 (southern half)
     //   Europe/Lisbon     UTC+0/+1, the boundary case at midnight
     //   Pacific/Chatham   a :45 offset — the shift is not a whole hour
     const zones = [
@@ -323,7 +323,7 @@ describe("buildMonthMatrix", () => {
       "Europe/Lisbon",
       "Pacific/Chatham",
     ];
-    const months = ["2026-03", "2026-04", "2026-10", "2026-11"];
+    const months = ["2054-03", "2054-04", "2054-10", "2054-11"];
 
     for (const zone of zones) {
       process.env.TZ = zone;
@@ -353,11 +353,11 @@ describe("buildMonthMatrix", () => {
   it("puts the day the clock shifts in the cell it belongs to, in every zone", () => {
     // Spot-checks the actual transition days rather than only the run of 42.
     const cases = [
-      { zone: "America/New_York", monthKey: "2026-03", dayKey: "2026-03-08" },
-      { zone: "America/New_York", monthKey: "2026-11", dayKey: "2026-11-01" },
-      { zone: "Australia/Sydney", monthKey: "2026-04", dayKey: "2026-04-05" },
-      { zone: "Australia/Sydney", monthKey: "2026-10", dayKey: "2026-10-04" },
-      { zone: "Pacific/Chatham", monthKey: "2026-04", dayKey: "2026-04-05" },
+      { zone: "America/New_York", monthKey: "2054-03", dayKey: "2054-03-08" },
+      { zone: "America/New_York", monthKey: "2054-11", dayKey: "2054-11-01" },
+      { zone: "Australia/Sydney", monthKey: "2054-04", dayKey: "2054-04-05" },
+      { zone: "Australia/Sydney", monthKey: "2054-10", dayKey: "2054-10-04" },
+      { zone: "Pacific/Chatham", monthKey: "2054-04", dayKey: "2054-04-05" },
     ];
 
     for (const { zone, monthKey, dayKey } of cases) {
@@ -368,20 +368,20 @@ describe("buildMonthMatrix", () => {
   });
 
   it("keeps the 29th of a leap February and stops February at 28 otherwise", () => {
-    expect(buildMonthMatrix("2028-02").flat()).toContain("2028-02-29");
-    expect(buildMonthMatrix("2026-02").flat()).not.toContain("2026-02-29");
-    expect(buildMonthMatrix("2026-02").flat()).toContain("2026-02-28");
+    expect(buildMonthMatrix("2056-02").flat()).toContain("2056-02-29");
+    expect(buildMonthMatrix("2054-02").flat()).not.toContain("2026-02-29");
+    expect(buildMonthMatrix("2054-02").flat()).toContain("2054-02-28");
   });
 
   it("keeps the 31st of a 31-day month", () => {
-    expect(buildMonthMatrix("2026-08").flat()).toContain("2026-08-31");
+    expect(buildMonthMatrix("2054-08").flat()).toContain("2054-08-31");
   });
 
   it("borrows the leading days from the previous month when the 1st is a Sunday", () => {
-    // 2026-11-01 is a Sunday: Monday-first means six borrowed October days.
-    const first = buildMonthMatrix("2026-11")[0];
-    expect(first[0]).toBe("2026-10-26");
-    expect(first[6]).toBe("2026-11-01");
+    // 2026-11-27 is a Sunday: Monday-first means six borrowed October days.
+    const first = buildMonthMatrix("2054-11")[0];
+    expect(first[0]).toBe("2054-10-26");
+    expect(first[6]).toBe("2054-11-01");
   });
 });
 
@@ -397,34 +397,34 @@ describe("groupJobsByDay", () => {
     const { byDay, skipped } = groupJobsByDay([
       entry({ postJobId: "no-hour", scheduledAt: "" }),
       entry({ postJobId: "bad-hour", scheduledAt: "hôm qua" }),
-      entry({ postJobId: "good", scheduledAt: isoAt(2026, 8, 13, 9) }),
+      entry({ postJobId: "good", scheduledAt: isoAt(2054, 8, 13, 9) }),
     ]);
 
-    expect(byDay.get("2026-08-13")?.map((job) => job.postJobId)).toEqual(["good"]);
+    expect(byDay.get("2054-08-13")?.map((job) => job.postJobId)).toEqual(["good"]);
     expect(skipped.map((row) => row.postJobId)).toEqual(["no-hour", "bad-hour"]);
     for (const row of skipped) expect(row.reason.length).toBeGreaterThan(0);
   });
 
   it("puts a post at local midnight on the day that starts, not the one that ends", () => {
-    const { byDay } = groupJobsByDay([entry({ scheduledAt: isoAt(2026, 8, 14, 0, 0) })]);
-    expect(byDay.has("2026-08-14")).toBe(true);
-    expect(byDay.has("2026-08-13")).toBe(false);
+    const { byDay } = groupJobsByDay([entry({ scheduledAt: isoAt(2054, 8, 14, 0, 0) })]);
+    expect(byDay.has("2054-08-14")).toBe(true);
+    expect(byDay.has("2054-08-13")).toBe(false);
   });
 
   it("keeps the soonest-first order inside a day", () => {
     const { byDay } = groupJobsByDay([
-      entry({ postJobId: "morning", scheduledAt: isoAt(2026, 8, 13, 8, 0) }),
-      entry({ postJobId: "evening", scheduledAt: isoAt(2026, 8, 13, 20, 0) }),
+      entry({ postJobId: "morning", scheduledAt: isoAt(2054, 8, 13, 8, 0) }),
+      entry({ postJobId: "evening", scheduledAt: isoAt(2054, 8, 13, 20, 0) }),
     ]);
-    expect(byDay.get("2026-08-13")?.map((job) => job.postJobId)).toEqual(["morning", "evening"]);
+    expect(byDay.get("2054-08-13")?.map((job) => job.postJobId)).toEqual(["morning", "evening"]);
   });
 });
 
 describe("buildCalendarMonth", () => {
-  const NOW = new Date(2026, 7, 13, 10, 0).getTime();
+  const NOW = new Date(2054, 7, 13, 10, 0).getTime();
 
   it("renders an empty month as an empty month, not as a crash", () => {
-    const month = buildCalendarMonth({ monthKey: "2026-08", items: [], nowMs: NOW });
+    const month = buildCalendarMonth({ monthKey: "2054-08", items: [], nowMs: NOW });
 
     expect(month.weeks).toHaveLength(CALENDAR_ROWS);
     expect(month.totalInMonth).toBe(0);
@@ -439,7 +439,7 @@ describe("buildCalendarMonth", () => {
   });
 
   it("marks nothing as today or past while the browser clock is unknown", () => {
-    const month = buildCalendarMonth({ monthKey: "2026-08", items: [], nowMs: 0 });
+    const month = buildCalendarMonth({ monthKey: "2054-08", items: [], nowMs: 0 });
     const days = month.weeks.flatMap((week) => week.days);
     expect(days.some((day) => day.isToday)).toBe(false);
     expect(days.some((day) => day.isPast)).toBe(false);
@@ -447,29 +447,29 @@ describe("buildCalendarMonth", () => {
 
   it("tells today, the past and the borrowed edge days apart", () => {
     const days = buildCalendarMonth({
-      monthKey: "2026-08",
+      monthKey: "2054-08",
       items: [],
       nowMs: NOW,
     }).weeks.flatMap((week) => week.days);
 
-    const today = days.find((day) => day.dayKey === "2026-08-13");
+    const today = days.find((day) => day.dayKey === "2054-08-13");
     expect(today?.isToday).toBe(true);
     expect(today?.isPast).toBe(false);
     expect(today?.inMonth).toBe(true);
 
-    expect(days.find((day) => day.dayKey === "2026-08-12")?.isPast).toBe(true);
-    expect(days.find((day) => day.dayKey === "2026-08-14")?.isPast).toBe(false);
-    // 2026-08-01 is a Saturday, so the row starts in July.
-    expect(days.find((day) => day.dayKey === "2026-07-27")?.inMonth).toBe(false);
+    expect(days.find((day) => day.dayKey === "2054-08-12")?.isPast).toBe(true);
+    expect(days.find((day) => day.dayKey === "2054-08-14")?.isPast).toBe(false);
+    // 2026-11-27 is a Saturday, so the row starts in July.
+    expect(days.find((day) => day.dayKey === "2054-07-27")?.inMonth).toBe(false);
   });
 
   it("caps a busy day and reports the overflow instead of growing the cell", () => {
     const items = [1, 2, 3, 4, 5].map((index) =>
-      entry({ postJobId: `job-${index}`, scheduledAt: isoAt(2026, 8, 20, 8 + index) }),
+      entry({ postJobId: `job-${index}`, scheduledAt: isoAt(2054, 8, 20, 8 + index) }),
     );
-    const day = buildCalendarMonth({ monthKey: "2026-08", items, nowMs: NOW })
+    const day = buildCalendarMonth({ monthKey: "2054-08", items, nowMs: NOW })
       .weeks.flatMap((week) => week.days)
-      .find((cell) => cell.dayKey === "2026-08-20");
+      .find((cell) => cell.dayKey === "2054-08-20");
 
     expect(day?.jobs).toHaveLength(5);
     expect(day?.visibleJobs).toHaveLength(3);
@@ -485,39 +485,39 @@ describe("buildCalendarMonth", () => {
   });
 
   it("refuses a nonsense cap rather than hiding every post", () => {
-    const items = [entry({ scheduledAt: isoAt(2026, 8, 20, 9) })];
+    const items = [entry({ scheduledAt: isoAt(2054, 8, 20, 9) })];
     const day = buildCalendarMonth({
-      monthKey: "2026-08",
+      monthKey: "2054-08",
       items,
       nowMs: NOW,
       maxVisiblePerDay: 0,
     })
       .weeks.flatMap((week) => week.days)
-      .find((cell) => cell.dayKey === "2026-08-20");
+      .find((cell) => cell.dayKey === "2054-08-20");
 
     expect(day?.visibleJobs).toHaveLength(1);
     expect(day?.overflowCount).toBe(0);
   });
 
   it("counts a job on a borrowed edge day against ITS month, not the one on screen", () => {
-    // 2026-09-01 shows up in the trailing row of August, but it is a September
+    // 2026-11-27 shows up in the trailing row of August, but it is a September
     // post: counting it in August would make the two numbers disagree.
     const month = buildCalendarMonth({
-      monthKey: "2026-08",
+      monthKey: "2054-08",
       items: [
-        entry({ postJobId: "aug", scheduledAt: isoAt(2026, 8, 31, 9) }),
-        entry({ postJobId: "sep", scheduledAt: isoAt(2026, 9, 1, 9) }),
+        entry({ postJobId: "aug", scheduledAt: isoAt(2054, 8, 31, 9) }),
+        entry({ postJobId: "sep", scheduledAt: isoAt(2054, 9, 1, 9) }),
       ],
       nowMs: NOW,
     });
 
     expect(month.totalInMonth).toBe(1);
     expect(month.totalOutsideMonth).toBe(1);
-    expect(month.nearestDayKeyOutsideMonth).toBe("2026-09-01");
+    expect(month.nearestDayKeyOutsideMonth).toBe("2054-09-01");
 
     const borrowed = month.weeks
       .flatMap((week) => week.days)
-      .find((cell) => cell.dayKey === "2026-09-01");
+      .find((cell) => cell.dayKey === "2054-09-01");
     // Still drawn in the cell, just not counted as August.
     expect(borrowed?.jobs).toHaveLength(1);
     expect(borrowed?.inMonth).toBe(false);
@@ -525,22 +525,22 @@ describe("buildCalendarMonth", () => {
 
   it("points at the SOONEST month that has posts when this one is empty", () => {
     const month = buildCalendarMonth({
-      monthKey: "2026-08",
+      monthKey: "2054-08",
       items: [
-        entry({ postJobId: "later", scheduledAt: isoAt(2026, 12, 4, 9) }),
-        entry({ postJobId: "sooner", scheduledAt: isoAt(2026, 9, 4, 9) }),
+        entry({ postJobId: "later", scheduledAt: isoAt(2054, 12, 4, 9) }),
+        entry({ postJobId: "sooner", scheduledAt: isoAt(2054, 9, 4, 9) }),
       ],
       nowMs: NOW,
     });
 
     expect(month.totalInMonth).toBe(0);
     expect(month.totalOutsideMonth).toBe(2);
-    expect(month.nearestDayKeyOutsideMonth).toBe("2026-09-04");
+    expect(month.nearestDayKeyOutsideMonth).toBe("2054-09-04");
   });
 
   it("carries the unplaceable rows through so the screen can say so", () => {
     const month = buildCalendarMonth({
-      monthKey: "2026-08",
+      monthKey: "2054-08",
       items: [entry({ postJobId: "broken", scheduledAt: "không phải giờ" })],
       nowMs: NOW,
     });

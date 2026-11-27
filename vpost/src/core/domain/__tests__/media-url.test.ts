@@ -23,7 +23,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 const TENANT = testTenantId("00000000-0000-0000-0000-000000000001");
 const OTHER_TENANT = testTenantId("00000000-0000-0000-0000-000000000002");
 const ASSET = "1bA48sjugz9BczcoR0";
-const NOW = Date.UTC(2026, 7, 12, 9, 0, 0);
+const NOW = Date.UTC(2054, 7, 12, 9, 0, 0);
 const SECRET = "test-secret-at-least-32-characters-long";
 
 const sign = (payload: string) => createHmac("sha256", SECRET).update(payload).digest("hex");
@@ -33,7 +33,7 @@ function signed(overrides: { ttlMs?: number; assetId?: string; tenantId?: string
   return signMediaUrl({
     tenantId: overrides.tenantId ?? TENANT,
     assetId: overrides.assetId ?? ASSET,
-    baseUrl: "https://mysp.example.com",
+    baseUrl: "https://vpost.example.com",
     nowMs: NOW,
     ttlMs: overrides.ttlMs,
     sign,
@@ -87,7 +87,7 @@ describe("mediaSignaturePayload", () => {
 describe("signMediaUrl", () => {
   it.each([
     ["a relative base URL", "/api"],
-    ["a non-http scheme", "ftp://mysp.example.com"],
+    ["a non-http scheme", "ftp://vpost.example.com"],
     ["an empty base URL", "  "],
   ])("refuses %s — Facebook must be able to GET it", (_label, baseUrl) => {
     expect(() => signMediaUrl({ tenantId: TENANT, assetId: ASSET, baseUrl, nowMs: NOW, sign })).toThrowError(
@@ -123,7 +123,7 @@ describe("signMediaUrl", () => {
     const result = signed();
     const url = new URL(result.url);
 
-    expect(result.url.startsWith("https://mysp.example.com")).toBe(true);
+    expect(result.url.startsWith("https://vpost.example.com")).toBe(true);
     expect(/^https?:\/\/\S+$/i.test(result.url)).toBe(true);
     expect(url.pathname).toBe(`${MEDIA_ROUTE_PREFIX}/${ASSET}`);
     expect(url.searchParams.get(MEDIA_QUERY_PARAMS.tenant)).toBe(TENANT);
@@ -136,11 +136,11 @@ describe("signMediaUrl", () => {
     const result = signMediaUrl({
       tenantId: TENANT,
       assetId: ASSET,
-      baseUrl: "https://mysp.example.com//",
+      baseUrl: "https://vpost.example.com//",
       nowMs: NOW,
       sign,
     });
-    expect(result.url).toBe(`https://mysp.example.com${result.path}`);
+    expect(result.url).toBe(`https://vpost.example.com${result.path}`);
   });
 });
 

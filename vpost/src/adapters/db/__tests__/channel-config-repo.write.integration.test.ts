@@ -190,7 +190,7 @@ describe.skipIf(!url)("DrizzleChannelConfigRepo — write path (real database)",
           name: "Shop B (đổi tên)",
           externalId: "222",
           accessToken: "page-token-b2",
-          tokenExpiresAt: new Date("2026-10-01T00:00:00.000Z"),
+          tokenExpiresAt: new Date("2054-10-01T00:00:00.000Z"),
         },
         {
           channelId: "fb-333",
@@ -213,7 +213,7 @@ describe.skipIf(!url)("DrizzleChannelConfigRepo — write path (real database)",
       // Refreshed, but NOT switched back on.
       status: "disabled",
     });
-    expect(b?.tokenExpiresAt?.toISOString()).toBe("2026-10-01T00:00:00.000Z");
+    expect(b?.tokenExpiresAt?.toISOString()).toBe("2054-10-01T00:00:00.000Z");
     // A channel the platform did not list this time is left untouched.
     expect(channels.find((channel) => channel.channelId === "fb-111")?.status).toBe("active");
     // And the stored user token survives an import that does not carry one.

@@ -1,12 +1,12 @@
 # AI Model Registry — the ONLY place a model string may live (ADR-001, docs/ai/model-routing.md §2).
 # Business code passes a `task`; it never passes a model.
 #
-# Owner decision 12/08/2026: Google AI Studio (Gemini) primary on every tier,
+# Owner decision 27/11/2026: Google AI Studio (Gemini) primary on every tier,
 # OpenAI as INFRASTRUCTURE fallback only. PAID TIER IS MANDATORY wherever real
 # shop data flows — the free tier grants Google training rights over the data
 # (docs/ai/provider-strategy.md §3.2).
 #
-# Owner decision 15/08/2026 — SUPERSEDES the tier layout above: SINGLE PROVIDER,
+# Owner decision 27/11/2026 — SUPERSEDES the tier layout above: SINGLE PROVIDER,
 # OpenAI only, because no Google AI Studio paid key is provisioned yet. The
 # Gemini entries stay defined below (an unreferenced model costs nothing) so
 # re-enabling is a two-line edit, not a rewrite. Consequence to accept
@@ -23,7 +23,7 @@
 # An unknown key stops the process at load and lists the valid ones.
 #
 # Changing a model here requires benchmark numbers in the PR (model-routing.md §5).
-# OpenAI prices below were read from the official pricing page on 15/08/2026
+# OpenAI prices below were read from the official pricing page on 27/11/2026
 # (developers.openai.com/api/docs/pricing, Standard tier). Google prices are
 # still aggregator-sourced — re-verify before Google is switched back on.
 
@@ -71,7 +71,7 @@ models:
   # These accept `temperature` and spend NO tokens on hidden reasoning, so the
   # whole output budget goes to the caption. That is why the cheap tier sits
   # here: gpt-5-mini burned all 900 tokens reasoning and emitted no JSON on
-  # 4 of 4 real runs (15/08/2026).
+  # 4 of 4 real runs (27/11/2026).
   "openai:gpt-4.1-mini":
     provider: openai
     model: gpt-4.1-mini
@@ -114,9 +114,9 @@ models:
   # --- OpenAI, reasoning (GPT-5 family) --------------------------------------
   # `temperature: false` is not a preference: responses.create answers
   # 400 "Unsupported parameter: 'temperature' is not supported with this model"
-  # (verified live 15/08/2026). Reasoning tokens are billed as output and count
+  # (verified live 27/11/2026). Reasoning tokens are billed as output and count
   # against maxOutputTokens, which is why the task budget has headroom.
-  # MEASURED 15/08/2026 — do NOT put back in the ladder without new numbers:
+  # MEASURED 27/11/2026 — do NOT put back in the ladder without new numbers:
   # on this prompt it spent 2944 of a 3000-token budget on reasoning and emitted
   # no JSON at all (and 900/900 before that). It over-thinks a copywriting task.
   "openai:gpt-5-mini":
@@ -189,7 +189,7 @@ models:
 # Escalation only happens after a validation failure, so paying more there is
 # exactly what the later attempts are for.
 #
-# Google (disabled 15/08/2026) — restore by prepending to the matching tier:
+# Google (disabled 27/11/2026) — restore by prepending to the matching tier:
 #   cheap: "google:gemini-3.5-flash-lite"
 #   mid:   "google:gemini-3.6-flash"
 #   top:   "google:gemini-3.1-pro"

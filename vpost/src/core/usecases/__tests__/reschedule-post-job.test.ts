@@ -21,7 +21,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 
 const TENANT = testTenantId("00000000-0000-0000-0000-000000000001");
 const JOB_ID = "11111111-1111-1111-1111-111111111111";
-const NOW = Date.parse("2026-08-13T02:00:00.000Z");
+const NOW = Date.parse("2054-08-13T02:00:00.000Z");
 const SCHEDULED_AT = new Date(NOW + 3 * 60 * 60 * 1000);
 const NEW_AT = new Date(NOW + 6 * 60 * 60 * 1000);
 

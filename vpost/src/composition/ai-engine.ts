@@ -54,7 +54,7 @@ export interface AiWiringDeps {
   env?: EnvRecord;
   /**
    * Source of the tenant's own sheet headers. Absent = every tenant validates
-   * against the MYSP preset labels, which is the pre-multi-tenant behaviour.
+   * against the VPOST preset labels, which is the pre-multi-tenant behaviour.
    */
   catalogConfig?: CatalogConfigRepo;
 }
@@ -111,7 +111,7 @@ export function tierModelsVariant(tierModels: Partial<Record<AITier, string>>): 
  * One function rather than two call sites on purpose: the tier swap has to reach
  * BOTH — the YAML store (which model each tier resolves to) and the cache key
  * (so another process's routing is never served back). Passing it to one and
- * forgetting the other is precisely the bug that shipped on 15/08/2026, and
+ * forgetting the other is precisely the bug that shipped on 27/11/2026, and
  * splitting them again would let it return.
  */
 export function makeAiPolicyStore(input: {
@@ -218,7 +218,7 @@ export function makeLazyPromptTemplates(deps: AiWiringDeps): ManagePromptTemplat
  * Provider adapters actually wired for this process.
  *
  * OpenAI is the only provider guaranteed to be present (owner decision
- * 15/08/2026, single-provider mode). Google is wired only when a key exists, so
+ * 27/11/2026, single-provider mode). Google is wired only when a key exists, so
  * a deployment without GOOGLE_AI_API_KEY generates content instead of refusing
  * to start. The registry decides which of them is ever REACHED — a tier naming
  * an unwired provider still fails loudly in the engine, it is not silently

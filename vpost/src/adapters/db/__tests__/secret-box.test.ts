@@ -225,15 +225,15 @@ describe("config helpers — the contract every repo follows", () => {
     // rule would not. It must still open — an envelope that survives into the
     // schema takes the whole provider row down with it.
     const stored = {
-      tokenExpiresAt: b.sealSecret("2026-10-01T00:00:00.000Z"),
+      tokenExpiresAt: b.sealSecret("2054-10-01T00:00:00.000Z"),
       note: b.sealSecret("nothing secret about this name"),
-      nested: { legacyTokenUtc: b.sealSecret("2026-10-01T00:00:00.000Z") },
+      nested: { legacyTokenUtc: b.sealSecret("2054-10-01T00:00:00.000Z") },
     };
 
     expect(openConfigSecrets(stored, b)).toEqual({
-      tokenExpiresAt: "2026-10-01T00:00:00.000Z",
+      tokenExpiresAt: "2054-10-01T00:00:00.000Z",
       note: "nothing secret about this name",
-      nested: { legacyTokenUtc: "2026-10-01T00:00:00.000Z" },
+      nested: { legacyTokenUtc: "2054-10-01T00:00:00.000Z" },
     });
   });
 
@@ -247,12 +247,12 @@ describe("config helpers — the contract every repo follows", () => {
 
   it("leaves an expiry date readable while still sealing the token beside it", () => {
     const b = box();
-    const config = { accessToken: TOKEN, tokenExpiresAt: "2026-10-01T00:00:00.000Z" };
+    const config = { accessToken: TOKEN, tokenExpiresAt: "2054-10-01T00:00:00.000Z" };
 
     const sealed = sealConfigSecrets(config, b);
 
     expect(isSealedSecret(sealed.accessToken)).toBe(true);
-    expect(sealed.tokenExpiresAt).toBe("2026-10-01T00:00:00.000Z");
+    expect(sealed.tokenExpiresAt).toBe("2054-10-01T00:00:00.000Z");
     // ...and the date must not be reported as a leaked credential.
     expect(findPlaintextSecretFields(sealed)).toEqual([]);
     expect(openConfigSecrets(sealed, b)).toEqual(config);

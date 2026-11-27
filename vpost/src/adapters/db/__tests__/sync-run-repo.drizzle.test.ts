@@ -69,8 +69,8 @@ function row(overrides: Record<string, unknown> = {}) {
   return {
     id: "11111111-1111-1111-1111-111111111111",
     status: "succeeded",
-    startedAt: new Date("2026-08-13T03:00:00.000Z"),
-    finishedAt: new Date("2026-08-13T03:01:00.000Z"),
+    startedAt: new Date("2054-08-13T03:00:00.000Z"),
+    finishedAt: new Date("2054-08-13T03:01:00.000Z"),
     counts: goodCounts,
     errorCode: null,
     ...overrides,
@@ -183,7 +183,7 @@ describe("listRecent — happy path", () => {
       {
         id: "11111111-1111-1111-1111-111111111111",
         status: "failed",
-        startedAt: new Date("2026-08-13T03:00:00.000Z"),
+        startedAt: new Date("2054-08-13T03:00:00.000Z"),
         finishedAt: null,
         issuesTotal: null,
         errorCode: "DRIVE_ERROR",

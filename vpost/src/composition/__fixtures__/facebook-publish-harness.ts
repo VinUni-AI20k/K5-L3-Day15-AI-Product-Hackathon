@@ -36,7 +36,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
  */
 
 export const TENANT = testTenantId("00000000-0000-0000-0000-000000000001");
-export const NOW = Date.parse("2026-08-13T02:00:00.000Z");
+export const NOW = Date.parse("2054-08-13T02:00:00.000Z");
 /** Inside the handoff window (T-30..T-12), so a handoff is what runs. */
 export const SCHEDULED_AT = new Date(NOW + 20 * 60_000);
 
@@ -278,7 +278,7 @@ export function harness(
     clock,
     logger,
     signMediaUrl,
-    mediaBaseUrl: () => "https://mysp.example.com",
+    mediaBaseUrl: () => "https://vpost.example.com",
     readMediaBytes,
   });
   // The operator's button and the screen that draws it, on the SAME repo the
