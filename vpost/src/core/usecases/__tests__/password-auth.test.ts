@@ -24,7 +24,7 @@ import { makePasswordAuth } from "../password-auth";
  */
 
 const PASSWORD = "Str0ng!pass";
-const T0 = Date.UTC(2026, 7, 24, 9, 0, 0);
+const T0 = Date.UTC(2054, 7, 24, 9, 0, 0);
 
 /**
  * The AppError a call was expected to reject with. A helper rather than
@@ -234,7 +234,7 @@ describe("signIn — the lock-out", () => {
       usecase.signIn({ email: "worker@vpost.vn", password: PASSWORD }),
     );
     // T0 is 09:00 UTC = 16:00 in Asia/Ho_Chi_Minh; +15min = 16:15.
-    expect(error.userMessage).toContain("16:15 ngày 24/08/2026");
+    expect(error.userMessage).toContain("16:15 ngày 24/08/2054");
   });
 
   it("lets the person back in once the lock has expired", async () => {
