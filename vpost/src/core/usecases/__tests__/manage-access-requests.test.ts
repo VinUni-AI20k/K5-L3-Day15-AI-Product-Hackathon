@@ -14,7 +14,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 
 /** E1.4 — the approval screen: list, approve with a role, block. */
 
-const NOW = new Date("2026-08-19T05:00:00.000Z");
+const NOW = new Date("2054-08-19T05:00:00.000Z");
 
 function clock(): Clock {
   return { now: () => NOW, nowMs: () => NOW.getTime() };
@@ -159,20 +159,20 @@ describe("listAccessRequests", () => {
 
   it("returns every row for `all`, newest request first, with ISO dates", async () => {
     const { usecase } = harness([
-      accessRow({ id: "req-old", requestedAt: new Date("2026-08-18T00:00:00.000Z") }),
+      accessRow({ id: "req-old", requestedAt: new Date("2054-08-18T00:00:00.000Z") }),
       accessRow({
         id: "req-new",
         providerAccountId: "2",
         status: "approved",
         role: "editor",
-        requestedAt: new Date("2026-08-19T00:00:00.000Z"),
+        requestedAt: new Date("2054-08-19T00:00:00.000Z"),
       }),
     ]);
 
     const items = await usecase.listAccessRequests({ tenantId: TEST_TENANT, status: "all" });
 
     expect(items.map((item) => item.id)).toEqual(["req-new", "req-old"]);
-    expect(items[0].requestedAt).toBe("2026-08-19T00:00:00.000Z");
+    expect(items[0].requestedAt).toBe("2054-08-19T00:00:00.000Z");
     expect(items[0].email).toBeNull();
   });
 

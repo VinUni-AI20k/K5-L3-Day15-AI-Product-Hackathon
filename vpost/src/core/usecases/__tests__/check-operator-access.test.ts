@@ -15,7 +15,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 
 /** E1.4 — the sign-in gate and the per-request status read. */
 
-const NOW = new Date("2026-08-19T04:00:00.000Z");
+const NOW = new Date("2054-08-19T04:00:00.000Z");
 
 function clock(): Clock {
   return { now: () => NOW, nowMs: () => NOW.getTime() };

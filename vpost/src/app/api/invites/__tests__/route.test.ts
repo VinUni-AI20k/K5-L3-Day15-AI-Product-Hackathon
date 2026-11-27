@@ -53,7 +53,7 @@ beforeEach(() => {
     id: "inv-1",
     role: "editor",
     token: TOKEN,
-    expiresAt: new Date("2026-08-27T05:00:00Z"),
+    expiresAt: new Date("2054-08-27T05:00:00Z"),
   });
 });
 
@@ -108,7 +108,7 @@ describe("/api/invites — token discipline", () => {
       {
         id: "inv-1",
         role: "editor",
-        expiresAt: new Date("2026-08-27T05:00:00Z"),
+        expiresAt: new Date("2054-08-27T05:00:00Z"),
         maxUses: 1,
         usedCount: 0,
         revokedAt: null,

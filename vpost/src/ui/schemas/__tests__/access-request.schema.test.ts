@@ -28,7 +28,7 @@ const PENDING_ROW = {
   email: null,
   status: "pending",
   role: null,
-  requestedAt: "2026-08-19T03:21:45.000Z",
+  requestedAt: "2054-08-19T03:21:45.000Z",
   decidedAt: null,
   decidedByEmail: null,
 };
@@ -41,8 +41,8 @@ const APPROVED_ROW = {
   email: "b@vpost.vn",
   status: "approved",
   role: "editor",
-  requestedAt: "2026-08-18T09:00:00+07:00",
-  decidedAt: "2026-08-18T10:15:00+07:00",
+  requestedAt: "2054-08-18T09:00:00+07:00",
+  decidedAt: "2054-08-18T10:15:00+07:00",
   decidedByEmail: "admin@vpost.vn",
 };
 
@@ -102,7 +102,7 @@ describe("AccessRequestListResponseSchema", () => {
   it("rejects an unparseable requestedAt instead of showing an invalid date", () => {
     expect(
       AccessRequestListResponseSchema.safeParse({
-        items: [{ ...PENDING_ROW, requestedAt: "19/08/2026" }],
+        items: [{ ...PENDING_ROW, requestedAt: "19/08/2054" }],
       }).success,
     ).toBe(false);
   });
