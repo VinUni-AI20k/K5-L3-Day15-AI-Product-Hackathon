@@ -11,8 +11,10 @@ os.environ["APP_DB"] = os.path.join(tempfile.mkdtemp(), "test.db")
 from fastapi.testclient import TestClient  # noqa: E402
 
 import schedule  # noqa: E402
-import server  # noqa: E402
 import tools  # noqa: E402
+
+tools.UPLOADS = tempfile.mkdtemp()   # ảnh test không ghi vào data/uploads của repo
+import server  # noqa: E402
 
 INV = {"T1": [{"mau": "Đen", "size": s, "ton": 3, "trang_thai": "Còn hàng"} for s in "SML"]}
 GOOD = {"decision": "write", "flag_reasons": [], "hook": "Một chiếc đầm voan cho buổi hẹn cuối tuần.",
