@@ -1,4 +1,4 @@
-# Canvas — [tên nhóm] · Track [A–F]
+# Canvas — SauBa · Track A
 
 > Điền ở guide bước 1.4. CP1 17:00 Thứ Sáu 27/11: nộp bản đầu, đủ 7 dòng (dòng 4 được ghi giả thuyết + nguồn sẽ kiểm).
 > CP2 19:30 Thứ Sáu 27/11: cập nhật (số bằng chứng đầu, lát cắt đã chốt) và điền dòng "Đã đổi gì so với CP1".
@@ -6,11 +6,11 @@
 
 | # | Dòng | Nhóm điền |
 |---|---|---|
-| 1 | Track + lát cắt dự kiến | |
-| 2 | Người dùng chính (một vai cụ thể — không phải "học viên nói chung") | |
-| 3 | Pain một câu: ai — đang làm gì — vướng đâu — hậu quả | |
-| 4 | Bằng chứng đầu — CP1: giả thuyết + nguồn sẽ kiểm · CP2: số đầu tiên + 1 trích dẫn | |
-| 5 | **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả) | |
-| 6 | AI tự làm đến đâu + 1 dòng lý do: sai thì ai chịu gì | |
-| 7 | Phân công có tên | |
+| 1 | Track + lát cắt dự kiến | **Track A · EdTech (hướng riêng, gần A1 "câu kiểm tra hiểu cuối bài").** Tầm nhìn: học viên đưa tài liệu → sinh đề ôn → chấm → chỉ chỗ yếu → lên lộ trình ôn theo quỹ giờ. **Lát cắt CP1 chỉ làm phần đầu:** sinh đề ôn bám tài liệu một buổi, chấm câu trả lời và chỉ ra ý kiến thức còn yếu (lộ trình ôn để sau). |
+| 2 | Người dùng chính (một vai cụ thể — không phải "học viên nói chung") | Học viên AI20K khoá 5 đang ôn cho bài kiểm tra giữa kỳ (trắc nghiệm, trả lời ngắn, viết code), vừa học vừa đi làm, muốn tự kiểm xem mình đã nắm tài liệu từng buổi chưa trước khi thi. |
+| 3 | Pain một câu: ai — đang làm gì — vướng đâu — hậu quả | Học viên AI20K — trước bài kiểm tra giữa kỳ, tự ôn bằng cách đọc lại slide/xem lại video từng buổi — không có đề ôn bám đúng nội dung buổi học và không biết mình hổng ý nào — nên ôn dàn trải, tốn giờ vào phần đã biết và chỉ phát hiện chỗ hổng khi đã làm bài thật. |
+| 4 | Bằng chứng đầu — CP1: giả thuyết + nguồn sẽ kiểm · CP2: số đầu tiên + 1 trích dẫn | **Giả thuyết:** học viên sai rải rác ở nhiều ý kiến thức nhưng không biết chính xác mình hổng ý nào, và không có đề ôn bám tài liệu để tự kiểm. **Số đếm sơ bộ** (`data/preclass/answers.csv`, `nguon = pre_post_post`): 1.970 lượt trả lời của 77 học viên, 20,3% sai; 69/77 học viên sai ≥1 câu, trung vị 4 ý kiến thức (`kc_code`) sai mỗi người. **Sẽ kiểm:** (a) data: sau khi sai một `kc_code`, bao nhiêu học viên quay lại xem đoạn video/bài chứa ý đó (`events.csv`); (b) phỏng vấn ≥4 học viên ngoài nhóm: lần ôn kiểm tra gần nhất làm gì, mất bao lâu, có tự tìm/tạo đề ôn không; (c) khảo sát ≥20 học viên: cách ôn hiện tại, số giờ ôn/tuần. **Cần xác nhận với lab coach:** lịch và hình thức bài kiểm tra giữa kỳ. |
+| 5 | **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả) | Một học viên AI20K sắp thi giữa kỳ · đưa tài liệu một buổi học · AI sinh một bộ câu hỏi ôn bám đúng tài liệu (mỗi câu trỏ về đoạn nguồn), chấm câu trả lời và chỉ ra ý kiến thức còn yếu · học viên biết mình cần ôn lại đoạn nào. |
+| 6 | AI tự làm đến đâu + 1 dòng lý do: sai thì ai chịu gì | **AI tự làm trong phạm vi tự ôn, không có tác động ra ngoài.** AI tự sinh câu hỏi, tự chấm và chỉ ý yếu; mỗi câu hỏi và mỗi nhận xét đều kèm mã đoạn nguồn để học viên tự kiểm. Điểm chỉ để tự ôn, **không** phải điểm chính thức, không gửi cho ai, không ghi vào hệ thống của khoá. Tài liệu thiếu thì nói "tài liệu không đủ để hỏi ý này" thay vì bịa; xin làm hộ bài kiểm tra thật thì từ chối. Lý do: sinh câu sai kiến thức hoặc chấm nhầm thì học viên tin sai và ôn nhầm chỗ ngay trước kỳ thi; hiện nguồn để học viên tự phát hiện. |
+| 7 | Phân công có tên | **Bùi Anh Dũng** (đội trưởng, SE & DevOps): repo, `agent.py`/`ai.py` (luồng sinh đề → chấm → chỉ ý yếu), nối model, chặn rủi ro, tracing · **Lê Hoàng Anh** (SE): `tools.py` (cắt tài liệu thành đoạn có mã, tra đoạn, chấm theo đáp án) + `app.py`, cải tiến lượt 2 · **Vương Xuân Dương** (SE): `eval/` bộ câu thử + metric (đúng nguồn, chấm khớp đáp án, từ chối đúng), `cost/`, `DATA_CARD.md` · **Phan Văn Cường** (BA): phỏng vấn, khảo sát, đào data (`evidence/`), xác nhận lịch giữa kỳ với lab coach, `spec.md`, slide. Cả nhóm: mỗi người hỏi ≥1 học viên. |
 | — | *(CP2)* Đã đổi gì so với CP1 | |
