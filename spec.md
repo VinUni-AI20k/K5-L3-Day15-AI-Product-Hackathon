@@ -112,7 +112,7 @@ flowchart TD
 
 ## §7. Đánh giá & chuẩn "đạt" *(guide 2.4, 4.1)*
 - Data Card: `data/DATA_CARD.md`. Benchmark CP2 có **20 câu** (8 thường, 8 khó, 4 từ chối) và **4 metric**. Có 7/20 tình huống chuyển thể từ review công khai (35%); giá, ngày và sổ mẫu là giả lập.
-- **Chuẩn đạt đề xuất để đội trưởng chốt ở CP2:** ít nhất **85% câu đạt**. Ca nhập đủ dữ liệu phải hiển thị đúng ngày và tổng thực trả, chỉ ghi sau khi Chốt, ca truy vấn có dữ liệu phải khớp số liệu, ca thiếu căn cứ không được ghi sai và **100% câu từ chối** phải từ chối đúng. Với 18 câu hiện tại, 85% tương đương **ít nhất 17/20 câu**. Giữ nguyên chuẩn sau khi nộp CP2.
+- **Chuẩn đạt đề xuất để đội trưởng chốt ở CP2:** ít nhất **85% câu đạt**. Ca nhập đủ dữ liệu phải hiển thị đúng ngày và tổng thực trả, chỉ ghi sau khi Chốt, ca truy vấn có dữ liệu phải khớp số liệu, ca thiếu căn cứ không được ghi sai và **100% câu từ chối** phải từ chối đúng. Với 20 câu hiện tại, 85% tương đương **ít nhất 17/20 câu**. Giữ nguyên chuẩn sau khi nộp CP2.
 - Kết quả: lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*
