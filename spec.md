@@ -1,36 +1,45 @@
-# AI SPEC — [Tên lát cắt] · Nhóm [tên nhóm] · Phòng [XXX] · Zone [X]
+# AI SPEC — Lịch trình một ngày ở khu vui chơi cho gia đình có trẻ nhỏ · Nhóm KKK · Phòng ____ · Zone ____
 
 > Mốc nộp: §7 chốt chuẩn "đạt" tại **CP2 19:30 Thứ Sáu 27/11** · §0–§7 nộp **CP3 10:00 Thứ Bảy 28/11** · đủ §0–§10 **CP4 14:30 Thứ Bảy 28/11** · §10 changelog ghi tiếp đến **23:59 Thứ Bảy 28/11**.
 > Đầu mỗi mục ghi bước guide (`02-guide.md` trong repo đề) chỉ cách điền. Mỗi mục ngắn, có số và nguồn; chi tiết để ở file được trỏ tới. Xoá dòng hướng dẫn trong ngoặc vuông khi điền xong.
 
-Track: [ ] A · [ ] B · [ ] C · [ ] D · [ ] E — bài toán: [đề gợi ý trong file track, hoặc bài toán nhóm tự mở rộng] __
-Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
+Track: [ ] A · [ ] B · [x] C · [ ] D · [ ] E — bài toán: C1 · Lịch trình một ngày ở khu vui chơi (đề gợi ý trong `tracks/track-c-travel.md`), thu hẹp về gia đình có trẻ nhỏ
+Data BTC cấp đã dùng (nếu có — không commit nguyên file): không dùng (track C không có data BTC). Bằng chứng: review công khai + phỏng vấn. Dữ liệu chạy thử: tự dựng có seed (`data/DATA_CARD.md`).
 
 ## §0. Hiện tại việc này diễn ra thế nào *(guide 1.1)*
-- Luồng hiện tại của việc này, trong khoá hoặc trên app thật (3–5 bước; ảnh chụp từ tài khoản của mình, đã che thông tin):
-- Công cụ / AI đang được dùng cho việc này (nếu có) + nguồn. Không kiểm được thì ghi "chưa kiểm":
+- Luồng hiện tại (theo trải nghiệm của nhóm, **chưa kiểm** bằng ảnh chụp — bổ sung ảnh app / trang chính thức trước CP3):
+  1. Tối hôm trước hoặc tại cổng: mua vé, mở app / trang web của khu vui chơi xem bản đồ và danh sách trò.
+  2. Xem lịch show ở một trang riêng (hoặc bảng ở cổng), tự nhớ giờ các show muốn xem.
+  3. Đến từng trò mới biết giới hạn chiều cao, thời gian chờ, trò có thu phí riêng không.
+  4. Trong ngày tự quyết đi đâu tiếp theo dựa vào bản đồ; mưa hoặc show huỷ thì tự xếp lại.
+  5. Cuối ngày mới biết tổng chi (vé cổng + trò thu phí riêng + ăn uống).
+- Công cụ / AI đang được dùng: app / trang chính thức của khu vui chơi (bản đồ, lịch show) — **chưa kiểm** tính năng gợi ý lịch trình ở các khu vui chơi Việt Nam · chatbot chung (ChatGPT, Gemini) để hỏi "nên chơi gì" — **chưa kiểm**, không có dữ liệu giờ mở cửa / giá của ngày đi.
 
 ## §1. Người dùng & bằng chứng *(guide 1.1, 1.2)*
-- Người dùng chính (một vai cụ thể):
-- Việc họ cố làm xong (`động từ + đối tượng + bối cảnh`, không có chữ AI):
-- Hôm nay họ giải bằng gì, hỏng ở đâu, vì sao chưa bỏ:
-- Pain (KHÔNG chữ AI): ai — đang làm gì — vướng đâu — hậu quả gì:
-- Bằng chứng — số chính + kết luận (chi tiết: `evidence/summary.md`): __
+- Người dùng chính (một vai cụ thể): bố hoặc mẹ đưa 1–2 con nhỏ (3–10 tuổi) đi khu vui chơi lớn một ngày, là người tự lên kế hoạch và cầm ngân sách.
+- Việc họ cố làm xong (`động từ + đối tượng + bối cảnh`, không có chữ AI): **xếp thứ tự trò chơi và show cho cả nhà trong một ngày ở khu vui chơi, vừa ngân sách và hợp với con nhỏ.**
+- Hôm nay họ giải bằng gì, hỏng ở đâu, vì sao chưa bỏ: tự xem bản đồ + lịch show + bảng giá rời nhau, đi tới đâu tính tới đó; hỏi người quen đã đi; hỏi chatbot chung. Hỏng ở chỗ các ràng buộc (giờ mở, giờ show, chiều cao trẻ, đi bộ, chờ hàng, mưa) không nằm cùng một chỗ nên dễ chồng giờ, lỡ show; chatbot chung không có dữ liệu ngày đi nên có thể nói sai giờ / giá. Chưa bỏ vì không có cách nào khác gom đủ thông tin, và mỗi gia đình chỉ đi vài lần một năm nên chấp nhận "đi rồi tính" *(giả thuyết — kiểm bằng phỏng vấn)*.
+- Pain (KHÔNG chữ AI): phụ huynh đi khu vui chơi với con nhỏ đang tự xếp thứ tự các trò và giờ show từ bản đồ, bảng giờ và bảng giá riêng lẻ, vướng ở chỗ giờ show, giờ mở cửa, giới hạn chiều cao của trẻ, thời gian đi bộ và mưa giữa ngày chồng chéo nhau → lỡ show con muốn xem, đến trò trẻ không được chơi, đi vòng vèo, chơi không hết mà tốn tiền hơn dự kiến.
+- Bằng chứng — số chính + kết luận (chi tiết: `evidence/summary.md`): **đang thu (CP2).** Giả thuyết và ngưỡng đúng/sai đã viết trước ở `evidence/hypothesis.md`. Nguồn chính: đào 60–100 review Google Maps / Tripadvisor của 2–3 khu vui chơi (`evidence/data-mining.md`, Kiên). Nguồn kiểm lại: phỏng vấn ≥4 phụ huynh / người đã đi gần đây (`evidence/interviews/P1.md`…, mỗi thành viên 1 người). Số chính + ≥5 trích dẫn: điền trước CP3.
 
 ## §2. Impact & quyết định chọn *(guide 1.3)*
 
+> **Bản nháp CP2** — mọi số đang là *(tự ước tính)*, thay bằng số từ review / phỏng vấn / nguồn công khai trước CP3. Không có nguồn thì giữ nhãn *(tự ước tính)*.
+
 | Hướng | Bao nhiêu người gặp | Bao nhiêu lần / tháng | Mỗi lần tốn gì | Impact / tháng | Làm kịp không | Chọn? |
 |---|---|---|---|---|---|---|
-|  |  |  |  |  |  |  |
-|  |  |  |  |  |  |  |
-|  |  |  |  |  |  |  |
+| **H1 · Xếp lịch một ngày cho gia đình có trẻ nhỏ** (trước ngày đi / tại cổng) | gia đình có trẻ nhỏ trong số khách khu vui chơi — __ *(cần nguồn: lượt khách/năm công khai × tỉ lệ khách đi cùng trẻ, tự ước tính)* | ~1 chuyến / gia đình, mỗi chuyến xếp 1 lần + sửa 1–3 lần *(tự ước tính, kiểm bằng phỏng vấn)* | ~30–60 phút tự lên kế hoạch + lỡ ≥1 trò / show định chơi + tiền vé trò không dùng được *(tự ước tính, kiểm bằng phỏng vấn + review)* | __ gia đình × 1 × ~45 phút | **Kịp**: dữ liệu tự dựng được, kiểm ràng buộc bằng code, đo được bằng câu thử | **✓ Chọn** |
+| H2 · Xếp lại phần còn lại của ngày khi mưa / show huỷ | chỉ các gia đình gặp mưa / huỷ show — ít hơn H1 *(tự ước tính)* | phụ thuộc mùa mưa *(tự ước tính)* | mất phần còn lại của ngày | nhỏ hơn H1 | Kịp, nhưng cần H1 chạy trước | Gộp vào H1 như **câu thử khó** (mưa giữa ngày), không làm riêng |
+| H3 · Dự đoán thời gian chờ hàng, gợi ý giờ vắng | mọi khách *(tự ước tính)* | mỗi lần đi | 15–60 phút chờ mỗi trò *(tự ước tính)* | có thể lớn | **Không kịp**: cần dữ liệu thời gian chờ thật, nhóm không có và không được nối hệ thống thật | ✗ Loại |
 
-- **Impact / tháng** của hướng chọn = __ người × __ lần × __ phút = __ — nguồn từng thừa số: __ (không có nguồn thì ghi rõ *(tự ước tính)*)
-- Hướng ĐÃ LOẠI + vì sao (giữ lại, đừng xoá):
-- Số lần / tháng của từng kiểu người dùng (dùng cho persona ở §8):
+- **Impact / tháng** của hướng chọn = __ gia đình / tháng × 1 lần × ~45 phút = __ giờ / tháng + __ trò / show bị lỡ — nguồn từng thừa số: số gia đình: __ *(nguồn công khai, Thành tìm ở chặng 4)* · 45 phút và số trò bị lỡ: *(tự ước tính — thay bằng số từ phỏng vấn P1–P4)*
+- Hướng ĐÃ LOẠI + vì sao (giữ lại, đừng xoá): **H3** loại vì cần dữ liệu thời gian chờ thật và nối vào hệ thống của khu vui chơi (trái ràng buộc chung số 2). **H2** không làm riêng, giữ làm tình huống khó trong bộ câu thử của H1.
+- Số lần / tháng của từng kiểu người dùng (dùng cho persona ở §8) *(tự ước tính, thay bằng số phỏng vấn)*: **xep_mot_lan** — xếp 1 lần rồi đi · **sua_nhieu_lan** — xếp rồi sửa 2–4 lần trước ngày đi (đổi giờ, bớt trò, đổi ngân sách) · **ngay_mua** — xếp lại giữa ngày vì mưa / show huỷ, mỗi lần xếp thêm các vòng tự kiểm.
 
 ## §3. Giải pháp tương tự *(guide 2.1)*
-- [sản phẩm / tính năng gần giống]: một điều đáng học · một điều đáng né · mình khác gì
+- **App / trang chính thức của khu vui chơi** (bản đồ, danh sách trò, lịch show) — *chưa kiểm chi tiết, chụp ảnh trước CP3*: đáng học · dữ liệu chính thức, là nguồn sự thật · đáng né · thông tin rải ở nhiều màn hình, khách tự ghép · mình khác · gom các ràng buộc lại và xếp sẵn thành lịch từng giờ.
+- **Disney Genie** trong app My Disney Experience (công viên Disney ở Mỹ, gợi ý lịch trình theo sở thích) — *theo trang chính thức của Disney, chưa kiểm lại trong hackathon*: đáng học · hỏi sở thích rồi gợi ý thứ tự, cập nhật trong ngày · đáng né · gắn với dịch vụ trả phí và dữ liệu chờ hàng thật mà nhóm không có · mình khác · làm cho một gia đình có trẻ nhỏ, chú trọng chiều cao / tuổi và ngân sách, nói rõ khi không xếp được.
+- **Chatbot chung (ChatGPT, Gemini)** hỏi "đi khu vui chơi X nên chơi gì": đáng học · nhập bằng câu tự nhiên, không cần form · đáng né · tự nhẩm giờ / giá, có thể nói sai giờ mở cửa, không kiểm chồng giờ · mình khác · giờ, giá, tổng tiền chỉ lấy từ dữ liệu và được **kiểm bằng code** trước khi đưa cho khách.
 
 ## §4. Thiết kế *(guide 2.2, 3.2)*
 - **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả):
@@ -87,7 +96,7 @@ Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
 - Ai có thể bị hại nếu AI sai, và nhóm chặn thế nào:
 
 ## §10. Phân công & changelog
-- Phân công có tên (theo chặng, chia cặp — guide "Cách chia việc"): __
+- Phân công có tên (theo chặng, chia cặp — guide "Cách chia việc"): **Đỗ Tuấn Anh** (đội trưởng) — `codebase/agent.py`, §0–3, bằng chứng pain, slide, nộp checkpoint · **Phan Nhật Trường** — `codebase/ai.py`, `codebase/planner.py`, §4 · **Bùi Xuân Thành** — `data/`, `codebase/tools.py`, `codebase/validator.py`, `cost/` · **Hoàng Đăng Kiên** — `eval/`, §5–7, `evidence/data-mining.md`. Review chéo: Tuấn Anh ↔ Trường, Thành ↔ Kiên. Chi tiết theo chặng: `PHAN-CONG.md`.
 - Dùng AI vào việc gì (2–3 dòng; chi tiết `docs/ai-usage.md`):
 - Nhật ký thay đổi — **mọi thay đổi sau CP2 19:30 Thứ Sáu 27/11 phải có dòng ở đây**:
 
