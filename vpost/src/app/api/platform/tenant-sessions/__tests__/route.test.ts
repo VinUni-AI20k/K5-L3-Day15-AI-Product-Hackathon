@@ -50,7 +50,7 @@ beforeEach(() => {
   open.mockResolvedValue({
     sessionId: SESSION_ID,
     tenant: { id: TENANT, name: "Khách A", slug: "khach-a" },
-    expiresAt: new Date("2026-08-22T07:00:00Z"),
+    expiresAt: new Date("2054-08-22T07:00:00Z"),
   });
 });
 

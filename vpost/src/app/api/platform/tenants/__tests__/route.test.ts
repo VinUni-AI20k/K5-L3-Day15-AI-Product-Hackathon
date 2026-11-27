@@ -54,14 +54,14 @@ const LIST_ITEM: PlatformTenantListItem = {
   plan: "standard",
   status: "active",
   memberCount: 3,
-  createdAt: new Date("2026-08-21T05:00:00Z"),
+  createdAt: new Date("2054-08-21T05:00:00Z"),
   survey: {
     sellerKind: "shop_owner",
     // `[]` and `null` in the SAME fixture: the pair that must never collapse.
     currentTools: [],
     channelCount: "4-6",
     focusChannels: null,
-    completedAt: new Date("2026-08-26T10:00:00Z"),
+    completedAt: new Date("2054-08-26T10:00:00Z"),
   },
 };
 
@@ -84,7 +84,7 @@ beforeEach(() => {
   createTenant.mockResolvedValue({
     tenant: { id: TENANT, name: "Khách A", slug: "khach-a", plan: "standard", status: "active" },
     ownerInviteToken: TOKEN,
-    inviteExpiresAt: new Date("2026-08-28T05:00:00Z"),
+    inviteExpiresAt: new Date("2054-08-28T05:00:00Z"),
   });
 });
 

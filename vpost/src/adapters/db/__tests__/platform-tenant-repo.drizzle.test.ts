@@ -32,7 +32,7 @@ function baseRow(over: JoinedRow = {}): JoinedRow {
     slug: "khach-a",
     plan: "standard",
     status: "active",
-    createdAt: new Date("2026-08-21T05:00:00.000Z"),
+    createdAt: new Date("2054-08-21T05:00:00.000Z"),
     memberCount: 2,
     // LEFT JOIN miss: every tenant_profile column arrives null.
     profileTenantId: null,
@@ -100,7 +100,7 @@ describe("listTenants — tenants without a survey row", () => {
         currentTools: [],
         channelCount: "4-6",
         focusChannels: ["tiktok"],
-        surveyCompletedAt: new Date("2026-08-26T10:00:00.000Z"),
+        surveyCompletedAt: new Date("2054-08-26T10:00:00.000Z"),
       }),
     ]);
 
@@ -112,7 +112,7 @@ describe("listTenants — tenants without a survey row", () => {
       currentTools: [],
       channelCount: "4-6",
       focusChannels: ["tiktok"],
-      completedAt: new Date("2026-08-26T10:00:00.000Z"),
+      completedAt: new Date("2054-08-26T10:00:00.000Z"),
     });
   });
 });

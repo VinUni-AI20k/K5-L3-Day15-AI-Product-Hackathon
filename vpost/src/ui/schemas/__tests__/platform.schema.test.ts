@@ -35,7 +35,7 @@ const SURVEY_ROW = {
   currentTools: ["meta_business_suite"],
   channelCount: "4-6",
   focusChannels: [],
-  completedAt: "2026-08-26T10:00:00.000Z",
+  completedAt: "2054-08-26T10:00:00.000Z",
 };
 
 const TENANT_ROW = {
@@ -45,7 +45,7 @@ const TENANT_ROW = {
   plan: "internal",
   status: "active",
   memberCount: 5,
-  createdAt: "2026-08-19T10:13:28.916Z",
+  createdAt: "2054-08-19T10:13:28.916Z",
   survey: SURVEY_ROW,
 };
 
@@ -117,7 +117,7 @@ describe("CreatePlatformTenantResponseSchema", () => {
   const created = {
     tenant: { id: "t-9", name: "Nhà Xe An Anh", slug: "an-anh", plan: "standard", status: "active" },
     ownerInviteUrl: "https://vpost.vn/join/abc123",
-    inviteExpiresAt: "2026-08-27T05:12:47.308Z",
+    inviteExpiresAt: "2054-08-27T05:12:47.308Z",
   };
 
   it("accepts the answer the contract describes", () => {
@@ -243,7 +243,7 @@ describe("support sessions (M3.3)", () => {
     const parsed = StartSupportSessionResponseSchema.safeParse({
       sessionId: "s-1",
       tenant: { id: "t-2", name: "Nha Xe An Anh", slug: "an-anh" },
-      expiresAt: "2026-08-20T11:00:00.000Z",
+      expiresAt: "2054-08-20T11:00:00.000Z",
     });
     expect(parsed.success).toBe(true);
   });
