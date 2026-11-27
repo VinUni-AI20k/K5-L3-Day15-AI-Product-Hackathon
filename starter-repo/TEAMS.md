@@ -11,10 +11,10 @@
 
 | STT | Họ và tên | Mã học viên | Vai trò | Phần việc chính |
 |---|---|---|---|---|
-| 1 | Phan Văn Diện | 2A202603653 | Đội trưởng | ____ |
-| 2 | Vũ Hải Tuấn | 2A202603689 | Thành viên | ____ |
-| 3 | Đoàn VIết Huy | 2A202603593 | Thành viên | ____ |
-| 4 | Nguyễn Văn Vinh | 2A202603672 | Thành viên | ____ |
+| 1 | Phan Văn Diện | 2A202603653 | Đội trưởng | Benckmark, Evaluation, Cost |
+| 2 | Vũ Hải Tuấn | 2A202603689 | Thành viên | Backend+Fontend+ Agent |
+| 3 | Đoàn VIết Huy | 2A202603593 | Thành viên | Deploy |
+| 4 | Nguyễn Văn Vinh | 2A202603672 | Thành viên | Data |
 
 **Quy tắc điền**
 - **Lớp:** `L3A` hoặc `L3B`. **Track:** một chữ `A` (EdTech), `B` (Y tế), `C` (Du lịch), `D` (Thương mại điện tử), `E` (Tài chính) hoặc `F` (Làn khác). **Link repo:** link GitHub công khai của nhóm.

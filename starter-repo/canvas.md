@@ -1,16 +1,16 @@
-# Canvas — [tên nhóm] · Track [A–F]
-Tên nhóm : AuraFarming.   Track: C
+# Canvas — AuraFarming · Track C
+
 > Điền ở guide bước 1.4. CP1 17:00 Thứ Sáu 27/11: nộp bản đầu, đủ 7 dòng (dòng 4 được ghi giả thuyết + nguồn sẽ kiểm).
 > CP2 19:30 Thứ Sáu 27/11: cập nhật (số bằng chứng đầu, lát cắt đã chốt) và điền dòng "Đã đổi gì so với CP1".
 > Track F: chép thêm thẻ đề của nhóm (khung trong file track F) xuống dưới bảng này.
 
 | # | Dòng | Nhóm điền |
 |---|---|---|
-| 1 | Track + lát cắt dự kiến |AI for Business – AI hỗ trợ HR tối ưu lịch trình Company Trip dựa trên số lượng và ngân sách doanh nghiệp. |
-| 2 | Người dùng chính (một vai cụ thể — không phải "học viên nói chung") |Nhân viên HR phụ trách tổ chức Company Trip cho doanh nghiệp có khoảng 50–200 nhân viên. |
-| 3 | Pain một câu: ai — đang làm gì — vướng đâu — hậu quả |HR đang phải tổng hợp thủ công sở thích, ngân sách và ý kiến của nhiều nhân viên để lập lịch trình du lịch, dẫn đến mất nhiều thời gian, khó dung hòa nhu cầu và lịch trình không đáp ứng được mong muốn của một số nhóm nhân viên. |
-| 4 | Bằng chứng đầu — CP1: giả thuyết + nguồn sẽ kiểm · CP2: số đầu tiên + 1 trích dẫn |CP1: Giả thuyết: HR phải tổng hợp nhiều biểu mẫu, tin nhắn và ý kiến để xây dựng lịch trình, trong khi khó đánh giá mức độ hài lòng của toàn bộ nhân viên. Nguồn sẽ kiểm: Phỏng vấn 3–5 HR, khảo sát nhân viên từng tham gia Company Trip, tìm hiểu quy trình tổ chức thực tế. CP2: Chưa có số liệu thực nghiệm. Sẽ đo thời gian HR lập kế hoạch, tỷ lệ nhân viên đồng ý với lịch trình và mức độ hài lòng. Đối chiếu với tài liệu sản phẩm của Vntrip TMS và NextRetreat. |
-| 5 | **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả) |HR nhập ngân sách và dữ liệu sở thích nhân viên, AI phân tích và đề xuất lịch trình Company Trip tối ưu, giúp HR chọn được phương án có mức độ phù hợp cao với nhân viên mà vẫn đảm bảo ngân sách. |
-| 6 | AI tự làm đến đâu + 1 dòng lý do: sai thì ai chịu gì |AI tự động phân tích sở thích, phân nhóm nhu cầu, đề xuất và xếp hạng lịch trình; HR là người phê duyệt cuối cùng vì nếu AI đề xuất sai có thể gây lãng phí ngân sách, ảnh hưởng trải nghiệm và kế hoạch của doanh nghiệp. |
-| 7 | Phân công có tên |Cần phân công thành viên thực tế của nhóm: Product Research, AI/ML, Backend, Frontend, Data & Evaluation. |
-| — | *(CP2)* Đã đổi gì so với CP1 | |
+| 1 | Track + lát cắt dự kiến | Track C (Du lịch) — lập kế hoạch du lịch cho cả công ty theo ngân sách: gợi ý địa điểm / dự trù 3 gói (tiết kiệm · cân bằng · cao cấp), giám đốc duyệt, rồi ra kế hoạch chi tiết từng giờ kèm bảng chi phí. |
+| 2 | Người dùng chính (một vai cụ thể — không phải "học viên nói chung") | Giám đốc (hoặc người được giám đốc giao) công ty khoảng 30–200 người, cần chốt chuyến đi nghỉ dưỡng / gắn kết trong nước cho cả công ty với một khoản kinh phí cho trước. |
+| 3 | Pain một câu: ai — đang làm gì — vướng đâu — hậu quả | Giám đốc đang lên chuyến đi cho cả công ty — phải tự tìm địa điểm, hỏi giá chỗ ở / xe / ăn cho cả đoàn và cộng tay xem có vừa ngân sách không — vướng ở chỗ giá trên mạng là giá lẻ, không tính được cơ cấu phòng, số xe, suất ăn cho vài chục người — hậu quả là mất nhiều ngày so sánh, dự trù lệch, chi vượt ngân sách hoặc cả đoàn thiếu phòng khi đã đi. |
+| 4 | Bằng chứng đầu — CP1: giả thuyết + nguồn sẽ kiểm · CP2: số đầu tiên + 1 trích dẫn | **Giả thuyết:** người lo chuyến đi công ty mất nhiều buổi để có được một bản dự trù cho cả đoàn, và bản dự trù thường lệch so với chi thực tế. **Nguồn sẽ kiểm:** phỏng vấn ≥3 người từng tổ chức chuyến đi công ty (giám đốc / HR / admin) — hỏi lần gần nhất mất bao lâu, lệch ngân sách bao nhiêu, đang dùng gì (Excel, báo giá công ty tour) · đối chiếu với các dịch vụ tương tự (công ty tour báo giá đoàn, Vntrip, NextRetreat). **CP2:** chưa có số — sẽ ghi vào `evidence/summary.md` và cập nhật dòng này khi có phỏng vấn đầu tiên. |
+| 5 | **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả) | Một giám đốc cần tổ chức chuyến đi cho công ty · nhập số người, mục đích, số ngày, nơi xuất phát cùng kinh phí và/hoặc địa điểm · AI tìm địa điểm, chỗ ở, ăn uống, hoạt động có nguồn và code dự trù 3 gói theo ngân sách · giám đốc nhận kế hoạch từng giờ kèm bảng chi phí và lời giải thích khi vượt ngân sách. |
+| 6 | AI tự làm đến đâu + 1 dòng lý do: sai thì ai chịu gì | AI gợi ý, người quyết: AI tìm địa điểm / cơ sở có link nguồn và đề xuất 3 gói; tiền, số phòng, số xe, giờ do code tính; giám đốc duyệt địa điểm + gói trước khi ra kế hoạch chi tiết, mọi việc đặt chỗ / thanh toán do công ty tự làm. Lý do: sai thì công ty chi vượt ngân sách hoặc cả đoàn thiếu phòng, thiếu chỗ ăn khi đã đi — sửa rất đắt. |
+| 7 | Phân công có tên | Phan Văn Diện (đội trưởng) · Vũ Hải Tuấn · Đoàn Viết Huy · Nguyễn Văn Vinh — phần việc từng người: __ (nhóm chốt, khớp cột "Phần việc chính" trong `TEAMS.md` và §10 `spec.md`) |
+| — | *(CP2)* Đã đổi gì so với CP1 | 
