@@ -1,0 +1,862 @@
+import { DEFAULT_STOCK_POLICY, type StockPolicy } from "@/core/domain/catalog-field-map";
+import { AppError } from "@/core/domain/errors";
+import { evaluateProductInventory } from "@/core/domain/inventory";
+import { normalizeColorName } from "@/core/domain/media-file-name";
+import {
+  MAX_ALBUM_MEDIA,
+  SUPPORTED_FORMATS,
+  evaluateScheduledAt,
+  handoffWakeDelayMs,
+  isPostFormat,
+  isVideoFormat,
+  scheduleRejectionMessage,
+  postJobDuplicateKey,
+  postJobQueueId,
+  transitionPostJob,
+  type PostBatchStatus,
+  type PostFormat,
+  type PostJob,
+  type PostJobMedia,
+  type PostJobStatus,
+  type ScheduleRejection,
+  type TransitionMeta,
+} from "@/core/domain/post-job";
+import { productOrigin } from "@/core/domain/product";
+import {
+  parseBatchSpacingMs,
+  spacingRejectionMessage,
+  MAX_SPACING_MS,
+  MIN_SPACING_MS,
+} from "@/core/domain/publish-spacing";
+import { isTenantId } from "@/core/domain/tenant";
+import type { CatalogConfigRepo } from "@/core/ports/drive-source";
+import type { Clock, Logger } from "@/core/ports/infra";
+import type { JobQueue } from "@/core/ports/job-queue";
+import type { NewPostJob, PostJobRepo } from "@/core/ports/post-job-repo";
+import type { ProductRepo } from "@/core/ports/product-repo";
+import type { ChannelConfigRepo, SignMediaUrlFn } from "@/core/ports/publisher";
+import type { UserRepo } from "@/core/ports/user-repo";
+
+import { PUBLISH_POST_JOB_NAME } from "./publish-post";
+import { resolveActorUserId } from "./resolve-actor";
+import { normalizeTenantId, type TenantId } from "@/core/domain/tenant-context";
+
+/**
+ * E7.2 — fan out ONE post to N channels: one post_job per channel, independent
+ * from the first line (business rule 6). A channel that is not configured is
+ * blocked on its own row; the other channels keep going.
+ *
+ * Order (business rule 1): stock gate BEFORE anything is queued. A sold-out code
+ * still gets its batch + jobs, all `blocked`, so the operator sees WHY in the
+ * batch summary instead of a silent no-op.
+ *
+ * The anti-duplicate lock (rule 4) is the unique index on
+ * (tenant, batch, code, colour, channel, format), taken inside the creating
+ * transaction — i.e. before any publish call exists. Re-running this usecase
+ * with the same `batchId` (the idempotency scope: a retried request, a replayed
+ * job) hits it and raises DUPLICATE_POST_BLOCKED.
+ */
+
+/**
+ * What a caller (UI / API route) hands over per photo: the ASSET, not a URL.
+ * A structural subset of `MediaAsset` (core/domain/product), so the compose
+ * screen forwards its own items untouched.
+ *
+ * The public URL is minted here (see `signMediaUrl` below): how Facebook reaches
+ * a Drive file is transport, not something a screen should know or be able to
+ * forge.
+ */
+export interface PostMediaInput {
+  /** Drive file id — the asset identity carried by post_job.media. */
+  readonly driveFileId: string;
+  readonly fileName?: string;
+  /** Phase 1 publishes images only; a video item is refused here. */
+  readonly kind?: string;
+}
+
+export interface CreatePostBatchInput {
+  readonly tenantId: TenantId;
+  /**
+   * Idempotency scope. Pass the SAME id to retry a half-created batch safely;
+   * omit it for a brand new batch (a fresh id is generated).
+   */
+  readonly batchId?: string;
+  readonly productCode: string;
+  /** Canonical or free-form colour; "" / absent = every colour of the code. */
+  readonly color?: string;
+  readonly format?: PostFormat;
+  readonly channelIds: readonly string[];
+  /** One caption per channel (brief §7.2 — never share a caption). */
+  readonly captionByChannel: Readonly<Record<string, string>>;
+  /** 1..10 assets, cover first. URLs are minted here, not by the caller. */
+  readonly media: readonly PostMediaInput[];
+  /**
+   * E8.1 — publish time for EVERY channel of this batch. Absent/null = now.
+   * Must be at least a second ahead and at most MAX_SCHEDULE_AHEAD_MS.
+   */
+  readonly scheduledAt?: Date | null;
+  /**
+   * E8.1 — per-channel publish time; wins over `scheduledAt` for the channels
+   * it names (brief §9: "hẹn giờ riêng cho từng kênh, vì Facebook và TikTok có
+   * khung giờ vàng khác nhau"). A bad time blocks ONLY that channel.
+   */
+  readonly scheduledAtByChannel?: Readonly<Record<string, Date | null | undefined>>;
+  /**
+   * E7 — gap the spacing gate keeps between two posts of THIS run, in
+   * MILLISECONDS. Absent/null = keep using the tenant's configured spacing
+   * (`PublishSettings.spacingMs`), which is what every batch did before this
+   * field existed.
+   *
+   * Range [0, 24h]. 0 is a real choice ("đăng liên tục"), not an absence. The
+   * UI advises at least 5 minutes but nothing here refuses a smaller number —
+   * that is advice, not a rule.
+   *
+   * PENDING(E1): the gap is between posts of the SAME CHANNEL; the channels of
+   * one batch still do not wait for each other.
+   */
+  readonly spacingMs?: number | null;
+  /** `app_user.id` when the caller already knows it; wins over `actorEmail`. */
+  readonly createdBy?: string | null;
+  /**
+   * Bug B6 — who pressed "Đăng", read from the SESSION by the route and never
+   * from the body. Resolved to an `app_user.id` here (same contract as retry /
+   * cancel / reschedule): an e-mail that maps to no row is a WARNING and an
+   * unattributed batch, never a refusal — a post that does not go out is a far
+   * worse outcome than a batch whose author we cannot name.
+   */
+  readonly actorEmail?: string | null;
+  readonly note?: string | null;
+}
+
+export interface CreatePostBatchChannelResult {
+  readonly channelId: string;
+  readonly postJobId: string;
+  readonly status: PostJobStatus;
+  readonly queued: boolean;
+  readonly queueJobId: string | null;
+  readonly errorCode: string | null;
+  readonly userMessage: string | null;
+  /** Publish time actually stored for this channel; null = as soon as possible. */
+  readonly scheduledAt: Date | null;
+}
+
+export interface CreatePostBatchResult {
+  readonly tenantId: TenantId;
+  readonly batchId: string;
+  readonly productCode: string;
+  readonly color: string;
+  readonly format: PostFormat;
+  readonly batchStatus: PostBatchStatus;
+  /**
+   * The gap STORED on this run, in milliseconds. Null = nothing was stored, so
+   * the tenant's configured spacing applies at publish time. Echoed back so a
+   * screen can show what it actually got instead of what it hoped it sent.
+   */
+  readonly spacingMs: number | null;
+  readonly channels: readonly CreatePostBatchChannelResult[];
+  /** Internal operator notes (low stock...). Never part of a caption. */
+  readonly warnings: readonly string[];
+}
+
+export interface CreatePostBatchDeps {
+  postJobs: PostJobRepo;
+  products: ProductRepo;
+  channels: ChannelConfigRepo;
+  queue: JobQueue;
+  clock: Clock;
+  logger: Logger;
+  /**
+   * Resolves `actorEmail` to an `app_user.id` for `post_batch.created_by`
+   * (Bug B6). Optional for the same reason it is in retry/cancel: a process
+   * without it still publishes, and says out loud that the row is unattributed.
+   */
+  users?: UserRepo;
+  /** Injected so tests get deterministic ids. */
+  newId: () => string;
+  /** Mints the public URL Graph API fetches (E3.6). */
+  signMediaUrl: SignMediaUrlFn;
+  /**
+   * Public origin, read LAZILY (a function, not a value): a missing
+   * MEDIA_PUBLIC_BASE_URL must fail when someone tries to post, with a message
+   * naming the variable — not at process boot, where nothing can act on it.
+   */
+  mediaBaseUrl: () => string;
+  /** Optional override; the signer clamps it to [1min, 24h]. */
+  mediaUrlTtlMs?: number;
+  /**
+   * Per-tenant stock policy (onboarding phase 1). Optional so a caller that is
+   * not wired yet keeps the `numeric` behaviour — the SAFE default, which still
+   * checks stock. A tenant on `textual`/`disabled` needs this wired.
+   */
+  catalogConfig?: CatalogConfigRepo;
+}
+
+export function makeCreatePostBatch(deps: CreatePostBatchDeps) {
+  return async function createPostBatch(
+    input: CreatePostBatchInput,
+  ): Promise<CreatePostBatchResult> {
+    // --- Edge cases first (CLAUDE.md technical rule 1) ---------------------
+    const rawTenantId = str(input?.tenantId);
+    const productCode = str(input?.productCode).toUpperCase();
+    if (!isTenantId(rawTenantId) || productCode.length === 0) {
+      throw invalid("createPostBatch requires a tenant UUID and a product code", {
+        tenant_id: rawTenantId || null,
+        product_code: productCode || null,
+      });
+    }
+    const tenantId = normalizeTenantId(input.tenantId);
+
+    const format = input?.format ?? "image_post";
+    if (!isPostFormat(format) || !SUPPORTED_FORMATS.includes(format)) {
+      throw invalid(`Format "${String(format)}" is not supported`, {
+        tenant_id: tenantId,
+        product_code: productCode,
+        format,
+        supported: SUPPORTED_FORMATS,
+      });
+    }
+
+    const channelIds = uniqueStrings(input?.channelIds);
+    if (channelIds.length === 0) {
+      throw invalid("createPostBatch requires at least one channel", {
+        tenant_id: tenantId,
+        product_code: productCode,
+      });
+    }
+
+    const assets = normaliseMediaInput(input?.media, format);
+    if (assets instanceof AppError) throw assets;
+
+    const captions = new Map<string, string>();
+    const missingCaptions: string[] = [];
+    for (const channelId of channelIds) {
+      const caption = str(input?.captionByChannel?.[channelId]);
+      if (caption.length === 0) missingCaptions.push(channelId);
+      else captions.set(channelId, caption);
+    }
+    if (missingCaptions.length > 0) {
+      // A caption per channel is a hard requirement (brief §7.2); a missing one
+      // is a caller bug, not a per-channel runtime failure.
+      throw invalid(`Missing caption for channel(s): ${missingCaptions.join(", ")}`, {
+        tenant_id: tenantId,
+        product_code: productCode,
+        channels_without_caption: missingCaptions,
+      });
+    }
+
+    // A spacing this usecase cannot store must stop the batch HERE, before a
+    // single row exists: a run created with the wrong gap would publish to real
+    // Pages at the wrong pace, and there is no undo for that.
+    const spacing = parseBatchSpacingMs(input?.spacingMs);
+    if (!spacing.ok) {
+      throw new AppError("INVALID_INPUT", {
+        message: `createPostBatch received an invalid spacingMs (${spacing.reason})`,
+        userMessage: spacingRejectionMessage(spacing.reason),
+        context: {
+          tenant_id: tenantId,
+          product_code: productCode,
+          field: "spacingMs",
+          reason: `SPACING_MS_${spacing.reason}`,
+          received: spacing.received,
+          min_ms: MIN_SPACING_MS,
+          max_ms: MAX_SPACING_MS,
+        },
+      });
+    }
+    const spacingMs = spacing.ms;
+
+    const batchId = str(input?.batchId) || deps.newId();
+    const color = normaliseColor(input?.color);
+    const log = deps.logger.child({
+      tenant_id: tenantId,
+      batch_id: batchId,
+      product_code: productCode,
+    });
+
+    const duplicateCaption = findSharedCaption(captions);
+    if (duplicateCaption) {
+      // Not fatal here (E4 owns caption rules) but it must be visible.
+      log.warn("Two channels received an identical caption (brief §7.2 requires distinct ones)", {
+        channels: duplicateCaption,
+      });
+    }
+
+    // --- Stock gate BEFORE queueing anything (business rule 1) -------------
+    const product = await deps.products.findByCode(tenantId, productCode);
+    if (!product) {
+      throw new AppError("PRODUCT_NOT_FOUND", {
+        message: `Product ${productCode} is not in the product catalog`,
+        userMessage: `Không tìm thấy mã ${productCode} trong dữ liệu sản phẩm — đồng bộ lại bảng dữ liệu, hoặc nhập tay thông tin sản phẩm cho bài này`,
+        context: { tenant_id: tenantId, product_code: productCode, batch_id: batchId },
+      });
+    }
+    // Read BEFORE the batch/jobs are written: an unreadable policy must stop
+    // here, with nothing created, rather than leave a batch nobody can explain.
+    const stockPolicy = await resolveStockPolicy(deps, tenantId, log);
+    const inventory = evaluateProductInventory(product, stockPolicy);
+    const warnings: string[] = [];
+    if (inventory.operatorMessage) warnings.push(inventory.operatorMessage);
+
+    // --- Mint one signed URL per photo (E3.6) -------------------------------
+    // Before the insert: a misconfigured signer must not leave a half-created
+    // batch of jobs pointing at nothing.
+    const signed = signMedia(deps, tenantId, assets, { batch_id: batchId, product_code: productCode });
+    const media = signed.media;
+
+    // --- Publish time per channel (E8.1) -----------------------------------
+    // Resolved BEFORE the insert so post_job.scheduled_at is right from the
+    // first write; a rejected time blocks only its own channel (rule 6).
+    const schedules = resolveSchedules(input, channelIds, deps.clock.nowMs());
+
+    // --- Create batch + jobs in ONE transaction (the lock) ------------------
+    // Stamped from the product this batch was actually built on — the row is
+    // already in hand (the guard above threw without it), so no extra read. It
+    // is a historical fact from here on: a later sync deleting or replacing the
+    // product cannot rewrite what this post was made from.
+    const origin = productOrigin(product);
+    const newJobs: NewPostJob[] = channelIds.map((channelId) => ({
+      id: deps.newId(),
+      tenantId,
+      batchId,
+      productCode,
+      productOrigin: origin,
+      color,
+      channelId,
+      format,
+      captionText: captions.get(channelId) ?? "",
+      media,
+      scheduledAt: schedules.get(channelId)?.at ?? null,
+    }));
+
+    const created = await deps.postJobs.createBatchWithJobs({
+      batch: {
+        id: batchId,
+        tenantId,
+        productCode,
+        color,
+        format,
+        note: str(input?.note) || null,
+        // null = "this run picked nothing"; the worker then reads the tenant's.
+        spacingMs,
+        // Bug B6: an explicit id wins, otherwise the session e-mail is looked
+        // up. `post_batch.created_by` is a FK to `app_user.id`, so an e-mail
+        // must never be written into it raw.
+        createdBy: await resolveActorUserId(
+          deps,
+          tenantId,
+          { actorUserId: input?.createdBy, actorEmail: input?.actorEmail },
+          log,
+        ),
+      },
+      jobs: newJobs,
+    });
+
+    log.info("Post batch created", {
+      channels: channelIds,
+      // Answers "vì sao lô này đăng nhanh/chậm thế" without reading the row.
+      spacing_ms: spacingMs,
+      spacing_source: spacingMs === null ? "tenant" : "batch",
+      product_origin: origin,
+      job_count: created.jobs.length,
+      media_count: media.length,
+      // Expiry only — a signed URL carries a MAC and never belongs in a log.
+      media_url_expires_at: new Date(signed.expiresAtMs).toISOString(),
+      stock: inventory.stock,
+      inventory_status: inventory.status,
+      stock_policy_mode: inventory.policyMode,
+      stock_check_skipped: inventory.stockCheckSkipped,
+      stock_check_skipped_reason: inventory.stockCheckSkippedReason,
+      duplicate_keys: created.jobs.map((job) => postJobDuplicateKey(job)),
+    });
+
+    // The tenant turned the stock gate OFF: no job of this batch passed a stock
+    // check (business rule 3 suspended by a written decision).
+    // Its own warn line so the batch trail answers "vì sao bài này lên dù hết
+    // hàng" without reading the tenant config months later.
+    if (inventory.stockCheckSkipped) {
+      log.warn("Post batch created WITHOUT a stock check — the tenant disabled the stock gate", {
+        stock_policy_mode: inventory.policyMode,
+        stock_check_skipped: true,
+        stock_check_skipped_reason: inventory.stockCheckSkippedReason,
+        channels: channelIds,
+        alert: "OPERATOR_ATTENTION",
+      });
+    }
+
+    if (inventory.blocked) {
+      const userMessage =
+        inventory.operatorMessage ?? `Mã ${productCode} đã hết hàng — không đăng`;
+      const channels: CreatePostBatchChannelResult[] = [];
+      for (const job of created.jobs) {
+        const blocked = await moveJob(deps, job, "blocked", {
+          reason: inventory.reason ?? "BLOCKED",
+          errorCode: "OUT_OF_STOCK",
+          errorMessage: userMessage,
+        });
+        channels.push({
+          channelId: job.channelId,
+          postJobId: job.id,
+          status: blocked?.status ?? "blocked",
+          queued: false,
+          queueJobId: null,
+          errorCode: "OUT_OF_STOCK",
+          userMessage,
+          scheduledAt: job.scheduledAt,
+        });
+      }
+      const summary = await deps.postJobs.refreshBatchStatus(tenantId, batchId);
+      // PENDING(E3): alert channel undecided — log + DB row for now.
+      log.warn("Post batch blocked by the stock gate — nothing was queued", {
+        error_code: "OUT_OF_STOCK",
+        reason: inventory.reason,
+        stock: inventory.stock,
+        stock_policy_mode: inventory.policyMode,
+        stock_check_skipped: inventory.stockCheckSkipped,
+        alert: "OPERATOR_ATTENTION",
+      });
+      return {
+        tenantId,
+        batchId,
+        productCode,
+        color,
+        format,
+        batchStatus: summary.status,
+        spacingMs,
+        channels,
+        warnings,
+      };
+    }
+
+    // --- Fan out: one queue job per channel, failures isolated (rule 6) -----
+    const settings = await deps.channels.getPublishSettings(tenantId);
+    const channels: CreatePostBatchChannelResult[] = [];
+
+    for (const job of created.jobs) {
+      const jobLog = log.child({ job_id: job.id, channel: job.channelId });
+      const schedule = schedules.get(job.channelId);
+
+      // A time this channel cannot be scheduled at: block THIS row, keep going.
+      if (schedule && !schedule.ok) {
+        const userMessage = schedule.userMessage;
+        const blocked = await moveJob(deps, job, "blocked", {
+          reason: `SCHEDULE_${schedule.reason}`,
+          errorCode: "INVALID_INPUT",
+          errorMessage: userMessage,
+        });
+        jobLog.warn("Channel blocked: invalid schedule; other channels continue", {
+          error_code: "INVALID_INPUT",
+          reason: schedule.reason,
+          requested_scheduled_at: schedule.requested?.toISOString() ?? null,
+        });
+        channels.push({
+          channelId: job.channelId,
+          postJobId: job.id,
+          status: blocked?.status ?? "blocked",
+          queued: false,
+          queueJobId: null,
+          errorCode: "INVALID_INPUT",
+          userMessage,
+          scheduledAt: null,
+        });
+        continue;
+      }
+
+      const channel = await deps.channels.findChannel(tenantId, job.channelId);
+      if (!channel || channel.status !== "active") {
+        const userMessage = `Kênh "${job.channelId}" chưa được cấu hình hoặc đang tắt — bài này không đăng`;
+        const blocked = await moveJob(deps, job, "blocked", {
+          reason: channel ? "CHANNEL_DISABLED" : "CHANNEL_MISSING",
+          errorCode: "CHANNEL_NOT_CONFIGURED",
+          errorMessage: userMessage,
+        });
+        jobLog.warn("Channel blocked at fan-out; other channels continue", {
+          error_code: "CHANNEL_NOT_CONFIGURED",
+          channel_status: channel?.status ?? "missing",
+        });
+        channels.push({
+          channelId: job.channelId,
+          postJobId: job.id,
+          status: blocked?.status ?? "blocked",
+          queued: false,
+          queueJobId: null,
+          errorCode: "CHANNEL_NOT_CONFIGURED",
+          userMessage,
+          scheduledAt: job.scheduledAt,
+        });
+        continue;
+      }
+
+      // DB first, queue second: a worker must never find the row still `draft`.
+      // The queue id is written IN the same transition: an operator must be able
+      // to cancel/reschedule this entry later (E8.4).
+      const queueJobId = postJobQueueId(job);
+      const queuedJob = await moveJob(deps, job, "queued", {
+        reason: "ENQUEUEING",
+        queueJobId,
+      });
+      if (!queuedJob) {
+        // Another writer moved the row — do not enqueue on top of it.
+        jobLog.warn("Skipped enqueue: the job row changed under us", {
+          error_code: "INVALID_JOB_TRANSITION",
+        });
+        channels.push({
+          channelId: job.channelId,
+          postJobId: job.id,
+          status: job.status,
+          queued: false,
+          queueJobId: null,
+          errorCode: "INVALID_JOB_TRANSITION",
+          userMessage: "Bài này đang được xử lý ở nơi khác — không đưa vào hàng đợi lần nữa",
+          scheduledAt: job.scheduledAt,
+        });
+        continue;
+      }
+
+      // E8.6 — a scheduled post wakes at the START of the handoff window
+      // (T-30), not at T: the worker must have time to re-check the stock,
+      // upload the album and give Facebook the post while Facebook still
+      // accepts the time. What happens at that wake-up is publish-post's
+      // decision (planScheduledPublish), not this file's.
+      const delayMs = schedule?.ok
+        ? handoffWakeDelayMs(schedule.at, deps.clock.nowMs())
+        : 0;
+      try {
+        await deps.queue.enqueue(
+          PUBLISH_POST_JOB_NAME,
+          { tenantId, postJobId: queuedJob.id },
+          {
+            jobId: queueJobId,
+            attempts: settings.maxAttempts,
+            backoff: { strategy: "exponential", delayMs: settings.retryBackoffMs },
+            ...(delayMs > 0 ? { delayMs } : {}),
+          },
+        );
+      } catch (error) {
+        // The queue is down for THIS job only: mark it and keep the loop going.
+        const appError = AppError.from(error, "QUEUE_ERROR", {
+          tenant_id: tenantId,
+          batch_id: batchId,
+          job_id: queuedJob.id,
+          channel: queuedJob.channelId,
+        });
+        const userMessage = "Không đưa được bài vào hàng đợi — cần thử lại kênh này";
+        await moveJob(deps, queuedJob, "failed", {
+          reason: "ENQUEUE_FAILED",
+          errorCode: appError.code,
+          errorMessage: userMessage,
+        });
+        jobLog.error("Enqueue failed; the other channels are unaffected", {
+          err: appError,
+          error_code: appError.code,
+        });
+        channels.push({
+          channelId: job.channelId,
+          postJobId: job.id,
+          status: "failed",
+          queued: false,
+          queueJobId: null,
+          errorCode: appError.code,
+          userMessage,
+          scheduledAt: queuedJob.scheduledAt,
+        });
+        continue;
+      }
+
+      jobLog.info("Post job queued", {
+        queue_job_id: queueJobId,
+        delay_ms: delayMs,
+        scheduled_at: queuedJob.scheduledAt?.toISOString() ?? null,
+        attempts: settings.maxAttempts,
+      });
+      channels.push({
+        channelId: job.channelId,
+        postJobId: job.id,
+        status: "queued",
+        queued: true,
+        queueJobId,
+        errorCode: null,
+        userMessage: null,
+        scheduledAt: queuedJob.scheduledAt,
+      });
+    }
+
+    const summary = await deps.postJobs.refreshBatchStatus(tenantId, batchId);
+    return {
+      tenantId,
+      batchId,
+      productCode,
+      color,
+      format,
+      batchStatus: summary.status,
+      spacingMs,
+      channels,
+      warnings,
+    };
+  };
+}
+
+export type CreatePostBatch = ReturnType<typeof makeCreatePostBatch>;
+
+// --- helpers ----------------------------------------------------------------
+
+/**
+ * The tenant's stock policy for this batch.
+ *
+ * No repo wired -> `numeric`: what every tenant had before onboarding, and the
+ * safe answer (stock IS still checked). A FAILURE is rethrown, never downgraded:
+ * the repo only throws on a STORED policy that cannot be parsed or on a database
+ * failure, and queueing a whole batch on a config we could not read is the
+ * silent fallback this feature is not allowed to have.
+ */
+async function resolveStockPolicy(
+  deps: CreatePostBatchDeps,
+  tenantId: TenantId,
+  log: Logger,
+): Promise<StockPolicy> {
+  if (!deps.catalogConfig) return DEFAULT_STOCK_POLICY;
+
+  try {
+    return await deps.catalogConfig.findStockPolicy(tenantId);
+  } catch (error) {
+    const appError = AppError.from(error, "SYNC_FAILED", { tenant_id: tenantId });
+    log.error("Post batch stopped: the tenant stock policy could not be read", {
+      reason: "STOCK_POLICY_UNREADABLE",
+      error_code: appError.code,
+      err: appError,
+      ...appError.toLogObject(),
+      alert: "OPERATOR_ATTENTION",
+    });
+    throw appError;
+  }
+}
+
+async function moveJob(
+  deps: CreatePostBatchDeps,
+  job: PostJob,
+  to: PostJobStatus,
+  meta: TransitionMeta & { reason: string },
+): Promise<PostJob | null> {
+  const next = transitionPostJob(job, to, meta);
+  return deps.postJobs.applyTransition({
+    tenantId: job.tenantId,
+    postJobId: job.id,
+    from: job.status,
+    next,
+    reason: meta.reason,
+  });
+}
+
+function invalid(message: string, context: Record<string, unknown>): AppError {
+  return new AppError("INVALID_INPUT", {
+    message,
+    userMessage: "Yêu cầu tạo bài đăng không hợp lệ — vui lòng kiểm tra lại.",
+    context,
+  });
+}
+
+function str(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function uniqueStrings(values: readonly string[] | undefined): string[] {
+  if (!Array.isArray(values)) return [];
+  const seen: string[] = [];
+  for (const value of values) {
+    const trimmed = str(value);
+    if (trimmed.length > 0 && !seen.includes(trimmed)) seen.push(trimmed);
+  }
+  return seen;
+}
+
+/** "" = every colour. Canonical form keeps the unique key stable across spellings. */
+function normaliseColor(raw: unknown): string {
+  const value = str(raw);
+  if (value.length === 0) return "";
+  return normalizeColorName(value) ?? value.toUpperCase();
+}
+
+interface NormalisedAsset {
+  readonly driveFileId: string;
+  readonly fileName: string;
+}
+
+/**
+ * Validates the ASSET list. No URL is involved yet — signing comes after.
+ *
+ * The rules differ by format because the platforms differ: a feed post takes an
+ * album of up to 10 photos, a video post and a Reel take exactly ONE clip.
+ */
+function normaliseMediaInput(
+  media: readonly PostMediaInput[] | undefined,
+  format: PostFormat,
+): NormalisedAsset[] | AppError {
+  const video = isVideoFormat(format);
+  if (!Array.isArray(media) || media.length === 0) {
+    return invalid("createPostBatch requires at least one media item", { media_count: 0, format });
+  }
+  if (video && media.length !== 1) {
+    // Not "we take the first one": an operator who picked three clips meant
+    // three posts, and silently dropping two is the surprise rule 5 forbids.
+    return invalid(`A ${format} post takes exactly one video, got ${media.length}`, {
+      media_count: media.length,
+      format,
+    });
+  }
+  if (!video && media.length > MAX_ALBUM_MEDIA) {
+    return invalid(`An album takes at most ${MAX_ALBUM_MEDIA} items`, {
+      media_count: media.length,
+      max: MAX_ALBUM_MEDIA,
+    });
+  }
+
+  const result: NormalisedAsset[] = [];
+  const seen = new Set<string>();
+  for (const [index, item] of media.entries()) {
+    const driveFileId = str(item?.driveFileId);
+    if (driveFileId.length === 0) {
+      // Without the asset id there is nothing to sign, and nothing to re-sign
+      // later at publish time — the post would go out with a dead link.
+      return invalid(`Media #${index + 1} has no driveFileId`, {
+        media_index: index,
+        file_name: str(item?.fileName) || null,
+      });
+    }
+    if (seen.has(driveFileId)) {
+      // The same photo twice in one album is always a caller bug, and it would
+      // silently shrink the post the operator previewed.
+      return invalid(`Media #${index + 1} repeats drive file ${driveFileId}`, {
+        media_index: index,
+        drive_file_id: driveFileId,
+      });
+    }
+    const kind = str(item?.kind).toLowerCase();
+    const expectedKind = video ? "video" : "image";
+    if (kind.length > 0 && kind !== expectedKind) {
+      return invalid(`Media #${index + 1} is a ${kind}; a ${format} post needs a ${expectedKind}`, {
+        media_index: index,
+        drive_file_id: driveFileId,
+        kind,
+        format,
+        expected_kind: expectedKind,
+      });
+    }
+    seen.add(driveFileId);
+    result.push({ driveFileId, fileName: str(item?.fileName) });
+  }
+  return result;
+}
+
+/**
+ * Signs every asset with the SAME base URL and clock reading. Any failure
+ * (missing MEDIA_PUBLIC_BASE_URL / MEDIA_SIGNING_SECRET, malformed asset id)
+ * aborts the whole batch: half an album is not a post.
+ */
+function signMedia(
+  deps: CreatePostBatchDeps,
+  tenantId: TenantId,
+  assets: readonly NormalisedAsset[],
+  context: Record<string, unknown>,
+): { media: PostJobMedia[]; expiresAtMs: number } {
+  let baseUrl: string;
+  try {
+    baseUrl = deps.mediaBaseUrl();
+  } catch (error) {
+    // Config error, not a caller error: name the variable and keep the cause.
+    throw AppError.from(error, "INVALID_INPUT", {
+      ...context,
+      tenant_id: tenantId,
+      reason: "MEDIA_BASE_URL_UNAVAILABLE",
+      hint: "MEDIA_PUBLIC_BASE_URL",
+    });
+  }
+
+  const media: PostJobMedia[] = [];
+  let earliestExpiry = Number.POSITIVE_INFINITY;
+  for (const [index, asset] of assets.entries()) {
+    try {
+      const url = deps.signMediaUrl({
+        tenantId,
+        assetId: asset.driveFileId,
+        baseUrl,
+        ttlMs: deps.mediaUrlTtlMs,
+      });
+      earliestExpiry = Math.min(earliestExpiry, url.expiresAtMs);
+      media.push({ driveFileId: asset.driveFileId, fileName: asset.fileName, url: url.url });
+    } catch (error) {
+      throw AppError.from(error, "INVALID_INPUT", {
+        ...context,
+        tenant_id: tenantId,
+        media_index: index,
+        drive_file_id: asset.driveFileId,
+        reason: "MEDIA_URL_SIGNING_FAILED",
+      });
+    }
+  }
+  return { media, expiresAtMs: Number.isFinite(earliestExpiry) ? earliestExpiry : 0 };
+}
+
+/** Two channels sharing one caption — returns the offending channel pair. */
+function findSharedCaption(captions: ReadonlyMap<string, string>): string[] | null {
+  const seen = new Map<string, string>();
+  for (const [channelId, caption] of captions) {
+    const key = caption.trim().toLowerCase();
+    const other = seen.get(key);
+    if (other) return [other, channelId];
+    seen.set(key, channelId);
+  }
+  return null;
+}
+
+/** One channel's resolved publish time: either a delay, or a reason it is refused. */
+type ChannelSchedule =
+  | { readonly ok: true; readonly at: Date | null; readonly delayMs: number }
+  | {
+      readonly ok: false;
+      readonly reason: ScheduleRejection;
+      readonly requested: Date | null;
+      readonly userMessage: string;
+      readonly at: null;
+    };
+
+/**
+ * Per-channel publish times (E8.1). `scheduledAtByChannel` wins over the batch
+ * `scheduledAt`; a channel with no entry anywhere publishes as soon as possible.
+ * A key naming a channel that is not in this batch is a caller bug and is
+ * reported — silently ignoring it would hide a wrong channel id.
+ */
+function resolveSchedules(
+  input: CreatePostBatchInput,
+  channelIds: readonly string[],
+  nowMs: number,
+): Map<string, ChannelSchedule> {
+  const byChannel = input?.scheduledAtByChannel ?? {};
+  const unknownKeys = Object.keys(byChannel).filter((key) => !channelIds.includes(key.trim()));
+  if (unknownKeys.length > 0) {
+    throw invalid("scheduledAtByChannel names channels that are not in this batch", {
+      unknown_channels: unknownKeys,
+      channels: channelIds,
+    });
+  }
+
+  const result = new Map<string, ChannelSchedule>();
+  for (const channelId of channelIds) {
+    const requested = byChannel[channelId] ?? input?.scheduledAt ?? null;
+    if (requested === null || requested === undefined) {
+      result.set(channelId, { ok: true, at: null, delayMs: 0 });
+      continue;
+    }
+    const verdict = evaluateScheduledAt(requested, nowMs);
+    if (verdict.ok) {
+      result.set(channelId, { ok: true, at: verdict.at, delayMs: verdict.delayMs });
+      continue;
+    }
+    result.set(channelId, {
+      ok: false,
+      reason: verdict.reason,
+      requested: verdict.at,
+      userMessage: `Kênh "${channelId}": ${scheduleRejectionMessage(verdict.reason)}`,
+      at: null,
+    });
+  }
+  return result;
+}

@@ -1,0 +1,432 @@
+# Single-VPS deployment (docs/07 section 1). Values come from .env — see .env.example.
+# Start order is enforced with service_healthy/service_completed_successfully,
+# never with sleeps:
+#   postgres/redis/minio healthy -> migrate + minio-init -> web + worker -> caddy.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mysp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mysp}
+      POSTGRES_DB: ${POSTGRES_DB:-mysp}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mysp} -d ${POSTGRES_DB:-mysp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # AOF on: queued jobs must survive a Redis restart.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # E9 (MinIO upload) — object storage for operator-uploaded bytes (mode B).
+  # Two endpoints exist for it (web/worker read them from MINIO_INTERNAL_ENDPOINT
+  # / MINIO_PUBLIC_ENDPOINT, see .env.example): this service is reached over the
+  # INTERNAL one, `minio:9000`, from every container on this compose network.
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      # `:?` is load-bearing, not decoration: an EMPTY value (not just an
+      # unset one) makes MinIO silently fall back to minioadmin:minioadmin.
+      # `:-` or a bare ${...} would let that happen quietly on a published
+      # port — `:?` aborts the whole `up` instead. Locked by
+      # minio-bucket-privacy.test.ts.
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
+    volumes:
+      - miniodata:/data
+    ports:
+      # LOOPBACK ONLY, never 0.0.0.0 — same discipline as WEB_BIND above. The
+      # bucket itself is private, but the API (and the admin console on 9001)
+      # still must not sit on the public interface. This is what the VPS's own
+      # Caddy (deploy/edge/mysp.caddy) proxies media.vannt.asia to; a bare
+      # `docker compose up` with no MINIO_API_PORT set just uses 9000 for
+      # local dev, where nothing else needs to reach it from outside the host.
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # One-shot bucket bootstrap. `mc anonymous set none` is what keeps the bucket
+  # PRIVATE — every tenant's photos are reachable ONLY through a presigned URL
+  # after this runs. Do not drop that line: without it the bucket defaults to
+  # readable by anyone who guesses (or is handed) an object key.
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "mc alias set local http://minio:9000 $$MINIO_ACCESS_KEY $$MINIO_SECRET_KEY &&
+             mc mb -p local/$$MINIO_BUCKET &&
+             mc anonymous set none local/$$MINIO_BUCKET"
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
+      MINIO_BUCKET: ${MINIO_BUCKET:-mysp-media}
+
+  # One-shot schema migration. Runs to completion BEFORE web/worker start.
+  # Why a dependency and not a `setup` profile: with
+  # `service_completed_successfully` the ordering is enforced by `docker compose
+  # up` itself, so no operator can forget the manual step and no app container
+  # ever boots against an un-migrated database. drizzle-kit migrate is
+  # idempotent, so re-running it on every `up` is a no-op.
+  # It also carries tsx + src, so `docker compose run --rm migrate pnpm db:seed`
+  # is the way to seed without a second image.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    # A finished one-shot must stay finished; restarting it would loop forever.
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mysp}:${POSTGRES_PASSWORD:-mysp}@postgres:5432/${POSTGRES_DB:-mysp}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_PRETTY: "false"
+      # Service names, not localhost: containers talk over the compose network.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mysp}:${POSTGRES_PASSWORD:-mysp}@postgres:5432/${POSTGRES_DB:-mysp}
+      REDIS_URL: redis://redis:6379
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      AUTH_ALLOWED_DOMAINS: ${AUTH_ALLOWED_DOMAINS:-example.com}
+      # The e-mail half of the escape hatch (M3.1). Same failure mode as the
+      # Facebook list below, and it bit us the same way: `deploy/env/*.env.example`
+      # ships the variable, an operator fills it in on the VPS, and nothing
+      # reaches the container because this file passes env EXPLICITLY rather than
+      # through env_file. `isBootstrapAdminEmail()` then answers false for every
+      # address and the deployment has no bootstrap admin at all — with no error
+      # anywhere, because an empty list is a legal configuration.
+      AUTH_BOOTSTRAP_ADMINS: ${AUTH_BOOTSTRAP_ADMINS:-}
+      # E5.2. An ABSENT list means nobody can sign in with Facebook (see
+      # composition/config.ts) — leaving it out of compose silently disabled the
+      # whole Facebook sign-in door in every container.
+      AUTH_FACEBOOK_ALLOWED_USER_IDS: ${AUTH_FACEBOOK_ALLOWED_USER_IDS:-}
+      # Never derive the browser-visible origin from Docker's 0.0.0.0 bind.
+      # Local default follows WEB_PORT; production must set its HTTPS origin.
+      AUTH_URL: ${AUTH_URL:-http://localhost:${WEB_PORT:-3000}}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      META_GRAPH_VERSION: ${META_GRAPH_VERSION:-v23.0}
+      # E9 mode B. A named volume, not a bind: the bytes must outlive a
+      # container rebuild, because a post referencing them can be scheduled for
+      # tomorrow. Same path in web and worker — one writes, the other sweeps.
+      UPLOAD_STORAGE_ROOT: /var/lib/mysp/uploads
+      # Phase 3 — a tenant may upload a CSV instead of connecting a Sheet.
+      # Its OWN volume, never the upload one: these bytes are the tenant's
+      # only product data, and the E9.4 orphan sweep must not reach them.
+      CATALOG_STORAGE_ROOT: /var/lib/mysp/catalog
+      UPLOAD_ORPHAN_TTL_HOURS: ${UPLOAD_ORPHAN_TTL_HOURS:-24}
+      # E3.6 — Drive byte cache. Same volume and same path in web and worker:
+      # the web process writes it on a miss, the worker sweeps it hourly. A
+      # cache the sweep cannot see is a disk leak.
+      MEDIA_CACHE_ROOT: /var/lib/mysp/media-cache
+      MEDIA_CACHE_TTL_HOURS: ${MEDIA_CACHE_TTL_HOURS:-72}
+      # E9 (MinIO upload) — the blob store is built EAGERLY when the container
+      # boots (composition/container.ts), so unlike most credential groups below
+      # a missing key here fails the container at startup, not at first request.
+      # INTERNAL is the in-network hostname this container reaches MinIO on;
+      # PUBLIC is the hostname baked into the signature of URLs handed to the
+      # browser (the Cloudflare Tunnel origin) — see .env.example for why the
+      # two must never be the same value.
+      MINIO_INTERNAL_ENDPOINT: minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:?MINIO_PUBLIC_ENDPOINT is required}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
+      MINIO_BUCKET: ${MINIO_BUCKET:-mysp-media}
+      # false: MinIO runs plain HTTP inside this Docker network (no cert on
+      # the container) — true here throws EPROTO on every server-side call.
+      # Only describes THIS internal hop, never the public one above.
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      # --- Credentials -------------------------------------------------------
+      # Passed through explicitly rather than via env_file: each service should
+      # carry only the secrets it actually uses, and the list doubles as the
+      # answer to "what does this container need to work?". All are read on
+      # demand, so a missing one lets the container boot and fails at the first
+      # request that needs it — with a message naming the variable.
+      #
+      # Reads the Drive files a post is made of.
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      # Opens the sealed Page tokens in tenant_integration. Without it there is
+      # no way to talk to Facebook at all.
+      TENANT_SECRETS_ENC_KEY: ${TENANT_SECRETS_ENC_KEY:-}
+      # Signs the media links. Image posts upload their bytes and need neither,
+      # but video posts still hand Meta a URL to fetch, and the preview bridge
+      # serves the compose screen.
+      MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:-}
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-}
+      # Caption generation (E4). OpenAI is the only wired provider today.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+      # Connecting Fanpages (E5.1). Only the web process runs that flow.
+      META_APP_ID: ${META_APP_ID:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_OAUTH_REDIRECT_URI: ${META_OAUTH_REDIRECT_URI:-}
+      # E2 — "Kết nối Google Drive". Reuses GOOGLE_CLIENT_ID/SECRET above; only
+      # the redirect URI is its own, and it must be registered in the same
+      # OAuth client. Empty = the connect button says which variable is missing.
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-}
+    volumes:
+      # E9 mode B — the web process WRITES operator uploads here. Without this
+      # mount the bytes land in the container layer: gone on the next rebuild,
+      # and invisible to the worker sweep that is supposed to reap them.
+      - uploaddata:/var/lib/mysp/uploads
+      - catalogdata:/var/lib/mysp/catalog
+      - mediacachedata:/var/lib/mysp/media-cache
+    expose:
+      - "3000"
+    ports:
+      # Direct access for debugging; Caddy is the normal entry point.
+      # WEB_BIND exists so a shared VPS can pin this to 127.0.0.1 — on a public
+      # IP an 0.0.0.0 bind would serve the app over plain HTTP, past Caddy.
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+
+  # Local UI-only demo. It deliberately runs `next dev`, rather than the
+  # production image, so DEV_FAKE_SESSION can be used without weakening prod.
+  # Start explicitly: docker compose --profile demo up -d web-demo
+  # Browse: http://localhost:3001
+  web-demo:
+    profiles: ["demo"]
+    build:
+      context: .
+      target: deps
+    command: pnpm dev --hostname 0.0.0.0
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_PRETTY: "true"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mysp}:${POSTGRES_PASSWORD:-mysp}@postgres:5432/${POSTGRES_DB:-mysp}
+      REDIS_URL: redis://redis:6379
+      AUTH_URL: http://localhost:${DEMO_WEB_PORT:-3001}
+      DEV_FAKE_SESSION: "1"
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      # `blobs` is built EAGERLY the first time any request touches
+      # getContainer() (composition/container.ts) — including `next dev`'s
+      # first request to almost any API route — so this profile needs the
+      # same MinIO env as `web`, not just its own upload/catalog volumes.
+      MINIO_INTERNAL_ENDPOINT: minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:?MINIO_PUBLIC_ENDPOINT is required}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
+      MINIO_BUCKET: ${MINIO_BUCKET:-mysp-media}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+    volumes:
+      - ./:/app
+      - webdemo_node_modules:/app/node_modules
+      - uploaddata:/var/lib/mysp/uploads
+      - catalogdata:/var/lib/mysp/catalog
+    ports:
+      - "${DEMO_WEB_PORT:-3001}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: .
+      target: worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_PRETTY: "false"
+      # The worker runs the same usecases as the web process, so it needs the DB.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mysp}:${POSTGRES_PASSWORD:-mysp}@postgres:5432/${POSTGRES_DB:-mysp}
+      REDIS_URL: redis://redis:6379
+      # Graph API version used by the publish jobs (E5). Bumping it is a deploy
+      # decision; Page ids and tokens live in tenant_integration, not here.
+      META_GRAPH_VERSION: ${META_GRAPH_VERSION:-v23.0}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
+      WORKER_HEARTBEAT_FILE: /tmp/mysp-worker-heartbeat
+      WORKER_SHUTDOWN_DEADLINE_MS: ${WORKER_SHUTDOWN_DEADLINE_MS:-30000}
+      # E9.4 — the cleanup sweep deletes the bytes, so it needs the same volume
+      # mounted at the same path as the web process.
+      UPLOAD_STORAGE_ROOT: /var/lib/mysp/uploads
+      # Phase 3 — a tenant may upload a CSV instead of connecting a Sheet.
+      # Its OWN volume, never the upload one: these bytes are the tenant's
+      # only product data, and the E9.4 orphan sweep must not reach them.
+      CATALOG_STORAGE_ROOT: /var/lib/mysp/catalog
+      UPLOAD_ORPHAN_TTL_HOURS: ${UPLOAD_ORPHAN_TTL_HOURS:-24}
+      # E3.6 — the hourly cache sweep deletes these bytes, so it needs the same
+      # volume mounted at the same path as the web process.
+      MEDIA_CACHE_ROOT: /var/lib/mysp/media-cache
+      MEDIA_CACHE_TTL_HOURS: ${MEDIA_CACHE_TTL_HOURS:-72}
+      # E9 (MinIO upload) — same eager-build note as the web service above: the
+      # blob store is constructed at container boot, so a missing key here
+      # fails startup rather than the first request.
+      MINIO_INTERNAL_ENDPOINT: minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:?MINIO_PUBLIC_ENDPOINT is required}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
+      MINIO_BUCKET: ${MINIO_BUCKET:-mysp-media}
+      # false: MinIO runs plain HTTP inside this Docker network (no cert on
+      # the container) — true here throws EPROTO on every server-side call.
+      # Only describes THIS internal hop, never the public one above.
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      # --- Credentials -------------------------------------------------------
+      # Passed through explicitly rather than via env_file: each service should
+      # carry only the secrets it actually uses, and the list doubles as the
+      # answer to "what does this container need to work?". All are read on
+      # demand, so a missing one lets the container boot and fails at the first
+      # request that needs it — with a message naming the variable.
+      #
+      # Reads the Drive files a post is made of.
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      # E2 — a tenant that connected their OWN Google account is read with
+      # THEIR refresh token, and refreshing it needs the OAuth app itself.
+      # Without these two the worker reaches Drive only for tenants still on
+      # the Service Account.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Opens the sealed Page tokens in tenant_integration. Without it there is
+      # no way to talk to Facebook at all.
+      TENANT_SECRETS_ENC_KEY: ${TENANT_SECRETS_ENC_KEY:-}
+      # Signs the media links. Image posts upload their bytes and need neither,
+      # but video posts still hand Meta a URL to fetch, and the preview bridge
+      # serves the compose screen.
+      MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:-}
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-}
+    volumes:
+      - uploaddata:/var/lib/mysp/uploads
+      - catalogdata:/var/lib/mysp/catalog
+      - mediacachedata:/var/lib/mysp/media-cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+
+  # E11.4 — periodic pg_dump into the `backupdata` volume.
+  # Image matches the server (postgres:16-alpine): pg_dump refuses a server newer
+  # than itself, so these two versions must move together.
+  # Restore instructions live in deploy/backup/backup.sh (read them BEFORE the
+  # day you need them). One-off dump:
+  #   docker compose run --rm -e BACKUP_RUN_ONCE=true pg-backup
+  pg-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-mysp}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-mysp}
+      PGDATABASE: ${POSTGRES_DB:-mysp}
+      BACKUP_DIR: /backups
+      # Daily by default; keep a week of dumps.
+      BACKUP_INTERVAL: ${BACKUP_INTERVAL:-86400}
+      BACKUP_KEEP: ${BACKUP_KEEP:-7}
+    entrypoint: ["/bin/sh", "/usr/local/bin/backup.sh"]
+    volumes:
+      - ./deploy/backup/backup.sh:/usr/local/bin/backup.sh:ro
+      - backupdata:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      # Host 8080 on purpose: never squat on the developer's 80/443.
+      # On the VPS use "80:80" and "443:443" together with a real hostname
+      # in deploy/caddy/Caddyfile.
+      - "${CADDY_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    # Caddy's admin API (localhost:2019, on by default) answers only while the
+    # config is loaded — a good liveness signal, and it needs no extra tool:
+    # wget ships with the alpine image.
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  # Dumps live in their own volume: a `docker compose down -v` of the app data
+  # must not be the same gesture that deletes the backups.
+  backupdata:
+  redisdata:
+  caddydata:
+  caddyconfig:
+  webdemo_node_modules:
+  # E9 — operator-uploaded media. Shared by web (writes) and worker (sweeps).
+  # Its own volume so `docker compose down -v` of the app data is a deliberate
+  # decision about the operator's files, not a side effect.
+  uploaddata:
+  # Phase 3 — uploaded catalog files (CSV). Separate from uploaddata because
+  # losing these loses the tenant's product data itself, not just media that
+  # still exists on Drive.
+  catalogdata:
+  # E3.6 — cached Drive bytes. Shared by web (writes on a miss) and worker
+  # (hourly TTL sweep). Losing it costs re-downloads, nothing else: it holds no
+  # data that does not exist on Drive.
+  mediacachedata:
+  # E9 (MinIO upload) — the object storage backing `uploaddata` moves to.
+  # `uploaddata` itself stays defined above until Task 12 removes the local
+  # store for good; until then it is unused dead weight, not a hazard.
+  miniodata:
