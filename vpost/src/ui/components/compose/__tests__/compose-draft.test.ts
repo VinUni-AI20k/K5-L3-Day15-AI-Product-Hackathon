@@ -34,7 +34,7 @@ function payload(overrides: Partial<ComposeDraftPayload> = {}): ComposeDraftPayl
     selectedChannelIds: ["page-a"],
     shareCaption: true,
     schedule: { mode: "now", value: "" },
-    savedAt: "2026-08-17T03:00:00.000Z",
+    savedAt: "2054-08-17T03:00:00.000Z",
     ...overrides,
   };
 }
@@ -69,8 +69,8 @@ describe("pickNewerDraft", () => {
   });
 
   it("prefers the newer savedAt, whichever side it is on", () => {
-    const older = payload({ savedAt: "2026-08-17T03:00:00.000Z", productCode: "OLD" });
-    const newer = payload({ savedAt: "2026-08-17T03:05:00.000Z", productCode: "NEW" });
+    const older = payload({ savedAt: "2054-08-17T03:00:00.000Z", productCode: "OLD" });
+    const newer = payload({ savedAt: "2054-08-17T03:05:00.000Z", productCode: "NEW" });
 
     expect(pickNewerDraft(older, newer)?.source).toBe("local");
     expect(pickNewerDraft(newer, older)?.source).toBe("server");
@@ -123,7 +123,7 @@ describe("shouldClearCaptions", () => {
 });
 
 /**
- * CHANGED with the ComposeFocus redesign (PM, 20/08/2026).
+ * CHANGED with the ComposeFocus redesign (PM, 27/11/2026).
  *
  * These tests used to cover `restoreTargetStep` — "restore mà compose bị chặn →
  * ở lại bước 1". There are no steps any more: the compose screen is one page,
@@ -199,10 +199,10 @@ describe("applyAlbumOrder", () => {
 
 describe("buildComposeDraftPayload", () => {
   it("produces a payload the boundary schema accepts", () => {
-    const built = buildComposeDraftPayload(snapshot(), Date.parse("2026-08-17T03:00:00.000Z"));
+    const built = buildComposeDraftPayload(snapshot(), Date.parse("2054-08-17T03:00:00.000Z"));
     const parsed = parseComposeDraftPayload(built);
     expect(parsed.ok).toBe(true);
-    expect(built.savedAt).toBe("2026-08-17T03:00:00.000Z");
+    expect(built.savedAt).toBe("2054-08-17T03:00:00.000Z");
   });
 
   it("copies ONLY the whitelisted fields — extra state cannot leak in", () => {
@@ -213,7 +213,7 @@ describe("buildComposeDraftPayload", () => {
       mediaUrl: "https://drive/x",
     } as unknown as ComposeDraftSnapshot;
 
-    const built = buildComposeDraftPayload(dirty, Date.parse("2026-08-17T03:00:00.000Z"));
+    const built = buildComposeDraftPayload(dirty, Date.parse("2054-08-17T03:00:00.000Z"));
     expect(Object.keys(built)).not.toContain("inventory");
     expect(Object.keys(built)).not.toContain("mediaUrl");
     expect(parseComposeDraftPayload(built).ok).toBe(true);
@@ -278,8 +278,8 @@ describe("draftContentDiffers", () => {
   });
 
   it("ignores savedAt — otherwise autosave would fire forever", () => {
-    const a = payload({ savedAt: "2026-08-17T03:00:00.000Z" });
-    const b = payload({ savedAt: "2026-08-17T09:99:00.000Z" });
+    const a = payload({ savedAt: "2054-08-17T03:00:00.000Z" });
+    const b = payload({ savedAt: "2054-08-17T09:99:00.000Z" });
     expect(draftContentDiffers(a, b)).toBe(false);
     expect(draftContentKey(a)).toBe(draftContentKey(b));
   });

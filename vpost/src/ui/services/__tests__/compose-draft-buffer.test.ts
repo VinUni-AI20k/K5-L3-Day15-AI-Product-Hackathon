@@ -31,7 +31,7 @@ const OWNER_B = "ffffeeeeddddcccc";
 const A = { tenantId: TENANT, ownerKey: OWNER_A } as const;
 const B_SAME_MACHINE = { tenantId: TENANT, ownerKey: OWNER_B } as const;
 const B_OTHER_TENANT = { tenantId: OTHER_TENANT, ownerKey: OWNER_A } as const;
-const T0 = Date.parse("2026-08-17T03:00:00.000Z");
+const T0 = Date.parse("2054-08-17T03:00:00.000Z");
 
 class FakeStorage implements Storage {
   private readonly entries = new Map<string, string>();
@@ -106,7 +106,7 @@ function payload(overrides: Partial<ComposeDraftPayload> = {}): ComposeDraftPayl
     selectedChannelIds: ["fanpage-a"],
     shareCaption: true,
     schedule: { mode: "now", value: "" },
-    savedAt: "2026-08-17T03:00:00.000Z",
+    savedAt: "2054-08-17T03:00:00.000Z",
     ...overrides,
   };
 }
@@ -343,7 +343,7 @@ describe("compose-draft-buffer — happy path", () => {
     const draft = payload({
       step: "xem-lai",
       captionOverrides: { "fanpage-a": "Bản riêng cho fanpage A" },
-      schedule: { mode: "scheduled", value: "2026-08-20T09:30" },
+      schedule: { mode: "scheduled", value: "2054-08-20T09:30" },
       shareCaption: false,
     });
     expect(composeDraftBuffer.write(A, draft, T0)).toEqual({ ok: true });

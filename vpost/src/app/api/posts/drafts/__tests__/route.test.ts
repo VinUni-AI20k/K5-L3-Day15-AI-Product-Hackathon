@@ -103,8 +103,8 @@ beforeEach(() => {
   claim = {};
   signIn(ACCOUNT);
   findDraftOwnerUserId.mockResolvedValue(USER_ID);
-  loadPostDraft.mockResolvedValue({ payload: PAYLOAD, updatedAt: "2026-08-20T03:00:00.000Z" });
-  savePostDraft.mockResolvedValue({ updatedAt: "2026-08-20T03:00:00.000Z", schemaVersion: 1 });
+  loadPostDraft.mockResolvedValue({ payload: PAYLOAD, updatedAt: "2054-08-20T03:00:00.000Z" });
+  savePostDraft.mockResolvedValue({ updatedAt: "2054-08-20T03:00:00.000Z", schemaVersion: 1 });
   discardPostDraft.mockResolvedValue(undefined);
   grantRole("editor");
 });

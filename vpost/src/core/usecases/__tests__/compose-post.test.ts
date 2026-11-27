@@ -77,7 +77,7 @@ function asset(overrides: Partial<MediaAsset> = {}): MediaAsset {
     variants: { aiGenerated: false, realPhoto: false, backView: false },
     mimeType: "image/jpeg",
     sizeBytes: 1000,
-    modifiedTime: "2026-08-01T00:00:00.000Z",
+    modifiedTime: "2054-08-01T00:00:00.000Z",
     warnings: [],
     needsReview: false,
     ...overrides,

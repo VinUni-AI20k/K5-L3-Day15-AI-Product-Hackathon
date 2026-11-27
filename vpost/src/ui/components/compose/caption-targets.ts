@@ -36,7 +36,7 @@ export function sameTarget(a: CaptionTarget | undefined, b: CaptionTarget): bool
  * WHICH channel the caption editor is editing, and the preview is previewing.
  * `null` = the shared caption.
  *
- * THIS IS THE FIX FOR THE BUG THAT FAILED REVIEW (20/08/2026). The editor used
+ * THIS IS THE FIX FOR THE BUG THAT FAILED REVIEW (27/11/2026). The editor used
  * to switch to per-channel only when MORE THAN ONE channel was ticked, while
  * `usePublishForm` built the payload from `resolveCaption` with no such
  * condition. Untick one of two channels after writing a per-channel caption and

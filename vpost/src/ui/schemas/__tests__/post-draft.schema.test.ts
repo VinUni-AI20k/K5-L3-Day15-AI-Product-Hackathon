@@ -31,8 +31,8 @@ function validPayload(overrides: Partial<ComposeDraftPayload> = {}): ComposeDraf
     albumOrder: ["drive-file-1", "drive-file-2"],
     selectedChannelIds: ["page-a", "page-b"],
     shareCaption: true,
-    schedule: { mode: "scheduled", value: "2026-08-20T09:30" },
-    savedAt: "2026-08-17T03:04:05.000Z",
+    schedule: { mode: "scheduled", value: "2054-08-20T09:30" },
+    savedAt: "2054-08-17T03:04:05.000Z",
     ...overrides,
   };
 }
@@ -191,7 +191,7 @@ describe("parseComposeDraftPayload — accepts everything core accepts", () => {
   });
 
   it("accepts a savedAt core would accept but z.iso.datetime() would not", () => {
-    expect(parseComposeDraftPayload(validPayload({ savedAt: "2026-08-17T10:00:00+07:00" })).ok).toBe(
+    expect(parseComposeDraftPayload(validPayload({ savedAt: "2054-08-17T10:00:00+07:00" })).ok).toBe(
       true,
     );
   });

@@ -31,7 +31,7 @@ function valid(overrides: Partial<ComposeDraftPayload> = {}): ComposeDraftPayloa
     selectedChannelIds: ["1234567890"],
     shareCaption: true,
     schedule: { mode: "now", value: "" },
-    savedAt: "2026-08-17T03:04:05.000Z",
+    savedAt: "2054-08-17T03:04:05.000Z",
     ...overrides,
   };
 }
@@ -249,7 +249,7 @@ describe("assertComposeDraftPayload — happy path", () => {
       albumOrder: [],
       selectedChannelIds: [],
       shareCaption: false,
-      schedule: { mode: "scheduled", value: "2026-08-18T09:00" },
+      schedule: { mode: "scheduled", value: "2054-08-18T09:00" },
     });
 
     expect(assertComposeDraftPayload(payload)).toEqual(payload);
