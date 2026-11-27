@@ -1,0 +1,1539 @@
+{
+  "schema_version": "1.0",
+  "seed": 42,
+  "currency": "VND",
+  "records": [
+    {
+      "id": "EXP-001",
+      "date": "2026-10-01",
+      "time": "09:00",
+      "merchant": "Tiền Trọ Mẫu",
+      "category": "Hóa đơn & Nhà ở",
+      "items": [
+        {
+          "name": "Tiền phòng",
+          "amount": 2800000
+        }
+      ],
+      "total": 2800000,
+      "note": "Đóng tiền nhà đầu tháng",
+      "source_type": "manual_note"
+    },
+    {
+      "id": "EXP-007",
+      "date": "2026-10-01",
+      "time": "11:10",
+      "merchant": "Grab*Bike",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Cước xe máy nội thành",
+          "amount": 65000
+        }
+      ],
+      "total": 65000,
+      "note": "Chi di chuyển tại Grab*Bike",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-008",
+      "date": "2026-10-02",
+      "time": "08:30",
+      "merchant": "Cơm Tấm Mẫu Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Cơm sườn bì chả",
+          "amount": 48000
+        },
+        {
+          "name": "Trà đá",
+          "amount": 21000
+        }
+      ],
+      "total": 69000,
+      "note": "Chi ăn uống tại Cơm Tấm Mẫu Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-009",
+      "date": "2026-10-02",
+      "time": "10:10",
+      "merchant": "Cơm Tấm Mẫu Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Cơm sườn bì chả",
+          "amount": 40000
+        }
+      ],
+      "total": 40000,
+      "note": "Chi ăn uống tại Cơm Tấm Mẫu Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-011",
+      "date": "2026-10-04",
+      "time": "10:25",
+      "merchant": "Trạm Xăng Mẫu A",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Xăng RON95",
+          "amount": 103000
+        }
+      ],
+      "total": 103000,
+      "note": "Chi di chuyển tại Trạm Xăng Mẫu A",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-010",
+      "date": "2026-10-04",
+      "time": "10:45",
+      "merchant": "Grab*Bike",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Cước xe máy nội thành",
+          "amount": 53000
+        }
+      ],
+      "total": 53000,
+      "note": "Chi di chuyển tại Grab*Bike",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-002",
+      "date": "2026-10-05",
+      "time": "10:15",
+      "merchant": "Internet Mẫu",
+      "category": "Hóa đơn & Nhà ở",
+      "items": [
+        {
+          "name": "Cước WiFi",
+          "amount": 220000
+        }
+      ],
+      "total": 220000,
+      "note": "Cước mạng hàng tháng",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-012",
+      "date": "2026-10-05",
+      "time": "18:25",
+      "merchant": "Grab*Bike",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Cước xe máy nội thành",
+          "amount": 28000
+        }
+      ],
+      "total": 28000,
+      "note": "Chi di chuyển tại Grab*Bike",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-014",
+      "date": "2026-10-06",
+      "time": "12:50",
+      "merchant": "Trà Sữa Mẫu B",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Trà sữa trân châu",
+          "amount": 44000
+        }
+      ],
+      "total": 44000,
+      "note": "Chi ăn uống tại Trà Sữa Mẫu B",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-013",
+      "date": "2026-10-06",
+      "time": "19:15",
+      "merchant": "HIGHLANDS*Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phin sữa đá",
+          "amount": 40000
+        },
+        {
+          "name": "Bánh mì que",
+          "amount": 18000
+        }
+      ],
+      "total": 58000,
+      "note": "Chi ăn uống tại HIGHLANDS*Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-016",
+      "date": "2026-10-08",
+      "time": "15:15",
+      "merchant": "Xanh SM Mẫu",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Cước xe điện",
+          "amount": 35000
+        }
+      ],
+      "total": 35000,
+      "note": "Chi di chuyển tại Xanh SM Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-015",
+      "date": "2026-10-08",
+      "time": "18:25",
+      "merchant": "Phở Bò Mẫu 24",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phở tái nạm",
+          "amount": 36000
+        },
+        {
+          "name": "Quẩy",
+          "amount": 16000
+        }
+      ],
+      "total": 52000,
+      "note": "Chi ăn uống tại Phở Bò Mẫu 24",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-017",
+      "date": "2026-10-09",
+      "time": "20:15",
+      "merchant": "Siêu Thị Mẫu C",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Đồ gia dụng nhỏ",
+          "amount": 235000
+        },
+        {
+          "name": "Giấy ăn",
+          "amount": 101000
+        }
+      ],
+      "total": 336000,
+      "note": "Chi mua sắm tại Siêu Thị Mẫu C",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-018",
+      "date": "2026-10-10",
+      "time": "07:45",
+      "merchant": "Trạm Xăng Mẫu A",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Xăng RON95",
+          "amount": 58000
+        }
+      ],
+      "total": 58000,
+      "note": "Chi di chuyển tại Trạm Xăng Mẫu A",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-003",
+      "date": "2026-10-10",
+      "time": "14:30",
+      "merchant": "Điện Lực Mẫu",
+      "category": "Hóa đơn & Nhà ở",
+      "items": [
+        {
+          "name": "Tiền điện",
+          "amount": 460000
+        }
+      ],
+      "total": 460000,
+      "note": "Hóa đơn điện sinh hoạt",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-019",
+      "date": "2026-10-10",
+      "time": "20:10",
+      "merchant": "Phở Bò Mẫu 24",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phở tái nạm",
+          "amount": 38000
+        },
+        {
+          "name": "Quẩy",
+          "amount": 17000
+        }
+      ],
+      "total": 55000,
+      "note": "Chi ăn uống tại Phở Bò Mẫu 24",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-020",
+      "date": "2026-10-11",
+      "time": "14:45",
+      "merchant": "Shop Thời Trang Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Áo thun cơ bản",
+          "amount": 211000
+        }
+      ],
+      "total": 211000,
+      "note": "Chi mua sắm tại Shop Thời Trang Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-021",
+      "date": "2026-10-12",
+      "time": "12:10",
+      "merchant": "Circle K Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Nước suối",
+          "amount": 48000
+        },
+        {
+          "name": "Bánh snack",
+          "amount": 21000
+        }
+      ],
+      "total": 69000,
+      "note": "Chi mua sắm tại Circle K Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-022",
+      "date": "2026-10-12",
+      "time": "16:45",
+      "merchant": "Trạm Xăng Mẫu A",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Xăng RON95",
+          "amount": 59000
+        }
+      ],
+      "total": 59000,
+      "note": "Chi di chuyển tại Trạm Xăng Mẫu A",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-023",
+      "date": "2026-10-14",
+      "time": "14:25",
+      "merchant": "HIGHLANDS*Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phin sữa đá",
+          "amount": 38000
+        },
+        {
+          "name": "Bánh mì que",
+          "amount": 17000
+        }
+      ],
+      "total": 55000,
+      "note": "Chi ăn uống tại HIGHLANDS*Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-024",
+      "date": "2026-10-14",
+      "time": "17:15",
+      "merchant": "BACH HOA XANH M1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Rau củ",
+          "amount": 98000
+        },
+        {
+          "name": "Thịt heo",
+          "amount": 43000
+        }
+      ],
+      "total": 141000,
+      "note": "Chi ăn uống tại BACH HOA XANH M1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-025",
+      "date": "2026-10-15",
+      "time": "20:00",
+      "merchant": "Circle K Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Nước suối",
+          "amount": 35000
+        },
+        {
+          "name": "Bánh snack",
+          "amount": 16000
+        }
+      ],
+      "total": 51000,
+      "note": "Chi mua sắm tại Circle K Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-026",
+      "date": "2026-10-16",
+      "time": "08:10",
+      "merchant": "Shop Thời Trang Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Áo thun cơ bản",
+          "amount": 208000
+        }
+      ],
+      "total": 208000,
+      "note": "Chi mua sắm tại Shop Thời Trang Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-027",
+      "date": "2026-10-16",
+      "time": "17:25",
+      "merchant": "Phòng Khám Mẫu",
+      "category": "Sức khỏe",
+      "items": [
+        {
+          "name": "Khám tổng quát",
+          "amount": 304000
+        }
+      ],
+      "total": 304000,
+      "note": "Chi sức khỏe tại Phòng Khám Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-028",
+      "date": "2026-10-17",
+      "time": "11:10",
+      "merchant": "Trà Sữa Mẫu B",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Trà sữa trân châu",
+          "amount": 47000
+        }
+      ],
+      "total": 47000,
+      "note": "Chi ăn uống tại Trà Sữa Mẫu B",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-029",
+      "date": "2026-10-18",
+      "time": "11:45",
+      "merchant": "BACH HOA XANH M1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Rau củ",
+          "amount": 155000
+        },
+        {
+          "name": "Thịt heo",
+          "amount": 67000
+        }
+      ],
+      "total": 222000,
+      "note": "Chi ăn uống tại BACH HOA XANH M1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-030",
+      "date": "2026-10-18",
+      "time": "12:10",
+      "merchant": "Trạm Xăng Mẫu A",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Xăng RON95",
+          "amount": 101000
+        }
+      ],
+      "total": 101000,
+      "note": "Chi di chuyển tại Trạm Xăng Mẫu A",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-031",
+      "date": "2026-10-20",
+      "time": "14:00",
+      "merchant": "Rạp Phim Mẫu",
+      "category": "Giải trí",
+      "items": [
+        {
+          "name": "Vé xem phim 2D",
+          "amount": 157000
+        },
+        {
+          "name": "Bắp nước",
+          "amount": 68000
+        }
+      ],
+      "total": 225000,
+      "note": "Chi giải trí tại Rạp Phim Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-032",
+      "date": "2026-10-20",
+      "time": "17:10",
+      "merchant": "Circle K Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Nước suối",
+          "amount": 41000
+        }
+      ],
+      "total": 41000,
+      "note": "Chi mua sắm tại Circle K Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-033",
+      "date": "2026-10-21",
+      "time": "08:25",
+      "merchant": "Shop Thời Trang Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Áo thun cơ bản",
+          "amount": 292000
+        }
+      ],
+      "total": 292000,
+      "note": "Chi mua sắm tại Shop Thời Trang Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-034",
+      "date": "2026-10-22",
+      "time": "11:30",
+      "merchant": "Trà Sữa Mẫu B",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Trà sữa trân châu",
+          "amount": 49000
+        },
+        {
+          "name": "Topping",
+          "amount": 22000
+        }
+      ],
+      "total": 71000,
+      "note": "Chi ăn uống tại Trà Sữa Mẫu B",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-035",
+      "date": "2026-10-22",
+      "time": "17:30",
+      "merchant": "Circle K Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Nước suối",
+          "amount": 36000
+        }
+      ],
+      "total": 36000,
+      "note": "Chi mua sắm tại Circle K Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-036",
+      "date": "2026-10-23",
+      "time": "08:15",
+      "merchant": "Siêu Thị Mẫu C",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Đồ gia dụng nhỏ",
+          "amount": 137000
+        },
+        {
+          "name": "Giấy ăn",
+          "amount": 60000
+        }
+      ],
+      "total": 197000,
+      "note": "Chi mua sắm tại Siêu Thị Mẫu C",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-037",
+      "date": "2026-10-25",
+      "time": "18:45",
+      "merchant": "Trà Sữa Mẫu B",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Trà sữa trân châu",
+          "amount": 38000
+        }
+      ],
+      "total": 38000,
+      "note": "Chi ăn uống tại Trà Sữa Mẫu B",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-038",
+      "date": "2026-10-26",
+      "time": "15:00",
+      "merchant": "BACH HOA XANH M1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Rau củ",
+          "amount": 91000
+        },
+        {
+          "name": "Thịt heo",
+          "amount": 39000
+        }
+      ],
+      "total": 130000,
+      "note": "Chi ăn uống tại BACH HOA XANH M1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-039",
+      "date": "2026-10-26",
+      "time": "15:30",
+      "merchant": "Phòng Khám Mẫu",
+      "category": "Sức khỏe",
+      "items": [
+        {
+          "name": "Khám tổng quát",
+          "amount": 413000
+        }
+      ],
+      "total": 413000,
+      "note": "Chi sức khỏe tại Phòng Khám Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-040",
+      "date": "2026-10-27",
+      "time": "15:50",
+      "merchant": "Phở Bò Mẫu 24",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phở tái nạm",
+          "amount": 42000
+        },
+        {
+          "name": "Quẩy",
+          "amount": 18000
+        }
+      ],
+      "total": 60000,
+      "note": "Chi ăn uống tại Phở Bò Mẫu 24",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-042",
+      "date": "2026-10-28",
+      "time": "10:00",
+      "merchant": "Phở Bò Mẫu 24",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phở tái nạm",
+          "amount": 48000
+        },
+        {
+          "name": "Quẩy",
+          "amount": 21000
+        }
+      ],
+      "total": 69000,
+      "note": "Chi ăn uống tại Phở Bò Mẫu 24",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-041",
+      "date": "2026-10-28",
+      "time": "14:00",
+      "merchant": "Nhà Thuốc Mẫu D",
+      "category": "Sức khỏe",
+      "items": [
+        {
+          "name": "Vitamin C",
+          "amount": 88000
+        },
+        {
+          "name": "Khẩu trang",
+          "amount": 39000
+        }
+      ],
+      "total": 127000,
+      "note": "Chi sức khỏe tại Nhà Thuốc Mẫu D",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-043",
+      "date": "2026-10-29",
+      "time": "08:45",
+      "merchant": "BACH HOA XANH M1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Rau củ",
+          "amount": 73000
+        },
+        {
+          "name": "Thịt heo",
+          "amount": 32000
+        }
+      ],
+      "total": 105000,
+      "note": "Chi ăn uống tại BACH HOA XANH M1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-045",
+      "date": "2026-10-30",
+      "time": "09:15",
+      "merchant": "Trà Sữa Mẫu B",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Trà sữa trân châu",
+          "amount": 51000
+        },
+        {
+          "name": "Topping",
+          "amount": 22000
+        }
+      ],
+      "total": 73000,
+      "note": "Chi ăn uống tại Trà Sữa Mẫu B",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-044",
+      "date": "2026-10-30",
+      "time": "19:10",
+      "merchant": "Cơm Tấm Mẫu Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Cơm sườn bì chả",
+          "amount": 48000
+        },
+        {
+          "name": "Trà đá",
+          "amount": 21000
+        }
+      ],
+      "total": 69000,
+      "note": "Chi ăn uống tại Cơm Tấm Mẫu Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-046",
+      "date": "2026-10-31",
+      "time": "10:30",
+      "merchant": "Trạm Xăng Mẫu A",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Xăng RON95",
+          "amount": 104000
+        }
+      ],
+      "total": 104000,
+      "note": "Chi di chuyển tại Trạm Xăng Mẫu A",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-004",
+      "date": "2026-11-01",
+      "time": "09:00",
+      "merchant": "Tiền Trọ Mẫu",
+      "category": "Hóa đơn & Nhà ở",
+      "items": [
+        {
+          "name": "Tiền phòng",
+          "amount": 2800000
+        }
+      ],
+      "total": 2800000,
+      "note": "Đóng tiền nhà đầu tháng",
+      "source_type": "manual_note"
+    },
+    {
+      "id": "EXP-047",
+      "date": "2026-11-01",
+      "time": "18:15",
+      "merchant": "Siêu Thị Mẫu C",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Đồ gia dụng nhỏ",
+          "amount": 112000
+        },
+        {
+          "name": "Giấy ăn",
+          "amount": 49000
+        }
+      ],
+      "total": 161000,
+      "note": "Chi mua sắm tại Siêu Thị Mẫu C",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-049",
+      "date": "2026-11-02",
+      "time": "08:15",
+      "merchant": "HIGHLANDS*Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phin sữa đá",
+          "amount": 41000
+        },
+        {
+          "name": "Bánh mì que",
+          "amount": 18000
+        }
+      ],
+      "total": 59000,
+      "note": "Chi ăn uống tại HIGHLANDS*Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-048",
+      "date": "2026-11-02",
+      "time": "21:30",
+      "merchant": "Phở Bò Mẫu 24",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phở tái nạm",
+          "amount": 54000
+        },
+        {
+          "name": "Quẩy",
+          "amount": 24000
+        }
+      ],
+      "total": 78000,
+      "note": "Chi ăn uống tại Phở Bò Mẫu 24",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-050",
+      "date": "2026-11-03",
+      "time": "16:10",
+      "merchant": "BACH HOA XANH M1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Rau củ",
+          "amount": 100000
+        },
+        {
+          "name": "Thịt heo",
+          "amount": 43000
+        }
+      ],
+      "total": 143000,
+      "note": "Chi ăn uống tại BACH HOA XANH M1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-051",
+      "date": "2026-11-05",
+      "time": "08:00",
+      "merchant": "Cơm Tấm Mẫu Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Cơm sườn bì chả",
+          "amount": 49000
+        }
+      ],
+      "total": 49000,
+      "note": "Chi ăn uống tại Cơm Tấm Mẫu Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-005",
+      "date": "2026-11-05",
+      "time": "10:15",
+      "merchant": "Internet Mẫu",
+      "category": "Hóa đơn & Nhà ở",
+      "items": [
+        {
+          "name": "Cước WiFi",
+          "amount": 220000
+        }
+      ],
+      "total": 220000,
+      "note": "Cước mạng hàng tháng",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-052",
+      "date": "2026-11-06",
+      "time": "11:45",
+      "merchant": "Circle K Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Nước suối",
+          "amount": 36000
+        },
+        {
+          "name": "Bánh snack",
+          "amount": 16000
+        }
+      ],
+      "total": 52000,
+      "note": "Chi mua sắm tại Circle K Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-053",
+      "date": "2026-11-06",
+      "time": "18:30",
+      "merchant": "BACH HOA XANH M1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Rau củ",
+          "amount": 82000
+        },
+        {
+          "name": "Thịt heo",
+          "amount": 36000
+        }
+      ],
+      "total": 118000,
+      "note": "Chi ăn uống tại BACH HOA XANH M1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-054",
+      "date": "2026-11-07",
+      "time": "19:25",
+      "merchant": "Grab*Bike",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Cước xe máy nội thành",
+          "amount": 48000
+        }
+      ],
+      "total": 48000,
+      "note": "Chi di chuyển tại Grab*Bike",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-055",
+      "date": "2026-11-09",
+      "time": "12:25",
+      "merchant": "Cơm Tấm Mẫu Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Cơm sườn bì chả",
+          "amount": 43000
+        },
+        {
+          "name": "Trà đá",
+          "amount": 19000
+        }
+      ],
+      "total": 62000,
+      "note": "Chi ăn uống tại Cơm Tấm Mẫu Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-056",
+      "date": "2026-11-10",
+      "time": "07:25",
+      "merchant": "Cơm Tấm Mẫu Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Cơm sườn bì chả",
+          "amount": 41000
+        }
+      ],
+      "total": 41000,
+      "note": "Chi ăn uống tại Cơm Tấm Mẫu Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-057",
+      "date": "2026-11-10",
+      "time": "10:10",
+      "merchant": "Grab*Bike",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Cước xe máy nội thành",
+          "amount": 33000
+        }
+      ],
+      "total": 33000,
+      "note": "Chi di chuyển tại Grab*Bike",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-006",
+      "date": "2026-11-10",
+      "time": "14:30",
+      "merchant": "Điện Lực Mẫu",
+      "category": "Hóa đơn & Nhà ở",
+      "items": [
+        {
+          "name": "Tiền điện",
+          "amount": 520000
+        }
+      ],
+      "total": 520000,
+      "note": "Hóa đơn điện sinh hoạt",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-058",
+      "date": "2026-11-11",
+      "time": "09:15",
+      "merchant": "Grab*Bike",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Cước xe máy nội thành",
+          "amount": 45000
+        }
+      ],
+      "total": 45000,
+      "note": "Chi di chuyển tại Grab*Bike",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-081",
+      "date": "2026-11-11",
+      "time": "20:40",
+      "merchant": "Siêu Thị Mẫu C",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Nồi chiên mini",
+          "amount": 950000
+        }
+      ],
+      "total": 950000,
+      "note": "Săn sale 11/11 (chi lớn bất thường)",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-060",
+      "date": "2026-11-12",
+      "time": "17:30",
+      "merchant": "Circle K Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Nước suối",
+          "amount": 28000
+        }
+      ],
+      "total": 28000,
+      "note": "Chi mua sắm tại Circle K Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-059",
+      "date": "2026-11-12",
+      "time": "19:50",
+      "merchant": "Cơm Tấm Mẫu Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Cơm sườn bì chả",
+          "amount": 44000
+        },
+        {
+          "name": "Trà đá",
+          "amount": 19000
+        }
+      ],
+      "total": 63000,
+      "note": "Chi ăn uống tại Cơm Tấm Mẫu Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-061",
+      "date": "2026-11-13",
+      "time": "09:25",
+      "merchant": "Circle K Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Nước suối",
+          "amount": 36000
+        },
+        {
+          "name": "Bánh snack",
+          "amount": 16000
+        }
+      ],
+      "total": 52000,
+      "note": "Chi mua sắm tại Circle K Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-063",
+      "date": "2026-11-14",
+      "time": "11:50",
+      "merchant": "Cơm Tấm Mẫu Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Cơm sườn bì chả",
+          "amount": 41000
+        },
+        {
+          "name": "Trà đá",
+          "amount": 18000
+        }
+      ],
+      "total": 59000,
+      "note": "Chi ăn uống tại Cơm Tấm Mẫu Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-062",
+      "date": "2026-11-14",
+      "time": "21:00",
+      "merchant": "HIGHLANDS*Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phin sữa đá",
+          "amount": 49000
+        },
+        {
+          "name": "Bánh mì que",
+          "amount": 21000
+        }
+      ],
+      "total": 70000,
+      "note": "Chi ăn uống tại HIGHLANDS*Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-082",
+      "date": "2026-11-15",
+      "time": "12:10",
+      "merchant": "HIGHLANDS*Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Cà phê sữa",
+          "amount": 49000
+        },
+        {
+          "name": "Bánh ngọt",
+          "amount": 39000
+        }
+      ],
+      "total": 88000,
+      "note": "Gặp bạn cuối tuần",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-064",
+      "date": "2026-11-15",
+      "time": "18:45",
+      "merchant": "Shop Thời Trang Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Áo thun cơ bản",
+          "amount": 248000
+        }
+      ],
+      "total": 248000,
+      "note": "Chi mua sắm tại Shop Thời Trang Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-083",
+      "date": "2026-11-15",
+      "time": "19:30",
+      "merchant": "Rạp Phim Mẫu",
+      "category": "Giải trí",
+      "items": [
+        {
+          "name": "2 vé xem phim",
+          "amount": 180000
+        }
+      ],
+      "total": 180000,
+      "note": "Xem phim tối Chủ nhật",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-065",
+      "date": "2026-11-16",
+      "time": "10:15",
+      "merchant": "Sách Mẫu E",
+      "category": "Giải trí",
+      "items": [
+        {
+          "name": "Sách kỹ năng",
+          "amount": 99000
+        }
+      ],
+      "total": 99000,
+      "note": "Chi giải trí tại Sách Mẫu E",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-066",
+      "date": "2026-11-16",
+      "time": "18:30",
+      "merchant": "Cơm Tấm Mẫu Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Cơm sườn bì chả",
+          "amount": 50000
+        },
+        {
+          "name": "Trà đá",
+          "amount": 22000
+        }
+      ],
+      "total": 72000,
+      "note": "Chi ăn uống tại Cơm Tấm Mẫu Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-067",
+      "date": "2026-11-18",
+      "time": "07:30",
+      "merchant": "Phở Bò Mẫu 24",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phở tái nạm",
+          "amount": 37000
+        },
+        {
+          "name": "Quẩy",
+          "amount": 16000
+        }
+      ],
+      "total": 53000,
+      "note": "Chi ăn uống tại Phở Bò Mẫu 24",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-068",
+      "date": "2026-11-18",
+      "time": "07:30",
+      "merchant": "BACH HOA XANH M1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Rau củ",
+          "amount": 87000
+        },
+        {
+          "name": "Thịt heo",
+          "amount": 38000
+        }
+      ],
+      "total": 125000,
+      "note": "Chi ăn uống tại BACH HOA XANH M1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-069",
+      "date": "2026-11-19",
+      "time": "16:00",
+      "merchant": "HIGHLANDS*Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phin sữa đá",
+          "amount": 49000
+        }
+      ],
+      "total": 49000,
+      "note": "Chi ăn uống tại HIGHLANDS*Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-070",
+      "date": "2026-11-20",
+      "time": "08:30",
+      "merchant": "Grab*Bike",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Cước xe máy nội thành",
+          "amount": 43000
+        }
+      ],
+      "total": 43000,
+      "note": "Chi di chuyển tại Grab*Bike",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-071",
+      "date": "2026-11-20",
+      "time": "16:00",
+      "merchant": "BACH HOA XANH M1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Rau củ",
+          "amount": 66000
+        },
+        {
+          "name": "Thịt heo",
+          "amount": 29000
+        }
+      ],
+      "total": 95000,
+      "note": "Chi ăn uống tại BACH HOA XANH M1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-084",
+      "date": "2026-11-20",
+      "time": "16:05",
+      "merchant": "CHUYEN KHOAN NOI BO",
+      "category": "không rõ",
+      "items": [
+        {
+          "name": "CK không ghi nội dung",
+          "amount": 150000
+        }
+      ],
+      "total": 150000,
+      "note": "Chuyển khoản thiếu mô tả — cần người dùng bổ sung nhóm chi",
+      "source_type": "manual_note"
+    },
+    {
+      "id": "EXP-072",
+      "date": "2026-11-21",
+      "time": "15:15",
+      "merchant": "BACH HOA XANH M1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Rau củ",
+          "amount": 160000
+        },
+        {
+          "name": "Thịt heo",
+          "amount": 69000
+        }
+      ],
+      "total": 229000,
+      "note": "Chi ăn uống tại BACH HOA XANH M1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-073",
+      "date": "2026-11-22",
+      "time": "10:15",
+      "merchant": "Rạp Phim Mẫu",
+      "category": "Giải trí",
+      "items": [
+        {
+          "name": "Vé xem phim 2D",
+          "amount": 122000
+        },
+        {
+          "name": "Bắp nước",
+          "amount": 53000
+        }
+      ],
+      "total": 175000,
+      "note": "Chi giải trí tại Rạp Phim Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-085",
+      "date": "2026-11-22",
+      "time": "11:20",
+      "merchant": "Quán Cơm Mẫu (Mờ)",
+      "category": "không rõ",
+      "items": [
+        {
+          "name": "Hóa đơn mờ thiếu tên món",
+          "amount": 65000
+        }
+      ],
+      "total": 65000,
+      "note": "Ảnh hóa đơn hơi mờ tên món, giữ được tổng tiền",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-074",
+      "date": "2026-11-22",
+      "time": "12:50",
+      "merchant": "Phở Bò Mẫu 24",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phở tái nạm",
+          "amount": 55000
+        },
+        {
+          "name": "Quẩy",
+          "amount": 24000
+        }
+      ],
+      "total": 79000,
+      "note": "Chi ăn uống tại Phở Bò Mẫu 24",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-076",
+      "date": "2026-11-24",
+      "time": "15:15",
+      "merchant": "Rạp Phim Mẫu",
+      "category": "Giải trí",
+      "items": [
+        {
+          "name": "Vé xem phim 2D",
+          "amount": 104000
+        },
+        {
+          "name": "Bắp nước",
+          "amount": 45000
+        }
+      ],
+      "total": 149000,
+      "note": "Chi giải trí tại Rạp Phim Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-075",
+      "date": "2026-11-24",
+      "time": "16:30",
+      "merchant": "Rạp Phim Mẫu",
+      "category": "Giải trí",
+      "items": [
+        {
+          "name": "Vé xem phim 2D",
+          "amount": 148000
+        },
+        {
+          "name": "Bắp nước",
+          "amount": 64000
+        }
+      ],
+      "total": 212000,
+      "note": "Chi giải trí tại Rạp Phim Mẫu",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-077",
+      "date": "2026-11-25",
+      "time": "21:10",
+      "merchant": "Phở Bò Mẫu 24",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phở tái nạm",
+          "amount": 37000
+        },
+        {
+          "name": "Quẩy",
+          "amount": 17000
+        }
+      ],
+      "total": 54000,
+      "note": "Chi ăn uống tại Phở Bò Mẫu 24",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-079",
+      "date": "2026-11-26",
+      "time": "07:45",
+      "merchant": "Trạm Xăng Mẫu A",
+      "category": "Di chuyển",
+      "items": [
+        {
+          "name": "Xăng RON95",
+          "amount": 117000
+        }
+      ],
+      "total": 117000,
+      "note": "Chi di chuyển tại Trạm Xăng Mẫu A",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-078",
+      "date": "2026-11-26",
+      "time": "20:30",
+      "merchant": "HIGHLANDS*Q1",
+      "category": "Ăn uống",
+      "items": [
+        {
+          "name": "Phin sữa đá",
+          "amount": 51000
+        },
+        {
+          "name": "Bánh mì que",
+          "amount": 22000
+        }
+      ],
+      "total": 73000,
+      "note": "Chi ăn uống tại HIGHLANDS*Q1",
+      "source_type": "receipt_photo"
+    },
+    {
+      "id": "EXP-080",
+      "date": "2026-11-27",
+      "time": "17:00",
+      "merchant": "Shop Thời Trang Mẫu",
+      "category": "Mua sắm",
+      "items": [
+        {
+          "name": "Áo thun cơ bản",
+          "amount": 378000
+        }
+      ],
+      "total": 378000,
+      "note": "Chi mua sắm tại Shop Thời Trang Mẫu",
+      "source_type": "receipt_photo"
+    }
+  ]
+}

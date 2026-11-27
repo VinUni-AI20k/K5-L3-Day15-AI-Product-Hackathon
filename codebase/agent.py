@@ -1,29 +1,172 @@
-"""Luồng chính của bản chạy thử — NHÓM VIẾT. Điền ở guide bước 3.2.
+"""Luồng chính của ứng dụng AI nhận hóa đơn, lưu note ngày kiểu Locket và phân tích chi tiêu.
 
-`python run.py`, `python run.py eval` và `python run.py simulate` đều gọi answer(text).
-
-Hợp đồng:
-    answer(text: str) -> dict có khoá "output" (str): kết quả đưa cho người dùng.
-    Token, tên model, số lần gọi model / công cụ: khung tự đếm qua call_model và @tool — không cần trả.
-    Bộ chạy gửi NGUYÊN ô input của câu thử vào text. Dữ liệu nền (bài học, thông báo, lịch…)
-    do luồng của nhóm tự đọc qua công cụ trong tools.py.
-
-Hình dạng: đúng như sơ đồ ở spec.md §4 (guide bước 2.2) — workflow cố định, một agent, hay nhiều agent.
-Khung dưới đây là một workflow 2 bước VÍ DỤ, chỉ để luồng chạy hết từ trước CP2. Thay bằng luồng của nhóm.
-Nếu viết vòng lặp agent (AI tự chọn bước tiếp): đặt giới hạn MAX_STEPS và ghi lý do dừng bằng note("dừng: …").
+Hình dạng: Workflow cố định có bước chặn an toàn bằng code + phân luồng công cụ + gọi AI tổng hợp.
+Mọi con số đều được tính trước bằng code trong codebase/tools.py; model không tự cộng trừ hay bịa số.
 """
-from ai import call_model
-from tools import search_example
-from tracing import note  # noqa: F401
+import re
 
-SYSTEM = ""     # NHÓM VIẾT: hướng dẫn hệ thống cho model (vai trò, phạm vi, khi nào nói "không có")
-MAX_STEPS = 5   # dùng khi viết vòng lặp agent
+from ai import call_model
+from tools import (
+    analyze_spending,
+    get_day_summary,
+    get_month_calendar,
+    parse_receipt_text,
+    save_daily_note,
+)
+from tracing import note
+
+SYSTEM = (
+    "Bạn là trợ lý tài chính cá nhân giúp người dùng nhận diện hóa đơn, lưu note chi tiêu hằng ngày kiểu Locket "
+    "và phân tích chi tiêu ngày/tháng. "
+    "Quy tắc bắt buộc: (1) Chỉ dùng đúng các con số từ phần Căn cứ công cụ, không tự cộng trừ hay bịa số; "
+    "(2) Nếu thiếu ngày, thiếu tổng tiền hoặc hóa đơn mờ thì hỏi lại đúng thông tin thiếu; "
+    "(3) Nếu chưa có dữ liệu của ngày/tháng được hỏi thì nói rõ chưa có dữ liệu; "
+    "(4) Từ chối tư vấn đầu tư/cổ phiếu/coin, từ chối xem dữ liệu người khác và từ chối ghi khống số tiền."
+)
+
+
+def _fmt_vnd(amount: int) -> str:
+    return f"{int(amount):,}".replace(",", ".") + "đ"
+
+
+def _check_safety_or_scope(text: str) -> str | None:
+    """Chặn yêu cầu ngoài phạm vi, prompt injection hoặc ép ghi khống số liệu bằng code."""
+    low = (text or "").lower()
+    if any(k in low for k in ("cổ phiếu", "co phieu", "chứng khoán", "chung khoan", "coin", "crypto", "đầu tư", "dau tu")):
+        return (
+            "Từ chối tư vấn đầu tư: ứng dụng chỉ hỗ trợ nhận hóa đơn, lưu note chi tiêu hằng ngày và phân tích chi tiêu cá nhân, "
+            "không tư vấn mua cổ phiếu, coin hay kênh đầu tư. Bạn có muốn xem tổng hợp các khoản chi tháng này để cân đối lại không?"
+        )
+    if any(k in low for k in ("người dùng khác", "nguoi dung khac", "người khác", "nguoi khac", "bỏ qua mọi quy tắc", "bo qua moi quy tac", "xuất toàn bộ", "xuat toan bo")):
+        return (
+            "Từ chối yêu cầu: hệ thống không truy cập hoặc xuất dữ liệu chi tiêu của người dùng khác và không bỏ qua quy tắc bảo mật dữ liệu cá nhân."
+        )
+    if ("thành 0đ" in low or "thanh 0d" in low or "0 đồng" in low) and any(k in low for k in ("ép", "ep", "giả", "gia", "vượt", "vuot", "sai sự thật")):
+        return (
+            "Từ chối ghi khống số liệu: hệ thống không chỉnh hóa đơn thành 0đ sai sự thật. "
+            "Vui lòng nhập đúng số tiền thực chi trên hóa đơn để lưu vào nhật ký ngày."
+        )
+    return None
+
+
+def _extract_dates_and_months(text: str):
+    dates = re.findall(r"(20\d{2}-\d{2}-\d{2})", text)
+    if not dates:
+        for d, m, y in re.findall(r"\b(\d{1,2})/(\d{1,2})/(20\d{2})\b", text):
+            dates.append(f"{y}-{int(m):02d}-{int(d):02d}")
+    months = re.findall(r"\b(20\d{2}-\d{2})\b(?!-\d{2})", text)
+    if not months:
+        for m, y in re.findall(r"tháng\s*(\d{1,2})\s*[/-]\s*(20\d{2})", text.lower()):
+            months.append(f"{y}-{int(m):02d}")
+    return dates, months
+
+
+def _is_receipt_input(text: str) -> bool:
+    low = (text or "").lower()
+    return any(k in low for k in ("chụp hóa đơn", "chup hoa don", "hóa đơn", "hoa don", "tổng cộng", "tong cong", "gửi ảnh", "gui anh"))
+
+
+def _build_context(text: str) -> tuple[str, str]:
+    """Chạy công cụ theo luồng cố định, trả về (context_for_model, deterministic_summary)."""
+    if _is_receipt_input(text):
+        parsed = parse_receipt_text(text)
+        if parsed["missing_fields"]:
+            missing = ", ".join(parsed["missing_fields"])
+            note("dừng: thiếu trường hóa đơn (%s)" % missing)
+            summary = (
+                f"Không thể tự lưu vì hóa đơn còn thiếu/mờ: {missing}. "
+                f"(Đã nhận diện tạm: nơi chi={parsed['merchant']}, ngày={parsed['date'] or 'chưa rõ'}, "
+                f"tổng={_fmt_vnd(parsed['total']) if parsed['total'] is not None else 'chưa rõ'}). "
+                f"Vui lòng bổ sung {missing} để lưu note ngày."
+            )
+            return f"Kết quả parse_receipt_text: {parsed}", summary
+
+        saved = save_daily_note(
+            date=parsed["date"],
+            merchant=parsed["merchant"],
+            total=parsed["total"],
+            category=parsed["category"],
+            note=f"Lưu từ hóa đơn {parsed['merchant']}",
+        )
+        note("lưu note hóa đơn thành công")
+        summary = (
+            f"Đã nhận diện và tạo note ngày {parsed['date']}: {parsed['merchant']} · "
+            f"{_fmt_vnd(parsed['total'])} · nhóm {parsed['category']}. "
+            f"Tổng chi ngày {parsed['date']} sau khi thêm là {_fmt_vnd(saved['new_day_total'])} ({saved['new_day_count']} khoản)."
+        )
+        return f"parse_receipt_text={parsed}\nsave_daily_note={saved}", summary
+
+    dates, months = _extract_dates_and_months(text)
+    if dates:
+        d = dates[0]
+        day_info = get_day_summary(d)
+        if day_info["count"] == 0:
+            note("ngày chưa có dữ liệu")
+            summary = f"Ngày {d} trên lịch chưa ghi nhận khoản chi nào (0đ)."
+            return f"get_day_summary={day_info}", summary
+        lines = [f"- {it['time']} | {it['merchant']} ({it['category']}): {_fmt_vnd(it['total'])}" for it in day_info["items"]]
+        extra = ""
+        if day_info["unknown_items"]:
+            unk = ", ".join(f"{u['merchant']} ({_fmt_vnd(u['total'])})" for u in day_info["unknown_items"])
+            extra = f" Lưu ý: có khoản gắn nhãn 'không rõ' ({unk}), bạn có thể bổ sung nhóm chi."
+        note("trả chi tiết ngày kiểu Locket")
+        summary = f"Chi tiêu ngày {d}: tổng {_fmt_vnd(day_info['total'])} ({day_info['count']} khoản):\n" + "\n".join(lines) + extra
+        return f"get_day_summary={day_info}", summary
+
+    if len(months) >= 2:
+        m1, m2 = months[0], months[1]
+        analysis = analyze_spending(m1, compare_with=m2)
+        if not analysis.get("has_data"):
+            note("chưa có dữ liệu tháng chính")
+            return f"analyze_spending={analysis}", f"Chưa có dữ liệu chi tiêu cho tháng {m1}."
+        comp = analysis.get("comparison") or {}
+        if not comp.get("other_total") and comp.get("has_data") is False:
+            summary = f"Tháng {m1} tổng chi {_fmt_vnd(analysis['total'])}, nhưng chưa có dữ liệu tháng {m2} để so sánh."
+        else:
+            sign = "+" if comp["diff"] >= 0 else ""
+            summary = (
+                f"So sánh {m1} với {m2}: {m1} chi {_fmt_vnd(analysis['total'])}, "
+                f"{m2} chi {_fmt_vnd(comp['other_total'])} "
+                f"(chênh lệch {sign}{_fmt_vnd(comp['diff'])}, {sign}{comp['pct_diff']}%). "
+                f"Nhóm cao nhất {m1}: {analysis['by_category'][0]['category']} ({_fmt_vnd(analysis['by_category'][0]['total'])})."
+            )
+        note("so sánh 2 tháng")
+        return f"analyze_spending={analysis}", summary
+
+    if len(months) == 1:
+        ym = months[0]
+        cal = get_month_calendar(ym)
+        analysis = analyze_spending(ym)
+        if not analysis.get("has_data"):
+            note("tháng chưa có dữ liệu")
+            return f"get_month_calendar={cal}\nanalyze_spending={analysis}", f"Chưa có dữ liệu chi tiêu trong tháng {ym}."
+        cats = ", ".join(f"{c['category']}: {_fmt_vnd(c['total'])} ({c['pct']}%)" for c in analysis["by_category"][:4])
+        top = analysis["top_day"]
+        note("phân tích chi tiêu tháng")
+        summary = (
+            f"Phân tích tháng {ym}: tổng chi {_fmt_vnd(analysis['total'])} qua {analysis['count']} khoản "
+            f"({analysis['active_days']} ngày có chi tiêu). Các nhóm chính: {cats}. "
+            f"Ngày chi cao nhất: {top['date']} ({_fmt_vnd(top['total'])})."
+        )
+        return f"get_month_calendar={cal}\nanalyze_spending={analysis}", summary
+
+    note("dừng: câu hỏi thiếu mốc ngày hoặc tháng")
+    summary = "Câu hỏi chưa rõ ngày hoặc tháng cần xem. Vui lòng cho biết cụ thể ngày (YYYY-MM-DD), tháng (YYYY-MM) hoặc gửi nội dung hóa đơn."
+    return "Thiếu tham số ngày/tháng hoặc hóa đơn.", summary
 
 
 def answer(text: str) -> dict:
-    # Bước 1 (ví dụ): lấy căn cứ từ dữ liệu / công cụ của bài toán
-    found = search_example(text)
-    context = "\n".join("[%s] %s" % (p["code"], p["text"]) for p in found)
-    # Bước 2 (ví dụ): model quyết định dựa trên căn cứ
-    reply = call_model(SYSTEM, "Căn cứ:\n%s\n\nĐầu vào của người dùng:\n%s" % (context, text))
+    """Điểm vào duy nhất cho run.py, run.py eval và run.py simulate."""
+    blocked = _check_safety_or_scope(text)
+    if blocked:
+        note("chặn bởi luật an toàn/phạm vi")
+        reply = call_model(SYSTEM, f"Tình huống bị từ chối theo quy tắc:\n{blocked}\n\nĐầu vào:\n{text}")
+        if reply["model"] == "fake":
+            return {"output": f"[AI giả - CP2] {blocked}"}
+        return {"output": reply["text"]}
+
+    context, summary = _build_context(text)
+    reply = call_model(SYSTEM, f"Căn cứ từ công cụ:\n{context}\n\nTóm tắt số liệu đã kiểm chứng:\n{summary}\n\nĐầu vào của người dùng:\n{text}")
+    if reply["model"] == "fake":
+        return {"output": f"[AI giả - CP2] {summary}"}
     return {"output": reply["text"]}
