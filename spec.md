@@ -1,38 +1,41 @@
-# AI SPEC — Hướng dẫn khiếu nại hàng không đúng mô tả · Nhóm 404ERROR · Phòng H210 · Zone 5
+# AI SPEC — Nhật ký chi tiêu từ ảnh · Nhóm 404ERROR · Phòng H210 · Zone 5
 
 Theo danh sách phân phòng, nhóm hiển thị là **404 ERROR**, đội **#5**.
 
 > Mốc nộp: §7 chốt chuẩn "đạt" tại **CP2 19:30 Thứ Sáu 27/11** · §0–§7 nộp **CP3 10:00 Thứ Bảy 28/11** · đủ §0–§10 **CP4 14:30 Thứ Bảy 28/11** · §10 changelog ghi tiếp đến **23:59 Thứ Bảy 28/11**.
 > Đầu mỗi mục ghi bước guide (`02-guide.md` trong repo đề) chỉ cách điền. Mỗi mục ngắn, có số và nguồn; chi tiết để ở file được trỏ tới. Xoá dòng hướng dẫn trong ngoặc vuông khi điền xong.
 
-Track D · D3 · Trả hàng, hoàn tiền trên sàn
-Nguồn bằng chứng dự kiến: review công khai và phỏng vấn người mua. Xem [giả thuyết](evidence/hypothesis.md).
+Track E · Tài chính · Nhật ký chi tiêu cá nhân
+
+**Thay đổi đề tài:** Đổi từ Track D (Thương mại điện tử) ở CP1 sang Track E (Tài chính cá nhân), với lát cắt tự ghi khoản chi ngay sau khi chụp hóa đơn.
 
 ## §0. Hiện tại việc này diễn ra thế nào *(guide 1.1)*
-- Luồng hiện tại của việc này, trong khoá hoặc trên app thật (3–5 bước; ảnh chụp từ tài khoản của mình, đã che thông tin):
-- Công cụ / AI đang được dùng cho việc này (nếu có) + nguồn. Không kiểm được thì ghi "chưa kiểm":
+
+- Luồng cần kiểm bằng phỏng vấn: người dùng nhận hóa đơn sau khi mua, rồi ghi số tiền vào sổ, bảng tính hoặc app để xem tổng chi sau này. Giả thuyết là họ tiếp tục ghi theo cách này vì muốn giữ một chỗ tra cứu, nhưng dễ bỏ qua khoản phải nhập lại.
+- Xác minh qua một lần gần nhất: dùng nguồn nào, thao tác nào hay bị bỏ qua và mất bao lâu. Chỉ hỏi về hành vi, thời gian và số bước.
 
 ## §1. Người dùng & bằng chứng *(guide 1.1, 1.2)*
-- Người dùng chính: người mua vừa nhận hàng không đúng mô tả và muốn gửi yêu cầu trả hàng.
-- Việc họ cố làm xong (`động từ + đối tượng + bối cảnh`, không có chữ AI):
-- Hôm nay họ giải bằng gì, hỏng ở đâu, vì sao chưa bỏ:
-- Pain dự kiến: Khi nhận hàng không đúng mô tả và muốn trả hàng, người mua trên sàn khó biết chi tiết nào trong mô tả lúc đặt có thể dùng để đối chiếu và cần nộp bằng chứng gì, nên có thể phải bổ sung nhiều lần hoặc lỡ hạn gửi yêu cầu.
-- Bằng chứng — số chính + kết luận (chi tiết: `evidence/summary.md`): __
+
+- Người dùng chính: người có hóa đơn khi mua sắm hoặc ăn uống và muốn biết đã tiêu gì trong ngày và tháng.
+- Việc muốn hoàn thành: ghi khoản chi ngay sau khi mua và mở lịch để xem lại.
+- Vấn đề dự kiến: Người muốn theo dõi chi tiêu hằng ngày phải nhập lại thông tin từ từng hóa đơn, nên dễ bỏ sót khoản chi và mất thời gian khi xem lại đã tiêu vào đâu.
+- Bằng chứng: 8/500 review nêu ma sát khi ghi hoặc muốn nhập tự động, 5/500 nêu khó tra cứu và 12/500 nêu sai lệch khi ghi sổ. Các nhóm này định hướng thiết kế và kiểm thử. [Tổng hợp bằng chứng](evidence/summary.md).
 
 ## §2. Impact & quyết định chọn *(guide 1.3)*
 
-| Hướng | Bao nhiêu người gặp | Bao nhiêu lần / tháng | Mỗi lần tốn gì | Impact / tháng | Làm kịp không | Chọn? |
-|---|---|---|---|---|---|---|
-|  |  |  |  |  |  |  |
-|  |  |  |  |  |  |  |
-|  |  |  |  |  |  |  |
+**Kịch bản thử, tất cả số ở bảng là tự ước tính.** Giả sử 30 người dùng chi tiêu từ hóa đơn thử mỗi hướng trong một tháng. Tần suất và thời gian là giả định khác nhau cho từng tác vụ. Các số review không dùng để suy ra quy mô này.
 
-- **Impact / tháng** của hướng chọn = __ người × __ lần × __ phút = __ — nguồn từng thừa số: __ (không có nguồn thì ghi rõ *(tự ước tính)*)
-- Hướng ĐÃ LOẠI + vì sao (giữ lại, đừng xoá):
-- Số lần / tháng của từng kiểu người dùng (dùng cho persona ở §8):
+| Hướng | Bao nhiêu người gặp | Số lần/người/tháng | Mỗi lần tốn gì | Impact/tháng | Làm kịp? | Chọn? |
+|---|---|---|---|---|---|---|
+| Tự tạo khoản chi sau khi chụp hóa đơn | 30 người thử | 12 hóa đơn | 35 giây có thể tiết kiệm mỗi lần (giả sử từ 60 còn 25 giây thao tác) | **210 phút** | Dự kiến có thể demo từ ảnh mẫu | Chọn làm lát cắt |
+| Tra khoản chi trên lịch | 30 người thử | 8 lượt tra | 20 giây có thể tiết kiệm mỗi lượt | 80 phút | Có thể dùng các khoản đã lưu | Giữ làm đầu ra |
+| Tổng hợp chi tiêu tháng | 30 người thử | 1 lượt tổng hợp | 4 phút có thể tiết kiệm mỗi lượt | 120 phút | Có thể tính từ các khoản đã lưu | Giữ ở mức tổng hợp |
+
+- **Impact / tháng của lát cắt:** 30 × 12 × 35 giây = 210 phút/tháng trong kịch bản giả định. Đo lại bằng cùng một hóa đơn ở hai cách ghi, tính từ khi bắt đầu đến khi xem được khoản đã lưu. Nếu ảnh phải chụp lại, tính cả thời gian thao tác thêm.
+- Chọn luồng chụp hóa đơn vì nó giải quyết ngay thao tác nhập lại. Lịch và tổng hợp tháng dùng dữ liệu từ luồng này. Phỏng vấn sẽ giúp kiểm tra ưu tiên giữa ba hướng.
 
 ## §3. Giải pháp tương tự *(guide 2.1)*
-- [sản phẩm / tính năng gần giống]: một điều đáng học · một điều đáng né · mình khác gì
+- Sổ Thu Chi MISA công bố có chụp hóa đơn và phân loại tự động. Ca thử của nhóm tập trung vào một lần chụp, tự ghi khoản có căn cứ và chạm ngày để mở từng khoản. Cần kiểm kỹ ảnh mờ, số tiền đọc sai và ghi trùng, vì các lỗi này làm lệch tổng ngày. [Mô tả của nhà phát hành trên Google Play](https://play.google.com/store/apps/details?hl=vi&id=vn.com.misa.sothuchi).
 
 ## §4. Thiết kế *(guide 2.2, 3.2)*
 - **Lát cắt dự kiến:** Một người dùng cá nhân chụp ảnh hoá đơn trên giao diện lịch kiểu Locket hoặc chọn xem ngày/tuần/tháng/năm; AI trích xuất thông tin hoá đơn thành bản nháp chờ xác nhận lưu vào đúng ngày và diễn giải bảng tổng kết, so sánh tăng/giảm với kỳ trước cùng xu hướng tiêu dùng dựa hoàn toàn trên số liệu do công cụ tính.
@@ -128,8 +131,8 @@ flowchart TD
 - Ai có thể bị hại nếu AI sai, và nhóm chặn thế nào:
 
 ## §10. Phân công & changelog
-- **Cặp làm sản phẩm (dự kiến):** Nguyễn Quang Vũ phụ trách code luồng tiếp nhận khiếu nại, nối model và tích hợp demo. Trịnh Công Đức code công cụ tra mô tả lúc đặt và chính sách, viết spec và cùng Vũ rà soát tích hợp. CP2 chạy được luồng D3 với dữ liệu giả lập và model giả. CP3 nối model thật và kiểm luồng xin thêm bằng chứng hoặc chuyển nhân viên.
-- **Cặp bằng chứng và kiểm thử (dự kiến):** Nguyễn Tiến Đạt phân tích review trên Google Play, viết benchmark và chạy đánh giá. Nguyễn Tuấn Kiệt phỏng vấn, tổng hợp bằng chứng và viết tiêu chí chấm. Hai cặp chạy thử chéo trước mỗi mốc.
+- **Cặp sản phẩm (dự kiến):** Vũ phụ trách nhận ảnh, nối model và giao diện lịch. Đức viết spec, code kiểm dữ liệu, lưu và tổng hợp ngày/tháng.
+- **Cặp bằng chứng và kiểm thử (dự kiến):** Đạt dựng hóa đơn giả lập và benchmark. Kiệt phỏng vấn, tổng hợp bằng chứng và viết tiêu chí chấm.
 - Dùng AI vào việc gì (2–3 dòng; chi tiết `docs/ai-usage.md`):
 - Nhật ký thay đổi — **mọi thay đổi sau CP2 19:30 Thứ Sáu 27/11 phải có dòng ở đây**:
 
