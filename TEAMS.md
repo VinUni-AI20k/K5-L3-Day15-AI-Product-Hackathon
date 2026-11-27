@@ -12,7 +12,7 @@
 | STT | Họ và tên | Mã học viên | Vai trò | Phần việc chính |
 |---|---|---|---|---|
 | 1 | Phạm Đức Vinh | 2A202603849 | Đội trưởng | Sản phẩm: canvas, spec.md, impact, slide và demo |
-| 2 | ____ Minh | ____ | Thành viên | Bằng chứng: gắn nhãn review Chợ Tốt, khảo sát, phỏng vấn (evidence/) |
+| 2 | Nguyễn Nhật Minh | 2A202603745 | Thành viên | Bằng chứng: gắn nhãn review Chợ Tốt, khảo sát, phỏng vấn (evidence/) |
 | 3 | ____ Hùng | ____ | Thành viên | Bản chạy thử: data Chợ Mẫu, công cụ, luồng, nối model (codebase/, data/) |
 | 4 | ____ Khánh | ____ | Thành viên | Đánh giá và chi phí: bộ câu thử, metric, chạy eval, mô phỏng chi phí (eval/, cost/) |
 
