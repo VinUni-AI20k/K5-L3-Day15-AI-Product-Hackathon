@@ -1,0 +1,172 @@
+import { AppError, type ErrorCode } from "@/core/domain/errors";
+
+/**
+ * Single place translating AppError -> HTTP. Route handlers stay thin:
+ * validate -> call usecase -> mapAppErrorToHttp (docs/07 section 3.3).
+ */
+
+/** Unified error body. `message` is the Vietnamese operator-facing text. */
+export interface ApiErrorBody {
+  code: ErrorCode;
+  message: string;
+  /** Field-level issues, only for INVALID_INPUT, so the UI can show them inline. */
+  issues?: { path: string; message: string }[];
+}
+
+const STATUS_BY_CODE: Record<ErrorCode, number> = {
+  INVALID_INPUT: 400,
+  UNAUTHORIZED: 401,
+  // Signed in, but not allowed to decide who else gets in — 403, not 401: the
+  // session is fine, so the screen must not bounce the operator to /signin.
+  ACCESS_FORBIDDEN: 403,
+  ACCESS_REQUEST_NOT_FOUND: 404,
+  // Multi-tenant session (M1.2, doc 10 §3): 409 = "pick a tenant" (UI shows the
+  // picker); 403 = member but role too low. "No membership" is never 403 — it is
+  // TENANT_NOT_FOUND 404, so outsiders cannot probe which tenants exist.
+  TENANT_NOT_SELECTED: 409,
+  FORBIDDEN: 403,
+  // Onboarding (M2.1/M2.2). INVITE_INVALID is 404 for every refusal reason on
+  // purpose: an invite endpoint that answers differently for "revoked" vs
+  // "never existed" is a probing oracle.
+  TENANT_LIMIT_REACHED: 409,
+  SLUG_TAKEN: 409,
+  // 503, not 409: no slug the caller sent is at fault and the same request,
+  // sent again, draws fresh entropy and very probably succeeds.
+  SLUG_DERIVATION_EXHAUSTED: 503,
+  INVITE_INVALID: 404,
+  INVITE_ROLE_FORBIDDEN: 403,
+  // Members (M2.3) + retirement (M2.4)
+  LAST_OWNER: 409,
+  MEMBER_NOT_FOUND: 404,
+  RETIRED: 410,
+  /**
+   * Password sign-in / sign-up. These normally travel through the Server
+   * Actions (which answer `{ok:false, code, message}`, not HTTP), but the map
+   * must be TOTAL — an unmapped code would fall through to 500 and turn "sai
+   * mật khẩu" into an outage in any route that ever surfaces one.
+   *
+   * 401, not 403: the caller failed to authenticate, and no role change fixes
+   * it. 423 Locked says exactly what a lock-out is. 429 carries the limiter.
+   */
+  AUTH_WEAK_PASSWORD: 422,
+  AUTH_EMAIL_TAKEN: 409,
+  AUTH_INVALID_CREDENTIALS: 401,
+  AUTH_ACCOUNT_LOCKED: 423,
+  AUTH_RATE_LIMITED: 429,
+  AUTH_CREDENTIAL_NOT_FOUND: 404,
+  TENANT_NOT_FOUND: 404,
+  INTERNAL: 500,
+  DB_ERROR: 503,
+  QUEUE_ERROR: 503,
+  JOB_PAYLOAD_INVALID: 400,
+  DRIVE_ERROR: 503,
+  SHEET_ERROR: 503,
+  FILE_NAME_INVALID: 422,
+  SHEET_ROW_INVALID: 422,
+  PRODUCT_NOT_FOUND: 404,
+  MEDIA_NOT_FOUND: 404,
+  OUT_OF_STOCK: 409,
+  SYNC_FAILED: 500,
+  // Not an outage and not a bad request: the run refused to delete a catalog
+  // the source stopped describing. The operator fixes the source, then retries.
+  SYNC_SOURCE_EMPTY: 409,
+  // All three are "state/config the operator must fix", not a bad request and
+  // not an outage — 409 keeps them out of the 401 handling of a dead session.
+  GOOGLE_NOT_CONNECTED: 409,
+  GOOGLE_AUTH_EXPIRED: 409,
+  GOOGLE_OAUTH_NOT_CONFIGURED: 409,
+  // The callback carried no usable state/code — the round trip must start over.
+  GOOGLE_CONNECT_STATE_INVALID: 400,
+  AI_PROVIDER_ERROR: 502,
+  AI_RESPONSE_INVALID: 502,
+  AI_RATE_LIMITED: 429,
+  AI_BUDGET_EXCEEDED: 429,
+  CAPTION_VALIDATION_FAILED: 422,
+  MODEL_NOT_CONFIGURED: 500,
+  PROMPT_NOT_FOUND: 500,
+  PROMPT_VERSION_NOT_FOUND: 404,
+  BATCH_NOT_FOUND: 404,
+  CHANNEL_GROUP_NOT_FOUND: 404,
+  META_ERROR: 502,
+  // 409, not 401: after M1.2 a 401 means "no session" and bounces the operator
+  // to /signin — a Facebook Page token expiring must not do that (doc 10 B4).
+  // Same family as GOOGLE_AUTH_EXPIRED above.
+  TOKEN_EXPIRED: 409,
+  // The platform's answer was unusable, not the caller's request.
+  UPLOAD_HOST_NOT_ALLOWED: 502,
+  CHANNEL_NOT_CONFIGURED: 409,
+  DUPLICATE_POST_BLOCKED: 409,
+  PUBLISH_FAILED: 502,
+  INVALID_JOB_TRANSITION: 409,
+  DRAFT_PAYLOAD_REJECTED: 422,
+  DRAFT_TOO_LARGE: 413,
+  VIDEO_SPEC_INVALID: 422,
+  VIDEO_PROBE_FAILED: 422,
+  TIKTOK_ERROR: 502,
+};
+
+/** Structural logger type — the app layer must not import ports or adapters. */
+export type ErrorLogger = {
+  warn(message: string, context?: Record<string, unknown>): void;
+  error(message: string, context?: Record<string, unknown> & { err?: unknown }): void;
+};
+
+export interface MapErrorOptions {
+  logger?: ErrorLogger;
+  /** Extra log context: route, tenant_id, job_id... */
+  context?: Record<string, unknown>;
+}
+
+export function httpStatusForCode(code: ErrorCode): number {
+  return STATUS_BY_CODE[code] ?? 500;
+}
+
+export function jsonError(
+  status: number,
+  code: ErrorCode,
+  message: string,
+  issues?: ApiErrorBody["issues"],
+): Response {
+  const body: ApiErrorBody = issues?.length ? { code, message, issues } : { code, message };
+  return Response.json(body, { status });
+}
+
+/**
+ * Never swallow: every mapped error is logged with context before the response.
+ * Unknown throwables become 500 INTERNAL — no stack, no cause, no context leaked.
+ */
+export function mapAppErrorToHttp(error: unknown, options: MapErrorOptions = {}): Response {
+  const { logger, context } = options;
+
+  if (AppError.is(error)) {
+    const status = httpStatusForCode(error.code);
+    const logPayload = { ...context, ...error.toLogObject(), status };
+    // 4xx is the caller's fault, not an incident: warn keeps the error channel
+    // meaningful for on-call. 5xx keeps `err` attached so the stack is stored.
+    if (status >= 500) logger?.error("Request failed with server error", { ...logPayload, err: error });
+    else logger?.warn("Request failed with client error", logPayload);
+
+    const issues = extractIssues(error);
+    return jsonError(status, error.code, error.userMessage, issues);
+  }
+
+  const wrapped = AppError.from(error, "INTERNAL", context);
+  logger?.error("Unhandled error in route handler", { ...context, err: wrapped, status: 500 });
+  return jsonError(500, "INTERNAL", wrapped.userMessage);
+}
+
+/** Pull zod-style issues out of AppError context; ignore anything malformed. */
+function extractIssues(error: AppError): ApiErrorBody["issues"] {
+  if (error.code !== "INVALID_INPUT") return undefined;
+  const raw = (error.context as { issues?: unknown }).issues;
+  if (!Array.isArray(raw)) return undefined;
+
+  const issues = raw.flatMap((item) => {
+    if (typeof item !== "object" || item === null) return [];
+    const { path, message } = item as { path?: unknown; message?: unknown };
+    if (typeof message !== "string") return [];
+    return [{ path: typeof path === "string" ? path : "", message }];
+  });
+
+  return issues.length > 0 ? issues : undefined;
+}

@@ -1,0 +1,114 @@
+import { index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+
+import type { PostJobMedia } from "@/core/domain/post-job";
+
+import { timestamps } from "./_columns";
+import { tenantIdColumn } from "./_tenant-column";
+import { postBatches } from "./post-batch";
+import { productOriginEnum } from "./product";
+
+/** Mirrors POST_JOB_STATUSES in core/domain/post-job.ts — keep both in sync. */
+export const postJobStatusEnum = pgEnum("post_job_status", [
+  "draft",
+  "queued",
+  "publishing",
+  /** E8.6 — Facebook holds the post and will publish it at `scheduled_at`. */
+  "scheduled_on_facebook",
+  "published",
+  "failed",
+  "blocked",
+]);
+
+/**
+ * ONE post on ONE channel (business rule 6). The centre of the system.
+ *
+ * ANTI-DUPLICATE LOCK (business rule 4, docs/02 §4): the unique index on
+ * (tenant_id, batch_id, product_code, color, channel_id, format). It is taken
+ * when the batch is created — before any publish call can exist — so a worker
+ * that dies mid-publish and a job that runs again cannot produce two posts.
+ * `color` and `format` are NOT NULL for exactly this reason: in Postgres
+ * NULL != NULL, so a nullable column would silently disable the constraint.
+ *
+ * Runtime half of the same protection: the state machine. A worker only moves
+ * `queued -> publishing` with an optimistic UPDATE ... WHERE status = 'queued',
+ * and `published` never transitions again.
+ */
+export const postJobs = pgTable(
+  "post_job",
+  {
+    id: uuid("id").primaryKey(),
+    tenantId: tenantIdColumn(),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => postBatches.id, { onDelete: "cascade" }),
+    productCode: text("product_code").notNull(),
+    /**
+     * Where the product text came from when this post was built. Stamped at
+     * creation, never joined at read time: the `product` row may be deleted or
+     * re-synced later, and this column must still answer "bài này lấy dữ liệu
+     * từ đâu". DEFAULT 'sheet' backfills existing rows truthfully — every post
+     * created before onboarding phase 3 came from a synced catalog.
+     */
+    productOrigin: productOriginEnum("product_origin").notNull().default("sheet"),
+    /** "" = every colour of the code. See the note above on NOT NULL. */
+    color: text("color").notNull().default(""),
+    /** Tenant-side channel id (tenant_integration.config), e.g. "fbpage-a". */
+    channelId: text("channel_id").notNull(),
+    format: text("format").notNull().default("image_post"),
+    status: postJobStatusEnum("status").notNull().default("draft"),
+    /** Publish attempts started; incremented on each `-> publishing`. */
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastErrorCode: text("last_error_code"),
+    /** Vietnamese operator message — "why is this post not live?". */
+    lastErrorMessage: text("last_error_message"),
+    /** Platform post id. Its presence IS the proof a post exists. */
+    publishedPostId: text("published_post_id"),
+    publishedUrl: text("published_url"),
+    publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
+    /**
+     * E8.6 — id of the UNPUBLISHED post the platform is holding. Deliberately
+     * not `published_post_id`: that column's presence is what every screen and
+     * query reads as "this post is live".
+     */
+    scheduledPostId: text("scheduled_post_id"),
+    captionText: text("caption_text").notNull(),
+    /** Ordered album; index 0 is the cover. */
+    media: jsonb("media").$type<PostJobMedia[]>().notNull().default([]),
+    /** When this job should publish. Null = as soon as a worker picks it up. */
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true, mode: "date" }),
+    /**
+     * Queue entry currently representing this job (E8.4). Stored because a
+     * delayed BullMQ job can only be REMOVED by id: an operator rescheduling or
+     * cancelling a post must be able to drop the old entry, or it fires anyway.
+     * Null whenever nothing is queued.
+     */
+    queueJobId: text("queue_job_id"),
+    ...timestamps,
+  },
+  (table) => [
+    unique("post_job_duplicate_uq").on(
+      table.tenantId,
+      table.batchId,
+      table.productCode,
+      table.color,
+      table.channelId,
+      table.format,
+    ),
+    index("post_job_tenant_status_idx").on(table.tenantId, table.status),
+    index("post_job_tenant_batch_idx").on(table.tenantId, table.batchId),
+    // Spacing gate: "when did this channel last publish?" (brief §6).
+    index("post_job_tenant_channel_published_idx").on(
+      table.tenantId,
+      table.channelId,
+      table.publishedAt,
+    ),
+    // E8.4 "bài đã hẹn": status + time is the exact shape of that screen's query.
+    index("post_job_tenant_scheduled_idx").on(table.tenantId, table.status, table.scheduledAt),
+    // E8.6 reconciliation: "which handed-over posts are due?" — a CROSS-TENANT
+    // sweep, so the tenant must NOT lead this index.
+    index("post_job_status_scheduled_idx").on(table.status, table.scheduledAt),
+  ],
+);
+
+export type PostJobRow = typeof postJobs.$inferSelect;
+export type NewPostJobRow = typeof postJobs.$inferInsert;
