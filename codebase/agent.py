@@ -11,10 +11,11 @@ Hợp đồng: answer(text: str) -> {"output": str}. Chỉ dùng thư viện chu
 """
 import json
 import re
-import unicodedata
 
 from ai import call_model
 from tools import (
+    _norm,
+    _to_int_or_none,
     kiem_tai_khoan,
     kiem_tin_dang,
     tinh_ti_le_coc,
@@ -59,17 +60,24 @@ SYSTEM_DECIDE = (
 # Hàm tiện ích nội bộ
 # ---------------------------------------------------------------------------
 
-def _norm(text: str) -> str:
-    s = (text or "").replace("đ", "d").replace("Đ", "D")
-    s = unicodedata.normalize("NFD", s)
-    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
-    return re.sub(r"\s+", " ", s.lower()).strip()
-
-
 def _fmt_vnd(amount) -> str:
     if amount is None:
         return "không rõ"
     return "{:,}đ".format(int(amount)).replace(",", ".")
+
+
+def _coerce_bool(val) -> bool:
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return val != 0
+    if isinstance(val, str):
+        s = _norm(val)
+        if s in ("true", "1", "yes", "co", "dung"):
+            return True
+        if s in ("false", "0", "no", "khong", "sai", "", "none", "null"):
+            return False
+    return bool(val)
 
 
 def _parse_json(text: str):
@@ -91,11 +99,14 @@ def _parse_json(text: str):
         return None
 
 
-def _parse_money_vnd(num_str: str, unit: str) -> int:
+def _parse_money_vnd(num_str: str, unit: str, tail_digit: str = "") -> int:
     raw = num_str.strip()
     u = _norm(unit)
-    if u in ("tr", "trieu", "cu"):
-        val = float(raw.replace(",", "."))
+    if u in ("tr", "trieu"):
+        if tail_digit and "." not in raw and "," not in raw:
+            val = float("%s.%s" % (raw, tail_digit))
+        else:
+            val = float(raw.replace(",", "."))
         return int(round(val * 1_000_000))
     if u in ("k", "nghin", "ngan"):
         val = float(raw.replace(",", "."))
@@ -179,29 +190,29 @@ def _trich_du_phong(text: str) -> dict:
             doi_may = m_doi.group(1).strip()
             break
 
-    # 5. Tình trạng
+    # 5. Tình trạng (thu hẹp 'lỗi' để tránh khớp 'trả lời')
     tinh_trang = ""
-    if re.search(r"\b(tray|xuoc|pin yeu|vo kinh|loi|can mop|cu nhieu)\b", low):
+    if re.search(r"\b(tray|xuoc|pin yeu|vo kinh|can mop|cu nhieu|bi loi|loi man|loi pin|loi loa|loi cam|loi sac)\b", low):
         tinh_trang = "trầy xước, pin yếu"
     elif re.search(r"\b(dep nhu moi|likenew|like new|99%|zin dep|fullbox)\b", low):
         tinh_trang = "đẹp như mới"
     elif re.search(r"\b(tot|on dinh|binh thuong)\b", low):
         tinh_trang = "tốt"
 
-    # 6. Giá bán & tiền cọc
-    money_pat = r"(\d+(?:[.,]\d+)?)\s*(tr|trieu|cu|k|nghin|ngan|vnd|d)\b"
+    # 6. Giá bán & tiền cọc (bỏ 'cu' để tránh khớp chữ 'cũ', hỗ trợ dạng '6tr5')
+    money_pat = r"(?<![a-z0-9])(\d+(?:[.,]\d+)?)\s*(tr|trieu|k|nghin|ngan|vnd|d)(\d)?\b"
     tien_coc = None
     m_coc = re.search(r"(?:coc|dat coc|chuyen truoc|phi ship)\D{0,20}" + money_pat, low)
     if m_coc:
-        tien_coc = _parse_money_vnd(m_coc.group(1), m_coc.group(2))
+        tien_coc = _parse_money_vnd(m_coc.group(1), m_coc.group(2), m_coc.group(3) or "")
 
     gia_dang = None
     m_gia = re.search(r"(?:gia|ban)\D{0,15}" + money_pat, low)
     if m_gia:
-        gia_dang = _parse_money_vnd(m_gia.group(1), m_gia.group(2))
+        gia_dang = _parse_money_vnd(m_gia.group(1), m_gia.group(2), m_gia.group(3) or "")
     else:
-        for num_s, unit_s in re.findall(money_pat, low):
-            val = _parse_money_vnd(num_s, unit_s)
+        for num_s, unit_s, tail_s in re.findall(money_pat, low):
+            val = _parse_money_vnd(num_s, unit_s, tail_s or "")
             if val >= 1_000_000 and val != tien_coc:
                 gia_dang = val
                 break
@@ -282,6 +293,57 @@ def _buoc_kiem_theo_mon(mon: str) -> list:
 # 5 bước của workflow cố định
 # ---------------------------------------------------------------------------
 
+_BOOL_FIELDS = (
+    "ngoai_pham_vi",
+    "da_chuyen_tien",
+    "doi_chuyen_tien_truoc",
+    "co_thuc_ep",
+    "doi_chuyen_kenh",
+    "tu_choi_gap_hoac_video",
+    "co_link_la",
+)
+_INT_FIELDS = ("gia_dang", "tien_coc")
+_STR_FIELDS = (
+    "ly_do_tu_choi",
+    "mon",
+    "doi_may",
+    "tinh_trang",
+    "cach_giao",
+    "so_tk",
+    "sdt",
+    "ten_chu_tk",
+    "ten_nguoi_ban",
+    "ma_tin",
+)
+
+
+def _chuan_hoa_info(parsed: dict, raw_text: str) -> dict:
+    """Ép kiểu an toàn cho JSON từ model thật (tránh sập khi model trả số/bool dạng chuỗi)."""
+    base = _trich_du_phong("")
+    base.update({k: v for k, v in parsed.items() if k in base})
+    for k in _INT_FIELDS:
+        base[k] = _to_int_or_none(base.get(k))
+    for k in _BOOL_FIELDS:
+        base[k] = _coerce_bool(base.get(k))
+    for k in _STR_FIELDS:
+        v = base.get(k)
+        base[k] = "" if v is None else str(v).strip()
+    dh = base.get("dau_hieu_chat")
+    if isinstance(dh, list):
+        base["dau_hieu_chat"] = [str(x).strip() for x in dh if str(x).strip()]
+    elif isinstance(dh, str) and dh.strip():
+        base["dau_hieu_chat"] = [dh.strip()]
+    else:
+        base["dau_hieu_chat"] = []
+
+    if not base["ngoai_pham_vi"]:
+        ly_do = _kiem_ngoai_pham_vi(raw_text)
+        if ly_do:
+            base["ngoai_pham_vi"] = True
+            base["ly_do_tu_choi"] = ly_do
+    return base
+
+
 def _buoc1_trich_thong_tin(text: str) -> tuple:
     """[1] AI trích thông tin từ tin đăng và đoạn chat → JSON."""
     reply = call_model(
@@ -290,18 +352,14 @@ def _buoc1_trich_thong_tin(text: str) -> tuple:
     )
     parsed = _parse_json(reply.get("text", ""))
     if parsed is None:
-        note("bước 1: phản hồi model không phải JSON (chế độ giả?), dùng bộ trích dự phòng")
-        return _trich_du_phong(text), True
+        model_name = reply.get("model") or "unknown"
+        if model_name == "fake":
+            note("bước 1: đang chạy chế độ AI giả, dùng bộ trích dự phòng")
+        else:
+            note("bước 1 CẢNH BÁO: model thật (%s) trả về không phải JSON hợp lệ, rơi về bộ trích dự phòng" % model_name)
+        return _trich_du_phong(text), (model_name == "fake")
 
-    # Hợp nhất an toàn với giá trị mặc định + kiểm ngoài phạm vi bằng code
-    base = _trich_du_phong("")
-    base.update({k: v for k, v in parsed.items() if k in base})
-    if not base["ngoai_pham_vi"]:
-        ly_do = _kiem_ngoai_pham_vi(text)
-        if ly_do:
-            base["ngoai_pham_vi"] = True
-            base["ly_do_tu_choi"] = ly_do
-    return base, False
+    return _chuan_hoa_info(parsed, text), False
 
 
 def _buoc2_tra_cuu(info: dict) -> dict:
@@ -360,12 +418,12 @@ def _buoc3_luat_cung(info: dict, ket_qua: dict) -> dict:
         do.append("Đoạn chat có đường link lạ ('nhận tiền' / 'bảo hiểm giao dịch') — nguy cơ lừa đảo chiếm đoạt tiền.")
 
     # --- Tín hiệu 🟡 VÀNG ---
-    if tin.get("found"):
-        tuoi = tin.get("tuoi_tai_khoan_ngay", -1)
-        so_dg = tin.get("so_danh_gia", 0)
-        if 0 <= tuoi < 30:
+    if tin.get("found") and tin.get("co_thong_tin_nguoi_ban"):
+        tuoi = tin.get("tuoi_tai_khoan_ngay")
+        so_dg = tin.get("so_danh_gia")
+        if tuoi is not None and 0 <= tuoi < 30:
             vang.append("Tài khoản người bán mới tạo (%d ngày, dưới ngưỡng 30 ngày)." % tuoi)
-        if so_dg == 0:
+        if so_dg is not None and so_dg == 0:
             vang.append("Người bán chưa có đánh giá nào trên hệ thống.")
 
     if info.get("doi_chuyen_kenh"):
@@ -434,8 +492,12 @@ def _buoc4_ai_ket_luan(info: dict, ket_qua: dict, luat: dict) -> tuple:
     )
     parsed = _parse_json(reply.get("text", ""))
     if parsed is None:
-        note("bước 4: phản hồi model không phải JSON (chế độ giả?), dùng tổng hợp dự phòng")
-        return _ket_luan_du_phong(info, ket_qua, luat), True
+        model_name = reply.get("model") or "unknown"
+        if model_name == "fake":
+            note("bước 4: đang chạy chế độ AI giả, dùng tổng hợp dự phòng")
+        else:
+            note("bước 4 CẢNH BÁO: model thật (%s) trả về không phải JSON hợp lệ, rơi về tổng hợp dự phòng" % model_name)
+        return _ket_luan_du_phong(info, ket_qua, luat), (model_name == "fake")
     return parsed, False
 
 
@@ -500,14 +562,20 @@ def _buoc5_ghi_de_va_dinh_dang(info: dict, ket_qua: dict, luat: dict, ket_luan: 
         so_lieu.append("Kiểm TK/SĐT: %s." % tk.get("thong_bao", "không có số TK/SĐT"))
 
     if tin.get("found"):
-        so_lieu.append(
-            "Kiểm tin đăng %s: tài khoản %d ngày, %d tin đã đăng, đánh giá %.1f (%d lượt), ảnh trùng người bán khác: %s."
-            % (
-                tin["ma_tin"], tin["tuoi_tai_khoan_ngay"], tin["so_tin_da_dang"],
-                tin["danh_gia"], tin["so_danh_gia"],
-                "CÓ (%s)" % ", ".join(tin["cac_tin_trung_anh"]) if tin["anh_trung_nguoi_ban_khac"] else "không",
+        trung_txt = "CÓ (%s)" % ", ".join(tin["cac_tin_trung_anh"]) if tin["anh_trung_nguoi_ban_khac"] else "không"
+        if tin.get("co_thong_tin_nguoi_ban"):
+            so_lieu.append(
+                "Kiểm tin đăng %s: tài khoản %d ngày, %d tin đã đăng, đánh giá %.1f (%d lượt), ảnh trùng người bán khác: %s."
+                % (
+                    tin["ma_tin"], tin["tuoi_tai_khoan_ngay"], tin["so_tin_da_dang"],
+                    tin["danh_gia"], tin["so_danh_gia"], trung_txt,
+                )
             )
-        )
+        else:
+            so_lieu.append(
+                "Kiểm tin đăng %s: chưa có hồ sơ người bán trong dữ liệu, ảnh trùng người bán khác: %s."
+                % (tin["ma_tin"], trung_txt)
+            )
     else:
         so_lieu.append("Kiểm tin đăng: %s." % tin.get("thong_bao", "không có mã tin"))
 

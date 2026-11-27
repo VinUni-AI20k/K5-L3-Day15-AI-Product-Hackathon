@@ -104,12 +104,40 @@ def _load_csv(filename: str, fallback: list) -> tuple:
     return rows, "data/%s" % filename
 
 
+def _to_int_or_none(val):
+    if val is None or isinstance(val, bool):
+        return None
+    if isinstance(val, (int, float)):
+        return int(val)
+    s = re.sub(r"[.,\s]", "", str(val).strip())
+    if re.fullmatch(r"-?\d+", s):
+        return int(s)
+    return None
+
+
 def _token_overlap(a: str, b: str) -> float:
     ta = set(_norm(a).split())
     tb = set(_norm(b).split())
     if not ta or not tb:
         return 0.0
     return len(ta & tb) / len(ta | tb)
+
+
+_VARIANT_TOKENS = {"pro", "max", "plus", "mini", "ultra", "fe", "air", "se", "lite", "note"}
+
+
+def _doi_compatible(q_doi: str, r_doi: str) -> bool:
+    """Chặn khớp nhầm biến thể (vd 'iphone 13 pro' ≠ 'iphone 13') và số đời máy khác nhau."""
+    qt = set(_norm(q_doi).split())
+    rt = set(_norm(r_doi).split())
+    if (qt & _VARIANT_TOKENS) != (rt & _VARIANT_TOKENS):
+        return False
+    # Các token có chữ số (trừ dung lượng GB/TB) trong q_doi phải xuất hiện ở r_doi
+    q_nums = {t for t in qt if re.search(r"\d", t) and not re.fullmatch(r"\d+(?:gb|tb)", t)}
+    r_nums = {t for t in rt if re.search(r"\d", t) and not re.fullmatch(r"\d+(?:gb|tb)", t)}
+    if q_nums and not q_nums.issubset(r_nums):
+        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -125,32 +153,34 @@ def tra_gia_thi_truong(mon: str, doi: str = "", tinh_trang: str = "", gia_dang: 
     q_mon = _norm(mon)
     q_doi = _norm(doi)
     q_tt = _norm(tinh_trang)
+    gia_dang_int = _to_int_or_none(gia_dang)
 
-    if not q_mon and not q_doi:
+    # Bắt buộc phải có đời máy để tránh lấy đại một dòng cùng món gây báo oan
+    if not q_doi:
         return {
             "found": False,
             "mon": mon,
             "doi": doi,
             "tinh_trang": tinh_trang,
-            "thong_bao": "chưa có dữ liệu giá tham chiếu (thiếu tên món/đời máy)",
+            "thong_bao": "chưa có dữ liệu giá tham chiếu (thiếu đời máy)",
             "nguon": nguon,
         }
 
-    # Lọc các dòng khớp đời máy / món
+    # Lọc các dòng khớp đời máy (kiểm chặt biến thể & số đời)
     candidates = []
     for r in rows:
         r_mon = _norm(r.get("mon", ""))
         r_doi = _norm(r.get("doi", ""))
-        doi_score = _token_overlap(q_doi, r_doi) if q_doi else 0.0
-        # Khớp trực tiếp chuỗi con đời máy (vd "iphone 13" trong "iphone 13 128gb")
-        if q_doi and (q_doi in r_doi or r_doi in q_doi):
-            doi_score = max(doi_score, 0.75)
+        if not _doi_compatible(q_doi, r_doi):
+            continue
         mon_match = (not q_mon) or (q_mon == r_mon) or (q_mon in r_mon) or (r_mon in q_mon)
-        if q_doi:
-            if doi_score >= 0.45 and mon_match:
-                candidates.append((doi_score, r))
-        elif mon_match and r_mon:
-            candidates.append((0.5, r))
+        if not mon_match:
+            continue
+        doi_score = _token_overlap(q_doi, r_doi)
+        if q_doi in r_doi or r_doi in q_doi:
+            doi_score = max(doi_score, 0.75)
+        if doi_score >= 0.5:
+            candidates.append((doi_score, r))
 
     if not candidates:
         return {
@@ -181,8 +211,8 @@ def tra_gia_thi_truong(mon: str, doi: str = "", tinh_trang: str = "", gia_dang: 
     gia_tb = (gia_min + gia_max) // 2 if (gia_min > 0 and gia_max > 0) else max(gia_min, gia_max)
 
     chenh_lech_pct = None
-    if gia_dang is not None and gia_dang > 0 and gia_tb > 0:
-        chenh_lech_pct = round((gia_dang - gia_tb) / gia_tb * 100.0, 1)
+    if gia_dang_int is not None and gia_dang_int > 0 and gia_tb > 0:
+        chenh_lech_pct = round((gia_dang_int - gia_tb) / gia_tb * 100.0, 1)
 
     return {
         "found": True,
@@ -192,7 +222,7 @@ def tra_gia_thi_truong(mon: str, doi: str = "", tinh_trang: str = "", gia_dang: 
         "gia_min": gia_min,
         "gia_max": gia_max,
         "gia_trung_binh": gia_tb,
-        "gia_dang": gia_dang,
+        "gia_dang": gia_dang_int,
         "chenh_lech_pct": chenh_lech_pct,
         "nguon": nguon,
     }
@@ -203,27 +233,29 @@ def tinh_ti_le_coc(gia: int = None, coc: int = None) -> dict:
     """tinh_ti_le_coc · Input: gia (int | None), coc (int | None) theo VND.
     Output: dict gồm hop_le (bool), gia, coc, ti_le_coc_pct (float | None).
     Tác động ra ngoài: không (chỉ tính toán trong bộ nhớ)."""
-    if gia is None or coc is None:
+    gia_int = _to_int_or_none(gia)
+    coc_int = _to_int_or_none(coc)
+    if gia_int is None or coc_int is None:
         return {
             "hop_le": False,
-            "gia": gia,
-            "coc": coc,
+            "gia": gia_int,
+            "coc": coc_int,
             "ti_le_coc_pct": None,
             "ly_do": "thiếu giá bán hoặc tiền cọc",
         }
-    if gia <= 0 or coc < 0:
+    if gia_int <= 0 or coc_int < 0:
         return {
             "hop_le": False,
-            "gia": gia,
-            "coc": coc,
+            "gia": gia_int,
+            "coc": coc_int,
             "ti_le_coc_pct": None,
             "ly_do": "giá bán phải > 0 và tiền cọc phải ≥ 0",
         }
-    ti_le = round(coc / gia * 100.0, 1)
+    ti_le = round(coc_int / gia_int * 100.0, 1)
     return {
         "hop_le": True,
-        "gia": int(gia),
-        "coc": int(coc),
+        "gia": gia_int,
+        "coc": coc_int,
         "ti_le_coc_pct": ti_le,
     }
 
@@ -297,7 +329,8 @@ def kiem_tin_dang(ma_tin: str = "") -> dict:
         }
 
     ma_nb = tin.get("ma_nguoi_ban", "").strip()
-    nb = next((r for r in nb_rows if r.get("ma_nguoi_ban", "").strip() == ma_nb), {})
+    nb = next((r for r in nb_rows if r.get("ma_nguoi_ban", "").strip() == ma_nb), None)
+    co_nb = nb is not None
 
     ma_anh = tin.get("ma_anh", "").strip()
     ngay_tin = tin.get("ngay_dang", "").strip()
@@ -309,7 +342,7 @@ def kiem_tin_dang(ma_tin: str = "") -> dict:
                 and other.get("ma_nguoi_ban", "").strip() != ma_nb
             ):
                 ngay_other = other.get("ngay_dang", "").strip()
-                # Chỉ đánh dấu trùng ảnh nếu tin khác đăng trước hoặc cùng ngày (tránh báo oan chủ ảnh gốc)
+                # Chỉ đánh dấu trùng ảnh nếu tin khác đăng trước hoặc cùng ngày (định dạng YYYY-MM-DD)
                 if not ngay_tin or not ngay_other or ngay_other <= ngay_tin:
                     tin_trung.append(other.get("ma_tin", "").strip())
 
@@ -317,11 +350,12 @@ def kiem_tin_dang(ma_tin: str = "") -> dict:
         "found": True,
         "ma_tin": code,
         "ma_nguoi_ban": ma_nb,
-        "ten_nguoi_ban": nb.get("ten_nguoi_ban", ""),
-        "tuoi_tai_khoan_ngay": _to_int(nb.get("tuoi_tai_khoan_ngay"), -1),
-        "so_tin_da_dang": _to_int(nb.get("so_tin_da_dang"), 0),
-        "danh_gia": _to_float(nb.get("danh_gia"), 0.0),
-        "so_danh_gia": _to_int(nb.get("so_danh_gia"), 0),
+        "co_thong_tin_nguoi_ban": co_nb,
+        "ten_nguoi_ban": nb.get("ten_nguoi_ban", "") if co_nb else "",
+        "tuoi_tai_khoan_ngay": _to_int_or_none(nb.get("tuoi_tai_khoan_ngay")) if co_nb else None,
+        "so_tin_da_dang": _to_int_or_none(nb.get("so_tin_da_dang")) if co_nb else None,
+        "danh_gia": _to_float(nb.get("danh_gia"), 0.0) if co_nb else None,
+        "so_danh_gia": _to_int_or_none(nb.get("so_danh_gia")) if co_nb else None,
         "anh_trung_nguoi_ban_khac": len(tin_trung) > 0,
         "cac_tin_trung_anh": tin_trung,
         "nguon": nguon_tin,
