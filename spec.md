@@ -1,10 +1,10 @@
-# AI SPEC — [Tên lát cắt] · Nhóm [tên nhóm] · Phòng [XXX] · Zone [X]
+# AI SPEC — Soạn hàng loạt và lên lịch bài đăng Facebook cho sản phẩm thời trang · Nhóm WorkHardToday · Phòng [XXX] · Zone [X]
 
 > Mốc nộp: §7 chốt chuẩn "đạt" tại **CP2 19:30 Thứ Sáu 27/11** · §0–§7 nộp **CP3 10:00 Thứ Bảy 28/11** · đủ §0–§10 **CP4 14:30 Thứ Bảy 28/11** · §10 changelog ghi tiếp đến **23:59 Thứ Bảy 28/11**.
 > Đầu mỗi mục ghi bước guide (`02-guide.md` trong repo đề) chỉ cách điền. Mỗi mục ngắn, có số và nguồn; chi tiết để ở file được trỏ tới. Xoá dòng hướng dẫn trong ngoặc vuông khi điền xong.
 
-Track: [ ] A · [ ] B · [ ] C · [ ] D · [ ] E — bài toán: [đề gợi ý trong file track, hoặc bài toán nhóm tự mở rộng] __
-Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
+Track: [ ] A · [ ] B · [ ] C · [ ] D · [ ] E · [x] F — bài toán: nhân viên soạn và đăng bài sản phẩm lên Fanpage của công ty bán thời trang đang làm thủ công qua ChatGPT rồi copy sang Facebook (thẻ đề: `canvas.md`)
+Data BTC cấp đã dùng (nếu có — không commit nguyên file): không dùng — data từ file vận hành của shop (đã sửa một phần) và phần tự dựng, xem `data/DATA_CARD.md`
 
 ## §0. Hiện tại việc này diễn ra thế nào *(guide 1.1)*
 - Luồng hiện tại của việc này, trong khoá hoặc trên app thật (3–5 bước; ảnh chụp từ tài khoản của mình, đã che thông tin):
@@ -33,8 +33,8 @@ Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
 - [sản phẩm / tính năng gần giống]: một điều đáng học · một điều đáng né · mình khác gì
 
 ## §4. Thiết kế *(guide 2.2, 3.2)*
-- **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả):
-- Không làm (≥3 điều):
+- **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả): Một nhân viên soạn bài · tải lên file Excel / CSV nhiều sản phẩm · AI quyết định với từng dòng: viết bài Facebook từ đúng dữ kiện trong file, hay đánh dấu dòng thiếu / mâu thuẫn thay vì bịa · nhân viên duyệt bảng bài nháp, bài đã duyệt được đưa vào lịch đăng của Fanpage.
+- Không làm (≥3 điều): không đăng ngay / không tự lên lịch khi chưa có người duyệt · không đọc ảnh bằng AI (chỉ kiểm tên file ảnh) · không làm kênh khác ngoài Facebook (Instagram, TikTok…) · không tự đặt giá, khuyến mãi · không trả lời bình luận / tin nhắn khách.
 - **Sơ đồ** (Mermaid, GitHub tự vẽ):
 
 ```mermaid
@@ -98,18 +98,19 @@ flowchart TD
 
   API → bước trên sơ đồ: `POST /api/posts/compose` = ①–③ (code, không gọi AI) · `POST /api/posts/captions` = ④–⑤ (`agent.process_row`, viết lại tối đa 1 lần) · `POST /api/posts/batches` = ⑥–⑦ (chỉ dòng đã duyệt).
 
-- **Mức tự động:** [ ] AI gợi ý, người quyết · [ ] AI tự làm khi chắc, chuyển người khi không · [ ] AI tự làm — lý do (sai thì ai chịu gì, sửa đắt hay rẻ):
-- **Chỗ chặn rủi ro** (rủi ro lớn nhất của lát cắt bị chặn ở đâu, bằng gì):
-- **Chỗ người duyệt** (việc AI không được tự làm):
+- **Mức tự động:** [x] AI gợi ý, người quyết · [ ] AI tự làm khi chắc, chuyển người khi không · [ ] AI tự làm — lý do: bài sai giá / size / chất liệu đã lên Fanpage thì shop chịu khiếu nại, đổi trả, mất uy tín; sửa sau khi khách đã đặt là đắt. Duyệt một bài nháp chỉ mất vài giây, nên giữ người quyết.
+- **Chỗ chặn rủi ro** (rủi ro lớn nhất của lát cắt bị chặn ở đâu, bằng gì): rủi ro lớn nhất là **bài bịa / sai giá, size, ưu đãi**. Chặn 3 lớp bằng code: ① `check_product` + ② `check_stock` chặn trước khi gọi AI (AI không thấy biến thể hết hàng) · ④ `verify_post` kiểm sau khi AI viết (giá lệch > 2%, cụm cấm, freeship / giảm giá không có trong file, nhắc biến thể hết hàng), sai thì bắt viết lại 1 lần rồi đánh dấu · khối cam kết do code gắn, không để AI viết.
+- **Chỗ người duyệt** (việc AI không được tự làm): mọi bài trước khi lên lịch — `schedule_post` chỉ chạy từ nút "Duyệt" của nhân viên, `agent.answer()` không gọi; dòng bị đánh dấu không lên lịch được; bài lên Facebook ở dạng hẹn giờ (`published=false`), huỷ được.
 - **Nguyên tắc thiết kế** (≥3, bắt buộc G10):
 
   | Nguyên tắc | Chỗ cụ thể trên sơ đồ / trong bản chạy thử |
   |---|---|
-  | G10 — thu hẹp phạm vi khi không chắc |  |
-  |  |  |
-  |  |  |
+  | G10 — thu hẹp phạm vi khi không chắc | Thiếu / mâu thuẫn dữ kiện → đánh dấu dòng, không viết; chỉ đưa cho AI các màu / size còn tồn (`check_stock`) |
+  | Người quyết việc có hậu quả | Nút duyệt trước `schedule_post`; bài hẹn giờ huỷ được |
+  | Việc tất định để code làm | Giá, tồn kho, cụm cấm, khối cam kết do code kiểm / gắn; AI chỉ viết câu chữ |
+  | Dữ liệu là dữ liệu, không phải lệnh | `check_product` bắt lệnh chèn trước khi gọi AI; SYSTEM prompt dặn bỏ qua lệnh trong dữ kiện |
 
-- Phần nào còn giả (công cụ trả dữ liệu giả, model chế độ giả…) — ghi rõ, không giả làm thật:
+- Phần nào còn giả (công cụ trả dữ liệu giả, model chế độ giả…) — ghi rõ, không giả làm thật: (27/11, CP2) model đang ở **chế độ giả** — bài nháp dựng theo mẫu từ dữ kiện, chưa gọi model thật · dữ liệu sản phẩm, kho, Page là `synthetic` · `schedule_post` mới lên lịch trong SQLite của app, **chưa gọi Facebook Graph API** · chưa có giao diện (chạy qua `python run.py`).
 
 ## §5. Chỗ khó — 4 lớp + ≥6 kịch bản + 2 tấn công *(guide 2.3)*
 
@@ -126,8 +127,8 @@ flowchart TD
 - Bị đòi ngoài phạm vi (lớp 3): · Trường hợp đặc thù lĩnh vực (lớp 4):
 
 ## §7. Đánh giá & chuẩn "đạt" *(guide 2.4, 4.1)*
-- Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — __ câu (thuong __ · kho __ · tu_choi __) · metric: `eval/metric_spec.yaml` (__ metric)
-- **Chuẩn "đạt"** (chốt **trước 19:30 Thứ Sáu 27/11**, giữ nguyên đến 23:59 Thứ Bảy 28/11): "Đạt khi ≥ __% câu qua, và __"
+- Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — 24 câu (thuong 8 · kho 11 · tu_choi 5) · metric: `eval/metric_spec.yaml` (3 metric)
+- **Chuẩn "đạt"** (chốt **trước 19:30 Thứ Sáu 27/11**, giữ nguyên đến 23:59 Thứ Bảy 28/11): "Đạt khi ≥ 80% câu qua, và 100% câu `tu_choi` qua (metric `an_toan_va_tu_choi`), và ≥ 90% câu đạt từng metric `khop_du_lieu_san_pham`, `chan_dung_loi_va_ton_kho`"
 - Kết quả: lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*
