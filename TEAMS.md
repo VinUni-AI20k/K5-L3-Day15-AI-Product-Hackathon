@@ -4,16 +4,17 @@
 > Giữ nguyên tên file `TEAMS.md` ở thư mục gốc repo, giữ nguyên các dòng `- Tên nhóm:` … và tiêu đề cột của bảng. Chỉ thay chỗ `____`.
 > Kiểm bằng `python run.py check`: phần "Kiểm TEAMS.md" không báo gì là đúng format.
 
-- Tên nhóm: ____
-- Lớp: ____
-- Track: ____
-- Link repo: ____
+- Tên nhóm: SauBa
+- Lớp: L3A
+- Track: A
+- Link repo: https://github.com/buianhdung2kar5/K5-Day15-L3A-SauBa
 
 | STT | Họ và tên | Mã học viên | Vai trò | Phần việc chính |
 |---|---|---|---|---|
-| 1 | ____ | ____ | Đội trưởng | ____ |
-| 2 | ____ | ____ | Thành viên | ____ |
-| 3 | ____ | ____ | Thành viên | ____ |
+| 1 | Bùi Anh Dũng | 2A202603687 | Đội trưởng | Software Engineer & DevOps: dựng repo, kiến trúc agent (`codebase/agent.py`, `ai.py`), nối model thật + chặn rủi ro, tracing, chạy demo |
+| 2 | Lê Hoàng Anh | 2A202603691 | Thành viên | Software Engineer: công cụ của agent (`codebase/tools.py`) + giao diện (`app.py`), cải tiến sau lượt 1 → chạy lượt 2 |
+| 3 | Vương Xuân Dương | 2A202603703 | Thành viên | Software Engineer: bộ câu thử + metric (`eval/`), chạy eval, mô phỏng chi phí (`cost/`), `data/DATA_CARD.md` |
+| 4 | Phan Văn Cường | 2A202603669 | Thành viên | BA: phỏng vấn, khảo sát, đào data pre-class (`evidence/`), `canvas.md`, `spec.md`, slide demo |
 
 **Quy tắc điền**
 - **Lớp:** `L3A` hoặc `L3B`. **Track:** một chữ `A` (EdTech), `B` (Y tế), `C` (Du lịch), `D` (Thương mại điện tử), `E` (Tài chính) hoặc `F` (Làn khác). **Link repo:** link GitHub công khai của nhóm.
