@@ -12,8 +12,8 @@ import { decideCelebrate, type CelebrateDecision } from "../celebrate-stage";
  * PHẢI làm gì lúc đó, thay vì để họ đoán.
  */
 
-const AT = "2026-08-27T03:00:00.000Z";
-const EARLIER = "2026-08-20T09:00:00.000Z";
+const AT = "2054-08-27T03:00:00.000Z";
+const EARLIER = "2054-08-20T09:00:00.000Z";
 
 const CASES: ReadonlyArray<{
   readonly completedAt: string | null;

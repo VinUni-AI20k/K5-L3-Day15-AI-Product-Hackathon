@@ -29,7 +29,7 @@ function silentLogger(): Logger {
   return logger;
 }
 
-const clock: Clock = { now: () => new Date("2026-08-20T05:00:00Z"), nowMs: () => 0 };
+const clock: Clock = { now: () => new Date("2054-08-20T05:00:00Z"), nowMs: () => 0 };
 
 function harness(
   options: {

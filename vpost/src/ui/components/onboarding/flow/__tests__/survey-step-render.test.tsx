@@ -90,7 +90,7 @@ describe("StepSeller — bước 1, một lựa chọn", () => {
     );
 
     // BLOCKED IS `aria-disabled`, NOT `disabled` (animation spec section 5.3,
-    // PM 26/08/2026). The way forward is still shut — the flow does not move —
+    // PM 27/11/2026). The way forward is still shut — the flow does not move —
     // but the press reaches the button so it can answer with the reason. A
     // truly disabled control swallows the press and explains nothing.
     expect(blank).toContain('aria-disabled="true"');

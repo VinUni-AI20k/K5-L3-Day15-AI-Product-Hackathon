@@ -143,7 +143,7 @@ const STILL_VARIANTS: Variants = {
  * rather than a dissolve. Going BACK mirrors it. This replaces the crossfade
  * that used to live here, read off the reference shot
  * `05-step-transition-crossfade.jpg`; the PM chose the spec's travel over the
- * shot's overlap on 26/08/2026, and the two cannot both be true because a
+ * shot's overlap on 27/11/2026, and the two cannot both be true because a
  * crossfade needs the screens on top of each other and a slide needs them one
  * after the other.
  *

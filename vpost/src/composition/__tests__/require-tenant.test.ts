@@ -294,7 +294,7 @@ describe("requireTenant — cache tiers", () => {
 
 describe("requireTenant — support sessions (doc 10 §8.1: read-only)", () => {
   const SUPPORT_SESSION = "99999999-8888-7777-6666-555555555555";
-  const liveVisit = { tenantId: TENANT_Y as never, expiresAt: new Date("2026-08-22T06:00:00Z") };
+  const liveVisit = { tenantId: TENANT_Y as never, expiresAt: new Date("2054-08-22T06:00:00Z") };
 
   it("grants a READ context for the visited tenant when every membership missed", async () => {
     const { gate, findSupportSession } = harness([accountRecord({ memberships: [] })]);

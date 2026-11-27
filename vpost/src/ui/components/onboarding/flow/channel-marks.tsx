@@ -15,7 +15,7 @@
  * this design system gets to make, so no `--color-*` would be correct. They are
  * literals for the same reason a logo file is a literal.
  *
- * WHERE THAT COLOUR MAY BE PAINTED (PM, 26/08/2026 — this REPLACES the earlier
+ * WHERE THAT COLOUR MAY BE PAINTED (PM, 27/11/2026 — this REPLACES the earlier
  * blanket ban this header carried):
  *
  *   ALLOWED — the 40px logo well of `ChannelTile` (filled with the brand

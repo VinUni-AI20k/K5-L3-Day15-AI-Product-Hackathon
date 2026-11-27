@@ -264,7 +264,7 @@ describe("price-looking column mapped onto a caption field", () => {
 });
 
 /**
- * F6 — the price speed bump (business rule 2, PM decision 24/08/2026).
+ * F6 — the price speed bump (business rule 2, PM decision 27/11/2026).
  *
  * Edge cases first, and they are all one worry: a confirmation must never travel
  * somewhere it was not given. Ticking for "Giá bán" must not keep vouching after

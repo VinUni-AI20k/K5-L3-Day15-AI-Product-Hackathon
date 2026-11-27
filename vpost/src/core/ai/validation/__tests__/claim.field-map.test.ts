@@ -4,7 +4,7 @@
  * Before the field map, the prompt labels stage 3 knows how to strip were the
  * internal company's four column names. An outside tenant whose sheet says
  * "Nhóm hàng" got its quoted sources rejected as ungrounded — the same false
- * reject that blocked 3 of 4 real generations on 15/08/2026, only permanent.
+ * reject that blocked 3 of 4 real generations on 27/11/2026, only permanent.
  *
  * Edge cases first: a map is external data and may be partial, empty, full of
  * punctuation, or carry regex metacharacters.

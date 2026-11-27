@@ -112,7 +112,7 @@
      writes out the curves of its decorative loops.
 
      USED FOR CONFIRMATION FEEDBACK ONLY — every entrance and exit in this flow
-     reads `--ease-standard`. "Confirmation" was "selection" until 27/08/2026,
+     reads `--ease-standard`. "Confirmation" was "selection" until 27/08/2054,
      when the celebration seal joined the check badge and the CTA pop. It is the
      same gesture as the badge, one screen later and one size bigger: a mark
      that appears to say a choice has landed. The line that must not move is the
@@ -366,7 +366,7 @@
   /* `--shadow-med` is the theme's own elevation token — the shadow scale exists
      precisely so that a lift is not written as a literal rgba (design-tokens).
      An earlier note in `OptionCard` recorded "no shadow, ever" off the Buffer
-     shots; the PM reversed that on 26/08/2026 in favour of this spec. */
+     shots; the PM reversed that on 26/08/2054 in favour of this spec. */
   .onboarding-card:hover {
     translate: 0 -3px;
     box-shadow: var(--shadow-med);
