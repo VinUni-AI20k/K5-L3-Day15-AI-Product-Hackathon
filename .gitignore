@@ -47,3 +47,8 @@ traces/simulate-error.jsonl
 traces/simulate-stopped.jsonl
 evidence/**/raw-*
 data-btc
+
+# Dữ liệu ảnh chụp & hoá đơn cục bộ của người dùng (tự khởi tạo khi chạy app)
+CSDL/images/
+CSDL/receipts.json
+CSDL/drafts.json
