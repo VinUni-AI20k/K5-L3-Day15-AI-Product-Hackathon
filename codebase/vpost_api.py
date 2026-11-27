@@ -8,16 +8,18 @@ Giờ luôn trả dạng ...Z (zod z.iso.datetime() không nhận +00:00). Lỗi
 """
 import os
 import re
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, File, Query, UploadFile
+from fastapi import APIRouter, File, Query, Request, UploadFile
 from fastapi import HTTPException
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 import agent
+import facebook
 import rules
 import schedule
 import store
@@ -65,14 +67,33 @@ def me():
             "activeTenantId": TENANT_ID, "isBootstrapAdmin": False, "supportSession": None}
 
 
+FB_PAGE_PREFIX = "fb-"   # kênh = Page nối qua OAuth, channelId = "fb-<page id>"
+
+
 def channels_list():
-    out = [{"channelId": p["id"], "platform": "facebook", "name": p["name"], "externalId": p["id"],
-            "status": "active", "tokenExpiresAt": None} for p in tools.PAGES.values()]
+    """Page nối qua OAuth (đăng thật) + Fanpage thử từ .env + 5 page mẫu trong pages.json (chỉ lịch trong app)."""
+    out = [{"channelId": FB_PAGE_PREFIX + p["page_id"], "platform": "facebook", "name": p["name"] or p["page_id"],
+            "externalId": p["page_id"], "status": "active", "tokenExpiresAt": None} for p in store.fb_pages()]
     fb = tools.fb_page()
-    if fb:
-        out.insert(0, {"channelId": FB_CHANNEL, "platform": "facebook", "externalId": fb[0], "status": "active",
-                       "name": os.environ.get("FB_PAGE_NAME", "Fanpage thử (Facebook thật)"), "tokenExpiresAt": None})
+    if fb and not any(c["externalId"] == fb[0] for c in out):
+        out.append({"channelId": FB_CHANNEL, "platform": "facebook", "externalId": fb[0], "status": "active",
+                    "name": os.environ.get("FB_PAGE_NAME", "Fanpage thử (Facebook thật)"), "tokenExpiresAt": None})
+    out += [{"channelId": p["id"], "platform": "facebook", "name": p["name"] + " (chỉ lịch trong app)",
+             "externalId": p["id"], "status": "active", "tokenExpiresAt": None} for p in tools.PAGES.values()]
+    statuses = store.channel_statuses()
+    for c in out:
+        c["status"] = statuses.get(c["channelId"], "active")
     return out
+
+
+def page_credentials(ch_id):
+    """(page_id, token) để đăng thật lên kênh này, hoặc None = kênh chỉ ghi lịch trong app."""
+    if ch_id.startswith(FB_PAGE_PREFIX):
+        p = store.fb_page(ch_id[len(FB_PAGE_PREFIX):])
+        return (p["page_id"], p["page_token"]) if p else None
+    if ch_id == FB_CHANNEL:
+        return tools.fb_page()
+    return None
 
 
 @router.get("/channels")
@@ -273,10 +294,11 @@ def _channel_map():
 
 
 def _publish(job_id, ch_id, text, images, when):
-    """Một post_job: Fanpage thử thì gọi Facebook, kênh khác chỉ ghi lịch trong app. → các trường cập nhật."""
-    if ch_id == FB_CHANNEL:
+    """Một post_job: kênh có token Page thì gọi Facebook, kênh mẫu chỉ ghi lịch trong app. → các trường cập nhật."""
+    creds = page_credentials(ch_id)
+    if creds:
         try:
-            res = tools.schedule_post(text, int(when.timestamp()) if when else None, images)
+            res = tools.schedule_post(text, int(when.timestamp()) if when else None, images, page=creds)
         except Exception as e:  # lỗi Facebook: ghi vào job, không làm hỏng các kênh khác
             return {"status": "failed", "error_code": "PUBLISH_FAILED", "user_message": "Facebook từ chối: %s" % str(e)[:200]}
         url = "https://www.facebook.com/%s" % res["fb_post_id"] if res.get("fb_post_id") else None
@@ -301,7 +323,10 @@ def create_batch(body: BatchIn):
     unknown = [c for c in body.channelIds if c not in chans]
     if unknown:
         raise ApiError(409, "CHANNEL_NOT_CONFIGURED", "Kênh không tồn tại: %s" % ", ".join(unknown))
-    missing = [c for c in body.channelIds if not (body.captionByChannel.get(c) or "").strip()]
+    off = [chans[c]["name"] for c in body.channelIds if chans[c]["status"] != "active"]
+    if off:
+        raise ApiError(409, "CHANNEL_NOT_CONFIGURED", "Kênh đang tắt: %s — bật lại ở màn Kênh" % ", ".join(off))
+    missing =[c for c in body.channelIds if not (body.captionByChannel.get(c) or "").strip()]
     if missing:
         raise ApiError(400, "INVALID_INPUT", "Thiếu nội dung bài cho kênh: %s" % ", ".join(chans[c]["name"] for c in missing))
     when0 = _parse_dt(body.scheduledAt, "scheduledAt") if body.scheduledAt else None
@@ -452,7 +477,9 @@ def cancel(job_id: str, body: Optional[dict] = None):
     j = _job_or_404(job_id)
     if j["status"] not in ("queued", "scheduled_on_facebook"):
         raise ApiError(409, "INVALID_INPUT", "Bài này không còn chờ đăng")
-    deleted = tools.delete_fb_post(j["fb_post_id"]) if j["status"] == "scheduled_on_facebook" else False
+    creds = page_credentials(j["channel_id"])
+    deleted = tools.delete_fb_post(j["fb_post_id"], creds[1] if creds else None) \
+        if j["status"] == "scheduled_on_facebook" else False
     if j["status"] == "scheduled_on_facebook" and not deleted:
         raise ApiError(502, "PUBLISH_FAILED", "Facebook chưa xoá được bài hẹn giờ — thử lại hoặc huỷ trên Meta Business Suite")
     msg = "Đã huỷ" + (" và xoá bài hẹn giờ trên Facebook" if deleted else "")
@@ -530,3 +557,99 @@ def detect_code(body: dict):
     files = [f.get("fileName", "") for f in (body.get("files") or []) if isinstance(f, dict)]
     return {"verdict": {"status": "no_code"},
             "files": [{"fileName": f, "status": "none", "productCode": None} for f in files], "warnings": []}
+
+
+# ---------------- OAuth Facebook: nối Page thật cho màn Kênh ----------------
+STATE_COOKIE = "vpost_fb_state"
+CHANNELS_SCREEN = os.environ.get("VPOST_UI_URL", "http://localhost:3010").rstrip("/") + "/channels"
+
+
+def _back(query):
+    return RedirectResponse("%s?%s" % (CHANNELS_SCREEN, query), status_code=302)
+
+
+def _import_pages(user_token):
+    """Token người dùng → lưu mọi Page có token. Lỗi Facebook → ApiError có mã."""
+    try:
+        if facebook.app_config():
+            user_token = facebook.long_lived(user_token)   # để token Page không hết hạn
+        pages = facebook.pages(user_token)
+    except facebook.FacebookError as e:
+        raise ApiError(502 if e.code == "GRAPH_UNREACHABLE" else 400, e.code, e.user_message)
+    usable = [p for p in pages if p.get("access_token")]
+    new, upd = store.save_fb_pages(usable, user_token, z(now()))
+    return {"tenantId": TENANT_ID, "imported": new, "updated": upd, "skipped": len(pages) - len(usable),
+            "channels": [c for c in channels_list() if c["channelId"].startswith(FB_PAGE_PREFIX)]}
+
+
+@router.get("/channels/connect")
+def channels_connect():
+    """Bắt đầu OAuth: 302 sang hộp thoại đăng nhập Facebook, kèm state chống giả mạo (cookie HttpOnly)."""
+    state = secrets.token_urlsafe(24)
+    try:
+        url = facebook.authorize_url(state)
+    except facebook.FacebookError as e:
+        return _back("connect=error&reason=%s" % e.code)
+    resp = RedirectResponse(url, status_code=302)
+    resp.set_cookie(STATE_COOKIE, state, max_age=600, httponly=True, samesite="lax", path="/api/channels")
+    return resp
+
+
+@router.get("/channels/callback")
+def channels_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    """Facebook gọi lại sau khi người dùng bấm cho phép (hoặc huỷ)."""
+    expected = request.cookies.get(STATE_COOKIE, "")
+    if error:
+        resp = _back("connect=cancelled")
+    elif not (code and state and expected and secrets.compare_digest(state, expected)):
+        resp = _back("connect=error&reason=STATE_MISMATCH")
+    else:
+        try:
+            r = _import_pages(facebook.exchange_code(code))
+            resp = _back("connected=%d&new=%d&skipped=%d" % (r["imported"] + r["updated"], r["imported"], r["skipped"]))
+        except facebook.FacebookError as e:
+            resp = _back("connect=error&reason=%s" % e.code)
+        except ApiError as e:
+            resp = _back("connect=error&reason=%s" % e.detail["code"])
+    resp.delete_cookie(STATE_COOKIE, path="/api/channels")
+    return resp
+
+
+class ImportIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    userAccessToken: str = Field(min_length=1, max_length=2000, pattern=r"^\S+$")
+
+
+@router.post("/channels/import")
+def channels_import(body: ImportIn):
+    """Cửa phụ: dán User Access Token (từ Graph API Explorer) thay cho đăng nhập."""
+    return _import_pages(body.userAccessToken)
+
+
+@router.post("/channels/refresh")
+def channels_refresh(body: Optional[dict] = None):
+    token = store.fb_user_token()
+    if not token:
+        raise ApiError(409, "CHANNEL_NOT_CONFIGURED", "Chưa nối Facebook lần nào — bấm Kết nối Facebook trước")
+    return _import_pages(token)
+
+
+class ChannelStatusIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    status: str = Field(pattern=r"^(active|disabled)$")
+
+
+@router.put("/channels/{channel_id}")
+def channel_set_status(channel_id: str, body: ChannelStatusIn):
+    if channel_id not in _channel_map():
+        raise ApiError(404, "CHANNEL_NOT_CONFIGURED", "Không có kênh này")
+    store.set_channel_status(channel_id, body.status)
+    return {"channelId": channel_id, "status": body.status}
+
+
+@router.delete("/channels/{channel_id}")
+def channel_remove(channel_id: str):
+    if not channel_id.startswith(FB_PAGE_PREFIX) or not store.fb_page(channel_id[len(FB_PAGE_PREFIX):]):
+        raise ApiError(409, "INVALID_INPUT", "Chỉ gỡ được Page đã nối qua Facebook; kênh mẫu thì tắt thay vì gỡ")
+    store.delete_fb_page(channel_id[len(FB_PAGE_PREFIX):])
+    return {"channelId": channel_id, "removed": True}

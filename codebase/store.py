@@ -31,6 +31,10 @@ create table if not exists post_job(
   published_at text, error_code text, user_message text default '', attempt_count integer default 0,
   created_at text, updated_at text);
 create index if not exists job_batch on post_job(batch_id);
+-- Page Facebook nối qua OAuth. shortcut: token lưu thường trong SQLite trên máy (data/app.db, không commit) — mã hoá khi deploy thật
+create table if not exists fb_page(page_id text primary key, name text, page_token text, connected_at text);
+create table if not exists fb_user(id integer primary key check (id = 1), user_token text, saved_at text);
+create table if not exists channel_status(channel_id text primary key, status text);
 """
 
 
@@ -186,3 +190,53 @@ def update_post_job(job_id, updated_at, **fields):
     fields["updated_at"] = updated_at
     with _lock, _conn() as c:
         c.execute("update post_job set %s where id=?" % ", ".join("%s=?" % k for k in fields), (*fields.values(), job_id))
+
+
+# ---------------- VPOST: Page Facebook đã nối + trạng thái kênh ----------------
+def save_fb_pages(pages, user_token, ts):
+    """Thêm/cập nhật Page có token; trả (mới, cập nhật). Page không có token thì bên gọi tự đếm là bỏ qua."""
+    new = upd = 0
+    with _lock, _conn() as c:
+        for p in pages:
+            exists = c.execute("select 1 from fb_page where page_id=?", (p["id"],)).fetchone()
+            c.execute("insert into fb_page(page_id, name, page_token, connected_at) values(?,?,?,?) "
+                      "on conflict(page_id) do update set name=excluded.name, page_token=excluded.page_token",
+                      (p["id"], p["name"], p["access_token"], ts))
+            upd, new = (upd + 1, new) if exists else (upd, new + 1)
+        c.execute("insert into fb_user(id, user_token, saved_at) values(1,?,?) "
+                  "on conflict(id) do update set user_token=excluded.user_token, saved_at=excluded.saved_at",
+                  (user_token, ts))
+    return new, upd
+
+
+def fb_pages():
+    with _conn() as c:
+        return [dict(r) for r in c.execute("select * from fb_page order by connected_at, name")]
+
+
+def fb_page(page_id):
+    with _conn() as c:
+        r = c.execute("select * from fb_page where page_id=?", (page_id,)).fetchone()
+    return dict(r) if r else None
+
+
+def fb_user_token():
+    with _conn() as c:
+        r = c.execute("select user_token from fb_user where id=1").fetchone()
+    return r[0] if r else None
+
+
+def delete_fb_page(page_id):
+    with _lock, _conn() as c:
+        c.execute("delete from fb_page where page_id=?", (page_id,))
+
+
+def channel_statuses():
+    with _conn() as c:
+        return {r[0]: r[1] for r in c.execute("select channel_id, status from channel_status")}
+
+
+def set_channel_status(channel_id, status):
+    with _lock, _conn() as c:
+        c.execute("insert into channel_status(channel_id, status) values(?,?) "
+                  "on conflict(channel_id) do update set status=excluded.status", (channel_id, status))

@@ -154,12 +154,12 @@ def _graph():
 
 
 @tool
-def schedule_post(text: str, when_ts, images: list) -> dict:
+def schedule_post(text: str, when_ts, images: list, page=None) -> dict:
     """schedule_post · input: bài đã DUYỆT + thời điểm (unix; None = đăng ngay) + danh sách ảnh
     · output: {"mode": "app"|"facebook", "fb_post_id"}
     · CÓ tác động ra ngoài khi .env có FB_PAGE_ID + FB_PAGE_TOKEN: tải ảnh lên Fanpage thử ở dạng chưa đăng, rồi tạo
     bài HẸN GIỜ (published=false, huỷ được) hoặc đăng ngay khi when_ts=None. Chỉ được gọi từ nút Duyệt của người."""
-    fb = fb_page()
+    fb = page or fb_page()   # page = (page_id, token) của Page nối qua OAuth; không có thì dùng Fanpage thử trong .env
     if not fb:
         return {"mode": "app", "fb_post_id": None}
     page_id, token = fb
@@ -190,10 +190,10 @@ def schedule_post(text: str, when_ts, images: list) -> dict:
 
 
 @tool
-def delete_fb_post(post_id: str) -> bool:
+def delete_fb_post(post_id: str, token=None) -> bool:
     """delete_fb_post · input: id bài trên Fanpage thử · output: True nếu Facebook xoá được
     · CÓ tác động ra ngoài: xoá bài (dùng khi người bấm Huỷ lịch một bài đã hẹn giờ trên Facebook)."""
-    fb = fb_page()
+    fb = (None, token) if token else fb_page()
     if not fb or not post_id:
         return False
     import httpx

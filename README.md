@@ -30,6 +30,11 @@ npx pnpm@11.21.0 dev -p 3010                    # giao diện: http://localhost:
   - `captions`: AI viết bài hoặc đánh dấu dòng.
   - Người duyệt, rồi `batches`: lên lịch.
 - **Bài đăng** (`/posts`): bài đã hẹn (đổi giờ, huỷ) và nhật ký.
+- **Kênh** (`/channels`): nối Page Facebook thật qua OAuth.
+  1. Ở app Facebook, mục *Facebook Login (for Business) → Settings → Valid OAuth Redirect URIs*, thêm `http://localhost:3010/api/channels/callback`.
+  2. Điền `FB_APP_ID`, `FB_APP_SECRET` vào `.env` ở gốc repo, rồi chạy lại backend.
+  3. Bấm nối kênh, tự đăng nhập Facebook và cho phép. Mỗi Page có token sẽ thành một kênh `fb-<id>`; bài hẹn giờ trên kênh đó lên Page thật.
+  - Token lưu trong `data/app.db` (không commit). Cách khác: dán User Access Token vào ô nhập token (`POST /api/channels/import`).
 - Tải file sản phẩm mới: `POST /api/vpost/catalog` (multipart, field `file`). Giao diện chưa có nút cho bước này.
 - API nằm ở `codebase/vpost_api.py`. Test: `python -m pytest tests -q`.
 
@@ -130,7 +135,7 @@ Nhóm dùng stack khác (Node, Streamlit, notebook…): sửa hàm `run_app()` t
 | Ảnh sản phẩm | **Thật** | Link ảnh công khai của shop (Google Drive). Ảnh không tải được bị bỏ khi dựng data và khi xử lý từng dòng |
 | Tồn kho (`data/inventory.csv`) | **Giả** (dựng, seed 42) | Thay POS thật; người dùng tải file tồn mới được trong app |
 | Giọng page, giá sàn, khung giờ (`data/pages.json`) | Dựng từ quy định thật | Tên page đã đổi; giá sàn, khung giờ giữ đúng mức của page gốc |
-| Lên lịch đăng | Lịch trong app | Facebook Graph API (bài hẹn giờ, chưa đăng) chỉ chạy khi `.env` có token Fanpage thử — chưa thử với Fanpage thật |
+| Lên lịch đăng | Lịch trong app | Facebook Graph API (bài hẹn giờ, chưa đăng) chạy khi kênh là Page nối qua OAuth (màn Kênh) hoặc `.env` có token Fanpage thử. OAuth mới thử bằng test giả lập, chưa nối Page thật |
 
 ## Dùng AI vào việc gì
 
