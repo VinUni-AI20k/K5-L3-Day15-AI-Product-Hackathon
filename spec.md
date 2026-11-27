@@ -35,7 +35,10 @@ Track E · Tài chính · Nhật ký chi tiêu cá nhân
 - Chọn luồng chụp hóa đơn vì nó giải quyết ngay thao tác nhập lại. Lịch và tổng hợp tháng dùng dữ liệu từ luồng này. Phỏng vấn sẽ giúp kiểm tra ưu tiên giữa ba hướng.
 
 ## §3. Giải pháp tương tự *(guide 2.1)*
-- Sổ Thu Chi MISA công bố có chụp hóa đơn và phân loại tự động. Ca thử của nhóm tập trung vào một lần chụp, tự ghi khoản có căn cứ và chạm ngày để mở từng khoản. Cần kiểm kỹ ảnh mờ, số tiền đọc sai và ghi trùng, vì các lỗi này làm lệch tổng ngày. [Mô tả của nhà phát hành trên Google Play](https://play.google.com/store/apps/details?hl=vi&id=vn.com.misa.sothuchi).
+- **Đối thủ đã làm gì:** [Sổ Thu Chi MISA](https://play.google.com/store/apps/details?hl=vi&id=vn.com.misa.sothuchi) công bố tính năng chụp hóa đơn và phân loại tự động; [Money Lover](https://play.google.com/store/apps/details?hl=vi&gl=vn&id=com.bookmark.money) có luồng ghi chi tiêu và quét/OCR hóa đơn được người dùng nhắc tới trong review.
+- **Một điều đáng học:** Đưa ảnh hóa đơn làm đầu vào chính để giảm ma sát ghi chép (8/500 review nêu phiền khi nhập tay hoặc muốn nhập tự động) và cho phép sửa nhanh khi OCR đọc nhầm (*“fix OCR errors easily”* — Money Lover · 163).
+- **Một điều đáng né:** Tự động lưu khi đọc sai số tiền hoặc ghi thiếu/trùng gây lệch tổng (12/500 review ở hai app nêu lỗi ghi thiếu, trùng hoặc sai tổng), và thiếu chế độ xem chi tiết từng ngày (*“không hiện được từng ngày cụ thể”* — Money Lover · 147).
+- **Mình khác gì (theo pain 1.2):** Tập trung đúng một lát cắt: chụp một hóa đơn → chỉ tự lưu khi xác định rõ số thực trả và ngày chi (dùng mã lượt chụp chống cộng trùng), ảnh mờ đẩy sang **Cần đọc lại**, và chạm ngày trên lịch mở ngay từng khoản kèm ảnh hóa đơn gốc.
 
 ## §4. Thiết kế *(guide 2.2, 3.2)*
 - **Lát cắt dự kiến:** Một người dùng cá nhân chụp ảnh hoá đơn trên giao diện lịch kiểu Locket hoặc chọn xem ngày/tuần/tháng/năm; AI trích xuất thông tin hoá đơn thành bản nháp chờ xác nhận lưu vào đúng ngày và diễn giải bảng tổng kết, so sánh tăng/giảm với kỳ trước cùng xu hướng tiêu dùng dựa hoàn toàn trên số liệu do công cụ tính.
