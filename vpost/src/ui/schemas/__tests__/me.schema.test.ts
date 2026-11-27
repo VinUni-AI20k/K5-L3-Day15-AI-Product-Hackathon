@@ -67,7 +67,7 @@ describe("MeResponseSchema", () => {
       supportSession: {
         tenantId: "00000000-0000-0000-0000-000000000002",
         tenantName: "Nhà Xe An Anh",
-        expiresAt: "2026-08-20T11:00:00.000Z",
+        expiresAt: "2054-08-20T11:00:00.000Z",
       },
     });
     expect(parsed.success && parsed.data.supportSession?.tenantName).toBe("Nhà Xe An Anh");

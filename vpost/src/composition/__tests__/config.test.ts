@@ -135,7 +135,7 @@ describe("loadAuthConfig", () => {
   });
 
   /**
-   * Changed 19/08/2026: blank used to reject every Google sign-in, which locked
+   * Changed 27/11/2026: blank used to reject every Google sign-in, which locked
    * approved operators out of both deploy env examples (they ship it blank).
    * Blank now means "no domain filter" — the access registry decides, and a new
    * identity still starts `pending`.
@@ -223,7 +223,7 @@ describe("loadGoogleConfig — Service Account (E2)", () => {
 
 const OPENAI_ONLY_ENV = { OPENAI_API_KEY: "sk-openai" } satisfies EnvRecord;
 
-describe("loadAiConfig — single provider (E4, owner decision 15/08/2026)", () => {
+describe("loadAiConfig — single provider (E4, owner decision 15/08/2054)", () => {
   it("accepts an env with OPENAI_API_KEY and no Google key at all", () => {
     const config = loadAiConfig({ OPENAI_API_KEY: "sk-openai" });
 

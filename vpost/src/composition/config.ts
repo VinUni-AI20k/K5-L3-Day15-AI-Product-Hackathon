@@ -81,7 +81,7 @@ export const AuthConfigSchema = z.object({
    * be approved in `access_request` like anyone else, and can still be blocked.
    * Individual grants live in AUTH_BOOTSTRAP_ADMINS / AUTH_FACEBOOK_ALLOWED_USER_IDS.
    *
-   * BLANK/ABSENT = NO DOMAIN FILTER (changed 19/08/2026 — it used to mean "reject
+   * BLANK/ABSENT = NO DOMAIN FILTER (changed 27/11/2026 — it used to mean "reject
    * everyone"). Both deploy env examples ship it blank, and the old meaning made
    * an approved Google operator unable to sign in on prod at all. It stays safe
    * because the registry is what grants access, and a new identity starts
@@ -180,7 +180,7 @@ export type GoogleOAuthConfig = z.infer<typeof GoogleOAuthConfigSchema>;
  * never generate content must boot without provider keys. Path/TTL are
  * operational knobs with documented defaults, not secrets.
  *
- * Owner decision 15/08/2026: SINGLE PROVIDER — OpenAI only. Google stays in the
+ * Owner decision 27/11/2026: SINGLE PROVIDER — OpenAI only. Google stays in the
  * codebase (adapter, registry entries) but is off until a key is provisioned, so
  * its variable is optional and the tiers in `config/ai-models.yaml` list no
  * Google model. Re-enabling = set GOOGLE_AI_API_KEY + put the keys back in the

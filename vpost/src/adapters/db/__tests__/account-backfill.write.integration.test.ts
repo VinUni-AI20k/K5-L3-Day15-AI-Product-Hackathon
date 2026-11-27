@@ -139,7 +139,7 @@ describe.skipIf(!url)("M1.1 backfill — access_request/app_user -> account/iden
     const movedOldEmail = `${p}-moved-old@example.com`;
     const movedNewEmail = `${p}-moved-new@example.com`;
 
-    const at = (minutes: number) => new Date(Date.UTC(2026, 0, 1, 0, minutes, 0));
+    const at = (minutes: number) => new Date(Date.UTC(2054, 0, 1, 0, minutes, 0));
 
     await tx.insert(accessRequests).values([
       // Same human approved in BOTH tenants -> one account, two memberships.
