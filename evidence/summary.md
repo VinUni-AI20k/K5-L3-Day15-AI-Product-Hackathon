@@ -1,16 +1,7 @@
-# Tổng hợp bằng chứng · Track D3
+# Tổng hợp bằng chứng · Nhật ký chi tiêu từ ảnh hóa đơn
 
-**Cập nhật 27/11/2026.** Nguồn đã dùng là review Shopee VN trên Google Play. Mẫu, cách đếm, giới hạn và 5 trích đoạn đã bỏ tên nằm trong [báo cáo đào review](data-mining.md).
+**Nguồn chính là review công khai, lấy ngày 27/11/2026.** Trong 500 review, 8 nêu ma sát khi ghi chi tiêu hoặc nhu cầu nhập tự động, 5 nêu khó khăn khi xem chi tiết hoặc lịch sử, và 12 nêu vấn đề khoản bị ghi thiếu, trùng hoặc sai tổng. Mẫu có trường hợp đề xuất dùng ảnh hóa đơn để ghi chi và trường hợp muốn sửa lỗi đọc ảnh. [Cách đếm và 5 trích đoạn có nguồn](data-mining.md).
 
-| Mẫu | Kết quả | Dùng để kết luận gì |
-|---|---|---|
-| 200 review mới nhất mọi mức sao | 0/200 kể đủ cả hàng sai mô tả và vướng mắc xử lý | Mẫu chính chưa đủ tình huống để kiểm giả thuyết 30%. |
-| 1.300 review 1–2★ thăm dò | 5/1.300 được tìm thấy bằng sàng từ khóa và đọc lại (0,38%) | Có các ca D3 cụ thể. Có 1 ca vướng lúc gửi, 3 ca vướng sau khi gửi và 1 ca bị từ chối. |
+**Kết luận:** review ủng hộ việc thử giảm bước nhập và xem từng khoản theo ngày. Dữ liệu này chưa xác nhận mức tiết kiệm thời gian hay tỷ lệ sử dụng thực tế. Số về impact trong spec là giả định cho một nhóm thử, cần đo lại khi có bản chạy thử.
 
-Hai mẫu có phần trùng và dùng cách đọc khác nhau. Phân bố trong mẫu thăm dò gợi ý nhiều vướng mắc xảy ra sau khi đã gửi yêu cầu. Hai review cho biết đã chờ 7 hoặc 13 ngày. Nhóm chưa biết số phút người mua trực tiếp bỏ ra, tần suất trong tháng hoặc việc hướng dẫn sớm sẽ giúp bao nhiêu.
-
-**Kết luận về giả thuyết:** chưa đủ dữ liệu để xác nhận hay bác bỏ ngưỡng 30% đã viết. Giữ lát cắt hướng dẫn bước đầu làm phương án thử vì có một tình huống cụ thể và có thể mô phỏng bằng mô tả lúc đặt, bằng chứng và chính sách. Đối chiếu với các hướng khác khi có ghi chép người mua.
-
-## Nguồn kiểm lại dự kiến
-
-Phỏng vấn ít nhất 3 người mua ngoài nhóm từng gặp trường hợp hàng khác mô tả. Repo hiện chưa có biên bản phỏng vấn. Hỏi về lần gần nhất trong tháng qua: người mua làm gì, khâu nào tốn thời gian, mất bao nhiêu **phút thao tác thực tế**, chờ bao lâu và gặp bao nhiêu lần trong tháng. Mỗi buổi ghi một file `evidence/interviews/P1.md`, `P2.md`, `P3.md` theo [mẫu phỏng vấn](interviews/TEMPLATE.md).
+**Bước kiểm chứng bổ sung:** nếu nhóm phỏng vấn, hỏi người từng tự theo dõi chi tiêu về lần gần nhất nhận hóa đơn, cách họ ghi, số bước, số phút, việc họ phải mở lại để tổng hợp và có từng bỏ sót khoản không. Ghi từng cuộc bằng mã P1, P2, P3. [Mẫu phỏng vấn](interviews/TEMPLATE.md)

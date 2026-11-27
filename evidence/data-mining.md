@@ -1,83 +1,38 @@
-# Đào review Google Play · Shopee VN · D3
+# Đào review công khai · Nhật ký chi tiêu từ ảnh hóa đơn
 
-- **Nguồn:** review công khai của ứng dụng Shopee VN (`com.shopee.vn`), ngôn ngữ tiếng Việt, vùng Việt Nam, xếp theo mới nhất. Ngày xem và lấy mẫu 27/11/2026. [Google Play](https://play.google.com/store/apps/details?hl=vi&gl=vn&id=com.shopee.vn)
-- **Mẫu chính:** 200 review mới nhất, mọi mức sao, từ 24/11 đến 26/11/2026. Đây là mẫu đã định trong [giả thuyết](hypothesis.md).
-- **Mẫu bổ sung thăm dò:** 1.000 review 1★ mới nhất (05/11–26/11) và 300 review 2★ mới nhất (19/09–26/11). Mẫu này thiên về phàn nàn và có 104 review trùng với mẫu chính. Báo riêng hai mẫu.
+## Mẫu và cách đếm
 
-## Cách lọc và đếm
+- Lấy 250 review mới nhất mỗi app trên Google Play tại Việt Nam, giao diện tiếng Việt, mọi mức sao, ngày lấy 27/11/2026. [Sổ Thu Chi MISA](https://play.google.com/store/apps/details?hl=vi&gl=vn&id=vn.com.misa.sothuchi) · [Money Lover](https://play.google.com/store/apps/details?hl=vi&gl=vn&id=com.bookmark.money)
+- MISA phủ 17/03–25/11/2026. Money Lover phủ 14/10/2024–14/11/2026. Ngôn ngữ của từng review có thể khác lựa chọn ngôn ngữ của truy vấn.
+- Thu với `google-play-scraper==1.2.7`, gọi `reviews(app_id, lang="vi", country="vn", sort=Sort.NEWEST, count=250)`. Giữ thứ tự trả về và đánh số từ 1. Mẫu số gồm toàn bộ 250 review mỗi app, kể cả khen và không liên quan. Kiểm mã review duy nhất trong từng mẫu.
+- Sàng từ khóa rồi đọc ứng viên: hóa đơn, bill, nhập, ghi chép, ghi lại, ghi tay, ghi khoản, ghi chi, thủ công, bỏ sót, quên, cộng lại, số tiền, chụp, quét, OCR, phân loại, phân nhóm, thống kê, báo cáo, giao dịch, khoản chi, scan. Khi lọc, dùng chữ thường, bỏ dấu, đổi `đ` thành `d`, và cho phép thiếu khoảng trắng trong các cụm.
+- Mỗi review có tối đa một nhãn chính. **entry** là phiền khi nhập/ghi đều đặn hoặc nêu nhu cầu dùng ảnh, OCR hay cách nhập thay thế. **lookup** là khó tra theo ngày, xem lịch sử hoặc mở từng khoản. **ledger** là khoản không được ghi/hiển thị đúng, bị ghi trùng hoặc lệch tổng sau khi lưu. Bỏ đánh giá chung, lỗi đăng nhập và phàn nàn về giá gói đơn thuần.
 
-1. Đơn vị đếm là một review. Loại trùng theo mã review trong mỗi mẫu. Giữ thứ tự mới nhất mà công cụ trả về để đối chiếu số thứ tự, bắt đầu từ 1.
-2. Đọc từng review trong mẫu chính. Gắn nhãn **D3 có vướng mắc** khi cùng một review mô tả hàng nhận sai với đơn, mô tả hoặc quảng cáo, đồng thời mô tả vướng mắc khi yêu cầu trả hàng, khiếu nại hoặc nhận hoàn tiền. Nhận sai hàng mà review không kể việc xử lý thì chưa đủ. Giao trễ, chưa nhận được hàng, lỗi đặt đơn và đổi kích cỡ theo nhu cầu cũng nằm ngoài nhãn.
-3. Trong mẫu bổ sung, dùng hai nhóm từ khóa sau để tìm ứng viên rồi đọc từng review khớp cả hai nhóm. Hạ chữ thường, bỏ dấu và đổi `đ` thành `d` trước khi lọc.
+[Bảng vị trí và nhãn đã gắn](expense-review-labels.csv) không chứa tên hoặc toàn văn. Có thể chạy lại phép đếm trên hai snapshot gốc như sau:
 
-```text
-Hàng sai hoặc căn cứ:
-\b(?:sai|nham).{0,20}(?:mau|hang|san pham|size|kich thuoc)|(?:giao|gui|nhan).{0,20}(?:nham|sai)|(?:khong|ko|k) (?:dung|giong|nhu).{0,14}(?:mo ta|hang|san pham|quang cao|quan cao|hinh|mau|dat)|khac.{0,10}(?:mo ta|hinh|quang cao)|hang gia|hang fake|bang chung|chung cu|nhu quang cao|nhu quan cao|khong hoat dong|khong bo.at dong
-Xử lý:
-tra ?hang|hang ?tra|hoan ?tien|khieu ?nai|doi ?tra|doi ?hang|tra ?tien|lay ?hang|gui ?tra|giao ?tra|doi lai tien|cskh|giai quyet|bang chung|chung cu|khong duyet
+```bash
+python3 evidence/count_expense_reviews.py ~/.local/share/404error/track-e-reviews-2026-11-27
 ```
 
-4. **Công thức:** `x = số dòng được xác nhận nhãn D3`, `N = số review trong mẫu, kể cả review không liên quan`, `% = 100 × x/N`. Đối với giả thuyết 30%, mẫu số riêng là số review 1–2★ trong mẫu chính có kể việc khiếu nại do hàng không đúng mô tả, kể cả khi xử lý thuận lợi. Nếu mẫu số này bằng 0, ghi **chưa đủ dữ liệu để kiểm**.
-5. **Lấy lại mẫu theo phương pháp:** chạy script [count_reviews.py](count_reviews.py) (dùng `google-play-scraper==1.2.7`, gọi `reviews("com.shopee.vn", lang="vi", country="vn", sort=Sort.NEWEST, count=200)` cho mẫu chính; mẫu thăm dò gọi riêng `filter_score_with=1, count=1000` và `filter_score_with=2, count=300`). Nguồn sắp xếp theo thời gian thực nên lấy lại vào ngày khác sẽ ra mẫu mới. Repo công khai lưu số đếm và trích đoạn ngắn đã bỏ tên.
+Script kiểm mã băm, số dòng và vị trí nhãn rồi tính số đếm trên toàn mẫu. Lấy lại review vào ngày khác sẽ tạo mẫu mới.
 
 ## Kết quả
 
-| Mẫu | Review có vướng mắc D3 | Tỉ lệ quan sát |
-|---|---:|---:|
-| Chính, mọi mức sao | 0/200 | 0% trong mẫu |
-| Bổ sung, 1★ | 4/1.000 | 0,40% theo cách sàng từ khóa |
-| Bổ sung, 2★ | 1/300 | 0,33% theo cách sàng từ khóa |
-| Bổ sung, gộp 1–2★ | 5/1.300 | 0,38% theo cách sàng từ khóa |
+| Nhãn | MISA | Money Lover | Gộp |
+|---|---:|---:|---:|
+| Nhập/ghi chi tiêu và nhu cầu nhập tự động | 5/250 | 3/250 | **8/500 (1,6%)** |
+| Tra cứu lịch sử hoặc chi tiết | 3/250 | 2/250 | 5/500 (1,0%) |
+| Ghi thiếu, trùng hoặc sai tổng | 7/250 | 5/250 | 12/500 (2,4%) |
+| Tổng số review gắn nhãn | 15/250 | 10/250 | 25/500 (5,0%) |
 
-Mẫu chính gồm 92 review 1★, 12 review 2★, 7 review 3★, 12 review 4★ và 77 review 5★. Có 1 review nêu giao sai nhưng không kể quá trình xử lý. Có 2 review nêu khó khăn khi trả hoặc hoàn tiền nhưng không nói nguyên nhân là hàng sai mô tả. Mẫu số của phép kiểm giả thuyết 30% là **0**, nên chưa thể kết luận.
+## Năm trích đoạn từ review
 
-Mẫu bổ sung có 14 ứng viên khớp từ khóa, 5 trường hợp đạt nhãn sau khi đọc. Chia theo vướng mắc chính, có **1 ca không gửi được yêu cầu**, **3 ca vướng sau khi gửi** và **1 ca bị từ chối**. Tỉ lệ 0,38% là số trường hợp tìm thấy theo cách lọc này. Review dùng cách diễn đạt khác có thể bị bỏ sót.
-
-## 5 ví dụ từ mẫu bổ sung
-
-Các trích đoạn ngắn giữ nguyên chữ của review. Bối cảnh là tóm tắt nội dung người viết tự kể. Cột mã là vị trí trong mẫu theo mức sao.
-
-| Mã | Ngày review | Trích đoạn | Bối cảnh |
+| Mẫu · dòng | Ngày · sao | Trích ngắn | Liên quan tới |
 |---|---|---|---|
-| 1★–342 | 19/11/2026 | “shop bán gửi sai màu” | Người mua cho biết họ không gửi được yêu cầu trả hàng dù cho rằng vẫn còn hạn. |
-| 1★–567 | 15/11/2026 | “13 ngày chưa xong” | Người mua tự báo đã chờ hoàn tiền sau khi nhận sai hàng. |
-| 1★–653 | 13/11/2026 | “thì shopee ko duyệt” | Người mua kể hàng khác quảng cáo và yêu cầu trả hàng bị từ chối. |
-| 1★–697 | 12/11/2026 | “xác minh tùm lum” | Sau khi nhận hàng khác, người mua mô tả vướng mắc ở bước xác minh để nhận tiền hoàn. |
-| 2★–77 | 09/11/2026 | “chờ 7 ngày” | Người mua kể sản phẩm khác quảng cáo và chờ lấy hàng trả. |
+| MISA · 8 | 21/11/2026 · 5★ | “phải chăm ghi thường xuyên” | Cần duy trì thao tác ghi |
+| MISA · 212 | 30/04/2026 · 1★ | “quên không nhập liệu” | Bỏ sót ghi chép |
+| Money Lover · 29 | 20/05/2026 · 5★ | “gửi ảnh hóa đơn” | Mong dùng ảnh để ghi khoản |
+| Money Lover · 163 | 25/05/2025 · 4★ | “fix OCR errors easily” | Mong sửa được khi quét đọc sai |
+| Money Lover · 147 | 21/07/2025 · 3★ | “không hiện được từng ngày cụ thể” | Khó xem chi theo ngày |
 
-## Giới hạn
-
-Review là lời tự thuật. Hai mẫu không đại diện cho người mua Shopee. Số ngày chờ là thời gian xử lý theo lời người viết. Để ước tính tác động theo tháng, cần hỏi thêm tần suất và số phút người mua trực tiếp chuẩn bị bằng chứng, kiểm trạng thái hoặc gửi lại yêu cầu.
-
----
-
-## Nguồn bổ sung · Kaggle ABSA Vietnamese (`cthng123/absa-vietnamese`)
-
-- **Nguồn:** tập dữ liệu [ABSA Vietnamese trên Kaggle](https://www.kaggle.com/datasets/cthng123/absa-vietnamese) gồm 3 file CSV (`train_data.csv` 8.424 dòng, `val_data.csv` 936 dòng, `test_data.csv` 2.340 dòng; tổng **11.700** review giày dép Shopee bằng tiếng Việt). Ngày tải và kiểm tra: 27/11/2026.
-- **Mục đích:** bổ sung bằng chứng về tần suất người mua gặp sản phẩm không khớp kỳ vọng về chất lượng (`Quality`), kích cỡ (`Size`) hoặc ngoại hình (`Outlook`).
-- **Cách đếm — viết trước khi chạy ([count_absa.py](count_absa.py)):**
-  - Bộ nhãn có 4 giá trị: `-1` (không nhắc), `0` (`Negative`), `1` (`Positive`), `2` (`Neutral`).
-  - Đếm số dòng mang nhãn `0` ở từng cột `Quality`, `Size`, `Outlook` và số dòng mang nhãn `0` ở **ít nhất 1 trong 3 cột** này.
-  - Tính theo 2 mẫu số để tránh lệch: (a) **toàn bộ tập** `N = 11.700` và (b) **tập review có nhắc đến khía cạnh** (`label != -1`).
-
-### Kết quả đếm (`count_absa.py`)
-
-| Khía cạnh | Negative / Toàn tập (`N = 11.700`) | % toàn tập | Negative / Có nhắc khía cạnh | % trong nhóm có nhắc |
-|---|---:|---:|---:|---:|
-| `Quality == 0` | 463 / 11.700 | 3,96% | 463 / 3.487 | 13,28% |
-| `Size == 0` | 662 / 11.700 | 5,66% | 662 / 1.975 | **33,52%** |
-| `Outlook == 0` | 459 / 11.700 | 3,92% | 459 / 6.339 | 7,24% |
-| **Gộp ≥1 khía cạnh (`Quality` / `Size` / `Outlook` = 0)** | **1.462 / 11.700** | **12,50%** | **1.462 / 8.519** | **17,16%** |
-
-### 5 ví dụ cụ thể (trích ≤2 câu, bỏ tên)
-
-1. `train_data.csv:L5` (`Size: 0`): “Mình đặt size 39 nhưng chật k đeo nổi.”
-2. `train_data.csv:L280` (`Quality: 0`): “có hai thứ khiến mình khó chịu thứ nhất giày hong giống hình Thứ hai cứng quá mang khiến chân đau”
-3. `train_data.csv:L543` (`Outlook: 0`): “Có vài chổ bẩn, vài đốm mốc, gói sơ sài vài chổ bị móp, đc đúng cái kích thước chuẩn ko đáng mua cho lắm 😌”
-4. `train_data.csv:L601` (`Outlook: 0`): “ko dc đẹp lắm thô mới cả là ko giống trong hình nx hơi thất vọng giày lại còn hai màu trắng khác nhau”
-5. `train_data.csv:L659` (`Quality: 0`): “Hàng bị móp méo chữ ny màu vàng bị mờ, còn bị xước xước nữa kh hài lòng”
-
-### Giới hạn của dataset bổ sung
-
-- Tập dữ liệu chỉ phủ **ngành hàng giày dép** trên Shopee và gán nhãn cảm xúc theo khía cạnh sản phẩm, **không ghi nhận bước khiếu nại trả hàng/hoàn tiền**.
-- Vì vậy, số liệu `12,50%` (`1.462/11.700`) chỉ dùng làm bằng chứng bổ trợ cho thấy tỷ lệ phản hồi tiêu cực về sai size / ngoại hình khác hình / chất lượng sản phẩm khá phổ biến; quy trình vướng mắc khi trả hàng vẫn phải kiểm bằng review app và phỏng vấn người mua.
+**Giới hạn:** review phản ánh người tự đăng đánh giá và có thể bỏ sót cách diễn đạt ngoài từ khóa. Hai app có khoảng ngày khác nhau, nên chỉ báo chung như tín hiệu của mẫu. Chưa đo thời gian tiết kiệm, tần suất nhận hóa đơn hay tỷ lệ người sẽ dùng luồng chụp rồi tự ghi. Snapshot đầy đủ được lưu cục bộ bên ngoài repo.
