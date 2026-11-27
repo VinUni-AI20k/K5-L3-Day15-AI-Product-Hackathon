@@ -45,4 +45,8 @@ Giả thuyết ở `evidence/hypothesis.md`: **đúng / sai / phải đổi** �
 
 | Vai | Giờ hẹn | Đã xong? |
 |---|---|---|
-| | | |
+| CEO mysp | đã trò chuyện (trước CP1) | Đã nghe mô tả pain — chưa ghi nguyên văn, chưa có số |
+| Nhóm nhân viên soạn bài mysp | đã trò chuyện (trước CP1) | Đã nghe mô tả pain — chưa ghi nguyên văn, chưa bấm giờ |
+| Nhân viên soạn bài P1 | ____ | Chưa — phỏng vấn + bấm giờ một lượt soạn / đăng (người phụ trách: Văn) |
+| Nhân viên soạn bài P2 | ____ | Chưa |
+| Nhân viên soạn bài P3 | ____ | Chưa |
