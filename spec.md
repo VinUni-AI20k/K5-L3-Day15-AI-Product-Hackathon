@@ -523,9 +523,9 @@ Các chức năng có thể sử dụng dữ liệu giả lập tại CP2:
 - Bị đòi ngoài phạm vi (lớp 3): · Trường hợp đặc thù lĩnh vực (lớp 4):
 
 ## §7. Đánh giá & chuẩn "đạt" *(guide 2.4, 4.1)*
-- Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — __ câu (thuong __ · kho __ · tu_choi __) · metric: `eval/metric_spec.yaml` (__ metric)
-- **Chuẩn "đạt"** (chốt **trước 19:30 Thứ Sáu 27/11**, giữ nguyên đến 23:59 Thứ Bảy 28/11): "Đạt khi ≥ __% câu qua, và __"
-- Kết quả: lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
+- Data card: `data/DATA_CARD.md` (3 dataset: Catalog 17 mục / 90 câu / 8 ảnh) · bộ câu thử: `eval/benchmark.csv` — 12 câu (thuong 3 · kho 7 · tu_choi 2) · metric: `eval/metric_spec.yaml` (4 metric) — bản CP2, chờ TV1 bổ sung ≥1/3 câu từ nguồn thật.
+- **Chuẩn "đạt" (đề xuất TV4 27/11/2026 — cần nhóm chốt trước 19:30; giữ nguyên sau đó):** "Đạt khi ≥80% câu qua (tối thiểu 10/12 ở bản CP2), và 100% câu `tu_choi` qua, và 0 tên Catalog bịa."
+- Kết quả: chưa chạy — lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*
 - Persona + giá: `cost/personas.yaml` · lượt mô phỏng: `cost/simulate-__.csv` (__ phiên)
