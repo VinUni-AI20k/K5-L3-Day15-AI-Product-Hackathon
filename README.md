@@ -1,6 +1,6 @@
 # 404ERROR · Nhật ký chi tiêu từ ảnh
 
-**Lớp L3A · Track E (Tài chính).** [Thành viên](TEAMS.md) · [Canvas CP1](canvas.md) · [Phân công và bàn giao](PHAN-CONG.md)
+**Lớp L3A · Track E (Tài chính).** [Thành viên](TEAMS.md) · [Canvas CP1](canvas.md)
 
 **Bài toán dự kiến.** Người muốn theo dõi chi tiêu hằng ngày phải nhập lại thông tin từ từng hóa đơn, nên dễ bỏ sót khoản chi và mất thời gian khi xem lại đã tiêu vào đâu.
 

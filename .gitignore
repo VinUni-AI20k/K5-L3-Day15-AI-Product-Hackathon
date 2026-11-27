@@ -46,6 +46,9 @@ traces/simulate-mock.jsonl
 traces/simulate-error.jsonl
 traces/simulate-stopped.jsonl
 evidence/**/raw-*
+
+# Tài liệu phân công nội bộ
+/PHAN-CONG.md
 data-btc
 
 # Sổ chi tiêu cục bộ của bản demo
