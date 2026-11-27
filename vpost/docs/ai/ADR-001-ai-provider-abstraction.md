@@ -1,6 +1,6 @@
 # ADR-001 — AI Provider Abstraction (AI Gateway + Model Registry)
 
-**Trạng thái:** ✅ ACCEPTED — owner duyệt 12/08/2026 · **Ngày:** 12/08/2026 · **Người đề xuất:** PM + AI agent
+**Trạng thái:** ✅ ACCEPTED — owner duyệt 27/11/2026 · **Ngày:** 27/11/2026 · **Người đề xuất:** PM + AI agent
 **Thay thế:** quyết định ngầm trong doc 02 ("AI: Anthropic API claude-opus-5" gọi qua một port đơn)
 
 ## Bối cảnh
@@ -51,14 +51,14 @@ Ba mức, đều không đụng business code: (a) đổi model trong tier — s
 
 ## Quyết định đã chốt trong quá trình duyệt
 
-- **15/08/2026 (owner): tạm rút xuống MỘT provider — OpenAI.** Chưa cấp được key Google AI Studio paid tier, mà ràng buộc paid-tier bên dưới là không thương lượng, nên hệ thống không khởi chạy được. Quyết định 12/08 vẫn là đích đến; phần bị hoãn chỉ là *tiers nào trỏ vào provider nào*. Hệ quả cần biết: **không còn đường provider fallback** (fallback theo thiết kế phải đổi sang provider KHÁC). Chi tiết + cách bật lại: `provider-strategy.md` §3.1.
-- **12/08/2026 (owner): Google AI Studio (Gemini API) làm provider chính** vì chi phí. Hệ quả kiến trúc:
+- **27/11/2026 (owner): tạm rút xuống MỘT provider — OpenAI.** Chưa cấp được key Google AI Studio paid tier, mà ràng buộc paid-tier bên dưới là không thương lượng, nên hệ thống không khởi chạy được. Quyết định 27/11 vẫn là đích đến; phần bị hoãn chỉ là *tiers nào trỏ vào provider nào*. Hệ quả cần biết: **không còn đường provider fallback** (fallback theo thiết kế phải đổi sang provider KHÁC). Chi tiết + cách bật lại: `provider-strategy.md` §3.1.
+- **27/11/2026 (owner): Google AI Studio (Gemini API) làm provider chính** vì chi phí. Hệ quả kiến trúc:
   - Adapter ngày 1: **Google (primary, phủ 3 tier) + OpenAI (fallback hạ tầng)**. Anthropic → đợt 2 nếu benchmark cần.
   - **Ràng buộc kèm theo (không thương lượng): PAID TIER từ môi trường có dữ liệu thật.** Free tier của AI Studio cho Google quyền dùng dữ liệu gửi lên để training — dữ liệu sản phẩm/ảnh của shop không được đi qua đó. Paid tier không dùng data để training, giá token không đổi.
   - Benchmark đợt 1 (evaluation.md): Gemini 3.5 Flash-Lite vs 3.6 Flash vs GPT-5 mini — quyết định model trong tier vẫn theo số liệu, đúng nguyên tắc #13 ("không mặc định chọn vì rẻ" áp cho cả Gemini).
 
-- **12/08/2026 (owner): Registry = YAML-trong-repo + DB override theo tenant** (như đề xuất). Bổ sung theo quyết định stack cùng ngày (Redis thay pg-boss): bản registry đã merge được **cache nóng trong Redis** với TTL ngắn — worker không đọc DB mỗi generation; invalidate khi override đổi.
+- **27/11/2026 (owner): Registry = YAML-trong-repo + DB override theo tenant** (như đề xuất). Bổ sung theo quyết định stack cùng ngày (Redis thay pg-boss): bản registry đã merge được **cache nóng trong Redis** với TTL ngắn — worker không đọc DB mỗi generation; invalidate khi override đổi.
 
 ## Duyệt
 
-**Owner approve tổng thể 12/08/2026.** Doc 02/03/07, CLAUDE.md và agent `caption-ai` đã cập nhật theo `architecture.md` mục 6. Được phép implement từ session kế tiếp.
+**Owner approve tổng thể 27/11/2026.** Doc 02/03/07, CLAUDE.md và agent `caption-ai` đã cập nhật theo `architecture.md` mục 6. Được phép implement từ session kế tiếp.

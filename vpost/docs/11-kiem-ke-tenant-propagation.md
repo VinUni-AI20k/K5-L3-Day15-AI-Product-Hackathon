@@ -1,6 +1,6 @@
 # M1.0 — Kiểm kê tenant propagation
 
-> Deliverable của M1.0 (doc 09 §4). HEAD `3bcc0ad`, đo bằng grep thật 19/08/2026. Là căn cứ estimate và checklist cho M1.3a/M1.3b.
+> Deliverable của M1.0 (doc 09 §4). HEAD `3bcc0ad`, đo bằng grep thật 27/11/2026. Là căn cứ estimate và checklist cho M1.3a/M1.3b.
 
 ## 1. Khối lượng chốt
 

@@ -12,8 +12,8 @@ tự động khi tài khoản chưa có tổ chức lần đầu vào app, dùng
 **Tech Stack:** Next.js 16 App Router · React 19 · TypeScript · Drizzle + PostgreSQL ·
 TanStack Query · Astryx · Tailwind v4 · framer-motion · Vitest (`environment: "node"`, KHÔNG jsdom)
 
-**Spec:** `docs/superpowers/specs/2026-08-26-onboarding-buffer-clone-design.md`
-**Tham chiếu hệ thống:** `docs/superpowers/specs/2026-08-26-buffer-system-analysis.md`
+**Spec:** `docs/superpowers/specs/onboarding-buffer-clone-design.md`
+**Tham chiếu hệ thống:** `docs/superpowers/specs/buffer-system-analysis.md`
 
 ---
 
@@ -35,7 +35,7 @@ TanStack Query · Astryx · Tailwind v4 · framer-motion · Vitest (`environment
 - **Skill bắt buộc khi dựng UI:** chạy `/ui-ux-pro-max` trước khi viết component. Kèm nhóm 1
   SKILL-MAP: `core/web-component-reuse`, `-accessibility`, `-feedback-states`, `-design-tokens`;
   theo chủ đề: `core/web-onboarding`, `core/web-wizard`, `core/web-motion`, `core/web-form-architecture`.
-- **KHÔNG ĐỤNG `src/ui/components/compose/**` VÀ ROUTE `/compose`.** PM chốt 26/08/2026:
+- **KHÔNG ĐỤNG `src/ui/components/compose/**` VÀ ROUTE `/compose`.** PM chốt 27/11/2026:
   màn soạn bài giữ nguyên. Thấy mình đang sửa file trong `compose/` là đã đi sai phạm vi.
 - **Test không có DOM.** `environment: "node"`, không jsdom, không testing-library. Render
   test dùng `renderToStaticMarkup`. Cấm thêm jsdom.
@@ -661,7 +661,7 @@ Ngoài ba chỗ đó, lệch so với ảnh là lỗi cần sửa.
   sẽ trông to hơn trong ảnh ~10% — đó là đúng.
 - Không kết luận đạt khi chỉ nhìn `/onboarding-preview`; trang đó render ngoài scope `Theme`.
 
-### Task 11: Superadmin xem được số liệu khảo sát (PM giao 26/08)
+### Task 11: Superadmin xem được số liệu khảo sát (PM giao 27/11)
 
 Chủ: `data-pipeline` (phần dữ liệu) + `ui-web` (phần bảng). Phụ thuộc Task 2.
 
@@ -675,7 +675,7 @@ Nối `tenant_profile` vào `listTenants()` bằng LEFT JOIN, mở rộng `Platf
 thêm bốn trường khảo sát + `completedAt`. Cộng một phép tổng hợp: đếm theo `seller_kind`,
 xếp hạng `focus_channels`, phân bố `current_tools`.
 
-**Phần B — bảng (`ui-web`) — PM HOÃN 26/08, KHÔNG vào trước `stg`.**
+**Phần B — bảng (`ui-web`) — PM HOÃN 27/11, KHÔNG vào trước `stg`.**
 Thêm cột vào `PlatformTenantTable` sẵn có và một dải tổng hợp phía trên. Chỉ đụng
 `src/ui/components/platform/**`.
 
@@ -693,7 +693,7 @@ chuyển đổi từ công cụ cũ. Hiện ta **chỉ lưu đáp án cuối**, 
 lúc nào". Muốn có phễu thật thì phải ghi thêm sự kiện — đó là quyết định riêng, không gói
 vào task này.
 
-### Task 13: Backfill `completed_at` cho tenant cũ (PM quyết 26/08)
+### Task 13: Backfill `completed_at` cho tenant cũ (PM quyết 27/11)
 
 Chủ: `data-pipeline`. Phải xong **trước** khi nhánh này lên `dev`.
 
@@ -775,7 +775,7 @@ việc riêng.
 
 ## Thủ tục gộp nhánh này vào `dev` — đọc trước khi merge
 
-Tình hình sau khi epic MinIO merge vào `dev` (`e3a655a`, 26/08): `dev` đi trước nhánh này
+Tình hình sau khi epic MinIO merge vào `dev` (`e3a655a`, 27/11): `dev` đi trước nhánh này
 **23 commit**, nhánh này đi trước `dev` **12 commit**. Ba việc phải làm đúng thứ tự.
 
 **1. Journal migration — conflict văn bản, nhưng ngữ nghĩa đơn giản.**

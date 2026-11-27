@@ -9,7 +9,7 @@
 
 **Tech Stack:** Next.js 16 App Router, Astryx v0.4.0 (`@astryxdesign/core`), Tailwind v4 token-first, vitest (node env cho logic test), TanStack Query.
 
-**Spec:** `docs/superpowers/specs/2026-08-21-ui-redesign-design.md` (đọc trước khi làm bất kỳ task nào — direction contract, 4 raise, ranh giới Operate nằm ở đó).
+**Spec:** `docs/superpowers/specs/ui-redesign-design.md` (đọc trước khi làm bất kỳ task nào — direction contract, 4 raise, ranh giới Operate nằm ở đó).
 
 ## Global Constraints
 
@@ -482,7 +482,7 @@ Kiểm tay đủ luồng: soạn ảnh 2 kênh → đăng luôn; bật hẹn l�
 **Files:** không tạo code mới ngoài sửa lỗi từ findings.
 
 - [ ] **Step 1: Verify đầy đủ** — `pnpm verify` (typecheck + lint + depcruise + test + build). Mọi lỗi sửa trước khi đi tiếp; dán output thật vào báo cáo.
-- [ ] **Step 1b: Vá 2 finding P1 từ critique 21/08 (PM đã duyệt nhập wave 1)** — (a) `JobLogTable` cột "Kênh": hiện tên Page thay `channelId` thô (map qua data `useChannels`, id xuống dòng mono phụ/tooltip; kênh đã gỡ → id + "(đã gỡ)"); (b) `CaptionBlock` tablist: thêm arrow-key navigation đúng pattern ARIA tabs (Left/Right/Home/End, roving tabindex). Kèm theo carry-forward Task 1: IMP-1 `--foreground-subtle` light → L≈0.53; IMP-2 tách dark `--info` khỏi dark `--primary` + sửa claim comment globals.css:140; IMP-3 pin dark `--foreground-subtle`; MIN-1 thêm English gloss 2 comment tiếng Việt trần.
+- [ ] **Step 1b: Vá 2 finding P1 từ critique 27/11 (PM đã duyệt nhập wave 1)** — (a) `JobLogTable` cột "Kênh": hiện tên Page thay `channelId` thô (map qua data `useChannels`, id xuống dòng mono phụ/tooltip; kênh đã gỡ → id + "(đã gỡ)"); (b) `CaptionBlock` tablist: thêm arrow-key navigation đúng pattern ARIA tabs (Left/Right/Home/End, roving tabindex). Kèm theo carry-forward Task 1: IMP-1 `--foreground-subtle` light → L≈0.53; IMP-2 tách dark `--info` khỏi dark `--primary` + sửa claim comment globals.css:140; IMP-3 pin dark `--foreground-subtle`; MIN-1 thêm English gloss 2 comment tiếng Việt trần.
 - [ ] **Step 2: Inspect round có giới hạn (doc 12 §6)** — `pnpm dev`, chụp desktop + mobile các màn đợt 1 (`/`, `/compose`, `/posts` 2 tab, `/channels` 3 tab, `/members` 3 tab, `/platform` badge) vào `.impeccable/review/desktop.png`, `mobile.png`; sửa 1 đợt; tối đa 1 vòng xác nhận.
 - [ ] **Step 3: Detector** — `node ~/.claude/skills/impeccable/scripts/detect.mjs --json` trên các file đã đổi; sửa lỗi cơ học, findings còn lại chuyển cho reviewer.
 - [ ] **Step 4: Impeccable finish** — spawn `impeccable-finish-reviewer` (input: request gốc, spec, contract, screenshots, findings, craft-floor); xử lý disposition đúng 4 từ (recapture/rebuild/ship/fix). Sau đó spawn `impeccable-documenter` ghi lại `DESIGN.md` + sidecar từ code mới.

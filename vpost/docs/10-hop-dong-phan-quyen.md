@@ -1,6 +1,6 @@
 # Hợp đồng phân quyền (M0)
 
-> Trạng thái: **ĐÃ DUYỆT 19/08/2026** — PM chốt mục 8 theo đề xuất, điều chỉnh duy nhất ở 8.9 (trần theo gói subscription, tenant VPOST không trần). Là văn bản mà M1.1→M3.3 đối chiếu (doc 09 §4).
+> Trạng thái: **ĐÃ DUYỆT 27/11/2026** — PM chốt mục 8 theo đề xuất, điều chỉnh duy nhất ở 8.9 (trần theo gói subscription, tenant VPOST không trần). Là văn bản mà M1.1→M3.3 đối chiếu (doc 09 §4).
 > Nguồn: phân tích code thật của 40 file route (48 route×method) bởi 3 agent domain (data-pipeline, fb-publisher, caption-ai) + orchestrator; đã qua gate reviewer-qa. Mục 8 là các quyết định chờ PM, mỗi câu có đề xuất sẵn — chốt "theo đề xuất" hoặc ghi đè từng dòng. **Vai trò/tầng trong ma trận §4 là ĐỀ XUẤT thống nhất với §8** — PM ghi đè §8 thì sửa ma trận theo.
 
 ## 1. Thang vai trò & ranh giới
@@ -158,7 +158,7 @@ Cookie state hiện là JSON **không ký** mang `tenantId`, callback tin nguyê
 | B6 | `POST /api/posts/batches` không đọc session → hành động hệ trọng nhất có `createdBy=null` | Actor từ session |
 | B7 | `/api/posts/worker-health` + mọi route GET tenant-scoped **trừ** `/api/posts/drafts` (owner từ session) và `/api/access-requests` (có role guard): ai đăng nhập cũng đọc được tenant bất kỳ | Chính là B-8, M1.3 |
 
-## 8. Quyết định — PM ĐÃ CHỐT 19/08/2026 theo đề xuất (8.9 có điều chỉnh)
+## 8. Quyết định — PM ĐÃ CHỐT 27/11/2026 theo đề xuất (8.9 có điều chỉnh)
 
 | # | Câu hỏi | Đề xuất |
 |---|---|---|

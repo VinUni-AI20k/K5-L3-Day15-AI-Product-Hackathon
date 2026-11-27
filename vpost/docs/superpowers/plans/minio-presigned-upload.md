@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16 App Router · TypeScript · Drizzle + PostgreSQL · vitest · package `minio` (dependency MỚI, PM đã duyệt) · Docker Compose
 
-**Spec:** `docs/superpowers/specs/2026-08-26-minio-presigned-upload-design.md`
+**Spec:** `docs/superpowers/specs/minio-presigned-upload-design.md`
 
 ## Global Constraints
 
@@ -1199,7 +1199,7 @@ function deps(overrides: Record<string, unknown> = {}) {
         postUrl: "https://media.vannt.asia/vpost-media",
         formFields: { key: `staging/${TENANT}/${assetId}` },
         storageKey: `${TENANT}/${assetId}`,
-        expiresAt: new Date("2026-08-26T10:30:00Z"),
+        expiresAt: new Date("2026-11-27T10:30:00Z"),
       })),
     },
     tickets: { createMany: vi.fn(async () => 1) },

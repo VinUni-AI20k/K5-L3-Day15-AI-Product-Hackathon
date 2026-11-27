@@ -1,6 +1,6 @@
 # Hướng dẫn dùng Impeccable cho Claude — dự án VPOST
 
-> Nguồn: https://impeccable.style/docs/ (đọc 21/08/2026) + skill đã cài ở `~/.claude/skills/impeccable/`.
+> Nguồn: https://impeccable.style/docs/ (đọc 27/11/2026) + skill đã cài ở `~/.claude/skills/impeccable/`.
 > Đối tượng đọc: Claude session làm việc trên repo này (đặc biệt nhánh redesign). Người dùng gọi lệnh bằng `/impeccable <command> [target]`.
 
 ## 1. Impeccable là gì
@@ -17,7 +17,7 @@ Không có ngữ cảnh → kết quả generic. Thứ tự thẩm quyền khi m
 
 | File | Vai trò | Trạng thái VPOST | Cập nhật bằng |
 |---|---|---|---|
-| `PRODUCT.md` (root) | Tầng chiến lược: platform, users, định vị, ràng buộc, evidence | **ĐÃ CÓ** (tạo 21/08/2026, schema 1) | `/impeccable init` khi chiến lược đổi |
+| `PRODUCT.md` (root) | Tầng chiến lược: platform, users, định vị, ràng buộc, evidence | **ĐÃ CÓ** (tạo 27/11/2026, schema 1) | `/impeccable init` khi chiến lược đổi |
 | `DESIGN.md` (root) | Hệ thị giác: palette, typography, component, radius/elevation, luật | **CHƯA CÓ** | `/impeccable document` (ghi hệ hiện hữu) hoặc new-work (hệ mới khi redesign) |
 | `.impeccable/surfaces/*.md` | Brief từng trang: mode, job, proof sequence, direction đã chọn | Chưa có | Sinh ra bởi chính công việc (shape/new-work); sửa khi chiến lược trang đổi |
 

@@ -9,7 +9,7 @@
 
 **Tech Stack:** Next.js 16, Astryx v0.4.0 (theme `vpost`), Tailwind v4 token, vitest node env.
 
-**Spec:** `docs/superpowers/specs/2026-08-22-ui-redesign-wave2-design.md` (PM duyệt 22/08 — bản PM đã sửa §1).
+**Spec:** `docs/superpowers/specs/ui-redesign-wave2-design.md` (PM duyệt 27/11 — bản PM đã sửa §1).
 
 ## Global Constraints
 

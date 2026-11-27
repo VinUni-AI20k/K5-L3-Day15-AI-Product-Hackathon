@@ -1,6 +1,6 @@
 # Thiết kế — Chuyển lưu trữ media sang MinIO + upload thẳng bằng presigned URL
 
-Ngày: 26/08/2026 · Trạng thái: chờ PM duyệt · Epic liên quan: E9 (chế độ B), E3.6 (media bridge)
+Ngày: 27/11/2026 · Trạng thái: chờ PM duyệt · Epic liên quan: E9 (chế độ B), E3.6 (media bridge)
 
 ## 1. Vì sao
 
@@ -103,7 +103,7 @@ promote(input: { tenantId; assetId }): Promise<{ storageKey: string; sizeBytes: 
 createDownloadUrl(input: { tenantId; storageKey; expiresInSeconds }): Promise<string | null>;
 ```
 
-`local-blob-store` giữ lại **chỉ để đọc** trong lúc di trú, rồi **xoá hẳn** (PM chốt 26/08/2026) —
+`local-blob-store` giữ lại **chỉ để đọc** trong lúc di trú, rồi **xoá hẳn** (PM chốt 27/11/2026) —
 cùng với `MEDIA_STORAGE_DRIVER`, biến env đó không còn lý do tồn tại. Unit test dùng fake in-memory
 implement đủ surface (container đã có `overrides.blobs`).
 
@@ -222,7 +222,7 @@ ký bằng host công khai thì thao tác server-side lại đi vòng ra ngoài.
 nội bộ cho `stat`/`readRange`/`promote`/`delete`, một công khai chỉ để ký URL đưa ra ngoài.
 
 Theo quy ước hạ tầng của dự án (Cloudflare Tunnel → Traefik, không mở IP public),
-`media.vannt.asia` (PM cấp 26/08/2026) phải được trỏ qua tunnel về service `minio`. Cloudflare giới hạn body **100MB** — cap 25MB/file nằm dưới ngưỡng,
+`media.vannt.asia` (PM cấp 27/11/2026) phải được trỏ qua tunnel về service `minio`. Cloudflare giới hạn body **100MB** — cap 25MB/file nằm dưới ngưỡng,
 nhưng con số phải ghi vào tài liệu vận hành chứ không để ngầm.
 
 ## 9. Di trú dữ liệu đang có
@@ -282,7 +282,7 @@ thật chứ không tin exit code.
 | 5 | Cloudflare 100MB body + timeout mạng chậm | Cap 25MB/file; UI báo tiến độ và cho thử lại từng file |
 | 6 | Di trú làm mất mapping | Giữ nguyên key, không xoá nguồn, rollback bằng env |
 
-## 13. Đã chốt (26/08/2026)
+## 13. Đã chốt (27/11/2026)
 
 | Câu | Chốt |
 |---|---|

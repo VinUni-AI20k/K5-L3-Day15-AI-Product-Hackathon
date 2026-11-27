@@ -1,6 +1,6 @@
 # PROMPT — Màn chúc mừng + bàn giao mượt vào app (onboarding)
 
-> **TRẠNG THÁI: ĐÃ DỰNG XONG** (27/08/2026, branch `feat/onboarding-celebrate-handoff`).
+> **TRẠNG THÁI: ĐÃ DỰNG XONG** (27/11/2026, branch `feat/onboarding-celebrate-handoff`).
 > Ba chỗ trong bản kế hoạch dưới đây **đã bị thay đổi khi thực thi**, vì thực tế bác bỏ
 > chúng. Chúng được sửa tại chỗ và ghi lý do; xem thêm mục 11 ở cuối.
 

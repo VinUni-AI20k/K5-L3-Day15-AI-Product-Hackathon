@@ -1,7 +1,7 @@
 # Spec — Redesign UI wave 2: hoàn chỉnh thế giới "Sổ mẫu vải"
 
-Ngày: 2026-08-22 · Trạng thái: chờ PM duyệt · Người quyết định: PM (Zan)
-Kế thừa: spec wave 1 (`2026-08-21-ui-redesign-design.md`), DESIGN.md "Sổ mẫu vải" (ghi từ code 22/08), backlog ledger wave 1, finish-review bàn giao đợt 2, critique 22/08 (29/40 — "thế giới cảm nhận được khi làm việc, biến mất khi cấu hình").
+Ngày: 2026-11-27 · Trạng thái: chờ PM duyệt · Người quyết định: PM (Zan)
+Kế thừa: spec wave 1 (`ui-redesign-design.md`), DESIGN.md "Sổ mẫu vải" (ghi từ code 27/11), backlog ledger wave 1, finish-review bàn giao đợt 2, critique 27/11 (29/40 — "thế giới cảm nhận được khi làm việc, biến mất khi cấu hình").
 
 ## 1. Mục tiêu
 

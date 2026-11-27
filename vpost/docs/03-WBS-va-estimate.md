@@ -1,6 +1,6 @@
 # WBS & Estimate — Công cụ đăng bài tự động
 
-> **Cập nhật v2 (12/08/2026)** — 3 quyết định mới của PM:
+> **Cập nhật v2 (27/11/2026)** — 3 quyết định mới của PM:
 > 1. **TikTok không nằm trong phase này.** Code TikTok (E6) chuyển hẳn sang Phase 2. App TikTok & Facebook **đã có sẵn** — thủ tục audit/duyệt tiếp tục chạy song song; việc còn lại của E0 là **verify trạng thái thật** trên dashboard (đã pass review chưa, quyền nào đã cấp).
 > 2. **SaaS-ready mức data model:** mọi bảng có `tenant_id`, query scope theo tenant, credential/cấu hình lưu theo tenant. E1.3 +2 MD.
 > 3. **Khảo sát dữ liệu do PM + AI agent tự làm** qua Google Drive MCP (không chờ BA) — kết quả ở `05-data-profile.md`.
@@ -38,7 +38,7 @@ Estimate này giả định các câu 🔴 trong `01-cau-hoi-lam-ro-cho-BA.md` �
 | E1.2 | Docker Compose (web + worker + postgres + **redis** + reverse proxy) | 1.5 | 1 | Redis: AOF persistence + nằm trong backup |
 | E1.3 | Schema DB + migration, **tenant_id mọi bảng + query scope theo tenant + bảng `tenant_integration`** (quyết định SaaS v2) | 4 | 3 | Còn chặn bởi câu B10 (F5 đã chốt) |
 | E1.4 | Đăng nhập Google, giới hạn theo tên miền, session | 1.5 | 1 | |
-| E1.5 | Dựng BullMQ + Redis, worker chạy được, job mẫu | 1 | 0.5 | Đổi từ pg-boss (quyết định 12/08) |
+| E1.5 | Dựng BullMQ + Redis, worker chạy được, job mẫu | 1 | 0.5 | Đổi từ pg-boss (quyết định 27/11) |
 | E1.6 | Log có cấu trúc, xử lý lỗi tập trung | 1 | 0.5 | |
 | | **Cộng** | **10** | **6.5** | |
 
@@ -273,7 +273,7 @@ TikTok audit không còn chặn phase này, nhưng vẫn theo dõi hằng tuần
 
 ## 6. Độ tin cậy của estimate
 
-**Mức tin cậy hiện tại: trung bình (±25%)** — nâng từ ±40% sau khảo sát dữ liệu 12/08/2026.
+**Mức tin cậy hiện tại: trung bình (±25%)** — nâng từ ±40% sau khảo sát dữ liệu 27/11/2026.
 
 Đã đóng: toàn bộ nhóm B trừ B5/B6/B12/B13 (xem `05-data-profile.md`), B10 (tồn theo mã — không phải đổi schema), F5 (SaaS). Khảo sát cũng xác nhận E2.2 (parser) đúng là hạng mục nhiều edge case như đã dự trù — 28,2% file sai chuẩn, cần thêm **+1,5 MD vào E2** cho bảng chuẩn hoá màu + khử trùng lặp (chưa cộng vào bảng, cộng khi chốt baseline).
 

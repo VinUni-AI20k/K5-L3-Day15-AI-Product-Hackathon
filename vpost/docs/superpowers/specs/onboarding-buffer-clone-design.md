@@ -1,6 +1,6 @@
 # Thiết kế — Onboarding kiểu Buffer (đo từ hệ thống thật)
 
-Ngày: 2026-08-26 · Epic E10 · **Thay thế** `2026-08-26-onboarding-slideshow-design.md`
+Ngày: 2026-11-27 · Epic E10 · **Thay thế** `onboarding-slideshow-design.md`
 Trạng thái: chờ PM duyệt
 
 ---
@@ -95,9 +95,9 @@ lập (Google Drive, Sheet, Facebook, nhóm kênh, mời người, chúc mừng)
 **Giữ lại từ lượt trước:** cơ chế cookie `vpost_oauth_return` (commit `064ca88`, `0df33f7`)
 vẫn có ích và không được gỡ — nó giúp callback OAuth quay về đúng nơi phát lệnh.
 
-**NGOÀI PHẠM VI — PM chốt 26/08/2026:** màn soạn bài `/compose` **giữ nguyên như hiện tại**.
+**NGOÀI PHẠM VI — PM chốt 27/11/2026:** màn soạn bài `/compose` **giữ nguyên như hiện tại**.
 Đợt việc này chỉ đụng onboarding. Composer của Buffer đã được phân tích trong
-`2026-08-26-buffer-system-analysis.md` §2.7 nhưng đó là tham chiếu cho sau, **không** phải
+`buffer-system-analysis.md` §2.7 nhưng đó là tham chiếu cho sau, **không** phải
 việc đang giao. Không sửa `src/ui/components/compose/**`.
 
 ---
@@ -257,7 +257,7 @@ lặp lại với độ mờ khác nhau — đám icon là trang trí, `aria-hid
 
 ---
 
-## 4b. Chuyển động nền màn chào (PM giao 26/08 — "chưa đủ tầm")
+## 4b. Chuyển động nền màn chào (PM giao 27/11 — "chưa đủ tầm")
 
 **Hiện trạng:** nền hoàn toàn tĩnh. Task 5 có viết hiệu ứng trôi bằng framer-motion nhưng đo
 trong app thật ra `transform: none` suốt 900ms — không chạy. Agent gỡ bỏ thay vì để lại code
@@ -277,7 +277,7 @@ fade-in, không phải lỗi chụp.
    với hệ số khác nhau khi rê chuột. Tầng sâu **ánh xạ theo độ mờ sẵn có** — ô mờ ở xa, dịch
    ít; ô rõ ở gần, dịch nhiều. Nhất quán với chiều sâu đã có sẵn thay vì bịa thêm.
 4. **Lưới hô hấp (tuỳ chọn).** Đường lưới sáng lên rất nhẹ theo chu kỳ dài.
-5. **Phản ứng theo lân cận con trỏ (PM yêu cầu 26/08).** Con trỏ đi ngang qua thì ô phản
+5. **Phản ứng theo lân cận con trỏ (PM yêu cầu 27/11).** Con trỏ đi ngang qua thì ô phản
    ứng — càng gần càng rõ. **Không dùng `:hover`**: cả lớp nền là `pointer-events-none` và
    phải giữ nguyên như thế, nếu không trang trí sẽ ăn sự kiện chuột của nút "Bắt đầu". Dùng
    chính vòng rAF của lớp 3, tính khoảng cách con trỏ tới từng ô. Phản ứng theo độ gần mượt
@@ -455,7 +455,7 @@ không hứa suông. **Không được chỉ làm mờ**: mờ mà vẫn bấm �
 4. **Chấm tiến độ không bấm được** — chỉ báo vị trí.
 5. Bước 1 và 3: **một lựa chọn**. Bước 2 và **bước 4**: **nhiều lựa chọn**.
 
-   *(Sửa 26/08 — bản đầu xếp nhầm bước 4 vào nhóm một-lựa-chọn. Ba bằng chứng ngược lại:
+   *(Sửa 27/11 — bản đầu xếp nhầm bước 4 vào nhóm một-lựa-chọn. Ba bằng chứng ngược lại:
    cột lưu là `focus_channels text[]`, ảnh `04-channels.jpg` vẽ ô tick, và §6 gọi đáp án
    là "phiếu bầu nhu cầu" — bầu thì phải chọn được nhiều.)*
 6. Đóng tab giữa chừng rồi quay lại → mở lại đúng bước còn dở (giống Buffer: mở lại

@@ -1,6 +1,6 @@
 # Thiết kế lại giao diện web VPOST trên Astryx Design System
 
-Ngày: 2026-08-14 · Branch: `feat/ui` · Trạng thái: đã duyệt, chờ lên kế hoạch thi công
+Ngày: 2026-11-27 · Branch: `feat/ui` · Trạng thái: đã duyệt, chờ lên kế hoạch thi công
 
 ## 1. Mục tiêu và phạm vi
 

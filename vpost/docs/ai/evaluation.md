@@ -4,7 +4,7 @@
 
 Không chọn model bằng cảm tính (nguyên tắc #10, #13). Mọi quyết định routing — kể cả "GPT-5.4 mini làm primary" đang đề xuất — chỉ chốt sau khi chạy benchmark trên **dữ liệu thật của VPOST**.
 
-Lợi thế có sẵn: khảo sát 12/08 đã cho chúng ta danh sách 5.497 file thật + snapshot Sheet (`sample-data/`) — không phải bịa dataset.
+Lợi thế có sẵn: khảo sát 27/11 đã cho chúng ta danh sách 5.497 file thật + snapshot Sheet (`sample-data/`) — không phải bịa dataset.
 
 ## 2. Cấu trúc dataset
 
@@ -44,7 +44,7 @@ Chấm người: blind A/B — người chấm thấy caption, không thấy tê
 ```
 1. Chốt dataset v1 (100 mã + test cases)     ← chặn bởi: expected_content cần shop cung cấp
 2. Chạy N model ứng viên × cùng prompt version × cùng dataset
-   Ứng viên đợt 1 (theo quyết định Google-primary 12/08): Gemini 3.5 Flash-Lite · Gemini 3.6 Flash · GPT-5 mini (cheap tier)
+   Ứng viên đợt 1 (theo quyết định Google-primary 27/11): Gemini 3.5 Flash-Lite · Gemini 3.6 Flash · GPT-5 mini (cheap tier)
                    + Gemini 3.1 Pro · GPT-5.4 mini (mid/escalation). Chạy trên PAID tier (data policy).
 3. Máy chấm tự động → lọc; người chấm blind phần rubric
 4. Bảng kết quả 8 tiêu chí → chọn: primary cheap, fallback cùng tier, bậc escalation

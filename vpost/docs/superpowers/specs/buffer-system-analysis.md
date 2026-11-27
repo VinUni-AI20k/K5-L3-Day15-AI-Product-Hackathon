@@ -1,6 +1,6 @@
 # Phân tích hệ thống Buffer — sau onboarding
 
-Ngày: 2026-08-26 · Bổ trợ cho `2026-08-26-onboarding-buffer-clone-design.md`
+Ngày: 2026-11-27 · Bổ trợ cho `onboarding-buffer-clone-design.md`
 Mục đích: làm nền tham chiếu khi dựng lại VPOST
 
 ---
@@ -62,7 +62,7 @@ Bài học: **một nút tạo duy nhất, mở menu** — không rải nút "t�
 
 Xếp theo thứ tự dọc:
 
-1. Lời chào theo giờ + ngày: "Good Morning, {tên}!" / "Wed, Aug 26 2026".
+1. Lời chào theo giờ + ngày: "Good Morning, {tên}!" / "Fri, Nov 27 2026".
 2. **Ba chỉ số** một hàng: Week Streak · Posting Goals · Comment Score. Mỗi cái có số to
    bên trái và nút ⓘ giải thích. Chưa có kênh thì cả ba bằng 0 kèm dải nhắc màu xanh:
    "Connect a channel to start tracking your posting streak…".
@@ -140,7 +140,7 @@ Bốn nhóm, thứ tự cố định:
 
 | Trường | Giá trị quan sát |
 |---|---|
-| Creation Date | August 26, 2026 — bằng ngày đăng ký |
+| Creation Date | November 27, 2026 — bằng ngày đăng ký |
 | Organization Name | **"My organization"** — tự đặt, sửa được, có nút Save Changes riêng |
 | Account Owner | email người đăng ký, "current owner" |
 | Change Owner | có, kèm chú thích chủ mới phải là Admin |
@@ -179,7 +179,7 @@ Mở từ `＋ New Post` hoặc từ một khung giờ trống trong hàng đợ
 
 Mô hình này khớp trực tiếp với VPOST: `post_job` = 1 bài × 1 kênh, fan-out từ một bản soạn.
 
-> **PHẠM VI — PM chốt 26/08/2026: KHÔNG đụng vào composer.**
+> **PHẠM VI — PM chốt 27/11/2026: KHÔNG đụng vào composer.**
 > VPOST tạm thời **giữ nguyên màn soạn bài hiện có** (`/compose`, `src/ui/components/compose/**`).
 > Toàn bộ phần composer trong tài liệu này là **tham chiếu cho sau này**, không phải việc
 > đang giao. Agent nào nhận task từ đợt này mà thấy mình đang sửa file trong `compose/`

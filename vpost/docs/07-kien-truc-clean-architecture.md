@@ -1,6 +1,6 @@
 # Kiến trúc & Stack — Clean Architecture một chiều
 
-**Ngày:** 12/08/2026 · Áp dụng cho toàn bộ code Phase 1 trở đi. Mọi agent domain code theo tài liệu này; `reviewer-qa` FAIL mọi diff vi phạm luật phụ thuộc.
+**Ngày:** 27/11/2026 · Áp dụng cho toàn bộ code Phase 1 trở đi. Mọi agent domain code theo tài liệu này; `reviewer-qa` FAIL mọi diff vi phạm luật phụ thuộc.
 
 ---
 
@@ -10,7 +10,7 @@
 |---|---|---|
 | Web app | Next.js App Router + TypeScript `strict` | Một codebase UI + API |
 | DB | PostgreSQL + Drizzle ORM | Transaction thật; migration rõ ràng |
-| Queue + scheduler | **BullMQ + Redis** *(đổi 12/08 — quyết định owner)* | Redis kiêm: cache nóng registry, rate-limit AI/Graph adapter |
+| Queue + scheduler | **BullMQ + Redis** *(đổi 27/11 — quyết định owner)* | Redis kiêm: cache nóng registry, rate-limit AI/Graph adapter |
 | Worker | Node.js, cùng repo, entrypoint riêng | Mọi I/O bên ngoài chạy ở đây |
 | UI | Tailwind + shadcn/ui | |
 | Validate | zod | Schema tại mọi biên |
