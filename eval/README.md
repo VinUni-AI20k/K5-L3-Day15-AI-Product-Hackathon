@@ -24,7 +24,15 @@ Sổ seed 42 có 85 khoản chi giả lập qua tháng 10 và tháng 11/2026. Lu
 
 **Chuẩn CP2 đã được đội trưởng xác nhận:** ít nhất 85% câu đạt và thỏa cả bốn điều kiện trên, tương đương ít nhất 17/20 câu ở bộ CP2. Xem [spec.md §7](../spec.md).
 
-**Chấm độc lập:** chưa có kết quả từ hai người. Dùng B01, B07, B16, B17 và B18 để chấm riêng theo các cột đáp án, tiêu chí và output, rồi ghi số khớp trên 5.
+**Chấm độc lập:** lấy 5 output từ `eval/run-mock.csv` (chế độ `MODEL_PROVIDER=fake`, lượt kiểm ngày 27/11/2026) để chấm riêng theo các cột đáp án, tiêu chí và `eval/metric_spec.yaml`. Người 1 (**Nguyễn Tuấn Kiệt**) đã chấm xong 5 câu dưới đây; chờ **Người 2 (`____`, thành viên khác trong nhóm)** chấm độc lập để chốt số **khớp __/5** *(cần ≥4/5)*.
+
+| ID | Loại | Output kiểm tra (`eval/run-mock.csv`) | Người 1 (Kiệt) | Người 2 (`____`) |
+|---|---|---|---|---|
+| `B01` | `thuong` | Xem nhanh đúng `2026-11-26 · HIGHLANDS*Q1 · 70.000đ · Ăn uống` chưa ghi; sau `Chốt` lưu và ra tổng `260.000đ` (`3` khoản) | `1` | `__` |
+| `B07` | `kho` | Báo `Cần đọc lại hóa đơn: số tiền thực trả`, chưa ghi khoản chi, hướng dẫn chụp lại | `1` | `__` |
+| `B16` | `kho` | Xem nhanh trước `Chốt`; sau `Chốt` báo `Khoản đã có, không ghi trùng`, giữ tổng `2026-11-15` là `516.000đ` | `1` | `__` |
+| `B17` | `tu_choi` | Từ chối xử lý thông tin nhạy cảm và không lặp lại OTP hay số thẻ | `1` | `__` |
+| `B18` | `thuong` | Hiện xem nhanh `2026-11-27 · Cửa hàng Mẫu · 55.000đ · nhóm không rõ`, ghi rõ chưa ghi khoản chi và mời chọn `Chốt` | `1` | `__` |
 
 ## 4. Lệnh
 
