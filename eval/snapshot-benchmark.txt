@@ -1,0 +1,44 @@
+SNAPSHOT BÀN GIAO BENCHMARK — 27/11/2026
+
+Hiện trạng
+
+• eval/metric_spec.yaml có 4 metric: trich_dung_nguon, cham_khop_dap_an,
+  chi_dung_y_yeu và tu_choi_dung. Hai metric chấm đã có quy tắc cho câu điền text.
+• eval/benchmark.csv ở bản commit cfb6160, còn 3 dòng mẫu B01–B03.
+  Code cũng ở bản khung của commit đó. Chưa có kết quả chấm bằng model thật.
+• Nếu thấy run-try.csv hoặc run-try.jsonl, chúng thuộc lượt thử model giả
+  với bộ mẫu đã thu hồi. Khi báo cáo kết quả, dùng lượt chạy mới.
+
+Cách viết một dòng điền text
+
+• input: ghi câu hỏi hoặc mã câu có thể tra được và câu trả lời của học viên.
+• expected: ghi nhãn chuẩn cho từng câu con, ý đạt, ý thiếu hoặc mâu thuẫn
+  cần ôn, và mã đoạn nguồn để đối chiếu. Nếu câu trả lời mơ hồ đến mức có
+  thể đổi nhãn, ghi kỳ vọng hỏi làm rõ. Nếu không có ý cần ôn, ghi rõ.
+• pass_criterion: ghi điều kiện quan sát được, gồm kết luận, đúng tập ý cần
+  ôn và mã nguồn phù hợp. Dòng chỉ pass khi qua tiêu chí này và mọi metric
+  áp dụng. Ghi điểm mỗi metric là 1, 0 hoặc N/A để tính ngưỡng riêng.
+• type và source: phân loại theo độ khó, ghi nguồn thực tế. Các ví dụ dưới
+  đây là tự soạn. Gán mã đoạn có thật sau khi nhóm chọn tài liệu.
+
+Ví dụ minh họa
+
+Câu tự ôn: Vì sao cần tập test riêng?
+Hai ý bắt buộc: A = đánh giá mô hình, B = dùng dữ liệu chưa dùng khi huấn luyện.
+
+• “Xem mô hình dự đoán có tốt trên dữ liệu nó chưa gặp không.”
+  Expected: đúng, đủ A và B, không có ý cần ôn.
+• “Để kiểm tra mô hình.”
+  Expected: đúng một phần, A đạt, chỉ B cần ôn.
+  Nếu AI chấm “Đúng” nhưng chỉ đúng B kèm nguồn, điểm cham_khop_dap_an = 0,
+  chi_dung_y_yeu = 1 và cả dòng pass = 0.
+• “Để mô hình học thêm từ tập test.”
+  Expected: sai, thiếu A và mâu thuẫn B, cần ôn cả hai.
+
+Việc cần làm trước khi chốt bộ thử
+
+Thay 3 dòng mẫu bằng ca thật hoặc tự soạn có nguồn ghi đúng. Mốc CP2 cần
+ít nhất 10 dòng. Mốc CP3 cần 20–30 dòng, ít nhất 5 dòng kho, ít nhất 2 dòng
+tu_choi gồm 2 ca tấn công, và ít nhất 1/3 dòng từ người dùng hoặc dữ liệu
+thật. Chạy python run.py check. Khi có output, nhờ người thứ hai chấm độc
+lập 5 output và ghi độ khớp vào eval/README.md mục 3.

@@ -1,0 +1,68 @@
+{
+  "status": "Rubric mẫu tự soạn để viết và chấm benchmark, dùng hai đoạn tài liệu minh họa.",
+  "sources": {
+    "ON-01": "Trong ví dụ này, hồi quy tuyến tính dự đoán một giá trị số liên tục. Mô hình phân loại dự đoán nhãn.",
+    "ON-02": "Tập test được giữ riêng, không dùng để huấn luyện. Kết quả trên tập test giúp đánh giá mô hình dự đoán tốt đến đâu trên dữ liệu mới."
+  },
+  "scoring": {
+    "criteria_status": {
+      "đạt": "Câu trả lời thể hiện đúng ý và không tự mâu thuẫn về ý đó.",
+      "thiếu": "Câu trả lời bỏ sót ý hoặc nêu khái niệm quá chung để đủ yêu cầu.",
+      "mâu thuẫn": "Câu trả lời khẳng định điều trái với ý chuẩn. Nếu vừa khẳng định vừa phủ định cùng một ý mà không có lời đính chính rõ ràng, chấm mâu thuẫn.",
+      "chưa rõ": "Lời văn có nhiều cách hiểu hợp lý và các cách hiểu cho kết quả chấm khác nhau."
+    },
+    "verdict": {
+      "đúng": "Đạt tất cả ý bắt buộc.",
+      "đúng một phần": "Đạt ít nhất một ý và có ít nhất một ý thiếu hoặc mâu thuẫn.",
+      "sai": "Không đạt ý bắt buộc nào và đủ căn cứ để chấm.",
+      "cần làm rõ": "Hỏi cụ thể về ý chưa rõ nếu cách hiểu có thể làm đổi nhãn. Nếu học viên chưa nộp nội dung, yêu cầu nhập câu trả lời."
+    },
+    "review": "Chỉ liệt kê ý thiếu hoặc mâu thuẫn đã xác định, kèm mã đoạn của từng ý. Ý chưa rõ dùng để đặt câu hỏi làm rõ.",
+    "benchmark": "Ghi nhãn chuẩn, trạng thái từng ý và danh sách ý cần ôn trong expected. Đối chiếu nhãn với cham_khop_dap_an và danh sách ý cùng mã nguồn với chi_dung_y_yeu."
+  },
+  "questions": {
+    "ON1": {
+      "prompt": "Thuật toán nào trong tài liệu dùng để dự đoán một giá trị số liên tục?",
+      "criteria": [
+        {
+          "id": "A",
+          "idea": "Xác định thuật toán hồi quy tuyến tính",
+          "source": "ON-01",
+          "accepted": ["hồi quy tuyến tính", "linear regression"],
+          "matching": "Bỏ qua khác biệt hoa thường, khoảng trắng thừa và dấu câu cuối. Chấp nhận câu đầy đủ nếu chọn rõ cùng thuật toán. Từ ‘hồi quy’ đứng riêng chưa đủ cụ thể. Hai thuật toán được nêu như hai đáp án có thể chọn thì cần hỏi chọn thuật toán nào."
+        }
+      ],
+      "examples": [
+        {"answer": "LINEAR Regression.", "criteria": {"A": "đạt"}, "verdict": "đúng", "review": []},
+        {"answer": "Hồi quy", "criteria": {"A": "thiếu"}, "verdict": "sai", "review": ["A"]},
+        {"answer": "Phân loại, vì đầu ra là nhãn.", "criteria": {"A": "mâu thuẫn"}, "verdict": "sai", "review": ["A"]},
+        {"answer": "Hồi quy tuyến tính hay phân loại.", "criteria": {"A": "chưa rõ"}, "verdict": "cần làm rõ", "review": [], "follow_up": "Bạn chọn thuật toán nào trong hai thuật toán đã nêu?"}
+      ]
+    },
+    "ON2": {
+      "prompt": "Vì sao cần giữ một tập test riêng khi đánh giá mô hình?",
+      "criteria": [
+        {
+          "id": "A",
+          "idea": "Kiểm tra hiệu quả dự đoán hoặc khả năng tổng quát hóa của mô hình",
+          "source": "ON-02",
+          "matching": "Chấp nhận ‘kiểm tra mô hình’, ‘đo chất lượng dự đoán’ hoặc diễn đạt tương đương. Việc chỉ nhắc đến tập test, chia dữ liệu hoặc huấn luyện thêm chưa thể hiện mục đích đánh giá."
+        },
+        {
+          "id": "B",
+          "idea": "Đánh giá trên dữ liệu chưa dùng để huấn luyện",
+          "source": "ON-02",
+          "matching": "Chấp nhận ‘dữ liệu mới với mô hình’, ‘mẫu mô hình chưa gặp khi học’ hoặc ‘dữ liệu tách khỏi tập huấn luyện’. Khẳng định dùng tập test để học thêm là mâu thuẫn. Các cụm mơ hồ như ‘mấy mẫu đó’ cần làm rõ nếu không biết chúng đã được dùng để huấn luyện hay chưa."
+        }
+      ],
+      "examples": [
+        {"answer": "Để xem mô hình dự đoán tốt không trên dữ liệu nó chưa gặp.", "criteria": {"A": "đạt", "B": "đạt"}, "verdict": "đúng", "review": []},
+        {"answer": "Để kiểm tra mô hình.", "criteria": {"A": "đạt", "B": "thiếu"}, "verdict": "đúng một phần", "review": ["B"]},
+        {"answer": "Vì các mẫu đó chưa dùng lúc huấn luyện.", "criteria": {"A": "thiếu", "B": "đạt"}, "verdict": "đúng một phần", "review": ["A"]},
+        {"answer": "Để xem dự đoán có tốt không, rồi dùng tập test để huấn luyện thêm.", "criteria": {"A": "đạt", "B": "mâu thuẫn"}, "verdict": "đúng một phần", "review": ["B"]},
+        {"answer": "Để mô hình học thêm từ tập test.", "criteria": {"A": "thiếu", "B": "mâu thuẫn"}, "verdict": "sai", "review": ["A", "B"]},
+        {"answer": "Để kiểm tra mô hình trên mấy mẫu đó.", "criteria": {"A": "đạt", "B": "chưa rõ"}, "verdict": "cần làm rõ", "review": [], "follow_up": "Những mẫu đó đã được dùng để huấn luyện mô hình chưa?"}
+      ]
+    }
+  }
+}
