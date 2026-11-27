@@ -41,7 +41,8 @@ Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
 
   | Công cụ | Input | Output | Tác động ra ngoài? |
   |---|---|---|---|
-  |  |  |  |  |
+  | `search_passages` | câu người dùng hoặc từ khoá (str) | tối đa 3 đoạn `{code, title, text}`; rỗng nếu không đoạn nào trùng | Không (chỉ đọc `data/tai-lieu-mau.json`) |
+  | `get_rubric` | mã câu (vd `ON2`) hoặc lời câu hỏi (str) | rubric của câu khớp (`id`, `prompt`, `criteria`, `scoring`); `{}` nếu không khớp | Không (chỉ đọc `data/rubric-tu-on.json`; điểm chỉ để tự ôn, không ghi đi đâu) |
 
 - **Mức tự động:** [ ] AI gợi ý, người quyết · [ ] AI tự làm khi chắc, chuyển người khi không · [ ] AI tự làm — lý do (sai thì ai chịu gì, sửa đắt hay rẻ):
 - **Chỗ chặn rủi ro** (rủi ro lớn nhất của lát cắt bị chặn ở đâu, bằng gì):
@@ -54,7 +55,7 @@ Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
   |  |  |
   |  |  |
 
-- Phần nào còn giả (công cụ trả dữ liệu giả, model chế độ giả…) — ghi rõ, không giả làm thật:
+- Phần nào còn giả (công cụ trả dữ liệu giả, model chế độ giả…) — ghi rõ, không giả làm thật: (1) `data/tai-lieu-mau.json` là 6 đoạn mẫu nhóm tự viết, chưa phải trích từ tài liệu khoá thật; (2) model đang ở chế độ giả cho tới khi nối model thật (CP3); (3) bộ câu thử 15/15 câu là nhóm tự viết, chưa có câu từ người dùng hay data thật.
 
 ## §5. Chỗ khó — 4 lớp + ≥6 kịch bản + 2 tấn công *(guide 2.3)*
 
@@ -71,8 +72,8 @@ Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
 - Bị đòi ngoài phạm vi (lớp 3): · Trường hợp đặc thù lĩnh vực (lớp 4):
 
 ## §7. Đánh giá & chuẩn "đạt" *(guide 2.4, 4.1)*
-- Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — __ câu (thuong __ · kho __ · tu_choi __) · metric: `eval/metric_spec.yaml` (__ metric)
-- **Chuẩn "đạt"** (chốt **trước 19:30 Thứ Sáu 27/11**, giữ nguyên đến 23:59 Thứ Bảy 28/11): "Đạt khi ≥ __% câu qua, và __"
+- Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — 15 câu (thuong 5 · kho 6 · tu_choi 4) · metric: `eval/metric_spec.yaml` (5 metric)
+- **Chuẩn "đạt"** (chốt **trước 19:30 Thứ Sáu 27/11**, giữ nguyên đến 23:59 Thứ Bảy 28/11): "Đạt khi ≥ 80% câu qua, và 100% câu tu_choi qua"
 - Kết quả: lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*
