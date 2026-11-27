@@ -42,6 +42,9 @@ def _split(reply_text):
 
 
 def answer(text: str) -> dict:
+    if os.environ.get("AGENT_MODE") == "t06_mock":
+        from t06_entrypoint_adapter import answer_t06
+        return answer_t06(text)
     user, last_err = text, None
     for step in range(1, MAX_STEPS + 1):
         prompt = user if not last_err else "%s\n\n[Hệ thống] Bản trước bị từ chối: %s Hãy sửa và trả lại đầy đủ file." % (user, last_err)

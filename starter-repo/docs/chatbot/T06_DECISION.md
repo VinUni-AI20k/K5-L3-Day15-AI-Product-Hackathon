@@ -7,10 +7,9 @@
 
    Đây là bản TV3 (T12/T14) và TV4 (T17) dùng để tích hợp. Bộ `ailab/chatbot/plans.py` + `ailab/chatbot/mock_agent.py` của I02 (workspace chính, chưa commit) **không** phải bản chuẩn. Sau này I02 dùng lại validator của T06, không giữ bộ riêng.
 2. **Envelope Contract** theo `spec.md`: 6 trường, `decision`/`warnings` là tùy chọn. REFUSE biểu diễn bằng `status=error` + `errors.code=refused`. Mọi plan hợp lệ đều có `interaction.fallback="mouse"` và `mouse_always_enabled=true`. Review độc lập lần 2 đạt; chi tiết ở `T06_INDEPENDENT_REVIEW.md`.
-3. **Không sửa `codebase/agent.py`** trong T06. Patch 3 dòng opt-in (`T06_ENTRYPOINT_OWNER.patch`, `AGENT_MODE=t06_mock`) được giữ làm tài liệu nhưng không áp.
-   - Hệ quả: tiêu chí "chạy qua `python run.py`" **còn mở**.
-   - `codebase/accept_t06_entrypoint.py` hiện FAIL đúng như kỳ vọng (5 subtest), vì `run.py` chưa trả envelope T06.
-   - Đường chạy chung sẽ được nối khi làm Shared Core ở T08 (`codebase/agent.py`, owner TV2).
+3. **Cập nhật cùng ngày: TV2 (owner `codebase/agent.py` theo T08) cho phép sửa `agent.py`.** Đã áp đúng patch `T06_ENTRYPOINT_OWNER.patch` (3 dòng, opt-in `AGENT_MODE=t06_mock`, import adapter lúc cần). Luồng mặc định giữ nguyên.
+   - `python codebase/accept_t06_entrypoint.py` chạy `run.py` thật bằng subprocess: **OK**. Cả 5 nhánh REUSE/GENERATE/ASK_CLARIFY/REFUSE/ERROR trả envelope T06; khi tắt `AGENT_MODE`, luồng cũ vẫn chạy.
+   - Smoke `AGENT_MODE=t06_mock` + `MODEL_PROVIDER=fake` qua `python run.py` trả `simulated=true`, `REUSE`, `pending_approval`, `player_id=101`, `html=null`.
 4. **Nhánh xuất bản:** `cp3/t06-contract-mock`. Chưa merge `main`.
 
 ## Trạng thái
@@ -21,9 +20,10 @@ Contract + Mock: **đạt** ở phạm vi module.
 |---|---|
 | Test T06 | 25/25 đạt |
 | Hồi quy `ailab` | 216/216 đạt |
+| Harness `run.py` thật (sau khi áp patch) | OK (5 nhánh + luồng mặc định) |
 | SHA256 3 file đã review | khớp với bản reviewer kiểm |
 
-T06 toàn task chưa DONE theo `docs/TASKS.md`, vì thiếu tiêu chí `run.py` (mục 3).
+Tiêu chí `run.py` (mục khẩn CP2 trong `docs/TASKS.md`) đã có bằng chứng (mục 3). Còn lại: TV3/TV1 xác nhận Contract (đã gửi Quân) và review độc lập cho bản có `agent.py`.
 
 ## Cách gọi cho TV3/TV4
 
