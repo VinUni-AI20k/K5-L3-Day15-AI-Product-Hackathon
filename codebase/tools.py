@@ -59,10 +59,19 @@ def _infer_category(text: str) -> str:
 
 @tool
 def parse_receipt_text(raw_input: str) -> dict:
-    """Bóc tách thông tin hóa đơn (cửa hàng, ngày, món, tổng tiền, nhóm chi) từ ảnh/văn bản hóa đơn.
-    Input: chuỗi mô tả/OCR hóa đơn (str). Output: dict gồm merchant, date, total, category, items, missing_fields, blurry. Không tác động ra ngoài."""
+    """Bóc tách thông tin hóa đơn (cửa hàng, ngày, tổng thực trả, nhóm chi, mã lượt chụp) từ ảnh/văn bản hóa đơn.
+    Input: chuỗi mô tả/OCR hóa đơn (str). Output: dict gồm capture_id, merchant, date, date_source, total, category, ambiguous_totals, blurry, duplicate_of, status, missing_fields. Không tác động ra ngoài."""
     text = (raw_input or "").strip()
     low = text.lower()
+
+    cap_m = re.search(r"(?:mã\s*lượt\s*chụp|capture_id)\s*[:\-]?\s*([A-Za-z0-9_-]+)", text, flags=re.IGNORECASE)
+    capture_id = cap_m.group(1).upper() if cap_m else None
+    duplicate_of = None
+    if capture_id:
+        for existing in _all_records():
+            if (existing.get("capture_id") or "").upper() == capture_id:
+                duplicate_of = existing.get("id")
+                break
 
     blurry = any(k in low for k in ("mờ", "nhòe", "nhoe", "không đọc được", "ko doc duoc", "bị che", "bi che"))
     date_m = re.search(r"(20\d{2}-\d{2}-\d{2})", text)
@@ -71,12 +80,13 @@ def parse_receipt_text(raw_input: str) -> dict:
         date_str = f"{dmy.group(3)}-{int(dmy.group(2)):02d}-{int(dmy.group(1)):02d}" if dmy else None
     else:
         date_str = date_m.group(1)
+    date_source = "receipt" if date_str else "missing"
 
     merchant = None
     if ":" in text and "|" in text:
         parts = [p.strip() for p in text.split("|")]
-        first = re.sub(r"^(?:chụp\s*)?hóa\s*đơn(?:\s*bị\s*[^:]+)?\s*:\s*", "", parts[0], flags=re.IGNORECASE).strip()
-        if first and "ngày" not in first.lower():
+        first = re.sub(r"^(?:chụp\s*)?hóa\s*đơn(?:\s*(?:bị\s*[^:]+))?\s*:\s*", "", parts[0], flags=re.IGNORECASE).strip()
+        if first and "ngày" not in first.lower() and "mã lượt chụp" not in first.lower():
             merchant = first
     if not merchant:
         for line in text.splitlines():
@@ -86,18 +96,39 @@ def parse_receipt_text(raw_input: str) -> dict:
                 line.strip(),
                 flags=re.IGNORECASE,
             ).strip()
-            if clean and not clean.lower().startswith(("ngày", "tổng")):
+            if clean and not clean.lower().startswith(("ngày", "tổng", "mã lượt")):
                 merchant = clean.split("(")[0].strip()[:60]
                 break
 
-    # Tìm tổng tiền tường minh trước; nếu không có, cộng các món nếu không bị đánh dấu mờ phần tổng
+    # Tìm tổng thực trả tường minh; nếu có nhiều mức tổng mâu thuẫn nhau mà không rõ thực trả -> Cần đọc lại
     total = None
-    total_m = re.search(
-        r"(?:tổng(?:\s*cộng|\s*tiền)?|thành\s*tiền|total)\s*[:\-]?\s*(\d+(?:[.,]\d{3})*\s*(?:k|nghin|ngan|đ|d|vnd)?)",
+    ambiguous_totals = False
+    paid_m = re.findall(
+        r"(?:thực\s*trả|thanh\s*toán|tổng\s*cộng|tổng\s*tiền|total)\s*[:\-]?\s*(\d+(?:[.,]\d{3})*\s*(?:k|nghin|ngan|đ|d|vnd)?)",
         low,
     )
-    if total_m:
-        total = _parse_vnd_amount(total_m.group(1))
+    paid_vals = [_parse_vnd_amount(v) for v in paid_m]
+    paid_vals = [v for v in paid_vals if v is not None]
+
+    # Bắt thêm các nhãn dễ gây nhầm nhiều mức tổng (tạm tính / tổng hàng / tổng bill)
+    other_totals = re.findall(
+        r"(?:tạm\s*tính|tổng\s*(?:tạm|hàng|bill))\s*[:\-]?\s*(\d+(?:[.,]\d{3})*\s*(?:k|nghin|ngan|đ|d|vnd)?)",
+        low,
+    )
+    other_vals = [v for v in (_parse_vnd_amount(v) for v in other_totals) if v is not None]
+
+    explicit_paid = re.search(
+        r"(?:thực\s*trả|khách\s*trả)\s*[:\-]?\s*(\d+(?:[.,]\d{3})*\s*(?:k|nghin|ngan|đ|d|vnd)?)",
+        low,
+    )
+    if explicit_paid:
+        total = _parse_vnd_amount(explicit_paid.group(1))
+    elif len(set(paid_vals)) > 1 or (other_vals and paid_vals and set(other_vals) != set(paid_vals) and "chưa rõ" in low):
+        ambiguous_totals = True
+    elif len(set(paid_vals)) == 1 and not (other_vals and ("chưa rõ" in low or "nhiều mức tổng" in low)):
+        total = paid_vals[0]
+    elif len(other_vals) > 1 or ("nhiều mức tổng" in low and not explicit_paid):
+        ambiguous_totals = True
     elif not blurry:
         amounts = []
         for m in re.finditer(r"(\d+(?:[.,]\d{3})+\s*(?:đ|d|vnd)?|\b\d+\s*k\b)", low):
@@ -110,33 +141,55 @@ def parse_receipt_text(raw_input: str) -> dict:
     missing = []
     if not date_str:
         missing.append("ngày (YYYY-MM-DD)")
-    if total is None or (blurry and not total_m):
+    if ambiguous_totals:
+        total = None
+        missing.append("xác nhận số thực trả (do có nhiều mức tổng)")
+    elif total is None or (blurry and not paid_vals and not explicit_paid):
         total = None
         missing.append("tổng tiền (VND)")
     if not merchant:
         missing.append("tên cửa hàng/khoản chi")
 
+    status = "duplicate" if duplicate_of else ("Cần đọc lại" if missing else "ready")
     category = _infer_category(text)
     return {
+        "capture_id": capture_id,
+        "duplicate_of": duplicate_of,
         "merchant": merchant or "không rõ",
         "date": date_str,
+        "date_source": date_source,
         "total": total,
         "category": category,
         "blurry": blurry,
+        "ambiguous_totals": ambiguous_totals,
+        "status": status,
         "missing_fields": missing,
     }
 
 
 @tool
-def save_daily_note(date: str, merchant: str, total: int, category: str, note: str = "") -> dict:
-    """Tạo bản ghi chú khoản chi từ hóa đơn cho nhật ký ngày (kiểu Locket) và tính tổng ngày mới.
-    Input: date (YYYY-MM-DD), merchant (str), total (int > 0), category (str), note (str). Output: bản nháp note để lưu và tổng ngày mới. Không ghi đè file dữ liệu gốc (an toàn, đảo được)."""
+def save_daily_note(date: str, merchant: str, total: int, category: str, note: str = "", capture_id: str = "") -> dict:
+    """Tạo bản ghi chú khoản chi từ hóa đơn cho nhật ký ngày (kiểu Locket), chống cộng trùng theo mã lượt chụp.
+    Input: date (YYYY-MM-DD), merchant (str), total (int > 0), category (str), note (str), capture_id (str). Output: bản nháp note để lưu và tổng ngày mới. Không ghi đè file dữ liệu gốc (an toàn, đảo được)."""
     if not date or total is None or total <= 0:
         return {"saved": False, "reason": "Thiếu ngày hoặc tổng tiền không hợp lệ (> 0)."}
+    if capture_id:
+        for r in _all_records():
+            if (r.get("capture_id") or "").upper() == capture_id.upper():
+                day_recs = [x for x in _all_records() if x.get("date") == r.get("date")]
+                return {
+                    "saved": False,
+                    "duplicate": True,
+                    "existing_id": r["id"],
+                    "capture_id": capture_id.upper(),
+                    "day_total": sum(int(x["total"]) for x in day_recs),
+                    "reason": f"Mã lượt chụp {capture_id.upper()} đã tồn tại ({r['id']}), không cộng trùng.",
+                }
     existing = [r for r in _all_records() if r.get("date") == date]
     new_total = sum(int(r["total"]) for r in existing) + int(total)
     rec = {
         "id": f"NOTE-{date}",
+        "capture_id": capture_id.upper() if capture_id else None,
         "date": date,
         "time": "12:00",
         "merchant": merchant,

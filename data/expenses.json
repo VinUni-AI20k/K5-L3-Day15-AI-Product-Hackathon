@@ -5,6 +5,7 @@
   "records": [
     {
       "id": "EXP-001",
+      "capture_id": "CAP-001",
       "date": "2026-10-01",
       "time": "09:00",
       "merchant": "Tiền Trọ Mẫu",
@@ -21,6 +22,7 @@
     },
     {
       "id": "EXP-007",
+      "capture_id": "CAP-007",
       "date": "2026-10-01",
       "time": "11:10",
       "merchant": "Grab*Bike",
@@ -37,6 +39,7 @@
     },
     {
       "id": "EXP-008",
+      "capture_id": "CAP-008",
       "date": "2026-10-02",
       "time": "08:30",
       "merchant": "Cơm Tấm Mẫu Q1",
@@ -57,6 +60,7 @@
     },
     {
       "id": "EXP-009",
+      "capture_id": "CAP-009",
       "date": "2026-10-02",
       "time": "10:10",
       "merchant": "Cơm Tấm Mẫu Q1",
@@ -73,6 +77,7 @@
     },
     {
       "id": "EXP-011",
+      "capture_id": "CAP-011",
       "date": "2026-10-04",
       "time": "10:25",
       "merchant": "Trạm Xăng Mẫu A",
@@ -89,6 +94,7 @@
     },
     {
       "id": "EXP-010",
+      "capture_id": "CAP-010",
       "date": "2026-10-04",
       "time": "10:45",
       "merchant": "Grab*Bike",
@@ -105,6 +111,7 @@
     },
     {
       "id": "EXP-002",
+      "capture_id": "CAP-002",
       "date": "2026-10-05",
       "time": "10:15",
       "merchant": "Internet Mẫu",
@@ -121,6 +128,7 @@
     },
     {
       "id": "EXP-012",
+      "capture_id": "CAP-012",
       "date": "2026-10-05",
       "time": "18:25",
       "merchant": "Grab*Bike",
@@ -137,6 +145,7 @@
     },
     {
       "id": "EXP-014",
+      "capture_id": "CAP-014",
       "date": "2026-10-06",
       "time": "12:50",
       "merchant": "Trà Sữa Mẫu B",
@@ -153,6 +162,7 @@
     },
     {
       "id": "EXP-013",
+      "capture_id": "CAP-013",
       "date": "2026-10-06",
       "time": "19:15",
       "merchant": "HIGHLANDS*Q1",
@@ -173,6 +183,7 @@
     },
     {
       "id": "EXP-016",
+      "capture_id": "CAP-016",
       "date": "2026-10-08",
       "time": "15:15",
       "merchant": "Xanh SM Mẫu",
@@ -189,6 +200,7 @@
     },
     {
       "id": "EXP-015",
+      "capture_id": "CAP-015",
       "date": "2026-10-08",
       "time": "18:25",
       "merchant": "Phở Bò Mẫu 24",
@@ -209,6 +221,7 @@
     },
     {
       "id": "EXP-017",
+      "capture_id": "CAP-017",
       "date": "2026-10-09",
       "time": "20:15",
       "merchant": "Siêu Thị Mẫu C",
@@ -229,6 +242,7 @@
     },
     {
       "id": "EXP-018",
+      "capture_id": "CAP-018",
       "date": "2026-10-10",
       "time": "07:45",
       "merchant": "Trạm Xăng Mẫu A",
@@ -245,6 +259,7 @@
     },
     {
       "id": "EXP-003",
+      "capture_id": "CAP-003",
       "date": "2026-10-10",
       "time": "14:30",
       "merchant": "Điện Lực Mẫu",
@@ -261,6 +276,7 @@
     },
     {
       "id": "EXP-019",
+      "capture_id": "CAP-019",
       "date": "2026-10-10",
       "time": "20:10",
       "merchant": "Phở Bò Mẫu 24",
@@ -281,6 +297,7 @@
     },
     {
       "id": "EXP-020",
+      "capture_id": "CAP-020",
       "date": "2026-10-11",
       "time": "14:45",
       "merchant": "Shop Thời Trang Mẫu",
@@ -297,6 +314,7 @@
     },
     {
       "id": "EXP-021",
+      "capture_id": "CAP-021",
       "date": "2026-10-12",
       "time": "12:10",
       "merchant": "Circle K Mẫu",
@@ -317,6 +335,7 @@
     },
     {
       "id": "EXP-022",
+      "capture_id": "CAP-022",
       "date": "2026-10-12",
       "time": "16:45",
       "merchant": "Trạm Xăng Mẫu A",
@@ -333,6 +352,7 @@
     },
     {
       "id": "EXP-023",
+      "capture_id": "CAP-023",
       "date": "2026-10-14",
       "time": "14:25",
       "merchant": "HIGHLANDS*Q1",
@@ -353,6 +373,7 @@
     },
     {
       "id": "EXP-024",
+      "capture_id": "CAP-024",
       "date": "2026-10-14",
       "time": "17:15",
       "merchant": "BACH HOA XANH M1",
@@ -373,6 +394,7 @@
     },
     {
       "id": "EXP-025",
+      "capture_id": "CAP-025",
       "date": "2026-10-15",
       "time": "20:00",
       "merchant": "Circle K Mẫu",
@@ -393,6 +415,7 @@
     },
     {
       "id": "EXP-026",
+      "capture_id": "CAP-026",
       "date": "2026-10-16",
       "time": "08:10",
       "merchant": "Shop Thời Trang Mẫu",
@@ -409,6 +432,7 @@
     },
     {
       "id": "EXP-027",
+      "capture_id": "CAP-027",
       "date": "2026-10-16",
       "time": "17:25",
       "merchant": "Phòng Khám Mẫu",
@@ -425,6 +449,7 @@
     },
     {
       "id": "EXP-028",
+      "capture_id": "CAP-028",
       "date": "2026-10-17",
       "time": "11:10",
       "merchant": "Trà Sữa Mẫu B",
@@ -441,6 +466,7 @@
     },
     {
       "id": "EXP-029",
+      "capture_id": "CAP-029",
       "date": "2026-10-18",
       "time": "11:45",
       "merchant": "BACH HOA XANH M1",
@@ -461,6 +487,7 @@
     },
     {
       "id": "EXP-030",
+      "capture_id": "CAP-030",
       "date": "2026-10-18",
       "time": "12:10",
       "merchant": "Trạm Xăng Mẫu A",
@@ -477,6 +504,7 @@
     },
     {
       "id": "EXP-031",
+      "capture_id": "CAP-031",
       "date": "2026-10-20",
       "time": "14:00",
       "merchant": "Rạp Phim Mẫu",
@@ -497,6 +525,7 @@
     },
     {
       "id": "EXP-032",
+      "capture_id": "CAP-032",
       "date": "2026-10-20",
       "time": "17:10",
       "merchant": "Circle K Mẫu",
@@ -513,6 +542,7 @@
     },
     {
       "id": "EXP-033",
+      "capture_id": "CAP-033",
       "date": "2026-10-21",
       "time": "08:25",
       "merchant": "Shop Thời Trang Mẫu",
@@ -529,6 +559,7 @@
     },
     {
       "id": "EXP-034",
+      "capture_id": "CAP-034",
       "date": "2026-10-22",
       "time": "11:30",
       "merchant": "Trà Sữa Mẫu B",
@@ -549,6 +580,7 @@
     },
     {
       "id": "EXP-035",
+      "capture_id": "CAP-035",
       "date": "2026-10-22",
       "time": "17:30",
       "merchant": "Circle K Mẫu",
@@ -565,6 +597,7 @@
     },
     {
       "id": "EXP-036",
+      "capture_id": "CAP-036",
       "date": "2026-10-23",
       "time": "08:15",
       "merchant": "Siêu Thị Mẫu C",
@@ -585,6 +618,7 @@
     },
     {
       "id": "EXP-037",
+      "capture_id": "CAP-037",
       "date": "2026-10-25",
       "time": "18:45",
       "merchant": "Trà Sữa Mẫu B",
@@ -601,6 +635,7 @@
     },
     {
       "id": "EXP-038",
+      "capture_id": "CAP-038",
       "date": "2026-10-26",
       "time": "15:00",
       "merchant": "BACH HOA XANH M1",
@@ -621,6 +656,7 @@
     },
     {
       "id": "EXP-039",
+      "capture_id": "CAP-039",
       "date": "2026-10-26",
       "time": "15:30",
       "merchant": "Phòng Khám Mẫu",
@@ -637,6 +673,7 @@
     },
     {
       "id": "EXP-040",
+      "capture_id": "CAP-040",
       "date": "2026-10-27",
       "time": "15:50",
       "merchant": "Phở Bò Mẫu 24",
@@ -657,6 +694,7 @@
     },
     {
       "id": "EXP-042",
+      "capture_id": "CAP-042",
       "date": "2026-10-28",
       "time": "10:00",
       "merchant": "Phở Bò Mẫu 24",
@@ -677,6 +715,7 @@
     },
     {
       "id": "EXP-041",
+      "capture_id": "CAP-041",
       "date": "2026-10-28",
       "time": "14:00",
       "merchant": "Nhà Thuốc Mẫu D",
@@ -697,6 +736,7 @@
     },
     {
       "id": "EXP-043",
+      "capture_id": "CAP-043",
       "date": "2026-10-29",
       "time": "08:45",
       "merchant": "BACH HOA XANH M1",
@@ -717,6 +757,7 @@
     },
     {
       "id": "EXP-045",
+      "capture_id": "CAP-045",
       "date": "2026-10-30",
       "time": "09:15",
       "merchant": "Trà Sữa Mẫu B",
@@ -737,6 +778,7 @@
     },
     {
       "id": "EXP-044",
+      "capture_id": "CAP-044",
       "date": "2026-10-30",
       "time": "19:10",
       "merchant": "Cơm Tấm Mẫu Q1",
@@ -757,6 +799,7 @@
     },
     {
       "id": "EXP-046",
+      "capture_id": "CAP-046",
       "date": "2026-10-31",
       "time": "10:30",
       "merchant": "Trạm Xăng Mẫu A",
@@ -773,6 +816,7 @@
     },
     {
       "id": "EXP-004",
+      "capture_id": "CAP-004",
       "date": "2026-11-01",
       "time": "09:00",
       "merchant": "Tiền Trọ Mẫu",
@@ -789,6 +833,7 @@
     },
     {
       "id": "EXP-047",
+      "capture_id": "CAP-047",
       "date": "2026-11-01",
       "time": "18:15",
       "merchant": "Siêu Thị Mẫu C",
@@ -809,6 +854,7 @@
     },
     {
       "id": "EXP-049",
+      "capture_id": "CAP-049",
       "date": "2026-11-02",
       "time": "08:15",
       "merchant": "HIGHLANDS*Q1",
@@ -829,6 +875,7 @@
     },
     {
       "id": "EXP-048",
+      "capture_id": "CAP-048",
       "date": "2026-11-02",
       "time": "21:30",
       "merchant": "Phở Bò Mẫu 24",
@@ -849,6 +896,7 @@
     },
     {
       "id": "EXP-050",
+      "capture_id": "CAP-050",
       "date": "2026-11-03",
       "time": "16:10",
       "merchant": "BACH HOA XANH M1",
@@ -869,6 +917,7 @@
     },
     {
       "id": "EXP-051",
+      "capture_id": "CAP-051",
       "date": "2026-11-05",
       "time": "08:00",
       "merchant": "Cơm Tấm Mẫu Q1",
@@ -885,6 +934,7 @@
     },
     {
       "id": "EXP-005",
+      "capture_id": "CAP-005",
       "date": "2026-11-05",
       "time": "10:15",
       "merchant": "Internet Mẫu",
@@ -901,6 +951,7 @@
     },
     {
       "id": "EXP-052",
+      "capture_id": "CAP-052",
       "date": "2026-11-06",
       "time": "11:45",
       "merchant": "Circle K Mẫu",
@@ -921,6 +972,7 @@
     },
     {
       "id": "EXP-053",
+      "capture_id": "CAP-053",
       "date": "2026-11-06",
       "time": "18:30",
       "merchant": "BACH HOA XANH M1",
@@ -941,6 +993,7 @@
     },
     {
       "id": "EXP-054",
+      "capture_id": "CAP-054",
       "date": "2026-11-07",
       "time": "19:25",
       "merchant": "Grab*Bike",
@@ -957,6 +1010,7 @@
     },
     {
       "id": "EXP-055",
+      "capture_id": "CAP-055",
       "date": "2026-11-09",
       "time": "12:25",
       "merchant": "Cơm Tấm Mẫu Q1",
@@ -977,6 +1031,7 @@
     },
     {
       "id": "EXP-056",
+      "capture_id": "CAP-056",
       "date": "2026-11-10",
       "time": "07:25",
       "merchant": "Cơm Tấm Mẫu Q1",
@@ -993,6 +1048,7 @@
     },
     {
       "id": "EXP-057",
+      "capture_id": "CAP-057",
       "date": "2026-11-10",
       "time": "10:10",
       "merchant": "Grab*Bike",
@@ -1009,6 +1065,7 @@
     },
     {
       "id": "EXP-006",
+      "capture_id": "CAP-006",
       "date": "2026-11-10",
       "time": "14:30",
       "merchant": "Điện Lực Mẫu",
@@ -1025,6 +1082,7 @@
     },
     {
       "id": "EXP-058",
+      "capture_id": "CAP-058",
       "date": "2026-11-11",
       "time": "09:15",
       "merchant": "Grab*Bike",
@@ -1041,6 +1099,7 @@
     },
     {
       "id": "EXP-081",
+      "capture_id": "CAP-081",
       "date": "2026-11-11",
       "time": "20:40",
       "merchant": "Siêu Thị Mẫu C",
@@ -1057,6 +1116,7 @@
     },
     {
       "id": "EXP-060",
+      "capture_id": "CAP-060",
       "date": "2026-11-12",
       "time": "17:30",
       "merchant": "Circle K Mẫu",
@@ -1073,6 +1133,7 @@
     },
     {
       "id": "EXP-059",
+      "capture_id": "CAP-059",
       "date": "2026-11-12",
       "time": "19:50",
       "merchant": "Cơm Tấm Mẫu Q1",
@@ -1093,6 +1154,7 @@
     },
     {
       "id": "EXP-061",
+      "capture_id": "CAP-061",
       "date": "2026-11-13",
       "time": "09:25",
       "merchant": "Circle K Mẫu",
@@ -1113,6 +1175,7 @@
     },
     {
       "id": "EXP-063",
+      "capture_id": "CAP-063",
       "date": "2026-11-14",
       "time": "11:50",
       "merchant": "Cơm Tấm Mẫu Q1",
@@ -1133,6 +1196,7 @@
     },
     {
       "id": "EXP-062",
+      "capture_id": "CAP-062",
       "date": "2026-11-14",
       "time": "21:00",
       "merchant": "HIGHLANDS*Q1",
@@ -1153,6 +1217,7 @@
     },
     {
       "id": "EXP-082",
+      "capture_id": "CAP-082",
       "date": "2026-11-15",
       "time": "12:10",
       "merchant": "HIGHLANDS*Q1",
@@ -1173,6 +1238,7 @@
     },
     {
       "id": "EXP-064",
+      "capture_id": "CAP-064",
       "date": "2026-11-15",
       "time": "18:45",
       "merchant": "Shop Thời Trang Mẫu",
@@ -1189,6 +1255,7 @@
     },
     {
       "id": "EXP-083",
+      "capture_id": "CAP-083",
       "date": "2026-11-15",
       "time": "19:30",
       "merchant": "Rạp Phim Mẫu",
@@ -1205,6 +1272,7 @@
     },
     {
       "id": "EXP-065",
+      "capture_id": "CAP-065",
       "date": "2026-11-16",
       "time": "10:15",
       "merchant": "Sách Mẫu E",
@@ -1221,6 +1289,7 @@
     },
     {
       "id": "EXP-066",
+      "capture_id": "CAP-066",
       "date": "2026-11-16",
       "time": "18:30",
       "merchant": "Cơm Tấm Mẫu Q1",
@@ -1241,6 +1310,7 @@
     },
     {
       "id": "EXP-067",
+      "capture_id": "CAP-067",
       "date": "2026-11-18",
       "time": "07:30",
       "merchant": "Phở Bò Mẫu 24",
@@ -1261,6 +1331,7 @@
     },
     {
       "id": "EXP-068",
+      "capture_id": "CAP-068",
       "date": "2026-11-18",
       "time": "07:30",
       "merchant": "BACH HOA XANH M1",
@@ -1281,6 +1352,7 @@
     },
     {
       "id": "EXP-069",
+      "capture_id": "CAP-069",
       "date": "2026-11-19",
       "time": "16:00",
       "merchant": "HIGHLANDS*Q1",
@@ -1297,6 +1369,7 @@
     },
     {
       "id": "EXP-070",
+      "capture_id": "CAP-070",
       "date": "2026-11-20",
       "time": "08:30",
       "merchant": "Grab*Bike",
@@ -1313,6 +1386,7 @@
     },
     {
       "id": "EXP-071",
+      "capture_id": "CAP-071",
       "date": "2026-11-20",
       "time": "16:00",
       "merchant": "BACH HOA XANH M1",
@@ -1333,6 +1407,7 @@
     },
     {
       "id": "EXP-084",
+      "capture_id": "CAP-084",
       "date": "2026-11-20",
       "time": "16:05",
       "merchant": "CHUYEN KHOAN NOI BO",
@@ -1349,6 +1424,7 @@
     },
     {
       "id": "EXP-072",
+      "capture_id": "CAP-072",
       "date": "2026-11-21",
       "time": "15:15",
       "merchant": "BACH HOA XANH M1",
@@ -1369,6 +1445,7 @@
     },
     {
       "id": "EXP-073",
+      "capture_id": "CAP-073",
       "date": "2026-11-22",
       "time": "10:15",
       "merchant": "Rạp Phim Mẫu",
@@ -1389,6 +1466,7 @@
     },
     {
       "id": "EXP-085",
+      "capture_id": "CAP-085",
       "date": "2026-11-22",
       "time": "11:20",
       "merchant": "Quán Cơm Mẫu (Mờ)",
@@ -1405,6 +1483,7 @@
     },
     {
       "id": "EXP-074",
+      "capture_id": "CAP-074",
       "date": "2026-11-22",
       "time": "12:50",
       "merchant": "Phở Bò Mẫu 24",
@@ -1425,6 +1504,7 @@
     },
     {
       "id": "EXP-076",
+      "capture_id": "CAP-076",
       "date": "2026-11-24",
       "time": "15:15",
       "merchant": "Rạp Phim Mẫu",
@@ -1445,6 +1525,7 @@
     },
     {
       "id": "EXP-075",
+      "capture_id": "CAP-075",
       "date": "2026-11-24",
       "time": "16:30",
       "merchant": "Rạp Phim Mẫu",
@@ -1465,6 +1546,7 @@
     },
     {
       "id": "EXP-077",
+      "capture_id": "CAP-077",
       "date": "2026-11-25",
       "time": "21:10",
       "merchant": "Phở Bò Mẫu 24",
@@ -1485,6 +1567,7 @@
     },
     {
       "id": "EXP-079",
+      "capture_id": "CAP-079",
       "date": "2026-11-26",
       "time": "07:45",
       "merchant": "Trạm Xăng Mẫu A",
@@ -1501,6 +1584,7 @@
     },
     {
       "id": "EXP-078",
+      "capture_id": "CAP-078",
       "date": "2026-11-26",
       "time": "20:30",
       "merchant": "HIGHLANDS*Q1",
@@ -1521,6 +1605,7 @@
     },
     {
       "id": "EXP-080",
+      "capture_id": "CAP-080",
       "date": "2026-11-27",
       "time": "17:00",
       "merchant": "Shop Thời Trang Mẫu",

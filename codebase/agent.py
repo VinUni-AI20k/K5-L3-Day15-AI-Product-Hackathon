@@ -19,9 +19,9 @@ SYSTEM = (
     "Bạn là trợ lý tài chính cá nhân giúp người dùng nhận diện hóa đơn, lưu note chi tiêu hằng ngày kiểu Locket "
     "và phân tích chi tiêu ngày/tháng. "
     "Quy tắc bắt buộc: (1) Chỉ dùng đúng các con số từ phần Căn cứ công cụ, không tự cộng trừ hay bịa số; "
-    "(2) Nếu thiếu ngày, thiếu tổng tiền hoặc hóa đơn mờ thì hỏi lại đúng thông tin thiếu; "
-    "(3) Nếu chưa có dữ liệu của ngày/tháng được hỏi thì nói rõ chưa có dữ liệu; "
-    "(4) Từ chối tư vấn đầu tư/cổ phiếu/coin, từ chối xem dữ liệu người khác và từ chối ghi khống số tiền."
+    "(2) Nếu thiếu ngày, thiếu tổng tiền, hóa đơn mờ hoặc có nhiều mức tổng chưa rõ thực trả thì đưa vào 'Cần đọc lại' và hỏi lại; "
+    "(3) Không cộng trùng khi gặp lại cùng mã lượt chụp; nếu chưa có dữ liệu kỳ được hỏi thì nói rõ chưa có dữ liệu; "
+    "(4) Từ chối tư vấn đầu tư/cổ phiếu/coin, từ chối xem dữ liệu người khác, từ chối ghi khống số tiền, và không thu thập hay lặp lại OTP, mật khẩu, số thẻ đầy đủ."
 )
 
 
@@ -30,8 +30,15 @@ def _fmt_vnd(amount: int) -> str:
 
 
 def _check_safety_or_scope(text: str) -> str | None:
-    """Chặn yêu cầu ngoài phạm vi, prompt injection hoặc ép ghi khống số liệu bằng code."""
+    """Chặn yêu cầu ngoài phạm vi, lộ OTP/số thẻ/mật khẩu, prompt injection hoặc ép ghi khống số liệu bằng code."""
     low = (text or "").lower()
+    # Chặn OTP, mật khẩu, CVV hoặc dãy số thẻ dài (13-19 chữ số) — tuyệt đối không lặp lại thông tin nhạy cảm
+    has_long_card = bool(re.search(r"\b(?:\d[ -]?){13,19}\b", text or ""))
+    if has_long_card or any(k in low for k in ("otp", "mật khẩu", "mat khau", "cvv", "số thẻ", "so the", "mã pin", "ma pin")):
+        return (
+            "Từ chối xử lý và không lưu/lặp lại thông tin nhạy cảm (OTP, mật khẩu, số thẻ hoặc mã PIN). "
+            "Ứng dụng chỉ nhận hóa đơn mua hàng thông thường, vui lòng che hoặc xóa các thông tin bảo mật ngân hàng trước khi gửi."
+        )
     if any(k in low for k in ("cổ phiếu", "co phieu", "chứng khoán", "chung khoan", "coin", "crypto", "đầu tư", "dau tu")):
         return (
             "Từ chối tư vấn đầu tư: ứng dụng chỉ hỗ trợ nhận hóa đơn, lưu note chi tiêu hằng ngày và phân tích chi tiêu cá nhân, "
@@ -70,14 +77,22 @@ def _build_context(text: str) -> tuple[str, str]:
     """Chạy công cụ theo luồng cố định, trả về (context_for_model, deterministic_summary)."""
     if _is_receipt_input(text):
         parsed = parse_receipt_text(text)
+        if parsed.get("duplicate_of"):
+            day_info = get_day_summary(parsed["date"]) if parsed.get("date") else {"total": 0}
+            note("trùng mã lượt chụp: không cộng đúp")
+            summary = (
+                f"Mã lượt chụp {parsed['capture_id']} đã được ghi nhận trước đó ({parsed['duplicate_of']}), "
+                f"hệ thống không cộng trùng. Tổng chi ngày {parsed['date'] or 'liên quan'} vẫn giữ nguyên là {_fmt_vnd(day_info['total'])}."
+            )
+            return f"parse_receipt_text={parsed}\nget_day_summary={day_info}", summary
         if parsed["missing_fields"]:
             missing = ", ".join(parsed["missing_fields"])
-            note("dừng: thiếu trường hóa đơn (%s)" % missing)
+            note("Cần đọc lại: thiếu hoặc mờ trường hóa đơn (%s)" % missing)
             summary = (
-                f"Không thể tự lưu vì hóa đơn còn thiếu/mờ: {missing}. "
+                f"Giữ ảnh ở mục Cần đọc lại vì hóa đơn còn thiếu/mờ: {missing}. "
                 f"(Đã nhận diện tạm: nơi chi={parsed['merchant']}, ngày={parsed['date'] or 'chưa rõ'}, "
                 f"tổng={_fmt_vnd(parsed['total']) if parsed['total'] is not None else 'chưa rõ'}). "
-                f"Vui lòng bổ sung {missing} để lưu note ngày."
+                f"Vui lòng bổ sung {missing} hoặc chụp lại ảnh rõ hơn để lưu note ngày."
             )
             return f"Kết quả parse_receipt_text: {parsed}", summary
 
@@ -87,6 +102,7 @@ def _build_context(text: str) -> tuple[str, str]:
             total=parsed["total"],
             category=parsed["category"],
             note=f"Lưu từ hóa đơn {parsed['merchant']}",
+            capture_id=parsed.get("capture_id") or "",
         )
         note("lưu note hóa đơn thành công")
         summary = (

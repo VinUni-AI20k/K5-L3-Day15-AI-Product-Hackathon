@@ -56,6 +56,7 @@ def generate(seed: int = SEED) -> dict:
         records.append(
             {
                 "id": f"EXP-{rec_id:03d}",
+                "capture_id": f"CAP-{rec_id:03d}",
                 "date": date_str,
                 "time": time_str,
                 "merchant": merchant,
