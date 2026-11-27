@@ -15,7 +15,11 @@
 | Nhãn | tự viết — không phải `synthetic` sinh bằng model, cũng **không phải bằng chứng pain** |
 | Giới hạn | chỉ 6 đoạn và 2 câu có rubric, nên câu chấm trong bộ thử chỉ xoay quanh ON1/ON2. Chưa phải tài liệu khoá thật → câu tìm thấy đoạn trong demo không chứng minh được nó bám tài liệu học viên đang học. Chỉ có câu điền text, chưa có bài nộp code hay trắc nghiệm (nên metric `cham_code_khop_test` hiện chưa có dòng nào áp dụng). Tìm đoạn bằng so khớp từ khoá, sẽ sót khi người dùng diễn đạt khác |
 
-## Dataset 2 · Câu trả lời pre-class của học viên (data BTC cấp, `data/preclass/answers.csv`)
+### Đoạn ôn bổ sung từ PDF Ngày 2
+
+`tai-lieu-mau.json` có 19 đoạn diễn giải từ tài liệu AI20K “Ngày 2 — Discovery & Problem Framing”, ngoài 6 đoạn ML mẫu. Các đoạn phủ kiểm chứng thống kê, PAIR và baseline, Discovery, stakeholder, metric và chi phí lỗi, tính khả thi, Gate 0, acceptance test và quản lý rủi ro. Mỗi đoạn có mã `D02-Pxxx` và số trang tính từ bìa PDF. Nhóm chọn và diễn giải nội dung từ lớp chữ, gồm cả nhãn trong sơ đồ Kim cương đôi và bảng hai kiểu sai. Phần cần đọc trực tiếp từ hình chưa được đối chiếu. Bộ rubric hiện dùng cho hai câu ML mẫu.
+
+## Dataset 2 · Metadata pre-class của học viên (data BTC cấp, `data-btc/preclass/answers.csv`)
 
 | | |
 |---|---|
@@ -32,11 +36,11 @@
 | | |
 |---|---|
 | Dùng để làm gì | chạy `python run.py eval`, chấm theo `eval/metric_spec.yaml` |
-| Từ đâu | nhóm tự viết dựa trên Dataset 1; cột `source` của cả 15 dòng ghi `tu_viet`. Chưa có câu từ người dùng (`nguoi_dung`) hay data thật (`data_that`) |
-| Xử lý những bước gì | viết tay · đã xoá 3 dòng mẫu cũ · chưa dùng data sinh tự động |
-| Số dòng / số đoạn | 15 câu (thuong 5 · kho 6 · tu_choi 4, trong đó 2 câu tấn công B13, B14) · cần 20–30 câu ở CP3 |
-| Phiên bản / ngày lấy | bản đầu CP2, 27/11 |
-| Nhãn | tự viết (chưa phải `synthetic` sinh bằng model) |
-| Giới hạn | `python run.py check` đang cảnh báo 0/15 câu từ người dùng hoặc data thật (cần ≥1/3). Cần bổ sung bằng câu hỏi/câu trả lời thật của học viên (từ phỏng vấn, khảo sát hoặc data BTC), không tự gán nhãn cho câu tự viết |
+| Từ đâu | 15 ca tự soạn dựa trên rubric mẫu. 8 ca chuyển thể từ metadata hậu kiểm Ngày 2 trong Dataset 2 và đối chiếu đoạn ôn trong Dataset 1. |
+| Xử lý những bước gì | Lọc hậu kiểm Ngày 2 có `was_correct=False`, chọn tám mã kiến thức có đoạn PDF tương ứng và viết yêu cầu tự ôn cho từng mã. Chỉ lưu mã bản ghi và mã kiến thức để đối chiếu. |
+| Số dòng / số đoạn | 23 câu (thuong 7 · kho 12 · tu_choi 4, gồm hai ca tấn công B13 và B14) |
+| Phiên bản / ngày lấy | bản CP3, 28/11 |
+| Nhãn | 15 `tu_viet`, 8 `data_that` (chuyển thể từ metadata BTC) |
+| Giới hạn | Các dòng B16–B23 kiểm sinh đề theo chủ đề từng làm sai. Bộ dữ liệu không chứa bài làm nguyên văn để kiểm AI chấm lại câu trả lời thật. |
 
 **Data `synthetic`:** hiện chưa có dữ liệu sinh bằng model hoặc script. Nếu sinh thêm câu thử hay đoạn nguồn, ghi cách sinh (prompt / script), seed, người kiểm và số dòng đã kiểm tay vào mục tương ứng. Data tự dựng không phải bằng chứng pain.

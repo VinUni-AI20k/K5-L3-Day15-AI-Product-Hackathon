@@ -1,0 +1,59 @@
+REQUIREMENTS CP3 — SAUBA · AI20K L3A
+
+Hạn theo spec: 10:00 thứ Bảy, 28/11/2026 (giờ Việt Nam).
+Phân công theo vai trò trong TEAMS.md. Bùi Anh Dũng nhận bàn giao và nộp CP3.
+
+ĐÃ CÓ
+
+- Benchmark: 23 ca, 12 ca khó, 4 ca từ chối, 8 ca chuyển thể từ dữ liệu BTC.
+  python run.py check đã qua.
+- Lượt 1: 17/23 (74%), Run ID run-1@20261128-041615. Báo cáo đã ghi kết quả.
+- Thử chi phí: 10 phiên, 0 lỗi, Run ID simulate-try@20261128-050357.
+- Spec §0–§7 đã có nội dung chính. §0 còn thiếu ảnh quy trình tự ôn thực tế.
+- Video demo đã có link trong README. Quyền xem khi đăng xuất cần kiểm tra.
+
+LÊ HOÀNG ANH — GIAO DIỆN, KIỂM DEMO VÀ CHẤM ĐỘC LẬP
+
+[ ] Mở https://youtu.be/Dz5oFrmJKHM trong tab ẩn danh. Xác nhận video phát
+    được và có cảnh AI tạo đề, hiển thị câu hỏi kèm mã hoặc trang nguồn.
+    Gửi lại trạng thái xem được hoặc cần chỉnh quyền.
+[ ] Nhận 5 output Lượt 1 từ Dương. Chấm 1/0 và ghi lý do ngắn cho từng ca
+    theo pass_criterion và metric. Gửi kết quả trước khi xem cột pass,
+    ghi_chu hoặc lượt rà soát AI. Vai trò chấm độc lập dành cho người
+    không tham gia viết metric.
+
+VƯƠNG XUÂN DƯƠNG — ĐÁNH GIÁ VÀ KIỂM HỒ SƠ NỘP
+
+[ ] Chọn 5 output thật từ Lượt 1, ưu tiên đủ dạng ca và có một ca sát ranh
+    giới. Gửi cho Hoàng Anh các trường id, input, expected,
+    pass_criterion, output và file eval/metric_spec.yaml. Ẩn pass,
+    ghi_chu và kết quả rà soát trước đó.
+[ ] Khi nhận điểm, đối chiếu với pass đã lưu và điền tên người chấm, số
+    khớp x/5 và mã ca lệch vào eval/README.md §3. Mục tiêu ít nhất 4/5.
+    Nếu lệch, ghi rõ cách hiểu tiêu chí và giữ kết quả Lượt 1 đã lưu.
+[ ] Rà bộ nộp: chạy python run.py check và python run.py score eval/run-1.csv.
+    Xác nhận có eval/run-1.csv, traces/run-1.jsonl, eval/report.md và ghi chú
+    thử chi phí trong cost/cost-estimate.md. Báo các file đã sẵn sàng để Dũng
+    đưa vào commit nộp.
+
+PHAN VĂN CƯỜNG — BẰNG CHỨNG VÀ SPEC
+
+[ ] Bổ sung 3 trích dẫn thật đã ẩn danh vào evidence/summary.md §3 để đủ 5.
+    Dùng câu trả lời mở hoặc lời phỏng vấn, giữ nguyên nội dung và ghi
+    mã phiếu hoặc mã phỏng vấn. Các lựa chọn có sẵn trong Form vẫn được
+    ghi là bằng chứng định lượng.
+[ ] Nếu dùng Form làm nguồn đạt ngưỡng, xác nhận có ít nhất 20 người
+    đúng đối tượng và ngoài nhóm dự án. Cập nhật số đã xác minh. Nếu
+    còn thiếu nguồn xác minh, ghi rõ phần còn thiếu.
+[ ] Bổ sung ảnh minh họa quy trình tự ôn ở spec.md §0 khi có ảnh đã che
+    thông tin. Rà §0–§7 để số liệu khớp báo cáo và phân biệt số đo với
+    số tự ước tính. Bàn giao spec và hồ sơ bằng chứng cho Dũng.
+
+BÀN GIAO CHO ĐỘI TRƯỞNG
+
+- Hoàng Anh gửi trạng thái link và kết quả chấm 5 ca cho Dương.
+- Dương gửi số khớp, Run ID và danh sách file nộp cho Dũng.
+- Cường gửi hồ sơ bằng chứng và xác nhận mục §0 cho Dũng.
+- Giữ chuẩn đạt, bộ câu thử, output và trace Lượt 1 làm mốc so sánh
+  với CP4. Giữ .env, dữ liệu BTC gốc và dữ liệu cục bộ .prototype/
+  ngoài commit.

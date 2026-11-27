@@ -37,3 +37,4 @@ data-btc
 data-btc/
 # Zip đóng gói
 dist/
+.prototype/

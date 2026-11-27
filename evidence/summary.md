@@ -16,6 +16,7 @@
 - Đào data: __/__ (__%) …
 - Phỏng vấn: __/3 người gặp *(n nhỏ không ghi %)* · số lần / tháng: P1 __, P2 __, P3 __ · mỗi lần mất __–__ phút
 - Khảo sát Google Form “Khảo sát thói quen kiểm tra kiến thức — Học viên AI20K”, bản CSV có 21 phản hồi. Ở câu 4, 17/21 (81%) không xác định rõ ý kiến thức mình còn yếu, gồm 15 người chỉ biết mơ hồ và 2 người không biết. 4 người cho biết họ biết rõ. Chưa xác minh người trả lời nào thuộc nhóm.
+- Ở câu 5 (chọn tối đa hai), 13/21 chọn thiếu thời gian xem lại slide hoặc video, 10/21 chọn khó xác định ý kiến thức còn yếu, và 10/21 chọn thiếu câu hỏi ôn bám nội dung từng buổi.
 
 Phỏng vấn nhiều vai thì đếm theo từng vai, không cộng chung.
 
@@ -28,10 +29,16 @@ Phỏng vấn nhiều vai thì đếm theo từng vai, không cộng chung.
 ## 3. ≥5 trích dẫn hoặc ví dụ nguyên văn (có nguồn, bỏ tên)
 
 1. “có kiến thức do học quá lâu nên nhiều phần không nhớ cách giải thích các khái niệm hoặc ý tưởng của một bài tập” — phiếu S11, câu 8 của Google Form. S11 là phản hồi thứ 11 theo thứ tự trong bản CSV, không tính dòng tiêu đề.
-2.
+2. “Các kiến thức trong slide đang quá tổng quan” — phiếu S21, câu 8 của Google Form.
 3.
 4.
 5.
+
+**Lựa chọn có sẵn trong Form, câu 5 (chọn tối đa hai).** Các dòng dưới đây là nguyên văn phương án mà học viên đã chọn. Số lượt chọn được đếm trên 21 phản hồi. Đây là bằng chứng khảo sát định lượng.
+
+- “Không đủ thời gian xem lại toàn bộ slide/video (vừa học vừa đi làm)” — 13/21.
+- “Không biết mình sai/hổng ở ý kiến thức nào để ôn trúng chỗ yếu” — 10/21.
+- “Không có bộ câu hỏi ôn bám sát đúng nội dung từng buổi” — 10/21.
 
 ## 4. Các nguồn có khớp nhau không
 
