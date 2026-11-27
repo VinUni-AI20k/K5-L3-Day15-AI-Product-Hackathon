@@ -1,0 +1,7 @@
+# Backend web (cách A): một tiến trình FastAPI, trạng thái graph lưu SQLite.
+fastapi
+uvicorn
+pydantic
+langgraph
+langgraph-checkpoint-sqlite
+google-genai
