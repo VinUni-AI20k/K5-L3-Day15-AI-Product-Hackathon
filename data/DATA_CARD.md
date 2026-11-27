@@ -19,7 +19,7 @@
 
 | | |
 |---|---|
-| Dùng để làm gì | Dữ liệu nền cho `codebase/tools.py` (`get_day_summary`, `get_month_calendar`, `analyze_spending`, `save_daily_note`) và đối chiếu đáp án `eval/benchmark.csv`. |
+| Dùng để làm gì | Dữ liệu nền cho `codebase/tools.py` (`get_day_summary`, `aggregate_period`, `compare_periods`, `save_daily_note`) và đối chiếu đáp án `eval/benchmark.csv`. |
 | Từ đâu | Sinh có `seed = 42` từ [data/seed_expenses.py](seed_expenses.py) theo ngữ cảnh Track E (Tài chính). |
 | Xử lý những bước gì | Sinh 2 tháng (`2026-10` và `2026-11`), gắn `capture_id` (`CAP-001`..`CAP-085`), tên cửa hàng dựng (`HIGHLANDS*Q1`, `Circle K Mẫu`, `BACH HOA XANH M1`, `Grab*Bike`…), chừa ngày `0đ`, chèn ca chi lớn `2026-11-11` và ca `không rõ` (`2026-11-20`, `2026-11-22`). Không chứa SĐT, STK, OTP hay tên người thật. |
 | Số dòng / số đoạn | **85** bản ghi (`EXP-001`..`EXP-085`), phủ **6** nhóm chi tiêu + `không rõ`. |
@@ -32,7 +32,7 @@
 | Dùng để làm gì | Đo chất lượng qua `python run.py eval`. |
 | Từ đâu | Kết hợp tình huống tự viết, seed 42 và 7 tình huống chuyển thể từ [review công khai](../evidence/data-mining.md). Số tiền, mốc ngày và mã lượt chụp trong benchmark là dữ liệu mẫu. |
 | Số dòng | **20** câu thử CP2 (`thuong`: 8 · `kho`: 8 · `tu_choi`: 4, gồm 2 câu tấn công + ca OTP/số thẻ). |
-| Giới hạn | Hiện có 7/20 tình huống chuyển thể từ review. CP3 cần kiểm lại các câu trên ảnh thật hoặc dữ liệu mẫu phù hợp, đồng thời duy trì tỷ lệ nguồn thật ít nhất 1/3. |
+| Giới hạn | Hiện có 7/20 tình huống chuyển thể từ review. CP3 cần kiểm lại các câu trên ảnh chụp hóa đơn giả lập hoặc dữ liệu mẫu phù hợp, đồng thời duy trì tỷ lệ nguồn thật ít nhất 1/3. |
 
 ## Lưu trong bản chạy thử
 

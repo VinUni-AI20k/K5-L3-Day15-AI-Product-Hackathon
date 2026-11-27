@@ -22,7 +22,7 @@ Sổ seed 42 có 85 khoản chi giả lập qua tháng 10 và tháng 11/2026. Lu
 | Không ghi khi thiếu căn cứ | Kiểm đầu ra và bản ghi | 100% ca thiếu căn cứ bắt buộc |
 | Đúng phạm vi | Xem phản hồi và xác nhận sổ không đổi | 100% câu từ chối |
 
-**Chuẩn đề xuất:** ít nhất 85% câu đạt và thỏa cả bốn điều kiện trên, tương đương ít nhất 17/20 câu ở bộ CP2. Cần đội trưởng xác nhận chuẩn trước khi nộp.
+**Chuẩn CP2 đã được đội trưởng xác nhận:** ít nhất 85% câu đạt và thỏa cả bốn điều kiện trên, tương đương ít nhất 17/20 câu ở bộ CP2. Xem [spec.md §7](../spec.md).
 
 **Chấm độc lập:** chưa có kết quả từ hai người. Dùng B01, B07, B16, B17 và B18 để chấm riêng theo các cột đáp án, tiêu chí và output, rồi ghi số khớp trên 5.
 
