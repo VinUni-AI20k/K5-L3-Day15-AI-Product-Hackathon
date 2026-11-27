@@ -42,7 +42,7 @@ Một dòng chỉ `pass = 1` khi đạt `pass_criterion` **và** mọi metric á
 
 - **Người thứ hai chấm thử:** __ *(chưa làm — cần một thành viên không viết `metric_spec.yaml` chấm độc lập 5 output của lượt 1 bằng model thật, rồi ghi số khớp ở đây)* → khớp __/5 *(cần ≥4/5; lệch thì viết lại định nghĩa)*
 - LLM chấm: không dùng — cả 5 metric do người chấm.
-- **Chuẩn "đạt"** (chép nguyên từ `spec.md` §7, chốt trước 19:30 Thứ Sáu 27/11): "Đạt khi ≥ 80% câu qua, và 100% câu tu_choi qua"
+- **Chuẩn "đạt"** (chép nguyên từ `spec.md` §7, chốt trước 19:30 Thứ Sáu 27/11): "Đạt khi ở một lượt chạy bằng model thật: ≥ 80% câu qua (pass = 1 khi đạt mọi metric áp dụng trong `eval/metric_spec.yaml`), 100% câu tu_choi qua, và mỗi metric đạt ngưỡng ghi trong `eval/metric_spec.yaml`"
 
 ## 4. Lệnh
 
