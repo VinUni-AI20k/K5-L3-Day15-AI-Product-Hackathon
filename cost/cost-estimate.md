@@ -4,6 +4,8 @@
 > Số **không điền tay**: điền `cost/personas.yaml` → `python run.py simulate` → chép bảng trong `cost/simulate-N-summary.md` vào đây.
 > Lúc build dùng gói miễn phí vẫn tính theo **giá gói trả phí** — đây là chi phí cho lúc đưa vào dùng thật.
 
+**Thử CP3.** `simulate-try@20261128-050357` chạy 10 phiên, seed 42, 0 lỗi. Đo token trên GPT‑5.4 mini và dùng tỷ lệ đạt Lượt 1 (17/23). Chi phí ước tính với GPT‑5.4 mini là **0,0026 USD/phiên**, **0,0035 USD/task thành công** và **16,39 USD/tháng** ở kịch bản 436 người. Kịch bản dùng số tài khoản hoạt động của gói pre-class làm mốc và giả định tần suất dùng SauBa. Kết quả đầy đủ nằm trong `simulate-try-summary.md` do runner sinh tại máy.
+
 ## 1. Đầu vào
 
 - **Persona** (`cost/personas.yaml`): ≥3 kiểu — tỉ lệ, số phiên / người / tháng, số lượt hỏi / phiên. Nguồn: __

@@ -17,7 +17,10 @@ Chế độ giả (mặc định khi .env chưa có MODEL_PROVIDER, hoặc MODEL
 Nối model thật: điền .env (chép từ .env.example), rồi viết nhánh gọi API ở dưới theo docs/connect-model.md
 (có ví dụ OpenAI, Claude, model chạy trên máy, và cách nối nhà cung cấp khác). Không dán API key vào file này.
 """
+import json
 import os
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 from tracing import model_call
 
@@ -51,6 +54,28 @@ def call_model(system: str, user: str) -> dict:
 
     # NHÓM VIẾT: gọi model thật ở đây (theo MODEL_PROVIDER, MODEL_NAME, API_KEY) rồi trả đúng 4 khoá.
     # Ví dụ chép được cho từng nhà cung cấp: docs/connect-model.md mục 2.
+    if MODEL_PROVIDER == "openai":
+        if not MODEL_NAME or not API_KEY:
+            raise ValueError("Cần điền MODEL_NAME và API_KEY trong .env.")
+        body = {"model": MODEL_NAME, "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]}
+        request = Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=75) as response:
+                data = json.load(response)
+        except HTTPError as error:
+            raise RuntimeError(f"OpenAI trả lỗi HTTP {error.code}.") from None
+        return {"text": data["choices"][0]["message"]["content"], "model": data["model"],
+                "tokens_in": data["usage"]["prompt_tokens"],
+                "tokens_out": data["usage"]["completion_tokens"]}
+
     raise NotImplementedError(
         "chưa viết phần gọi model thật cho MODEL_PROVIDER=%s trong codebase/ai.py — xem docs/connect-model.md"
         % MODEL_PROVIDER)

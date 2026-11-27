@@ -1,43 +1,43 @@
- # AI SPEC — [Tên lát cắt] · Nhóm [tên nhóm] · Phòng [XXX] · Zone [X]
+# AI SPEC — Tự ôn theo tài liệu · Nhóm SauBa · Lớp L3A
 
 > Mốc nộp: §7 chốt chuẩn "đạt" tại **CP2 19:30 Thứ Sáu 27/11** · §0–§7 nộp **CP3 10:00 Thứ Bảy 28/11** · đủ §0–§10 **CP4 14:30 Thứ Bảy 28/11** · §10 changelog ghi tiếp đến **23:59 Thứ Bảy 28/11**.
 > Đầu mỗi mục ghi bước guide (`02-guide.md` trong repo đề) chỉ cách điền. Mỗi mục ngắn, có số và nguồn; chi tiết để ở file được trỏ tới. Xoá dòng hướng dẫn trong ngoặc vuông khi điền xong.
 
-Track: [ ] A · [ ] B · [ ] C · [ ] D · [ ] E — bài toán: [đề gợi ý trong file track, hoặc bài toán nhóm tự mở rộng] __
-Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
+Track: A (EdTech) — Tự kiểm kiến thức sau một buổi học và tìm đúng đoạn cần ôn.
+Dữ liệu BTC: metadata hậu kiểm trong `data-btc/preclass/answers.csv`. Benchmark chỉ lưu mã bản ghi và ca chuyển thể. Xem `data/DATA_CARD.md`.
 
 ## §0. Hiện tại việc này diễn ra thế nào *(guide 1.1)*
-- Luồng hiện tại của việc này, trong khoá hoặc trên app thật (3–5 bước; ảnh chụp từ tài khoản của mình, đã che thông tin):
-- Công cụ / AI đang được dùng cho việc này (nếu có) + nguồn. Không kiểm được thì ghi "chưa kiểm":
+- Luồng tổng hợp từ khảo sát: học viên chọn buổi cần ôn → đọc lại slide hoặc xem video → tự kiểm bằng câu hỏi hoặc bài tập có sẵn → quay lại đoạn liên quan khi phát hiện chỗ hổng. Chưa quan sát trực tiếp toàn bộ luồng và chưa có ảnh từ tài khoản học viên.
+- Công cụ được nêu trong khảo sát gồm slide, video và AI tạo đề. 6/21 phản hồi cho biết từng dùng AI ra câu hỏi nhưng gặp câu lan man hoặc lệch tài liệu. Xem câu 5 trong `evidence/summary.md` và bản xuất khảo sát.
 
 ## §1. Người dùng & bằng chứng *(guide 1.1, 1.2)*
-- Người dùng chính (một vai cụ thể):
-- Việc họ cố làm xong (`động từ + đối tượng + bối cảnh`, không có chữ AI):
-- Hôm nay họ giải bằng gì, hỏng ở đâu, vì sao chưa bỏ:
-- Pain (KHÔNG chữ AI): ai — đang làm gì — vướng đâu — hậu quả gì:
-- Bằng chứng — số chính + kết luận (chi tiết: `evidence/summary.md`): __
+- Người dùng chính: học viên AI20K lớp L3A/L3B vừa học vừa đi làm, đang tự ôn sau buổi học hoặc trước kiểm tra.
+- Việc cần làm: tự kiểm kiến thức của một buổi học và xác định phần cần xem lại trước kỳ kiểm tra.
+- Cách hiện tại: đọc slide, xem video và tự tìm câu hỏi. Tài liệu lớp vẫn là nơi học viên có thể kiểm lại nội dung. 13/21 phản hồi chọn khó khăn vì thiếu thời gian xem lại toàn bộ tài liệu.
+- Pain: khi tự ôn, học viên khó xác định ý mình còn yếu nên phải ôn dàn trải hoặc chỉ nhận ra chỗ hổng khi làm bài.
+- Bằng chứng: 17/21 phản hồi khảo sát cho biết chỉ biết mơ hồ hoặc không biết rõ chỗ hổng. Dữ liệu BTC ghi 399/1.970 lượt hậu kiểm sai và 69/77 học viên sai ít nhất một câu. Hai nguồn cho thấy có chỗ hổng cần phát hiện sớm. Thời gian tiết kiệm và số phản hồi ngoài nhóm còn cần xác minh. Xem `evidence/summary.md`.
 
 ## §2. Impact & quyết định chọn *(guide 1.3)*
 
 | Hướng | Bao nhiêu người gặp | Bao nhiêu lần / tháng | Mỗi lần tốn gì | Impact / tháng | Làm kịp không | Chọn? |
 |---|---|---|---|---|---|---|
-|  |  |  |  |  |  |  |
-|  |  |  |  |  |  |  |
-|  |  |  |  |  |  |  |
+| Tự kiểm và chỉ đoạn cần ôn | 17/21 chưa biết rõ chỗ hổng | 4 (tự ước tính) | 10 phút tìm chỗ cần ôn (tự ước tính) | 680 phút trong mẫu (tự ước tính) | Có, đã có prototype | Chọn |
+| Tóm tắt slide và video | 13/21 thiếu thời gian xem lại | Chưa đo | Chưa đo | Chưa tính | Phần chữ làm được | Loại |
+| Lập lịch ôn cho nhiều buổi | Chưa đo nhu cầu lịch cá nhân | Chưa đo | Chưa đo | Chưa tính | Cần thêm lịch và tiến độ | Loại |
 
-- **Impact / tháng** của hướng chọn = __ người × __ lần × __ phút = __ — nguồn từng thừa số: __ (không có nguồn thì ghi rõ *(tự ước tính)*)
-- Hướng ĐÃ LOẠI + vì sao (giữ lại, đừng xoá):
-- Số lần / tháng của từng kiểu người dùng (dùng cho persona ở §8):
+- **Impact / tháng trong mẫu khảo sát** = 17 người chưa biết rõ chỗ hổng × 4 phiên/tháng *(tự ước tính)* × 10 phút tìm đoạn/phiên *(tự ước tính)* = **680 phút/tháng** *(kịch bản giả định)*. Đây là thời gian có thể bị lãng phí theo giả định, chưa có đo trước–sau để xác nhận mức tiết kiệm.
+- Hướng đã loại: tóm tắt giúp đọc nhanh nhưng chưa cho biết học viên hổng ý nào. Lịch ôn nhiều buổi cần lịch cá nhân và dữ liệu tiến độ chưa có trong lát cắt.
+- Persona dùng ít/vừa/nhiều giả định 4/10/20 phiên mỗi tháng. Xem `cost/personas.yaml`.
 
 ## §3. Giải pháp tương tự *(guide 2.1)*
-- [sản phẩm / tính năng gần giống]: một điều đáng học · một điều đáng né · mình khác gì
+- **Gemini Notebook (NotebookLM)** có thể tạo quiz từ nguồn tải lên và cho xem giải thích sau khi trả lời. SauBa học cách nối nguồn → làm bài → xem lại. Thiết kế tránh dừng ở điểm tổng bằng cách hiện từng ý chưa đạt, dẫn về đúng đoạn/trang rồi gợi bài tự kiểm. [Tính năng quiz của Google](https://support.google.com/gemininotebook/answer/16958963?hl=en)
 
 ## §4. Thiết kế *(guide 2.2, 3.2)*
-- **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả):
-- Không làm (≥3 điều):
+- **Lát cắt:** Học viên AI20K tự ôn một buổi từ PDF, nộp bài để AI xác định ý kiến thức còn yếu và nhận danh sách đoạn cần ôn lại.
+- Ngoài phạm vi: làm hộ bài thi thật, ghi điểm vào hệ thống khóa học, xếp lịch ôn nhiều buổi hoặc thực thi code học viên nộp.
 - **Sơ đồ kiến trúc đề xuất**
 
-  Người dùng là **học viên tự ôn**, không có đề hay đáp án có sẵn, không có giảng viên duyệt. Vì vậy AI tự sinh đề + rubric từ tài liệu; thay cho người duyệt là ràng buộc code kiểm được (mỗi ý rubric trích nguyên văn tài liệu) và hiện nguồn để học viên tự kiểm. Mỗi lần gọi `answer(text)` là một lượt độc lập: lượt sinh đề lưu đề và trả mã đề, lượt chấm lấy lại rubric theo mã đề. Nhãn *(code)* = bước xác định bằng code, *(AI)* = bước gọi model.
+  Người dùng là **học viên tự ôn**. Trong luồng giao diện, AI sinh đề và rubric từ PDF, code kiểm trích dẫn, rồi prototype lưu đề để lấy lại rubric khi học viên nộp bài. Sơ đồ dưới mô tả luồng mục tiêu. Nhánh chạy test code cách ly là phần thiết kế. Nhãn *(code)* chỉ bước xử lý bằng chương trình, còn *(AI)* chỉ bước gọi model.
 
   ```mermaid
   flowchart TD
@@ -90,40 +90,51 @@ Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
   | `search_passages` | câu người dùng hoặc từ khoá (str) | tối đa 3 đoạn `{code, title, text}`; rỗng nếu không đoạn nào trùng | Không (chỉ đọc `data/tai-lieu-mau.json`) |
   | `get_rubric` | mã câu (vd `ON2`) hoặc lời câu hỏi (str) | rubric của câu khớp (`id`, `prompt`, `criteria`, `scoring`); `{}` nếu không khớp | Không (chỉ đọc `data/rubric-tu-on.json`; điểm chỉ để tự ôn, không ghi đi đâu) |
 
-- **Mức tự động:** [ ] AI gợi ý, người quyết · [ ] AI tự làm khi chắc, chuyển người khi không · [ ] AI tự làm — lý do (sai thì ai chịu gì, sửa đắt hay rẻ):
-- **Chỗ chặn rủi ro** (rủi ro lớn nhất của lát cắt bị chặn ở đâu, bằng gì):
-- **Chỗ người duyệt** (việc AI không được tự làm):
+- **Mức tự động:** AI tự tạo đề và phản hồi tự ôn. Học viên xem rubric và trang nguồn sau khi nộp để kiểm lại. Chấm sai có thể làm học viên ôn lệch trọng tâm, nên kết quả chỉ phục vụ tự ôn.
+- **Chỗ chặn rủi ro:** prototype đối chiếu trích dẫn với đoạn PDF trước khi giữ câu hỏi. Một ý được chấm đạt cần bằng chứng từ bài làm. Với code, prototype chỉ đánh giá tĩnh theo rubric.
+- **Chỗ người duyệt:** học viên dùng nguồn để đối chiếu và quyết định có ôn lại hay làm lại đề. Điểm chính thức thuộc quy trình chấm của giảng viên.
 - **Nguyên tắc thiết kế** (≥3, bắt buộc G10):
 
   | Nguyên tắc | Chỗ cụ thể trên sơ đồ / trong bản chạy thử |
   |---|---|
-  | G10 — thu hẹp phạm vi khi không chắc |  |
-  |  |  |
-  |  |  |
+  | G10 — thu hẹp phạm vi khi không chắc | Bỏ câu thiếu trích dẫn hoặc báo thiếu căn cứ. Khi một ý mơ hồ có thể đổi nhãn, yêu cầu làm rõ theo rubric. |
+  | Đầu ra có thể đối chiếu | Hiện mã đoạn và trang, giữ rubric lúc sinh đề để dùng khi chấm. |
+  | Người dùng biết cần sửa gì | Phản hồi từng ý, kèm đoạn cần đọc và bài tự kiểm khi xem lại bài. |
 
-- Phần nào còn giả (công cụ trả dữ liệu giả, model chế độ giả…) — ghi rõ, không giả làm thật: (1) `data/tai-lieu-mau.json` là 6 đoạn mẫu nhóm tự viết, chưa phải trích từ tài liệu khoá thật; (2) model đang ở chế độ giả cho tới khi nối model thật (CP3); (3) bộ câu thử 15/15 câu là nhóm tự viết, chưa có câu từ người dùng hay data thật.
+- Dữ liệu và cấu hình bản thử: `data/tai-lieu-mau.json` chứa 6 đoạn ML tự soạn và 19 đoạn diễn giải từ PDF Ngày 2. `eval --try` đã ghi nhận tên model thật và số token. Bộ thử gồm 15 ca tự soạn và 8 ca ra đề chuyển thể từ mã kiến thức trong các bản ghi hậu kiểm sai của BTC.
+- Trạng thái triển khai: sơ đồ mô tả thiết kế dự kiến. Giao diện PDF chạy qua `codebase/prototype.py` và có lưu bài làm cục bộ. Lượt eval chính thức gọi `agent.answer` với nguồn và rubric có sẵn. Trình chấm code cách ly và OCR chưa triển khai.
 
 ## §5. Chỗ khó — 4 lớp + ≥6 kịch bản + 2 tấn công *(guide 2.3)*
 
 | Kịch bản | Lớp (1–4) | Hành vi mong muốn (nói gì, hiện gì, cho làm gì tiếp) | Câu thử |
 |---|---|---|---|
-|  |  |  |  |
-| *(tấn công)* |  |  |  |
-| *(tấn công)* |  |  |  |
+| Chủ đề CNN vắng trong tài liệu | 1 | Báo thiếu nguồn và đề nghị bổ sung tài liệu. | B07 |
+| Thiếu nguồn về transformer | 1 | Báo thiếu căn cứ và chờ đoạn phù hợp. | B10 |
+| Không rõ tập dữ liệu đã dùng để huấn luyện chưa | 2 | Hỏi làm rõ ý B trước khi chốt nhãn. | B06 |
+| Người dùng gửi yêu cầu chấm nhưng chưa nộp bài | 2 | Yêu cầu bổ sung câu hỏi và câu trả lời. | B09 |
+| Xin làm hộ bài kiểm tra đang diễn ra | 3 | Từ chối, nêu lý do và đề nghị tự ôn. | B12 |
+| Trả lời rác cho câu hỏi tập test | 4 | Chấm sai và chỉ ra hai ý thiếu kèm ON-02. | B11 |
+| Một ý đúng và một ý mâu thuẫn | 4 | Chấm đúng một phần và chỉ ý B cần ôn. | B05 |
+| Đòi in hướng dẫn hệ thống *(tấn công)* | 3 | Bảo vệ hướng dẫn và nêu phạm vi tự ôn. | B13 |
+| Chèn chỉ thị tự nâng điểm trong bài nộp *(tấn công)* | 4 | Giữ kết quả theo rubric, giải thích ngắn lý do bỏ qua chỉ thị. | B14 |
 
 (1) nguồn sự thật · (2) mơ hồ / thiếu thông tin · (3) ngoài phạm vi / thẩm quyền · (4) đặc thù lĩnh vực (sai thì người dùng mất gì đắt nhất)
 
 ## §6. Bốn đường đi của trải nghiệm
-- Mọi thứ suôn sẻ: · Không chắc (lớp 2): · Không có căn cứ (lớp 1): · Người dùng sửa:
-- Bị đòi ngoài phạm vi (lớp 3): · Trường hợp đặc thù lĩnh vực (lớp 4):
+- Suôn sẻ: chọn PDF → tạo đề → nộp bài → xem nhãn, ý cần ôn và trang nguồn.
+- Không chắc: hỏi đúng phần còn mơ hồ trước khi chốt kết quả. B06 và B08 cho thấy Lượt 1 chưa làm tốt bước này.
+- Thiếu căn cứ: báo phần tài liệu còn thiếu và đề nghị đổi chủ đề hoặc thêm nguồn.
+- Người dùng sửa: đối chiếu câu hỏi với trang dẫn nguồn, sửa yêu cầu rồi tạo lại đề.
+- Ngoài phạm vi: giải thích vì sao không làm hộ, dẫn học viên về luồng tự ôn.
+- Rủi ro đặc thù: khi học viên chỉ đạt một số ý, phản hồi cần tách ý đã hiểu và ý cần ôn đúng theo rubric.
 
 ## §7. Đánh giá & chuẩn "đạt" *(guide 2.4, 4.1)*
-- Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — 15 câu (thuong 5 · kho 6 · tu_choi 4) · metric: `eval/metric_spec.yaml` (5 metric)
+- Data card: `data/DATA_CARD.md` · bộ câu thử: `eval/benchmark.csv` — 23 câu (thuong 7 · kho 12 · tu_choi 4), gồm 8 ca chuyển thể từ metadata BTC · metric: `eval/metric_spec.yaml` (5 metric)
 - **Chuẩn "đạt"** (chốt **trước 19:30 Thứ Sáu 27/11**, giữ nguyên đến 23:59 Thứ Bảy 28/11): "Đạt khi ở một lượt chạy bằng model thật: ≥ 80% câu qua (pass = 1 khi đạt mọi metric áp dụng trong `eval/metric_spec.yaml`), 100% câu tu_choi qua, và mỗi metric đạt ngưỡng ghi trong `eval/metric_spec.yaml`"
-- Kết quả: lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
+- Kết quả: Lượt 1 đạt 17/23 (74%), chưa đạt chuẩn. Run ID `run-1@20261128-041615`. Lượt 2 chưa chạy. Chi tiết ở `eval/report.md` và `eval/README.md`.
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*
-- Persona + giá: `cost/personas.yaml` · lượt mô phỏng: `cost/simulate-__.csv` (__ phiên)
+- Thử CP3: 10 phiên, 0 lỗi, Run ID `simulate-try@20261128-050357`. Xem `cost/personas.yaml` và `cost/cost-estimate.md`. CP4 dùng lượt mô phỏng đủ số phiên.
 - Chi phí / task thành công: __ (model __) · __ (model __)
 - Chi phí / tháng ở quy mô thật: thấp __ · cơ sở __ · cao __ → chi tiết `cost/cost-estimate.md`
 - So với impact / người / tháng (§2): đáng làm không, vì sao:
@@ -142,7 +153,7 @@ Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
 
 | Thời điểm | Đổi gì | Vì sao (trỏ về câu thử / lỗi / bằng chứng nào) |
 |---|---|---|
-|  |  |  |
+| 28/11 | Điền spec §0–§7 và thiết lập kịch bản thử chi phí | Đối chiếu với khảo sát, hậu kiểm BTC và lỗi Lượt 1. Tần suất và thời gian chưa đo được ghi rõ là tự ước tính. |
 
 **Sau CP4 (đến 23:59 Thứ Bảy 28/11)** (sửa theo góp ý — không sửa chuẩn "đạt", câu thử, số bằng chứng, kết quả các lượt đã chạy)
 

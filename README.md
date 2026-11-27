@@ -102,6 +102,12 @@ Nhóm dùng stack khác (Node, Streamlit, notebook…): sửa hàm `run_app()` t
 
 - **Trước CP2:** để chế độ giả, công cụ trả dữ liệu giả — `python run.py` đi hết luồng là đủ.
 - **Trước CP3:** nối model thật theo [docs/connect-model.md](docs/connect-model.md), `eval --try` thấy token > 0 rồi mới `eval`.
+
+### Thử giao diện tự ôn trên trình duyệt
+
+Chạy `python -m pip install -r requirements.txt` và `python codebase/prototype.py`, rồi mở http://127.0.0.1:8765. Có thể mở đề mẫu và thử đáp án “Để kiểm tra mô hình” ở câu tập test. PDF tải lên cần có lớp chữ. Tệp ZIP cần giải nén trước.
+
+Để sinh và kiểm câu hỏi từ PDF, tạo `.env` ở gốc repo theo `.env.example`. Đặt `MODEL_PROVIDER=openai`, `MODEL_NAME` là model chat mà tài khoản của bạn có quyền dùng, và điền `API_KEY` tại máy. Khởi động lại giao diện, vào **Upload tài liệu**, rồi chọn tài liệu từ danh sách trong **Tạo đề**. Ví dụ yêu cầu “Tạo 3 câu trắc nghiệm, 1 câu code và 1 câu tự luận”. Mặc định đề có 6 câu và phân bổ gần nhất theo tỷ lệ 60/20/20. Câu code được đánh giá theo rubric mà không thực thi bài nộp. Tên PDF, các đoạn văn bản trích ra và đề đã tạo được lưu cục bộ trong `.prototype/`. Khi sinh đề hoặc chấm, phần văn bản cần thiết được gửi tới nhà cung cấp model. Lệnh eval tiếp tục dùng bộ benchmark và entry point hiện có.
 - Bộ chạy gửi **nguyên ô `input`** của câu thử vào `answer(text)`. Dữ liệu nền (bài học, thông báo, lịch…) để trong `data/`, đọc qua công cụ.
 
 ## Phần nào thật, phần nào giả
@@ -147,5 +153,5 @@ ____
 | 4 | Bản chạy thử làm trọn lát cắt | `codebase/` · lệnh ở mục "Lệnh" |
 | 5 | Định nghĩa "tốt" + bộ câu thử | `data/DATA_CARD.md` · `eval/` |
 | 6 | Mô phỏng chi phí khi dùng thật | `cost/` |
-| 7 | Slide + demo + video dự phòng | `demo-slides.pdf` ở thư mục gốc · link video: ____ |
+| 7 | Slide + demo + video dự phòng | `demo-slides.pdf` ở thư mục gốc · [Video demo SauBa CP3](https://youtu.be/Dz5oFrmJKHM) |
 | + | *Bonus:* người dùng thử | `validation/log.md` |
