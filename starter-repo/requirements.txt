@@ -4,5 +4,9 @@
 # và ghi lệnh cài vào README: python -m pip install -r requirements.txt
 # Agent lập lịch du lịch (LangGraph + Gemini) và test
 langgraph
+langgraph-checkpoint-sqlite
 google-genai
+fastapi
+uvicorn
+httpx
 pytest

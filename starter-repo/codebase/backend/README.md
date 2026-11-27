@@ -1,55 +1,12 @@
-### Yêu cầu
+# Backend — Travel Planner
 
-- Python 3.12+
-- PostgreSQL 14+
-- Redis 7+
-- Model AI: cấu hình ở `.env` của khung (`starter-repo/.env`: MODEL_PROVIDER, MODEL_NAME, API_KEY), gọi qua `codebase/ai.py`
+Một tiến trình FastAPI phục vụ API (`/api`) và web React đã build. Không cần database server hay Redis:
+trạng thái từng chuyến đi lưu trong SQLite (`var/trips.sqlite`, đổi bằng env `TRIPS_DB`).
 
-### Cấu hình `.env`
-
-```env
-APP_NAME=Travel Planner API
-DEBUG=false
-
-# Database
-DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/travel_planner
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-
-
-# Auth
-SECRET_KEY=your_secret_key_min_32_chars
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=7
-```
-
-### Cài đặt và khởi chạy
+Kiến trúc, luồng dữ liệu và trạng thái từng phần: [../../ARCHITECTURE.md](../../ARCHITECTURE.md).
 
 ```bash
-# Cài dependencies
-pip install -r requirements.txt
-
-# Chạy database migration
-alembic upgrade head
-
-# Khởi động server
-uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Swagger UI tự động tại: `http://localhost:8000/docs`
-
-### Alembic (Database Migration)
-
-```bash
-# Tạo migration mới
-alembic revision --autogenerate -m "mô tả thay đổi"
-
-# Apply migration
-alembic upgrade head
-
-# Rollback 1 bước
-alembic downgrade -1
+# từ starter-repo/
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python run.py          # mở http://localhost:8000
 ```

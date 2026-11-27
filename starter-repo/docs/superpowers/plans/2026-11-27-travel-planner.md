@@ -84,32 +84,34 @@ starter-repo/
 - [ ] **Step 5:** Viết `_paths.py`, `tests/conftest.py`, và `tests/test_smoke.py::test_imports` (`import tracing, ai, tools; import langgraph`). Run `.venv/bin/pytest tests -q` → PASS.
 - [ ] **Step 6:** Commit `chore: restore framework files, add venv deps and test harness`.
 
-### Task 1: Dữ liệu Đà Lạt + DATA_CARD + bộ đọc dữ liệu
+### Task 1: Nguồn dữ liệu web — Tavily + Nominatim + cache + bảng ước tính (spec §5.10)
 
 **Files:**
-- Create: `data/cities/da_lat/*.json`, `codebase/backend/src/core/planning/data.py`, `tests/test_data.py`
-- Modify: `data/DATA_CARD.md`
+- Create: `codebase/backend/src/core/sources/{cache,tavily_client,geo}.py`, `data/estimates.json`, `codebase/backend/src/core/planning/estimates.py`, `tests/test_sources.py`
+- Modify: `planning/types.py` (thêm `Place`), `planning/data.py` (xoá — thay bằng sources), `data/DATA_CARD.md`, `.env.example` (thêm `TAVILY_API_KEY=`, `SEARCH_MODE=`)
+
+`src/core/sources/` là lớp gọi mạng (hạ tầng); `planning/` vẫn là code thuần, không import `sources`.
 
 **Interfaces:**
-- Produces: `SUPPORTED_CITIES: dict[str, str]` (slug → tên hiển thị, `{"da_lat": "Đà Lạt"}`); `city_slug(name: str) -> str | None` (bỏ dấu, thường hoá, bỏ khoảng trắng: "Đà Lạt", "da lat", "Dalat" → `"da_lat"`); `load_city(slug: str) -> dict` với khoá `diem_choi, quan_an, khach_san, phuong_tien` (list dict), cache theo slug.
+- `cache.cached_call(namespace: str, params: dict, fetch: Callable[[], dict | list]) -> dict | list` — khoá `sha1(json.dumps(params, sort_keys=True))`, file `data/cache/<namespace>/<khoa>.json`. Mode từ env `SEARCH_MODE` (mặc định `live`): `live`/`record` → đọc cache nếu có, không thì gọi `fetch` và ghi; `replay` → chỉ đọc, thiếu thì `raise CacheMiss(namespace, params)`.
+- `SearchHit = TypedDict{title: str, url: str, snippet: str, domain: str}`.
+- `tavily_client.search(query: str, max_results: int = 8, include_domains: list[str] | None = None) -> list[SearchHit]` — POST `https://api.tavily.com/search` bằng `httpx` (key `TAVILY_API_KEY`, timeout 20 s), qua `cached_call("tavily", …)`; `snippet` cắt tối đa 2 câu và 300 ký tự; `domain` bỏ `www.`. Thiếu key ở chế độ live → `raise SearchUnavailable`.
+- `geo.geocode(name: str, city: str) -> tuple[float, float] | None`, `geo.city_center(city: str) -> tuple[float, float] | None` — Nominatim `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=...`, User-Agent `travel-planner-hackathon`, ≥ 1 s giữa hai lần gọi mạng, qua `cached_call("geo", …)`.
+- `Place` (dataclass trong `types.py`): `id: str` (sha1 tên chuẩn hoá + city, 10 ký tự), `name`, `category: Literal["tham_quan","an_uong","luu_tru"]`, `city`, `reason`, `interests: list[str]`, `sources: list[SearchHit]`, `mention_count: int`, `lat/lng: float | None`, `gio_mo: dict[str, list[str]]` ("0"=Thứ Hai), `gio_mo_uoc_tinh: bool`, `thoi_luong_phut: int`, `gia: int` (VND/người, hoặc /đêm/phòng với luu_tru), `gia_uoc_tinh: bool`, `gia_nguon_url: str | None`, `hop_tre_nho: bool | None`, `ngoai_troi: bool | None`.
+- `data/estimates.json`: theo `category` × mức `re|vua|cao` → `gio_mo` (mặc định: tham_quan 08:00–17:30 mọi ngày; an_uong 10:00–21:30; luu_tru 00:00–23:59), `thoi_luong_phut` (tham_quan 90, an_uong 60), `gia`. Nguồn từng mức ghi ở `DATA_CARD.md` *(tự ước tính nếu không có nguồn)*. `estimates.estimate(category: str, muc: str = "vua") -> dict`.
 
-Lược đồ (cố định, các task sau dựa vào):
-- `diem_choi`: `id` ("DC01"…), `ten`, `loai`, `so_thich` ⊂ {kham_pha, am_thuc, ngam_canh, chup_anh}, `gio_mo` {"0".."6" (0=Thứ Hai): ["HH:MM","HH:MM"]} (thiếu khoá = đóng cửa ngày đó), `thoi_luong_phut`, `gia_nguoi_lon`, `gia_tre_em`, `hop_tre_nho` bool, `ngoai_troi` bool, `lat`, `lng`.
-- `quan_an`: `id` ("QA01"…), `ten`, `mon`, `gio_mo` (như trên), `gia_trung_binh_nguoi`, `lat`, `lng`.
-- `khach_san`: `id` ("KS01"…), `ten`, `hang_sao`, `gia_dem` (mỗi phòng), `suc_chua_phong`, `het_phong_ngay` ["YYYY-MM-DD"], `hop_tre_nho`, `lat`, `lng`.
-- `phuong_tien`: `id` ("xe_may","taxi","di_bo"), `ten`, `toc_do_kmh`, `gia_mo_cua`, `gia_moi_km`, `gia_moi_ngay`, `cho_moi_xe`. Giá trị: xe_may 30 km/h, 0, 0, 150000/ngày, 2 chỗ; taxi 30 km/h, 12000, 16000/km, 0, 4 chỗ; di_bo 4.5 km/h, 0, 0, 0, 99 chỗ.
+- [ ] **Step 1: Test** `tests/test_sources.py` (không gọi mạng: monkeypatch `httpx.post`/`httpx.get`, `tmp_path` làm thư mục cache):
+  - `test_cache_live_writes_then_reuses`: gọi 2 lần cùng params → `fetch` chạy 1 lần, có 1 file.
+  - `test_cache_replay_miss_raises`: `SEARCH_MODE=replay`, cache trống → `CacheMiss`.
+  - `test_tavily_hit_shape_and_snippet_trim`: phản hồi giả 1 kết quả có `content` 5 câu → `snippet` ≤ 2 câu, `domain == "vnexpress.net"` cho `https://www.vnexpress.net/...`.
+  - `test_tavily_missing_key_live` → `SearchUnavailable`.
+  - `test_geocode_none_when_empty`: Nominatim trả `[]` → `None`.
+  - `test_estimates_all_categories`: mỗi category × mức có đủ khoá, `gia > 0`.
+- [ ] **Step 2:** FAIL → **Step 3:** implement → **Step 4:** PASS.
+- [ ] **Step 5:** Điền `data/DATA_CARD.md`: nguồn (Tavily, Nominatim/OSM — giấy phép ODbL, ghi công), những gì được lưu (title, url, snippet ≤ 2 câu), bảng ước tính và nguồn, cache nào được commit.
+- [ ] **Step 6:** Commit `feat(sources): Tavily/Nominatim clients with record-replay cache and estimates`.
 
-Cỡ & chỗ khó (bắt buộc): 20 điểm, 15 quán, 8 khách sạn. ≥1 điểm nổi tiếng đóng cửa Thứ Hai; ≥3 điểm `hop_tre_nho=false`; ≥6 điểm `ngoai_troi=true`; ≥2 quán chỉ mở từ 17:00; ≥1 khách sạn hết phòng `2026-11-28` và `2026-12-05`; ≥2 điểm cách trung tâm > 15 km. Tên dựng, không lấy giá thật làm khẳng định.
-
-- [ ] **Step 1: Test** `tests/test_data.py`:
-  - `test_city_slug`: `city_slug("Đà Lạt") == city_slug("dalat") == "da_lat"`; `city_slug("Hội An") is None`.
-  - `test_counts_and_ids_unique`: 20/15/8/3 bản ghi, id không trùng trên toàn bộ.
-  - `test_hard_cases_present`: có điểm không có khoá `"0"` trong `gio_mo`; ≥3 `hop_tre_nho` false; ≥6 ngoài trời; ≥2 quán giờ mở đầu ≥ "17:00"; có KS mà `"2026-11-28" in het_phong_ngay`.
-- [ ] **Step 2:** Run `.venv/bin/pytest tests/test_data.py -q` → FAIL (module chưa có).
-- [ ] **Step 3:** Dựng 4 file JSON (seed cố định, viết tay hoặc script `data/cities/build_da_lat.py` có `random.seed(27)`); viết `data.py`. Đường dẫn data tính từ `Path(__file__).parents[5] / "data" / "cities"` (kiểm bằng test).
-- [ ] **Step 4:** Run lại → PASS.
-- [ ] **Step 5:** Điền `data/DATA_CARD.md`: nguồn tham khảo công khai (trang du lịch, ghi link + ngày xem), cách dựng, seed, các chỗ khó cố ý, "tên và giá là dựng".
-- [ ] **Step 6:** Commit `feat(data): seeded Da Lat dataset and loader`.
+> **Ảnh hưởng tới task khác (theo spec §5.10):** Task 2 — `expected` theo tiêu chí, ≥ 3 thành phố, thêm metric `nguon_hop_le` (100% điểm trong lịch có link nguồn thuộc kết quả tìm), bỏ `HET_PHONG`; cache bộ câu thử ghi bằng `SEARCH_MODE=record` sau Task 7 rồi commit. Task 4 — công cụ `tim_kiem_web`, `dinh_vi`, `tim_review(name, city) -> {videos, articles}`, `uoc_thoi_gian_di(a: Place, b: Place, transport)`, `kiem_lich_trinh`; bỏ `tra_diem_choi/tra_quan_an/tra_khach_san`. Task 5–6 — làm việc trên `Place`; thiếu toạ độ → 20 phút, cờ ước tính; bỏ mã `HET_PHONG`. Task 7 — node theo §5.10 (`plan_queries`, `search`, `extract_candidates`, `ground_and_rank`, `auto_select`), test `test_ungrounded_candidate_dropped` (ứng viên có url ngoài kết quả bị loại). Task 9′ — `status "choose_places"` + `candidates`, `POST /api/trips/{id}/selection {tham_quan, an_uong, luu_tru}`, `GET /api/trips/{id}/places/{place_id}/reviews`. Task 11 — `CandidatePicker` 3 nhóm có giới hạn chọn, nút "Xem review" mở link video / bài viết.
 
 ### Task 2: Chuẩn "đạt" và bộ câu thử (trước 19:30)
 
@@ -263,7 +265,19 @@ Tiền: `ve` = Σ(gia_nguoi_lon × adults + gia_tre_em × số trẻ ≥ 3 tuổ
 - [ ] **Step 2:** Kiểm: `grep -rniE "cv_|interview|job_|tavily|company_research|career" codebase/backend --include=*.py --include=*.txt --include=*.md` → rỗng; `.venv/bin/python -m compileall -q codebase/backend/src` → exit 0; `.venv/bin/pytest tests -q` → vẫn PASS.
 - [ ] **Step 3:** Commit `refactor(backend): remove career/CV/interview modules`.
 
-### Task 9: API du lịch với bước chọn khách sạn
+
+### Task 8b: Rút backend về cách A (spec §5.9)
+
+**Files:**
+- Delete: `src/api/controller/auth.py`, `src/api/config/{security,redis_client,checkpointer,settings,exceptions}.py`, `src/core/application/`, `src/core/infrastructure/`, `src/core/domain/`, `src/migrations/`, `alembic.ini`, `init_db.py`
+- Rewrite: `codebase/backend/requirements.txt` → `fastapi`, `uvicorn`, `pydantic`, `langgraph`, `langgraph-checkpoint-sqlite`, `google-genai` (không pin cứng); cùng các gói này thêm vào `starter-repo/requirements.txt` (bỏ trùng). `src/main.py` chỉ còn app + `/api/health` + mount static (Task 11 nối thêm). `README.md`, `Dockerfile` (CMD giữ uvicorn; bỏ biến DB).
+- Modify: `starter-repo/.gitignore` thêm `codebase/backend/var/`, `codebase/web/node_modules/`.
+
+- [ ] **Step 1: Test** `tests/test_api.py::test_health`: `TestClient(app).get("/api/health").json() == {"status": "ok"}` (thêm `httpx` vào requirements cho TestClient).
+- [ ] **Step 2:** FAIL → **Step 3:** xoá + viết lại → **Step 4:** PASS; `grep -rniE "sqlalchemy|redis|alembic|jwt|postgres" codebase/backend` → rỗng.
+- [ ] **Step 5:** Commit `refactor(backend): single-process FastAPI, drop auth/Postgres/Redis`.
+
+### Task 9 (CŨ — thay bằng Task 9′ bên dưới): API du lịch với bước chọn khách sạn
 
 **Files:**
 - Modify: `agentdtos.py`, `IAgentRepository.py`, `infrastructure/repositories/agent_repo.py`, `api/controller/agent.py`, `graphs/graph.py` (init singleton dùng `get_checkpointer()` + `interrupt_after_select=True`)
@@ -275,6 +289,39 @@ Tiền: `ve` = Σ(gia_nguoi_lon × adults + gia_tre_em × số trẻ ≥ 3 tuổ
 - [ ] **Step 1: Test** `test_interrupt_after_select_and_resume`: `build_travel_graph(MemorySaver(), interrupt_after_select=True)`, invoke với thread_id → dừng, `snapshot.next == ("schedule_node",)`; update hotel sang KS khác còn phòng; `invoke(None, config)` → output chứa tên KS mới.
 - [ ] **Step 2:** FAIL → **Step 3:** implement graph + repo + controller → **Step 4:** PASS; `compileall` exit 0.
 - [ ] **Step 5:** Commit `feat(api): travel session start/resume with hotel confirmation`.
+
+
+### Task 9′: API du lịch (FastAPI + SqliteSaver)
+
+**Files:**
+- Create: `src/api/schemas.py`, `src/api/services/trip_service.py`, `src/api/routes/trips.py`, `tests/test_api.py`
+- Modify: `src/main.py` (include router), `orchestration/graphs/graph.py` (hàm `get_web_graph()`: singleton, `SqliteSaver.from_conn_string(TRIPS_DB)` + `interrupt_after_select=True`), `planning/render.py` (thêm `itinerary_json(req, it, reasons) -> dict`)
+
+**Interfaces:**
+- Consumes: `build_travel_graph`, `TripState`, `render` (Task 7).
+- Produces: `TripView` (Pydantic, đúng spec §5.9), `HotelOption(id, ten, hang_sao, gia_dem, tong_tien_phong)`, `TripService.start(message) -> TripView`, `TripService.choose_hotel(trip_id, hotel_id | None) -> TripView`, `TripService.get(trip_id) -> TripView` (trip không tồn tại → 404).
+
+- [ ] **Step 1: Test** `tests/test_api.py` (monkeypatch `trip_nodes.call_model` như Task 7; env `TRIPS_DB` = file tạm):
+  - `test_start_pauses_for_hotel`: POST /api/trips → `status == "hotel_pending"`, `hotel_options` không rỗng, mọi option `con_phong`.
+  - `test_choose_hotel_completes`: POST hotel với id khác → `status == "ok"`, `itinerary.total == sum(breakdown)`, `chosen_hotel.id` đúng id đã chọn.
+  - `test_keep_hotel_null`: `hotel_id: null` → ok, giữ khách sạn AI chọn.
+  - `test_ask_back_no_pause`: thiếu ngân sách → `status == "ask_back"`, không có `hotel_options`.
+  - `test_unknown_trip_404`; `test_invalid_hotel_id_422` (id không có trong options).
+- [ ] **Step 2:** FAIL → **Step 3:** implement → **Step 4:** PASS.
+- [ ] **Step 5:** Commit `feat(api): trip endpoints with hotel confirmation`.
+
+### Task 11: Web React
+
+**Files:**
+- Create: `codebase/web/` (Vite React TS: `package.json`, `vite.config.ts` có proxy `/api` → `http://localhost:8000`, `src/main.tsx`, `src/App.tsx`, `src/api.ts`, `src/types.ts` (khớp `TripView`), `src/components/{RequestForm,HotelPicker,Itinerary,AssistantMessage}.tsx`, `src/styles.css`), `web/dist/` (build, commit)
+- Modify: `src/main.py` (mount `codebase/web/dist` ở `/`, fallback `index.html`), `codebase/app.py` (thay CLI: chạy `uvicorn.run("src.main:app", port=8000)` sau `import _paths`), `starter-repo/README.md` (lệnh cài, chạy, dev web)
+
+- [ ] **Step 1:** `npm create vite@latest web -- --template react-ts` trong `codebase/`, bỏ file mẫu thừa; `npm i` (không thêm thư viện UI).
+- [ ] **Step 2:** Viết `types.ts`, `api.ts` (`startTrip`, `chooseHotel`, `getTrip`), các component theo spec §5.9; tiền định dạng `toLocaleString("vi-VN") + "đ"` lấy nguyên số từ API (không tự cộng ở client).
+- [ ] **Step 3:** `npm run build` → exit 0, có `web/dist/index.html`.
+- [ ] **Step 4: Test** `tests/test_api.py::test_serves_web`: GET `/` → 200, `text/html`; GET `/trip/abc` (đường dẫn SPA) → 200 `index.html`.
+- [ ] **Step 5:** Chạy `.venv/bin/python run.py`, mở `http://localhost:8000`, thử 1 câu thường + 1 câu thiếu ngân sách với model thật (dùng skill `run` hoặc chụp màn hình).
+- [ ] **Step 6:** Commit `feat(web): React trip planner UI`.
 
 ### Task 10: Chạy cả bộ câu thử
 

@@ -1,151 +1,166 @@
-# Thiết kế — Agent lập lịch trình du lịch 2–3 ngày (Track C)
+# Thiết kế — Agent lập kế hoạch du lịch cho cả công ty (Track C)
 
-Ngày: 2026-11-27 · Trạng thái: bản nháp chờ duyệt
+Ngày: 2026-11-27 · Trạng thái: bản nháp chờ duyệt (thay toàn bộ thiết kế "người đi lẻ" trước đó; lịch sử ở §8) · Bản đồ code: [`ARCHITECTURE.md`](../../../ARCHITECTURE.md) · Bản nộp: [`spec.md`](../../../spec.md)
 
-Kế hoạch triển khai: `docs/superpowers/plans/2026-11-27-travel-planner.md`
+## 1. Mục đích
 
-## 1. Mục đích và lý do
+**Người dùng:** giám đốc, hoặc người được giao tổ chức chuyến du lịch cho cả công ty.
 
-**Người dùng:** người muốn đi du lịch ngắn ngày (2–3 ngày, một thành phố) nhưng không tự lên được kế hoạch: không biết chọn điểm nào, ở đâu, đi lại thế nào, xếp sao cho vừa thời gian và ngân sách.
+**Pain (lời người dùng):** khó và mất thời gian (1) tìm địa điểm phù hợp cho cả công ty, (2) ra kế hoạch tối ưu nằm trong ngân sách được cấp. *(Bằng chứng định lượng cho spec.md §1 nhóm thu song song.)*
 
-**Việc agent làm:** nhận một đoạn mô tả bằng tiếng Việt (sở thích — khám phá, ẩm thực, ngắm cảnh, chụp ảnh; ngân sách; số ngày / ngày đi; số người, có trẻ nhỏ không), rồi trả về **một lịch trình từng ngày, từng khung giờ**: điểm chơi, quán ăn, khách sạn, cách di chuyển giữa các điểm, tổng chi phí, và lý do chọn. Nếu không xếp được thì nói rõ ràng buộc nào cần nới, không xếp bừa.
+**Việc hệ thống làm:** nhận số người, mục đích (nghỉ dưỡng hay gắn kết), số ngày, nơi xuất phát, cùng **kinh phí dự trù và/hoặc địa điểm** → gợi ý địa điểm hoặc dự trù kinh phí theo **3 gói (tiết kiệm · cân bằng · cao cấp)** → giám đốc duyệt → **kế hoạch chi tiết**: di chuyển, ăn uống, nghỉ ngơi, hoạt động theo từng ngày, từng giờ, kèm bảng chi phí cả đoàn và mỗi người. Vượt ngân sách thì giải thích rõ: vượt bao nhiêu, khoản nào gây vượt, vì sao, bớt gì để về trong ngân sách.
 
-**Bối cảnh nộp bài:** hackathon AI20K, Track C. Mốc: chuẩn "đạt" chốt CP2 19:30 27/11; §0–§7 spec CP3 10:00 28/11; đủ CP4 14:30 28/11. Rubric chấm một lát cắt, đo bằng bộ câu thử (`python run.py eval`) và mô phỏng chi phí.
+**Lát cắt một câu:** *Một giám đốc cần tổ chức chuyến đi cho công ty · nhập số người, mục đích, số ngày, nơi xuất phát cùng kinh phí và/hoặc địa điểm · AI tìm địa điểm, chỗ ở, ăn uống, hoạt động có nguồn và code dự trù 3 gói theo ngân sách · giám đốc nhận kế hoạch từng giờ kèm bảng chi phí và lời giải thích khi vượt ngân sách.*
 
-**Lát cắt một câu (đề xuất):** *Một người/nhóm nhỏ định đi Đà Lạt 2–3 ngày · nhập sở thích, ngân sách, số ngày · AI chọn điểm, quán, khách sạn, phương tiện và code xếp giờ thoả mọi ràng buộc, hoặc nói không xếp được · người dùng nhận lịch từng giờ kèm tổng tiền và lý do chọn.*
+**Bối cảnh:** hackathon AI20K, Track C (hướng nhóm tự mở rộng). CP2 19:30 27/11 chốt chuẩn "đạt" · CP3 10:00 28/11 · CP4 14:30 28/11.
 
-**Chưa có:** bằng chứng pain (spec §1). Nhóm thu song song (review app du lịch, hỏi người quen vừa đi chơi). Thiết kế này không phụ thuộc vào kết quả đó, nhưng câu thử nên lấy từ đó.
+## 2. Ba cách vào
 
-## 2. Mục tiêu / không làm / thất bại dù chạy được
+| Cách | Người dùng nhập (ngoài số người, mục đích, số ngày, nơi xuất phát) | Hệ thống trả | Người duyệt |
+|---|---|---|---|
+| **A** | kinh phí dự trù | 2–3 địa điểm phù hợp, mỗi nơi có tổng chi phí 3 gói (ước tính), cách đi, thời gian đi, lý do, link tham khảo | Có — chọn địa điểm + gói, sửa được → kế hoạch chi tiết **gói đã chọn** |
+| **B** | địa điểm | dự trù kinh phí 3 gói cho địa điểm đó, tách từng khoản | Có — chọn gói, sửa được → kế hoạch chi tiết **gói đã chọn** |
+| **C** | cả kinh phí và địa điểm | **bỏ qua bước duyệt**, sinh luôn **kế hoạch chi tiết cả 3 gói**, đánh dấu gói nào trong / vượt ngân sách, giải thích gói vượt | Không |
+
+Hệ thống tự nhận cách vào từ những gì người dùng nhập. Thiếu số người, mục đích, số ngày, nơi xuất phát, hoặc thiếu cả kinh phí lẫn địa điểm → hỏi lại đúng thông tin thiếu.
+
+## 3. Mục tiêu · không làm · thất bại dù chạy được
 
 **Mục tiêu**
-- Lịch trình 2–3 ngày, một thành phố (Đà Lạt), từ một tin nhắn đầu vào.
-- Mọi con số (giá, giờ, thời lượng, tổng tiền, thời gian đi lại) lấy từ dữ liệu / tính bằng code.
-- Lịch trả về qua bộ kiểm bằng code: 0 vi phạm.
-- Thiếu thông tin bắt buộc (ngân sách, số ngày, số người) thì hỏi lại, không tự đoán.
-- Không khả thi thì báo và gợi ý nới ràng buộc cụ thể.
-- Thiết kế mở được sang nhiều thành phố (hướng C) mà không viết lại.
+- Ba cách vào như §2; ba gói luôn tính bằng code trên cùng một khung lịch.
+- Mọi con số (giờ, tiền, số phòng, số xe, thời gian đi) do code tính; số không có nguồn mang nhãn "ước tính".
+- Vượt ngân sách luôn kèm giải thích có số: chênh bao nhiêu, 2–3 khoản đóng góp lớn nhất, lựa chọn cắt giảm và số tiền tiết kiệm của từng lựa chọn.
+- Mỗi địa điểm, chỗ ở, quán, hoạt động có link nguồn (bài viết, video) nếu tìm thấy.
 
-**Không làm (bản này)**
-- Không đặt phòng, đặt vé, thanh toán thật — chỉ đề xuất.
-- Không tìm web thật (bỏ Tavily); không giá thời gian thực.
-- Không nhiều thành phố / chặng bay nối nhau (chỉ chừa chỗ).
-- Không xếp lại theo thời gian thực như một tính năng riêng; "trễ chuyến / mưa" chỉ là tình huống khó trong bộ câu thử, xử lý bằng cách chạy lại bộ xếp lịch cho phần còn lại.
-- Không đăng nhập / lịch sử người dùng cho luồng chấm.
+**Không làm**
+- Không đặt phòng, đặt xe, đặt vé, thanh toán; không khẳng định còn phòng / còn chỗ; giá là "tham khảo / ước tính".
+- Chỉ trong nước (Việt Nam) — không visa, ngoại tệ *(người thiết kế tự quyết, xem §7)*.
+- Không khảo sát nguyện vọng từng nhân viên; không chia lịch riêng theo phòng ban.
+- Không đăng nhập, không lưu lịch sử dài hạn.
 
 **Thất bại dù chạy được**
-- Model tự nhẩm tiền / giờ và sai lệch so với dữ liệu.
-- Báo một điểm mở cửa / còn phòng khi dữ liệu nói không.
-- Lịch chồng giờ, đến khi đã đóng cửa, vượt ngân sách.
-- Đưa điểm không hợp trẻ nhỏ khi nhóm có trẻ nhỏ.
-- Tự đoán ngân sách / số ngày thay vì hỏi lại.
-- Lịch "đẹp" nhưng không giải thích được vì sao chọn.
+- Model tự nhẩm tiền cho cả đoàn; bảng chi phí không khớp phép tính.
+- Gói "trong ngân sách" mà tổng thực tế vượt; vượt mà không giải thích hoặc giải thích không có số.
+- Gợi ý địa điểm / chỗ ở không có trong kết quả tìm kiếm (bịa).
+- Lịch chồng giờ, đến lúc đóng cửa, đoàn 60 người xếp vào quán 20 chỗ khi nguồn ghi rõ sức chứa.
+- Cơ cấu phòng không đủ chỗ cho cả đoàn, hoặc đắt hơn cơ cấu rẻ nhất có thể với cùng loại phòng.
+- Tự đoán số người / ngân sách thay vì hỏi lại.
 
-## 3. Ràng buộc
+## 4. Ràng buộc
 
-- **Hợp đồng khung chấm (không đổi):** `codebase/agent.py` có `answer(text: str) -> {"output": str}`; `codebase/ai.py` có `call_model(system, user) -> {"text","model","tokens_in","tokens_out"}` bọc bởi `@model_call`, token lấy từ `usage` của API; mỗi công cụ là hàm có `@tool` trong `codebase/tools.py`; `codebase/tracing.py` là file khung, **không sửa**. Ba file `agent.py`, `ai.py`, `tools.py`, `tracing.py` hiện đã bị xoá khỏi working tree — phải khôi phục (`git checkout -- starter-repo/codebase/`) rồi viết lại `agent.py`, `ai.py`, `tools.py`.
-- **Kiến trúc code theo `codebase/backend/`** (người dùng chọn): LangGraph `StateGraph` với node, `TypedDict` state, interrupt để người dùng chọn (HITL), FastAPI controller, lớp LLM service (Gemini/Ollama). Bỏ phần nghề nghiệp (CV, job, interview, company research).
-- **Mọi lần gọi model đi qua `call_model`** trong `codebase/ai.py` để khung đếm được token. Node trong backend không gọi LangChain LLM trực tiếp.
-- **Luồng chấm chạy không cần Postgres / Redis:** `answer()` dùng graph compile với checkpointer trong bộ nhớ (hoặc không checkpointer), không interrupt, chạy một mạch.
-- Model không tự tính tiền / giờ (bẫy track C). Chỉ dùng dữ liệu tự dựng có seed, mô tả trong `data/DATA_CARD.md`; không dùng dữ liệu thật của người thật.
-- Chuẩn "đạt" (`spec.md` §7, `eval/metric_spec.yaml`) chốt trước CP2, không sửa sau.
+- **Hợp đồng khung chấm (không đổi):** `codebase/agent.py::answer(text) -> {"output": str}` · `codebase/ai.py::call_model(system, user)` có `@model_call`, token từ `usage` · công cụ `@tool` trong `codebase/tools.py` · không sửa `tracing.py`, `eval/run_eval.py`, `cost/simulate.py`, `run.py` (giao diện thay qua `codebase/app.py`).
+- Mọi lời gọi model qua `call_model`; model không trả số dùng trong output.
+- `answer()` chạy không cần server / database, không nhớ giữa các lần gọi, không dừng chờ người duyệt.
+- Luật dữ liệu: cache chỉ giữ tiêu đề, link, trích ≤ 2 câu; không tên người viết; không dữ liệu thật của người thật.
+- `TAVILY_API_KEY`, khoá model trong `starter-repo/.env` (không commit). Nominatim ≤ 1 yêu cầu / giây, User-Agent `travel-planner-hackathon`.
+- Chuẩn "đạt" chốt trước CP2, không sửa sau.
 
-## 4. Các cách đã cân nhắc
+## 5. Các cách đã cân nhắc
 
-| Cách | Được | Mất | Chọn? |
+| Quyết định | Các cách | Chọn | Vì sao |
 |---|---|---|---|
-| **1. Model chọn điểm, code xếp giờ** — graph cố định: hiểu yêu cầu → tra dữ liệu → model chọn → code xếp & tính → code kiểm → (sửa ≤ N vòng) → model giải thích | Số luôn đúng; đúng luật track; giữ kiểu graph backend | Phải viết bộ xếp giờ đơn giản | **Chọn** |
-| 2. Agent tự do + code kiểm cuối | Viết nhanh | Model nhẩm sai, nhiều vòng sửa, tốn token, khó 0 vi phạm | Loại |
-| 3. Bộ giải tối ưu (OR-Tools), model chỉ hiểu & giải thích | Lịch tối ưu | Nặng, khó kịp; phần "AI quyết định" mờ | Loại |
+| Dựng hệ thống | (1) một graph có bước nhận cách vào · (2) hai agent "dự trù" + "lập kế hoạch" nối qua API · (3) model tự dự trù và viết kế hoạch | **(1)** | dùng lại lõi, web, lối chấm chung một graph; (2) tách trạng thái, trông như hai sản phẩm; (3) model nhẩm tiền cho cả đoàn — bẫy track |
+| "Tối ưu theo ngân sách" | (a) dùng sát ngân sách · (b) rẻ nhất · (c) 3 gói | **(c)** | giám đốc so sánh rồi chọn |
+| Lõi | model chọn, code xếp giờ + tính tiền | giữ | số luôn đúng |
+| Nguồn dữ liệu | Tavily + Nominatim + bảng ước tính + cache ghi-lại-phát-lại | giữ | địa điểm bất kỳ, có bài viết / review |
+| Web | một tiến trình FastAPI + SQLite + React | giữ | người ngoài chạy một lệnh (rubric R3) |
 
-Người dùng chọn cách 1. Hình dạng: **workflow cố định có một vòng sửa có giới hạn** (không phải agent tự do) — mỗi bước biết trước, dễ đo; vòng sửa đủ để xử lý vi phạm mà không cần agent tự chọn bước.
+Hình dạng: **workflow cố định có rẽ nhánh theo cách vào và một vòng sửa giới hạn** (`MAX_REPAIR = 2`).
 
-## 5. Thiết kế (đã quyết)
+## 6. Thiết kế
 
-### 5.1 Luồng (LangGraph)
+### 6.1 Luồng graph
 
 ```
-parse_request ──thiếu thông tin──▶ ask_back ──▶ END
-      │ đủ
-      ▼
-research (tools, chỉ đọc) ──▶ select (model) ──▶ schedule (code) ──▶ validate (code)
-                                   ▲                                      │
-                                   └──── còn vi phạm & vòng < MAX_REPAIR ─┤
-                                                                          │ sạch            │ hết vòng
-                                                                          ▼                 ▼
-                                                                   explain (model)    infeasible (model+code) ──▶ END
-                                                                          ▼
-                                                                         END
+parse_request ──thiếu thông tin / ngoài phạm vi──► END (hỏi lại · từ chối)
+     │
+   route ─┬─ A (chỉ kinh phí) ─► goi_y_dia_diem: plan_queries → tim_kiem_web → extract → ground_and_rank (địa điểm)
+          │                       → du_tru_3_goi cho từng địa điểm (2–3)
+          ├─ B (chỉ địa điểm) ──► du_tru_3_goi
+          └─ C (cả hai) ───────► du_tru_3_goi
+                                     │
+          A, B (web): DỪNG — giám đốc duyệt: chọn địa điểm (A) + gói, sửa số người / bỏ hoạt động → tính lại
+          A, B (chấm): tự duyệt — A lấy địa điểm xếp hạng 1; gói = gói cao nhất còn trong ngân sách
+                       (B không có ngân sách → cân bằng; không gói nào trong ngân sách → tiết kiệm)
+          C: không dừng, đi tiếp với cả 3 gói
+                                     │
+     lap_ke_hoach (mỗi gói được giao): tim_kiem_web (chỗ ở, quán cho đoàn, hoạt động theo mục đích)
+          → extract → ground_and_rank → chon (model, một lần gọi cho mọi gói) → xep_gio (code) → kiem (code)
+          → (vi phạm, ≤ 2 vòng) chon lại → render: lịch + bảng chi phí + giải thích vượt ngân sách
 ```
 
-- **parse_request (model):** tin nhắn → `TripRequest` JSON: `city`, `days`, `start_date` (tuỳ chọn), `budget_vnd` (tổng), `adults`, `children` (kèm tuổi nếu có), `interests` ⊂ {kham_pha, am_thuc, ngam_canh, chup_anh}, `pace` (tuỳ chọn), `constraints` tự do. Code kiểm trường bắt buộc: `days`, `budget_vnd`, số người. Thiếu → `ask_back`. Thành phố không có trong dữ liệu → trả lời không hỗ trợ + danh sách thành phố có.
-- **research (code + tools):** lấy ứng viên điểm chơi, quán ăn, khách sạn, phương tiện của thành phố, lọc sẵn bằng code theo trẻ nhỏ, ngày trong tuần (giờ mở), ngân sách thô.
-- **select (model):** từ danh sách ứng viên (đã có id), chọn cho mỗi ngày: các điểm chơi (theo thứ tự mong muốn), quán ăn trưa/tối, 1 khách sạn cho cả chuyến, phương tiện chính; kèm lý do ngắn mỗi lựa chọn. Chỉ trả id + lý do, **không trả giờ, không trả tiền**. Ở vòng sửa, nhận thêm danh sách vi phạm.
-- **schedule (code):** xếp giờ tuần tự mỗi ngày từ giờ bắt đầu (mặc định 08:00) đến giờ kết thúc (mặc định 21:00): cộng thời gian đi lại (`uoc_thoi_gian_di`), thời lượng tham quan, chèn bữa trưa ~11:30–13:30 và tối ~18:00–20:00; nếu đến sớm hơn giờ mở thì chờ; tính tổng tiền = vé × số người theo độ tuổi + ăn ước theo đầu người + phòng × số đêm + di chuyển.
-- **validate (code, tool `kiem_lich_trinh`):** trả danh sách vi phạm có mã: `DONG_CUA` (đến/ở ngoài giờ mở), `CHONG_GIO`, `VUOT_NGAN_SACH`, `QUA_GIO_KET_THUC`, `KHONG_HOP_TRE_NHO`, `TRUNG_DIEM`, `ID_KHONG_TON_TAI`.
-- **Vòng sửa:** `MAX_REPAIR = 2`. Ghi lý do dừng bằng `note(...)`.
-- **explain (model):** nhận lịch đã xếp (JSON, số do code tính) → viết lịch dễ đọc tiếng Việt. Con số trong lời giải thích được **chèn bằng code từ lịch** (template / bảng), model chỉ viết phần lý do — để "mọi con số khớp công cụ: 100%".
-- **infeasible:** code tính ràng buộc nào chặn (vd tổng tối thiểu > ngân sách, thời gian không đủ) → nêu số cụ thể và đề xuất nới (tăng ngân sách tối thiểu X, bớt 1 ngày, bỏ khách sạn hạng Y…).
+### 6.2 Dự trù 3 gói (code, `du_tru_3_goi`)
 
-### 5.2 Công cụ (`codebase/tools.py`, đều chỉ đọc, không tác động ra ngoài)
+Gói khác nhau ở **mức** của từng hạng mục; khung lịch (số ngày, giờ đi / về, bữa ăn) giống nhau.
 
-| Công cụ | Input | Output |
-|---|---|---|
-| `tra_diem_choi(city, co_tre_nho)` | thành phố, bool | điểm: id, tên, loại, nhãn sở thích, giờ mở theo thứ, thời lượng gợi ý, giá vé người lớn/trẻ em, hợp trẻ nhỏ, khu vực/toạ độ |
-| `tra_quan_an(city)` | thành phố | quán: id, tên, món, giờ mở, giá trung bình/người, khu vực |
-| `tra_khach_san(city, so_dem, so_nguoi)` | | khách sạn: id, tên, hạng, giá/đêm, sức chứa, khu vực, còn phòng (bool theo ngày) |
-| `tra_phuong_tien(city)` | | phương tiện: loại (xe máy thuê, taxi, xe buýt…), giá theo ngày hoặc theo km |
-| `uoc_thoi_gian_di(a, b, phuong_tien)` | 2 id, loại | phút, tiền (tính từ toạ độ/khoảng cách trong dữ liệu) |
-| `kiem_lich_trinh(lich)` | lịch đã xếp | danh sách vi phạm |
+| Hạng mục | Tiết kiệm | Cân bằng | Cao cấp | Số lượng |
+|---|---|---|---|---|
+| Di chuyển chặng đi / về | xe khách 45 chỗ | limousine / xe đời mới | limousine, hoặc máy bay nếu đường bộ > 8 giờ | số xe = ⌈người / sức chứa⌉; máy bay theo người |
+| Lưu trú | khách sạn 2–3★ | khách sạn 4★ | resort 4–5★ | cơ cấu phòng tối ưu (§6.2a) × số đêm |
+| Ăn | suất thường | set menu | set menu cao cấp | người × bữa |
+| Gala / tiệc tối | không | 1 buổi (nếu gắn kết) | 1 buổi có sân khấu | người |
+| Hoạt động | tự tổ chức | team building có đơn vị (gắn kết) / spa, tour nhẹ (nghỉ dưỡng) | trọn gói | người hoặc trọn gói |
+| Phát sinh | 5% | 5% | 5% | % tổng |
 
-### 5.3 Dữ liệu
+- Đơn giá: ưu tiên số có trong bài viết tìm được (kèm link), không có thì `data/estimates.json` theo hạng mục × mức (có nhãn "ước tính"). Giá máy bay theo cặp thành phố nếu tìm được, không thì ước tính theo khoảng cách.
+- Chặng đi: định vị nơi xuất phát và địa điểm (Nominatim) → km đường ≈ đường chim bay × 1.3; xe khách 50 km/h + 30 phút nghỉ mỗi 3 giờ; máy bay: giờ bay ước tính + 2 giờ thủ tục + đưa đón sân bay.
+- Kết quả mỗi gói: bảng khoản mục {hạng mục, mô tả, số lượng, đơn giá, thành tiền, ước tính?, nguồn?}, tổng cả đoàn, mỗi người, chênh so với ngân sách.
 
-- File JSON tự dựng có seed trong `starter-repo/data/` theo thành phố: `data/cities/da_lat/{diem_choi,quan_an,khach_san,phuong_tien}.json`. Thêm thành phố = thêm thư mục.
-- Cố tình có chỗ khó: điểm đóng cửa thứ Hai, điểm không hợp trẻ nhỏ, khách sạn hết phòng vài ngày, quán chỉ mở tối, điểm xa nhau.
-- Ghi nguồn tham khảo (trang công khai) và cách dựng trong `data/DATA_CARD.md`; tên dựng khi cần.
+### 6.2a Xếp phòng (code)
 
-### 5.4 Nối với khung chấm và backend
+Theo yêu cầu người dùng: **không mặc định 2 người / phòng** — khách sạn có phòng 2, 3, 4 người…; xếp dựa trên chi phí và số lượng phòng của khách sạn.
+- Mỗi khách sạn có danh sách loại phòng `{loai, suc_chua, gia_dem, so_luong?, uoc_tinh, nguon?}` lấy từ bài viết / trang khách sạn tìm được; thiếu thì `estimates.json` cho hạng sao đó (phòng 2, 3, 4 người, giá ước tính, `so_luong` không biết).
+- Bài toán: chọn số phòng mỗi loại sao cho tổng sức chứa ≥ số người, mỗi loại ≤ `so_luong` (nếu biết), **tổng tiền / đêm nhỏ nhất**; hoà thì ít phòng hơn. Giải bằng quy hoạch động theo số người (N ≤ 500, ≤ 6 loại phòng).
+- Không đủ phòng theo `so_luong` đã biết → mã `THIEU_PHONG`, gợi ý thêm khách sạn thứ hai cùng mức hoặc đổi khách sạn. `so_luong` không biết → vẫn xếp, ghi "cần xác nhận số phòng còn trống với khách sạn" (không khẳng định còn phòng).
+- Output hiện cơ cấu phòng (vd "10 phòng 4 người + 2 phòng 3 người + 1 phòng 2 người = 48 chỗ cho 48 người"), giá / đêm từng loại, tổng. Việc ai ở với ai do công ty tự xếp.
 
-- `codebase/ai.py::call_model` là chỗ duy nhất gọi model; hỗ trợ `fake` + `gemini` (theo `.env`: `MODEL_PROVIDER`, `MODEL_NAME`, `API_KEY`); token từ `usage_metadata`.
-- Node trong backend gọi `call_model` (qua một adapter thay cho `ILLMService`) và gọi công cụ từ `codebase/tools.py`.
-- `codebase/agent.py::answer(text)` dựng/lấy graph (không checkpointer Postgres, không interrupt), chạy một mạch, trả `{"output": lịch dạng chữ}`.
-- Backend FastAPI (luồng app): giữ cấu trúc controller/repo/graph runner; graph có `interrupt_after=["select"]` để người dùng xác nhận/đổi khách sạn trước khi xếp giờ. Phần này làm sau khi luồng chấm chạy được.
+### 6.3 Giải thích vượt ngân sách (code, chữ do code dựng; model chỉ thêm lý do định tính)
 
-### 5.5 Mở sang hướng C (chỉ chừa chỗ)
+Khi tổng > ngân sách: (1) số vượt và %, (2) 2–3 khoản đóng góp nhiều nhất vào phần chênh so với gói thấp hơn liền kề (vd "resort 5★: +28 triệu so với 4★"), (3) danh sách cắt giảm tính sẵn, mỗi dòng ghi số tiết kiệm và tổng sau khi cắt (hạ một mức một hạng mục · bớt một đêm · bỏ gala), (4) nếu gói tiết kiệm vẫn vượt: ngân sách tối thiểu cần có và gợi ý nới (bớt ngày, địa điểm gần hơn).
 
-- `TripRequest` có `city` → sau đổi thành `legs: [{city, days}]`.
-- Thêm công cụ `tra_chang_di(city_a, city_b)` và một node xếp chặng giữa các thành phố trước `schedule`; `schedule` chạy theo từng chặng.
+### 6.4 Kế hoạch chi tiết (`lap_ke_hoach`)
 
-### 5.6 Tình huống khó cho bộ câu thử (gợi ý)
+- Ngày 1 bắt đầu từ giờ xuất phát (mặc định 06:30 với xe khách, theo giờ bay với máy bay); ngày cuối kết thúc khi về tới nơi xuất phát.
+- Mỗi ngày: di chuyển · bữa sáng (tại chỗ ở, nếu có đêm trước) · trưa 11:30–13:30 · tối 18:00–20:00 · hoạt động · nghỉ ngơi. Gắn kết: ≥ 1 khối team building, gala tối (gói có). Nghỉ dưỡng: ≥ 1 khối tự do mỗi ngày, hoạt động nhẹ.
+- Quán ăn cho đoàn: ưu tiên nguồn ghi phục vụ đoàn / sức chứa; không rõ thì ghi "cần xác nhận sức chứa".
+- Bộ kiểm: `CHONG_GIO`, `DONG_CUA`, `QUA_GIO_KET_THUC` (> 22:00), `ID_KHONG_TON_TAI`, `TRUNG_DIEM`, `THIEU_SUC_CHUA`, `THIEU_PHONG` (chỉ khi nguồn ghi sức chứa < số người). Vượt ngân sách **không** là lỗi chặn — bắt buộc có giải thích §6.3.
 
-Thiếu ngân sách / số ngày / số người → hỏi lại · ngân sách quá thấp → infeasible + mức tối thiểu · "muốn đi hết" mà chỉ 1 ngày · có trẻ nhỏ · đi ngày điểm chính đóng cửa · khách sạn ưa thích hết phòng · mưa / chuyến bay trễ 4 tiếng ngày đầu → xếp lại phần còn lại · thành phố không có trong dữ liệu · yêu cầu đặt phòng / thanh toán → từ chối, chỉ đề xuất · câu tự xưng nhân viên đòi bỏ qua ngân sách.
+### 6.5 Hai lối vào
 
-### 5.7 Quyết định bổ sung (người thiết kế tự quyết — kiểm lại khi đọc)
+- **Chấm — `answer(text)`:** `parse_request` bóc từ chữ; tự duyệt như §6.1; output chữ: (A) danh sách địa điểm + 3 gói rồi kế hoạch chi tiết của lựa chọn tự duyệt, (B) bảng 3 gói rồi kế hoạch gói tự duyệt, (C) cả 3 kế hoạch. Cache Tavily / Nominatim ở chế độ `replay`.
+- **Web:** form có trường riêng (số người, số ngày, ngày đi, nơi xuất phát, mục đích, kinh phí, địa điểm) gửi thẳng JSON — không cần model bóc chữ; graph với `SqliteSaver`, dừng ở bước duyệt (A, B).
+  - `POST /api/trips` (form) → `TripView` (status `choose_destination` | `choose_package` | `ok` | `ask_back` | `refused` | `error`)
+  - `POST /api/trips/{id}/approve {destination?, package, headcount?, remove_items?}` → tính lại nếu có sửa → `TripView` (`ok` + kế hoạch)
+  - `GET /api/trips/{id}` · `GET /api/health`
+- **Màn hình (React):** form → (A) thẻ địa điểm, mỗi thẻ 3 cột gói + lý do + link / (B) bảng so 3 gói → nút duyệt (có chỉnh số người, bỏ hạng mục) → kế hoạch từng ngày + bảng chi phí + khối "Vì sao vượt ngân sách" khi có. (C) hiện 3 kế hoạch dạng tab.
 
-- **`answer(text)` không nhớ giữa các lần gọi.** Mỗi câu thử tự đủ thông tin. Câu "trễ chuyến / mưa → xếp lại" ghi luôn yêu cầu gốc + sự cố trong cùng một input (vd "…đi Đà Lạt 3 ngày… Chuyến bay ngày 1 trễ 4 tiếng, đến 12:00"); agent xếp lại từ thời điểm đó. Không có bộ nhớ toàn cục để tránh rò giữa các câu thử. Nhớ hội thoại chỉ có ở luồng app (checkpointer LangGraph theo `thread_id`).
-- **Không có ngày đi:** không hỏi lại (ngày không bắt buộc); giả định đi từ **thứ Bảy gần nhất** và ghi rõ giả định trong output. Kiểm giờ mở theo thứ và còn phòng vẫn chạy theo ngày giả định.
-- **Ngân sách** = tổng cho cả nhóm, **chi phí tại điểm đến** (vé tham quan, ăn, khách sạn, di chuyển trong thành phố); không gồm vé đến/về thành phố. Câu "mỗi người X" thì code nhân số người. Output ghi rõ ngân sách đã hiểu.
+### 6.6 Dữ liệu
 
-### 5.8 Dọn `codebase/backend/` (người dùng yêu cầu: bỏ phần không dùng)
+- `Place` (địa điểm / chỗ ở / quán / hoạt động): id, tên, loại, thành phố, lý do, nguồn, số nguồn nhắc tới, toạ độ?, giờ mở (+ ước tính), thời lượng, giá (+ ước tính, nguồn), sức chứa?, hạng sao?.
+- `Package`: tier, line_items, total, per_person, over_budget, explanation.
+- `data/estimates.json` thêm: xe khách 45 chỗ / limousine theo km, vé máy bay theo khoảng cách, phòng theo hạng sao, suất ăn / set menu theo mức, gala / người, team building / người.
+- Cache `data/cache/{tavily,geo}/`; `SEARCH_MODE` live / record / replay.
 
-Phạm vi: luồng app FastAPI **có** trong kế hoạch (người dùng yêu cầu dọn backend để dùng tiếp), làm sau luồng chấm. Backend là thư mục chưa commit — **sao lưu trước khi xoá** (commit nhánh riêng hoặc chép ra ngoài).
+## 7. Người thiết kế tự quyết (kiểm lại khi đọc)
 
-**Xoá** (phần nghề nghiệp / rác):
-- `api/controller/cv.py`, `api/controller/interview.py`
-- `orchestration/nodes/{job_finder,company_researcher,cv_reviewer,interview_nodes}.py`, `orchestration/prompts/*`, `graphs/interview_graph.py`, `state/interview_state.py`
-- `application/repositories/{cv_repo,interview_repo}/`, `infrastructure/repositories/{cv_repo,interview_repo}.py`, `application/services/cv_service/`, `infrastructure/services/cv_service.py`
-- Model `CVDocument`, `CVUsageHistory`, `InterviewHistoryItem`, `InterviewQAPair`; 3 migration cũ → thay bằng 1 migration đầu (users, agent_sessions)
-- Mọi `__pycache__/`, `check_imports.py`; `init_db.py` sửa danh sách bảng
-- Thư viện: `tavily-python`, `pypdf`, `python-docx`
+- Chỉ trong nước. · Phát sinh 5%. · Đường bộ > 8 giờ thì gói cao cấp dùng máy bay.
+- Cách A gợi ý 2–3 địa điểm; mỗi địa điểm tính đủ 3 gói (bằng code, không thêm lời gọi model).
+- Lối chấm tự duyệt: địa điểm xếp hạng 1; gói cao nhất còn trong ngân sách (B không ngân sách → cân bằng).
+- Web dùng form có trường riêng; `answer()` vẫn bóc từ chữ.
+- Ngày đi không có → giả định thứ Sáu gần nhất (đi công ty thường cuối tuần), env `TRAVEL_TODAY` để cố định khi chấm.
+- Số người hợp lệ 5–500; mục đích nhận "nghỉ dưỡng", "gắn kết", hoặc cả hai (ưu tiên gắn kết cho khối hoạt động).
 
-**Đã làm (27/11):** đã xoá thêm phần "keo" gắn chặt với luồng nghề nghiệp — controller `agent`, `history`; repo `agent_repo`, `session_history_repo`; `graph_runner`, `session_events`, `stream_service`, `utils/helper.py`, `graphs/`, `state/`. Các file này viết quanh các bước job/interview, Task 9 dựng lại bản du lịch theo cùng khuôn (controller → IRepository → repo → graph runner). Bản gốc sao lưu ở scratchpad `backup/backend-career`.
+- **Thiếu dữ liệu tìm kiếm:** `SEARCH_MODE` mặc định `live` cho cả `answer()` và web; chạy bộ câu thử dùng `replay` (cache đã ghi, commit). Không có `TAVILY_API_KEY` hoặc cache thiếu → **chế độ chỉ ước tính**: vẫn dự trù 3 gói và lập lịch bằng hạng mục chung ("khách sạn 4★ tại <địa điểm>", "nhà hàng set menu"), không nêu tên cơ sở nào, mọi số nhãn "ước tính", đầu output ghi rõ "chưa tìm được nguồn trên mạng". Cách A ở chế độ này: gợi ý địa điểm chỉ từ danh sách điểm đến phổ biến trong `data/estimates.json` (có nhãn).
+- **Số nào là chuẩn:** tổng ở bước dự trù là **"dự trù"**; khi lập kế hoạch chi tiết, chi phí tính từ chỗ ở / quán / hoạt động cụ thể là **"theo kế hoạch"** và là số chuẩn. Sau khi lập xong kiểm lại ngân sách; lệch so với dự trù thì hiện "dự trù X → theo kế hoạch Y" và chạy giải thích §6.3 nếu vượt.
+- **Tìm kiếm cho 3 gói (cách C):** một lượt tìm chung; ứng viên phân mức theo hạng sao / giá; mỗi gói chọn trong nhóm mức của mình (một lần gọi model cho cả 3 gói).
+- **Ngân sách** = tổng cả đoàn, trừ khi chữ ghi rõ "mỗi người / /người / một người" thì code nhân số người; output luôn ghi "ngân sách đã hiểu: … cho N người". Web: ô kinh phí có lựa chọn "tổng đoàn / mỗi người".
+- **Xếp hạng địa điểm (cách A):** địa điểm có gói cân bằng nằm trong ngân sách xếp trước; cùng nhóm thì theo số nguồn nhắc tới. Lối chấm lấy hạng 1.
 
-**Giữ, sửa cho du lịch (kế hoạch ban đầu):** `main.py` (bỏ router cv/interview, đổi tên/mô tả app), `api/config/*` (đổi `CareerAgentException` → tên chung), controller `auth`, `agent`, `history`; repo `user`, `agent`, `session_history` (bỏ phần CV/phỏng vấn, `cv_id`); `session_service`, `stream_service`, `graph_runner`, `session_events` (bỏ sự kiện job/interview); `graph.py`, `state.py` viết lại theo §5.1; `llm_service` thay bằng adapter gọi `codebase/ai.py::call_model`. Đăng nhập (auth) giữ nguyên — đã chạy, dùng chung được.
+## 8. Lịch sử quyết định (27/11)
 
-## 6. Để lại cho người xây
+1. Người đi lẻ, Đà Lạt 2–3 ngày, dữ liệu dựng sẵn → 2. tìm web bằng Tavily, người dùng chọn ứng viên có review → 3. **đổi đối tượng: chuyến đi cả công ty**, ba cách vào, 3 gói, duyệt bởi giám đốc (A, B), C bỏ duyệt và sinh cả 3 kế hoạch.
+- Giữ từ các bước trước: model chọn / code tính · Tavily + Nominatim + ước tính + cache · FastAPI một tiến trình + SQLite + React · `answer()` dùng chung graph.
 
-- Cách dựng graph cho luồng chấm (sync wrapper quanh `ainvoke`, đặt `sys.path` để import `backend/src`).
-- Thuật toán xếp giờ cụ thể (tham lam theo thứ tự model chọn là đủ).
-- Định dạng chữ của lịch trả về, prompt cụ thể.
-- Số lượng bản ghi dữ liệu (gợi ý ~20 điểm, ~15 quán, ~8 khách sạn).
-- Dọn code nghề nghiệp trong backend: xoá hay để riêng.
+## 9. Để lại cho người xây
+
+Prompt cụ thể · giá trị trong `estimates.json` (ghi nguồn hoặc *tự ước tính*) · định dạng chữ của kế hoạch và bảng chi phí · thuật toán xếp giờ chi tiết (tham lam là đủ) · deploy công khai nếu cần cho người dùng thử.
