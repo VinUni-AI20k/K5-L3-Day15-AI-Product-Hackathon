@@ -1,4 +1,20 @@
-# Mini Hackathon AI — AI20K khoá 5 · L3
+# 404ERROR · Hướng dẫn khiếu nại hàng không đúng mô tả
+
+**Lớp L3A · Track D (Thương mại điện tử), hướng D3.** [Thành viên](TEAMS.md) · [Canvas CP1](canvas.md) · [Phân công và bàn giao](PHAN-CONG.md)
+
+**Bài toán dự kiến.** Khi nhận hàng không đúng mô tả và muốn trả hàng, người mua trên sàn khó biết chi tiết nào trong mô tả lúc đặt có thể dùng để đối chiếu và cần nộp bằng chứng gì, nên có thể phải bổ sung nhiều lần hoặc lỡ hạn gửi yêu cầu.
+
+**Lát cắt dự kiến.** Một người mua trên sàn báo hàng không đúng mô tả, AI đối chiếu mô tả lúc đặt, bằng chứng hiện có và chính sách áp dụng để chọn hướng dẫn gửi yêu cầu trả hàng, xin thêm bằng chứng hoặc chuyển nhân viên, giúp người mua biết bước tiếp theo và hạn gửi yêu cầu nếu xác định được.
+
+**Chạy khung.** Từ thư mục gốc, chạy `python run.py check` để kiểm bảng thành viên và bộ câu thử, hoặc `python run.py` để chạy khung mẫu ở chế độ giả. Trên máy chỉ có lệnh `python3`, dùng `python3 run.py`. [Các lệnh của bộ khung](starter-repo/README.md#lệnh)
+
+## Dùng AI vào việc gì
+
+Nhóm dùng Codex để soạn bản nháp CP1, chuyển thông tin thành viên vào mẫu và kiểm tra định dạng. Đội trưởng rà nội dung và phân công trước khi nộp. [Khai báo chi tiết](docs/ai-usage.md)
+
+---
+
+## Đề hackathon AI20K khoá 5 · L3
 
 > **[README]** → [01-challenge-brief](01-challenge-brief.md) → [tracks/](tracks/README.md) → [02-guide](02-guide.md) → [03-rubric](03-rubric.md)
 
