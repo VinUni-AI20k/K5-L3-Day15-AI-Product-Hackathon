@@ -30,7 +30,7 @@ Kiểm tại CP4, 14:30 Thứ Bảy 28/11. Thiếu 1 trong 4 điều kiện → 
 | 1 | **Bản chạy thử gọi AI thật** ở quyết định trung tâm của lát cắt | Chạy theo README repo nhóm hoặc demo trực tiếp. Bản trả câu giả cố định không tính. Mạng hỏng lúc demo thì video dự phòng (thao tác thật, AI trả kết quả thật) được tính thay |
 | 2 | **Bằng chứng pain ≥1 nguồn đạt ngưỡng** | Ngưỡng ở [R1](#r1) · `evidence/` |
 | 3 | **Bộ câu thử ≥20 câu + kết quả có % đạt** | `eval/benchmark.csv` · `eval/run-N.csv` đã chấm · `eval/report.md` |
-| 4 | **Slide** | Định dạng nào cũng được (PDF, PPTX, HTML…): file trong repo hoặc link slide nộp ở form CP4, có tại CP4 |
+| 4 | **Slide PDF** | `demo-slides.pdf` ở thư mục gốc repo, có tại CP4 |
 
 ---
 
@@ -61,7 +61,7 @@ Kiểm tại CP4, 14:30 Thứ Bảy 28/11. Thiếu 1 trong 4 điều kiện → 
 | [R4 · Định nghĩa "tốt": bộ câu thử + metric](#r4) | **14** | `eval/benchmark.csv` · `eval/metric_spec.yaml` · `spec.md` §7 · `data/DATA_CARD.md` | [2.3](02-guide.md#b2-3), [2.4](02-guide.md#b2-4) |
 | [R5 · Báo cáo đánh giá](#r5) | **8** | `eval/report.md` · `eval/README.md` | [4.1](02-guide.md#b4-1) |
 | [R6 · Mô phỏng chi phí khi dùng thật](#r6) | **12** | `cost/personas.yaml` · `cost/simulate-N.csv` · `cost/cost-estimate.md` | [4.2](02-guide.md#b4-2) |
-| [R7 · Slide & demo](#r7) | **10** | slide (file trong repo hoặc link ở form CP4) · demo | [5.1](02-guide.md#b5-1), [5.3](02-guide.md#b5-3) |
+| [R7 · Slide & demo](#r7) | **10** | `demo-slides.pdf` · demo | [5.1](02-guide.md#b5-1), [5.3](02-guide.md#b5-3) |
 | **Tổng** | **85** | | |
 | [*Bonus* · Người dùng thử](#bonus) | +5 | `validation/log.md` | [4.3](02-guide.md#b4-3) |
 
@@ -135,7 +135,7 @@ Kiểm tại CP4, 14:30 Thứ Bảy 28/11. Thiếu 1 trong 4 điều kiện → 
 
 | Tiêu chí | Điểm |
 |---|---|
-| **Slide** (PDF, PPTX, HTML… hoặc link) theo khung 8 trang ở [guide 5.1](02-guide.md#b5-1): kể rõ câu chuyện Pain → Impact → Giải pháp AI → Đánh giá → Chi phí, mỗi trang có ≥1 con số / trích dẫn có nguồn / kết quả đo | 4 |
+| **Slide** `demo-slides.pdf` theo khung 8 trang ở [guide 5.1](02-guide.md#b5-1): kể rõ câu chuyện Pain → Impact → Giải pháp AI → Đánh giá → Chi phí, mỗi trang có ≥1 con số / trích dẫn có nguồn / kết quả đo | 4 |
 | **Demo trực tiếp:** 1 trường hợp thường + 1 trường hợp khó · chạy được câu thử lạ giám khảo đưa tại chỗ · mạng hỏng thì chiếu video dự phòng | 3 |
 | **Ai được hỏi cũng trả lời được:** vì sao chọn hình dạng này · lỗi nguy hiểm nhất là gì · chi phí / task thành công tính thế nào · phần mình làm là gì | 3 |
 

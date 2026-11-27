@@ -369,7 +369,7 @@ Nộp CP2: [README → Checkpoint](README.md#checkpoint). **Trước khi rời l
 - [ ] Lượt 2 + `eval/report.md` + `eval/README.md` (Hồ sơ đánh giá)
 - [ ] `cost/cost-estimate.md` 3 kịch bản + chi phí / task thành công
 - [ ] `spec.md` đủ §0–§9 · bảng impact có nguồn
-- [ ] Slide (PDF, PPTX, HTML…) trong repo hoặc link slide ở form CP4 ([5.1](#b5-1)) · video demo dự phòng
+- [ ] `demo-slides.pdf` ở thư mục gốc ([5.1](#b5-1)) · video demo dự phòng
 - [ ] Tự khai phần chưa xong — khai thật không bị trừ thêm
 - [ ] *(Bonus)* `validation/log.md`
 
@@ -382,7 +382,7 @@ Nộp CP4: [README → Checkpoint](README.md#checkpoint).
 <a id="b5-1"></a>
 ## 5.1 Slide — "không có bằng chứng thì không có slide"
 
-Mỗi trang có ≥1 con số / trích dẫn có nguồn / kết quả đo. Định dạng nào cũng được (PDF, PPTX, HTML…): để file trong repo hoặc nộp link slide ở form CP4 (ai có link cũng xem được).
+Mỗi trang có ≥1 con số / trích dẫn có nguồn / kết quả đo. Nộp **PDF**, không nộp link.
 
 | # | Trang | Có gì | Lấy từ |
 |---|---|---|---|

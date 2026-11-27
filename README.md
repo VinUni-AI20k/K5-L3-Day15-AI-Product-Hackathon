@@ -4,18 +4,16 @@
 
 **Tìm một chỗ đau thật của người dùng, thiết kế một giải pháp AI cho nó, rồi chứng minh bằng số.**
 
-> **Trang hackathon:** https://ai20k-hackathon.pages.dev — đăng ký nhóm, tìm đồng đội, nộp checkpoint, đồng hồ đếm giờ, side quest.
-
 Bài của nhóm phải cân bằng hai nửa: **tư duy sản phẩm** (đúng người dùng, đúng chỗ đau, đáng làm) và **giải pháp AI** (thiết kế công nghệ ra sao, AI dựa vào dữ liệu và công cụ nào, chạy thật được). Ba câu phải trả lời, mỗi câu bằng số:
 
 1. **Pain & impact:** ai đang đau, đau thế nào, bao nhiêu người, mỗi tháng mất bao nhiêu?
 2. **Giải pháp AI:** AI quyết định gì, dựa trên dữ liệu và công cụ nào, chọn workflow hay agent và vì sao, chặn rủi ro ở đâu, người duyệt ở đâu? Bản chạy thử phải gọi AI thật.
 3. **Đánh giá & chi phí:** giải pháp đúng được bao nhiêu trên bộ câu thử? Dùng thật ở quy mô thật của sản phẩm thì tốn bao nhiêu mỗi tháng?
 
-- Nhóm **3–5 người**, tự ghép, bầu một đội trưởng. Chưa có nhóm: mục **Đồng đội** trên trang hackathon.
+- Nhóm **3–5 người**, tự ghép, bầu một đội trưởng.
 - Khoảng **10 giờ làm thật**: chiều tối Thứ Sáu 27/11 và sáng Thứ Bảy 28/11.
 - **6 track:** A EdTech (chính khoá AI20K) · B Y tế · C Du lịch · D Thương mại điện tử · E Tài chính · F Làn khác (lĩnh vực bất kỳ, có insight từ người dùng thật).
-- BTC **không cấp API key** cho mọi nhóm. Nhóm dùng gói miễn phí hoặc tài khoản của nhóm (một số credit API là quà của side quest trên trang hackathon).
+- BTC **không cấp API key**. Nhóm dùng gói miễn phí hoặc tài khoản của nhóm.
 - Mọi kỹ thuật cần dùng, nhóm đã học trong 15 ngày giai đoạn 1. [02-guide.md](02-guide.md) chỉ rõ bước nào ôn lại ngày nào.
 
 ---
@@ -40,7 +38,7 @@ Bài của nhóm phải cân bằng hai nửa: **tư duy sản phẩm** (đúng 
 <a id="checkpoint"></a>
 ## CHECKPOINT
 
-**Mỗi checkpoint nộp trên [trang hackathon](https://ai20k-hackathon.pages.dev), thay cả nhóm.** Đội trưởng đăng ký nhóm một lần (tên nhóm + PIN + mã học viên đội trưởng); ai trong nhóm có PIN cũng nộp thay được. Trang ghi giờ nộp và commit của repo lúc nộp, agent tự kiểm đủ phần trong vài phút.
+**Mỗi checkpoint, đội trưởng nộp 1 lần qua link nộp, thay cả nhóm**, cả 4 mốc dùng cùng một mã học viên.
 - Đúng hạn và đủ phần → đủ điểm mốc. Muộn hoặc thiếu → 0 điểm mốc đó.
 - Vẫn nộp phần đã có và khai thật phần còn thiếu.
 - Tự soát trước khi nộp: bước guide ghi ở từng mốc.
@@ -53,7 +51,7 @@ Bài của nhóm phải cân bằng hai nửa: **tư duy sản phẩm** (đúng 
 - Canvas 7 dòng (`canvas.md`).
 - Link repo GitHub công khai, mở được bằng cửa sổ ẩn danh.
 
-Tự soát: [guide 1.4](02-guide.md#b1-4) · **Nộp CP1:** [trang hackathon → Nộp checkpoint](https://ai20k-hackathon.pages.dev/#submit)
+Tự soát: [guide 1.4](02-guide.md#b1-4) · **Link nộp CP1:** `________` *(BTC cập nhật)*
 
 ### CP2 · 19:30 Thứ Sáu 27/11 · 4 điểm
 
@@ -64,7 +62,7 @@ Tự soát: [guide 1.4](02-guide.md#b1-4) · **Nộp CP1:** [trang hackathon →
 - **Chuẩn "đạt" bằng số**, chép từ `spec.md` §7. **Chốt tại mốc này, không sửa về sau.**
 - Bản chạy thử dạng khung: `python run.py` đi hết luồng với AI giả.
 
-Tự soát: [guide 2.5](02-guide.md#b2-5) · **Nộp CP2:** [trang hackathon → Nộp checkpoint](https://ai20k-hackathon.pages.dev/#submit)
+Tự soát: [guide 2.5](02-guide.md#b2-5) · **Link nộp CP2:** `________` *(BTC cập nhật)*
 
 ### CP3 · 10:00 Thứ Bảy 28/11 · 4 điểm
 
@@ -75,7 +73,7 @@ Tự soát: [guide 2.5](02-guide.md#b2-5) · **Nộp CP2:** [trang hackathon →
 - Link `spec.md` đã có §0–§7.
 - Phần chưa xong, nếu có.
 
-Tự soát: [guide 3.4](02-guide.md#b3-4) · **Nộp CP3:** [trang hackathon → Nộp checkpoint](https://ai20k-hackathon.pages.dev/#submit)
+Tự soát: [guide 3.4](02-guide.md#b3-4) · **Link nộp CP3:** `________` *(BTC cập nhật)*
 
 ### CP4 · 14:30 Thứ Bảy 28/11 · 4 điểm
 
@@ -83,10 +81,10 @@ Tự soát: [guide 3.4](02-guide.md#b3-4) · **Nộp CP3:** [trang hackathon →
 - Tích 7 hạng mục bắt buộc đã có ([01-challenge-brief](01-challenge-brief.md#7-hang-muc)).
 - Kết quả lượt 1 → lượt 2 (ví dụ 14/24 → 18/24).
 - Chi phí / task thành công ở kịch bản cơ sở, kèm tên model.
-- Slide, định dạng nào cũng được (PDF, PPTX, HTML, Keynote…): file trong repo **hoặc** link slide nộp ở form CP4 (Drive, Canva, Google Slides…, ai có link cũng xem được) · link video demo dự phòng.
+- `demo-slides.pdf` ở thư mục gốc repo + link video demo dự phòng.
 - Phần chưa xong, nếu có.
 
-Tự soát: [guide 4.4](02-guide.md#b4-4) · **Nộp CP4:** [trang hackathon → Nộp checkpoint](https://ai20k-hackathon.pages.dev/#submit)
+Tự soát: [guide 4.4](02-guide.md#b4-4) · **Link nộp CP4:** `________` *(BTC cập nhật)*
 
 ### Hạn chót · 23:59 Thứ Bảy 28/11 · không nộp form
 

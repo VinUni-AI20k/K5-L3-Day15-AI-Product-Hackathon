@@ -85,10 +85,10 @@ Ví dụ để hình dung độ lớn: *Một học viên · dán lỗi khi làm
 | 4 | **Bản chạy thử làm trọn lát cắt** | Người dùng đưa gì vào, AI quyết định gì, ra cái gì dùng được? | Gọi AI thật · quyết định dựa trên dữ liệu / công cụ của bài toán · chạy được bằng `run.py eval` và `run.py simulate` | [3.2](02-guide.md#b3-2) | `codebase/` |
 | 5 | **Định nghĩa "tốt" + bộ câu thử** | Thế nào là đủ tốt với người dùng, và giải pháp đúng được bao nhiêu? | Data card · 20–30 câu thử · metric spec ≥3 metric · chuẩn "đạt" chốt ở CP2 · lượt 1 → lượt 2 | [2.4](02-guide.md#b2-4), [4.1](02-guide.md#b4-1) | `data/`, `eval/` |
 | 6 | **Mô phỏng chi phí khi dùng thật** | Dùng thật ở quy mô thật của sản phẩm thì tốn bao nhiêu mỗi tháng, có đáng so với impact? | ≥50 phiên giả lập chạy qua bản chạy thử → chi phí / task thành công → 3 kịch bản ở quy mô thật | [4.2](02-guide.md#b4-2) | `cost/` |
-| 7 | **Slide + demo + video dự phòng** | Kết luận go / iterate / stop dựa trên số nào? | Slide (PDF, PPTX, HTML… hoặc link) có trang "Đánh giá thế nào" và "Chi phí khi dùng thật" | [5.1](02-guide.md#b5-1) | thư mục gốc repo |
+| 7 | **Slide + demo + video dự phòng** | Kết luận go / iterate / stop dựa trên số nào? | `demo-slides.pdf` có trang "Đánh giá thế nào" và "Chi phí khi dùng thật" | [5.1](02-guide.md#b5-1) | thư mục gốc repo |
 | + | *Bonus:* người dùng thử | Người dùng thật dùng được không, đổi gì sau khi thử? | 2–3 người ngoài nhóm dùng thử, có log | [4.3](02-guide.md#b4-3) | `validation/` |
 
-**Thiếu hạng mục 1, 4, 5 (bộ câu thử + % đạt) hoặc slide → không xét giải** (vẫn được chấm điểm lab). Cách chấm: [03-rubric.md](03-rubric.md).
+**Thiếu hạng mục 1, 4, 5 (bộ câu thử + % đạt) hoặc slide PDF → không xét giải** (vẫn được chấm điểm lab). Cách chấm: [03-rubric.md](03-rubric.md).
 
 ## 5 câu tự kiểm bài toán — trước CP1 (17:00 Thứ Sáu 27/11) và trước khi chốt lát cắt ở CP2 (19:30)
 
