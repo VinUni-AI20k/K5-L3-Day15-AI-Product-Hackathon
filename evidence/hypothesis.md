@@ -1,8 +1,7 @@
-# Giả thuyết — Track D3
+# Giả thuyết · Nhật ký chi tiêu từ ảnh
 
-- Ngày ghi: 27/11/2026.
-- **Mình nghĩ:** người mua nhận hàng không đúng mô tả dễ chậm hoặc lỡ hạn gửi yêu cầu trả hàng vì khó biết cần đối chiếu mô tả nào và chuẩn bị bằng chứng gì.
-- **Có thể còn cách giải thích khác:** thời gian chờ chủ yếu đến từ thời hạn phản hồi của người bán hoặc khâu vận chuyển hàng trả.
-- **Mình đúng nếu thấy:** Trong các review Shopee 1–2★ kể về khiếu nại hàng không đúng mô tả, ít nhất 30% nhắc đến việc xử lý chậm hoặc thiếu hướng dẫn về căn cứ, bằng chứng hay thời hạn. Đây là ngưỡng kiểm tra trong nhóm review đã lọc.
-- **Nguồn chính dự kiến:** lấy 200 review tiếng Việt mới nhất của ứng dụng Shopee trên Google Play ở mọi mức sao, rồi lọc review 1–2★ kể về khiếu nại, trả hàng hoặc hoàn tiền do hàng không đúng mô tả. Ghi khoảng ngày của mẫu và báo x/N cùng tỷ lệ, với N gồm toàn bộ review khớp bộ lọc.
-- **Nguồn kiểm lại dự kiến:** phỏng vấn ít nhất 3 người mua ngoài nhóm về lần gần nhất họ làm thủ tục trả hàng trong tháng qua, tập trung vào trường hợp hàng không đúng mô tả.
+- **Người dùng:** người có hóa đơn khi mua sắm hoặc ăn uống và từng muốn theo dõi chi tiêu.
+- **Mình nghĩ:** sau khi nhận hóa đơn, người dùng dễ bỏ qua việc nhập khoản chi ở nơi khác, dù họ muốn biết đã tiêu gì khi xem lại.
+- **Cách giải thích khác:** lịch sử thanh toán có thể đã đủ cho mục đích xem lại.
+- **Mình đúng nếu thấy:** ít nhất 2/3 người ngoài nhóm kể được một lần trong tháng qua đã có hóa đơn nhưng bỏ qua việc ghi sổ hoặc phải nhập lại thông tin sau đó.
+- **Nguồn đã kiểm bước đầu:** 500 review công khai của hai ứng dụng ghi chi tiêu. Mẫu cho tín hiệu có vướng mắc khi ghi và tra lại. Ngưỡng 2/3 vẫn là tiêu chí dự kiến cho một lần kiểm bằng phỏng vấn nếu nhóm thực hiện. Dùng ảnh giả lập cho bản demo. [Kết quả review](summary.md).

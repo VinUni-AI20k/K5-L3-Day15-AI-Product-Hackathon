@@ -6,15 +6,15 @@
 
 - Tên nhóm: 404ERROR
 - Lớp: L3A
-- Track: D
+- Track: E
 - Link repo: https://github.com/trinhcongduc112/K5-Day15-L3A-404ERROR
 
 | STT | Họ và tên | Mã học viên | Vai trò | Phần việc chính |
 |---|---|---|---|---|
-| 1 | Trịnh Công Đức | 2A202603527 | Đội trưởng | Điều phối, viết spec, code công cụ đối chiếu và rà soát tích hợp |
-| 2 | Nguyễn Tiến Đạt | 2A202603452 | Thành viên | Phân tích review, viết benchmark và chạy đánh giá |
-| 3 | Nguyễn Tuấn Kiệt | 2A202603417 | Thành viên | Phỏng vấn, tổng hợp bằng chứng và viết tiêu chí chấm |
-| 4 | Nguyễn Quang Vũ | 2A202603407 | Thành viên | Phụ trách code sản phẩm, nối model thật và tích hợp bản demo |
+| 1 | Trịnh Công Đức | 2A202603527 | Đội trưởng | Điều phối, viết spec, code kiểm dữ liệu, lưu và tổng hợp và rà soát tích hợp |
+| 2 | Nguyễn Tiến Đạt | 2A202603452 | Thành viên | Dựng hóa đơn mẫu, viết benchmark và chạy đánh giá |
+| 3 | Nguyễn Tuấn Kiệt | 2A202603417 | Thành viên | Phỏng vấn người dùng, tổng hợp bằng chứng và viết tiêu chí chấm |
+| 4 | Nguyễn Quang Vũ | 2A202603407 | Thành viên | Code luồng nhận ảnh, nối model thật và tích hợp giao diện |
 
 **Quy tắc điền**
 - **Lớp:** `L3A` hoặc `L3B`. **Track:** một chữ `A` (EdTech), `B` (Y tế), `C` (Du lịch), `D` (Thương mại điện tử), `E` (Tài chính) hoặc `F` (Làn khác). **Link repo:** link GitHub công khai của nhóm.

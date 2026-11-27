@@ -1,16 +1,22 @@
-# 404ERROR · Hướng dẫn khiếu nại hàng không đúng mô tả
+# 404ERROR · Nhật ký chi tiêu từ ảnh
 
-**Lớp L3A · Track D (Thương mại điện tử), hướng D3.** [Thành viên](TEAMS.md) · [Canvas CP1](canvas.md) · [Phân công và bàn giao](PHAN-CONG.md)
+**Lớp L3A · Track E (Tài chính).** [Thành viên](TEAMS.md) · [Canvas CP1](canvas.md) · [Phân công và bàn giao](PHAN-CONG.md)
 
-**Bài toán dự kiến.** Khi nhận hàng không đúng mô tả và muốn trả hàng, người mua trên sàn khó biết chi tiết nào trong mô tả lúc đặt có thể dùng để đối chiếu và cần nộp bằng chứng gì, nên có thể phải bổ sung nhiều lần hoặc lỡ hạn gửi yêu cầu.
+**Bài toán dự kiến.** Người muốn theo dõi chi tiêu hằng ngày phải nhập lại thông tin từ từng hóa đơn, nên dễ bỏ sót khoản chi và mất thời gian khi xem lại đã tiêu vào đâu.
 
-**Lát cắt dự kiến.** Một người mua trên sàn báo hàng không đúng mô tả, AI đối chiếu mô tả lúc đặt, bằng chứng hiện có và chính sách áp dụng để chọn hướng dẫn gửi yêu cầu trả hàng, xin thêm bằng chứng hoặc chuyển nhân viên, giúp người mua biết bước tiếp theo và hạn gửi yêu cầu nếu xác định được.
+**Lát cắt dự kiến.** Khi người dùng chụp một hóa đơn, AI đọc ngày mua và số tiền thực trả rồi phân loại khoản chi để ứng dụng tự lưu khoản chi vào lịch, giúp người dùng xem tổng tiền và từng khoản theo ngày.
 
-**Chạy khung.** Từ thư mục gốc, chạy `python run.py check` để kiểm bảng thành viên và bộ câu thử, hoặc `python run.py` để chạy khung mẫu ở chế độ giả. Trên máy chỉ có lệnh `python3`, dùng `python3 run.py`. [Các lệnh của bộ khung](starter-repo/README.md#lệnh)
+**Trải nghiệm demo.** **Chụp hóa đơn → app tự đọc, phân loại, lưu và cập nhật lịch.** Chạm một ngày để xem tổng; chọn **Xem thêm** để mở từng khoản. **+** mở camera để ghi khoản mới. Kết quả tháng tính từ các khoản đã ghi.
+
+**Thiết kế giao diện.** Lịch tháng ưu tiên điện thoại với ô ngày hiện số tiền. Chạm ngày mở bảng tổng hợp và nút **Xem thêm**. Dùng bố cục và nhận diện riêng cho nhật ký chi tiêu.
+
+**Thay đổi đề tài.** Đổi từ Track D (Thương mại điện tử) ở CP1 sang Track E (Tài chính cá nhân), với lát cắt tự ghi khoản chi ngay sau khi chụp hóa đơn. Thực hiện theo mục đổi track của đề.
+
+**Chạy khung.** `python3 run.py check` kiểm bảng thành viên và bộ câu thử. `python3 run.py` hiện chạy ví dụ starter với model giả.
 
 ## Dùng AI vào việc gì
 
-Nhóm dùng Codex để soạn bản nháp CP1, chuyển thông tin thành viên vào mẫu và kiểm tra định dạng. Đội trưởng rà nội dung và phân công trước khi nộp. [Khai báo chi tiết](docs/ai-usage.md)
+Nhóm dùng Codex để soạn lại hồ sơ theo lát cắt tự ghi chi tiêu khi chụp hóa đơn và kiểm tra định dạng. Đội trưởng rà phạm vi, giả thuyết và phân công trước khi nộp. [Khai báo chi tiết](docs/ai-usage.md)
 
 ---
 
