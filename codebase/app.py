@@ -36,7 +36,7 @@ def main() -> int:
         print("Không nạp được codebase/ — lỗi ở %s: %s: %s" % (_where(e), type(e).__name__, e))
         print("Sửa lỗi rồi chạy lại. Cách nối model: docs/connect-model.md")
         return 1
-    print("Bản chạy thử CP2 — nhập văn bản OCR mẫu, xem nhanh rồi gõ Chốt để lưu. Có thể nhập ngày/tháng để xem. Thoát bằng Ctrl+C.")
+    print("Bản chạy thử CP2 — nhập văn bản OCR mẫu, xem nhanh rồi gõ Chốt để lưu. Có thể xem ngày, tuần ISO, tháng hoặc năm. Thoát bằng Ctrl+C.")
     journal = Path(os.environ.get("RECEIPT_JOURNAL") or Path(__file__).resolve().parents[1] / "data" / "runtime" / "receipts.sqlite")
     pending_receipt = None
     blank = 0

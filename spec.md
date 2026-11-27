@@ -46,28 +46,40 @@ Track E · Tài chính · Nhật ký chi tiêu cá nhân
 
 ```mermaid
 flowchart TD
-    U["Chụp hóa đơn · CP2 nhập OCR mẫu"] --> V["Đọc ngày và tổng thực trả"]
-    V --> K{"Có đủ căn cứ để ghi?"}
-    K -- "Thiếu số hoặc mâu thuẫn" --> P["Báo cần đọc lại · chưa cộng"]
-    K -- "Đủ" --> V2["Xem nhanh ngày, tổng, nơi mua và nhóm chi"]
-    V2 --> C["Người dùng bấm Chốt một lần"]
-    C --> W["Lưu khoản vào sổ cục bộ"]
-    W --> D["Xem từng khoản theo ngày"]
-    W --> M["Tổng ngày và tháng tính bằng code"]
+    subgraph L1["Luồng 1 · Chụp và ghi hóa đơn vào lịch"]
+        U1["Chụp hóa đơn · CP2 nhập OCR mẫu"] --> S1["Đọc ngày, tổng thực trả, nơi mua và nhóm chi"]
+        S1 --> S2["Code kiểm dữ liệu và số tiền · validate_receipt"]
+        S2 --> C1{"Đủ căn cứ?"}
+        C1 -- "Ảnh mờ, thiếu hoặc mâu thuẫn" --> R1["Cần đọc lại · chụp lại"]
+        C1 -- "Đủ" --> DRAFT["Tạo bản xem nhanh · draft_save_receipt"]
+        DRAFT --> H1["Xem nhanh, sửa tiền hoặc nhóm nếu cần, rồi bấm Chốt"]
+        H1 --> DB["Sổ chi tiêu theo ngày · save_daily_note"]
+    end
+    subgraph L2["Luồng 2 · Xem chi theo lịch và so sánh kỳ"]
+        U2["Chọn ngày, tuần, tháng, năm hoặc kỳ so sánh"] --> H2{"Trong phạm vi?"}
+        H2 -- "Ngoài phạm vi hoặc có dữ liệu nhạy cảm" --> STOP["Từ chối trước khi gọi model"]
+        H2 -- "Trong phạm vi" --> CALC["Code tính tổng và chi tiết · get_day_summary / aggregate_period / compare_periods"]
+        DB --> CALC
+        CALC --> C2{"Có dữ liệu?"}
+        C2 -- "Không" --> EMPTY["Báo chưa có dữ liệu"]
+        C2 -- "Có" --> S6["Diễn giải theo dữ liệu công cụ · AI giả ở CP2"]
+        S6 --> S7["Hiện số liệu do code tính và chi tiết từ sổ"]
+    end
 ```
 
 | Công cụ CP2 | Input | Output | Tác động |
 |---|---|---|---|
-| `parse_receipt_text` | OCR mẫu, ngày chụp nếu cần | Ngày, tổng thực trả, nơi mua, nhóm và trường thiếu | Chỉ đọc |
-| `save_daily_note` | Bản xem nhanh đã được người dùng chốt, OCR mẫu, sổ phiên | Bản ghi, trạng thái trùng và tổng ngày | Ghi SQLite cục bộ ở CLI; eval dùng sổ tạm |
-| `get_day_summary`, `get_month_calendar`, `analyze_spending` | Ngày hoặc tháng | Tổng, chi tiết, nhóm chi và ngày chi nhiều nhất | Chỉ đọc |
+| `parse_receipt_text`, `validate_receipt` | OCR mẫu, ngày chụp nếu cần | Ngày, tổng thực trả, nơi mua, nhóm và trường thiếu | Chỉ đọc |
+| `draft_save_receipt` | Dữ liệu đã kiểm và OCR mẫu | Bản xem nhanh trong phiên | Chỉ giữ trong phiên |
+| `save_daily_note` | Bản đã được người dùng chốt | Bản ghi, trạng thái trùng và tổng ngày | Ghi SQLite cục bộ ở CLI; eval dùng sổ tạm |
+| `get_day_summary`, `aggregate_period`, `compare_periods` | Ngày hoặc mốc tuần ISO, tháng, năm | Chi tiết, tổng theo nhóm và chênh lệch giữa các kỳ | Chỉ đọc |
 
-- **G10:** nếu tổng thực trả không xác định được, báo cần đọc lại và giữ nguyên tổng. **G1:** CLI nói rõ đầu vào là OCR mẫu và model giả. **G11:** hiển thị tổng, từng khoản và nguồn ngày chụp nếu phải dùng ngày mặc định.
-- Người dùng chụp một lần, xem nhanh và bấm Chốt nếu thông tin đúng. Nếu thông tin không đọc được hoặc người dùng thấy sai, chụp lại để tạo bản xem nhanh mới. CLI hiện hiển thị thông báo, phần lưu ảnh chờ đọc lại thuộc màn hình ảnh sau CP2.
+- **G10:** nếu tổng thực trả không xác định được, báo cần đọc lại và giữ nguyên tổng. **G1:** CLI nói rõ đầu vào là OCR mẫu và model giả. **G8/G9:** nếu người dùng thấy dữ liệu đọc sai, có thể sửa tiền hoặc nhóm trước khi chốt. **G11:** hiển thị căn cứ tính tổng và nguồn ngày chụp nếu dùng ngày mặc định.
+- Ở CP2, app hiển thị số liệu do code tính sau bước gọi AI giả. Phần ảnh thật, giao diện bấm lịch và nhận xét từ model thật cần kiểm ở bản tiếp theo.
 
 - **Luồng đề xuất:** mở camera → chụp hóa đơn → app đọc và hiển thị bản xem nhanh → bấm Chốt một lần → app lưu khoản chi, cập nhật lịch và tổng tiền.
 - **Dữ liệu mỗi khoản:** số thực trả (VND nguyên), ngày chi, nơi mua nếu đọc được, nhóm chi và ảnh hóa đơn. Dùng nhóm Chưa phân loại nếu thiếu căn cứ xếp nhóm. Dùng ngày chụp theo múi giờ người dùng nếu hóa đơn không ghi ngày và đánh dấu nguồn ngày.
-- **Điều kiện lưu:** cần có số thực trả rõ, ngày chi và thao tác Chốt. Nếu ảnh mờ hoặc có nhiều mức tổng chưa phân biệt được, hiển thị **Cần đọc lại** và hướng dẫn chụp lại. Bản xem nhanh chưa chốt không đi vào sổ. Dùng mã lượt chụp để xử lý lại cùng ảnh mà không cộng trùng.
+- **Điều kiện lưu:** cần có số thực trả rõ, ngày chi và thao tác Chốt. Nếu ảnh mờ hoặc có nhiều mức tổng chưa phân biệt được, hiển thị **Cần đọc lại** và hướng dẫn chụp lại. Bản xem nhanh chưa chốt không đi vào sổ. Người dùng có thể sửa tiền hoặc nhóm nếu phát hiện đọc sai. Dùng mã lượt chụp để xử lý lại cùng ảnh mà không cộng trùng.
 - **Giao diện:** mỗi ô lịch hiện tổng tiền ngày đó. Chạm ngày mở tổng và nhóm chi; **Xem thêm** mở từng khoản và ảnh hóa đơn. **+** mở camera để thêm ảnh. Màn hình tháng tính tổng, tổng theo nhóm và ngày chi nhiều nhất từ các khoản đã ghi.
 - **Phạm vi demo:** mỗi ảnh hóa đơn giả lập tương ứng một khoản VND. Tính tổng ngày và tháng bằng code từ các khoản đã lưu.
 
@@ -78,6 +90,7 @@ flowchart TD
 |---|---|---|---|
 | Xem nhanh nhưng chưa Chốt | 4 | Hiện thông tin và chưa ghi vào sổ | B18 |
 | Có khoản trong ngày | 1 | Hiện đúng tổng và từng khoản | B03 |
+| So sánh tuần và tổng năm | 1 | Tính từ các khoản đã ghi trong kỳ tương ứng | B19, B20 |
 | Ngày hoặc tháng trống | 1 | Báo chưa có dữ liệu | B06, B10 |
 | Mờ số tiền | 2 | Yêu cầu chụp lại và giữ nguyên tổng | B07 |
 | Thiếu ngày trên hóa đơn | 2 | Hiện nguồn ngày chụp ngay ở màn xem nhanh để người dùng kiểm trước khi Chốt | B08 |
@@ -98,8 +111,8 @@ flowchart TD
 - **Trùng hoặc ngoài phạm vi:** báo không ghi lại, từ chối trước khi gọi model. Luồng sửa/xóa khoản trên giao diện thuộc bản sau.
 
 ## §7. Đánh giá & chuẩn "đạt" *(guide 2.4, 4.1)*
-- Data Card: `data/DATA_CARD.md`. Benchmark CP2 có **18 câu** (6 thường, 8 khó, 4 từ chối) và **4 metric**. Có 6/18 tình huống chuyển thể từ review công khai (33,3%); giá, ngày và sổ mẫu là giả lập.
-- **Chuẩn đạt đề xuất để đội trưởng chốt ở CP2:** ít nhất **85% câu đạt**. Ca nhập đủ dữ liệu phải hiển thị đúng ngày và tổng thực trả, chỉ ghi sau khi Chốt, ca truy vấn có dữ liệu phải khớp số liệu, ca thiếu căn cứ không được ghi sai và **100% câu từ chối** phải từ chối đúng. Với 18 câu hiện tại, 85% tương đương **ít nhất 16/18 câu**. Giữ nguyên chuẩn sau khi nộp CP2.
+- Data Card: `data/DATA_CARD.md`. Benchmark CP2 có **20 câu** (8 thường, 8 khó, 4 từ chối) và **4 metric**. Có 7/20 tình huống chuyển thể từ review công khai (35%); giá, ngày và sổ mẫu là giả lập.
+- **Chuẩn đạt đề xuất để đội trưởng chốt ở CP2:** ít nhất **85% câu đạt**. Ca nhập đủ dữ liệu phải hiển thị đúng ngày và tổng thực trả, chỉ ghi sau khi Chốt, ca truy vấn có dữ liệu phải khớp số liệu, ca thiếu căn cứ không được ghi sai và **100% câu từ chối** phải từ chối đúng. Với 18 câu hiện tại, 85% tương đương **ít nhất 17/20 câu**. Giữ nguyên chuẩn sau khi nộp CP2.
 - Kết quả: lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*

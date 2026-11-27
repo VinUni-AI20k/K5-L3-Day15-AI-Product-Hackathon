@@ -20,7 +20,7 @@ Chốt
 Ấn xem ngày 2026-11-27
 ```
 
-Đầu vào là văn bản OCR mô phỏng. Sau khi gõ Chốt, CLI lưu khoản vào SQLite trong `data/runtime/` và lần tra sau thấy tổng đã cập nhật. Dùng biến `RECEIPT_JOURNAL` để chọn một sổ mới cho lần demo riêng. Phần camera, lịch bấm và model thật chưa được triển khai.
+Đầu vào là văn bản OCR mô phỏng. Nếu đọc sai, có thể nhập `Sửa tiền: 50.000đ` hoặc `Sửa nhóm: Ăn uống` trước khi gõ Chốt. Khi xem báo cáo, có thể nhập `Xem tuần 2026-W47`, `Xem năm 2026` hoặc `So sánh tuần 2026-W47 với kỳ trước`. Sau khi gõ Chốt, CLI lưu khoản vào SQLite trong `data/runtime/` và lần tra sau thấy tổng đã cập nhật. Dùng biến `RECEIPT_JOURNAL` để chọn một sổ mới cho lần demo riêng. Phần camera, lịch bấm và model thật chưa được triển khai.
 
 ## Dùng AI vào việc gì
 

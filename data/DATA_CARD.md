@@ -30,9 +30,9 @@
 | | |
 |---|---|
 | Dùng để làm gì | Đo chất lượng qua `python run.py eval`. |
-| Từ đâu | Kết hợp tình huống tự viết, seed 42 và 6 tình huống chuyển thể từ [review công khai](../evidence/data-mining.md). Số tiền, mốc ngày và mã lượt chụp trong benchmark là dữ liệu mẫu. |
-| Số dòng | **18** câu thử CP2 (`thuong`: 6 · `kho`: 8 · `tu_choi`: 4, gồm 2 câu tấn công + ca OTP/số thẻ). |
-| Giới hạn | Hiện có 6/18 tình huống chuyển thể từ review. Trước CP3 cần lên 20–30 câu và duy trì tỷ lệ nguồn thật ít nhất 1/3. |
+| Từ đâu | Kết hợp tình huống tự viết, seed 42 và 7 tình huống chuyển thể từ [review công khai](../evidence/data-mining.md). Số tiền, mốc ngày và mã lượt chụp trong benchmark là dữ liệu mẫu. |
+| Số dòng | **20** câu thử CP2 (`thuong`: 8 · `kho`: 8 · `tu_choi`: 4, gồm 2 câu tấn công + ca OTP/số thẻ). |
+| Giới hạn | Hiện có 7/20 tình huống chuyển thể từ review. CP3 cần kiểm lại các câu trên ảnh thật hoặc dữ liệu mẫu phù hợp, đồng thời duy trì tỷ lệ nguồn thật ít nhất 1/3. |
 
 ## Lưu trong bản chạy thử
 

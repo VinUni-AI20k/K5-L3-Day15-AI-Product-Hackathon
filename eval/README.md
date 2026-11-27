@@ -9,7 +9,7 @@ Sổ seed 42 có 85 khoản chi giả lập qua tháng 10 và tháng 11/2026. Lu
 
 ## 2. Bộ câu thử dựng ra sao
 
-- 18 câu, gồm 6 thường, 8 khó và 4 từ chối. Có 6/18 tình huống chuyển thể từ [review công khai](../evidence/data-mining.md).
+- 20 câu, gồm 8 thường, 8 khó và 4 từ chối. Có 7/20 tình huống chuyển thể từ [review công khai](../evidence/data-mining.md).
 - Độ phủ theo 4 chiều: nhập hoặc tra cứu; đủ hoặc thiếu căn cứ; sổ có dữ liệu, rỗng hoặc trùng; trong hoặc ngoài phạm vi.
 - Các câu theo lớp vấn đề có trong [spec](../spec.md).
 
@@ -22,7 +22,7 @@ Sổ seed 42 có 85 khoản chi giả lập qua tháng 10 và tháng 11/2026. Lu
 | Không ghi khi thiếu căn cứ | Kiểm đầu ra và bản ghi | 100% ca thiếu căn cứ bắt buộc |
 | Đúng phạm vi | Xem phản hồi và xác nhận sổ không đổi | 100% câu từ chối |
 
-**Chuẩn đề xuất:** ít nhất 85% câu đạt và thỏa cả bốn điều kiện trên, tương đương ít nhất 16/18 câu ở bộ CP2. Cần đội trưởng xác nhận chuẩn trước khi nộp.
+**Chuẩn đề xuất:** ít nhất 85% câu đạt và thỏa cả bốn điều kiện trên, tương đương ít nhất 17/20 câu ở bộ CP2. Cần đội trưởng xác nhận chuẩn trước khi nộp.
 
 **Chấm độc lập:** chưa có kết quả từ hai người. Dùng B01, B07, B16, B17 và B18 để chấm riêng theo các cột đáp án, tiêu chí và output, rồi ghi số khớp trên 5.
 

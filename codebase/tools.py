@@ -4,7 +4,8 @@ Mỗi công cụ có @tool và docstring 4 ý: tên · input · output · tác �
 Mọi phép cộng trừ tổng tiền theo ngày/tháng chạy bằng code Python, không để model tự nhẩm.
 """
 from contextlib import closing
-from datetime import date
+from datetime import date, timedelta
+import calendar
 import hashlib
 import json
 import os
@@ -52,7 +53,7 @@ def _all_records(journal_path=None) -> list:
         return base + [json.loads(row[0]) for row in connection.execute("SELECT payload FROM receipts ORDER BY rowid")]
 
 
-def _parse_vnd_amount(token: str) -> int | None:
+def parse_vnd_amount(token: str) -> int | None:
     """Chuyển chuỗi tiền Việt ('45.000đ', '38k', '70000') thành số nguyên VND."""
     s = (token or "").strip().lower().replace(" ", "")
     m = re.match(r"^(\d+(?:[.,]\d{3})*)(k|nghin|ngan)?(?:d|đ|vnd)?$", s)
@@ -93,14 +94,11 @@ def parse_receipt_text(raw_input: str, capture_date: str | None = None) -> dict:
         receipt_date = f"{y}-{int(m):02d}-{int(d):02d}"
 
     chosen_date = receipt_date or (capture_marker.group(1) if capture_marker else capture_date)
-    missing = []
     if chosen_date:
         try:
             chosen_date = date.fromisoformat(chosen_date).isoformat()
         except ValueError:
             chosen_date = None
-    if not chosen_date:
-        missing.append("ngày hợp lệ")
 
     merchant = re.sub(
         r"^(?:chụp|gửi ảnh)?\s*hóa đơn(?: bị [^:]+)?\s*:\s*",
@@ -110,7 +108,7 @@ def parse_receipt_text(raw_input: str, capture_date: str | None = None) -> dict:
         merchant = "Không rõ"
 
     amounts = {
-        _parse_vnd_amount(match.group(1))
+        parse_vnd_amount(match.group(1))
         for match in re.finditer(
             r"(?:tổng cộng|tổng thanh toán|tổng phải trả|thực trả|phải trả)\s*:?\s*"
             r"(\d+(?:[.,]\d{3})*\s*(?:k|nghin|ngan|vnd|đ|d)?)(?![\d.,])",
@@ -120,8 +118,6 @@ def parse_receipt_text(raw_input: str, capture_date: str | None = None) -> dict:
     total = next(iter(amounts)) if len(amounts) == 1 else None
     if "chưa rõ thực trả" in low or "nhiều mức tổng chưa rõ" in low:
         total = None
-    if total is None or total <= 0:
-        missing.append("số tiền thực trả")
     return {
         "merchant": merchant,
         "capture_id": capture_id.group(1).upper() if capture_id else None,
@@ -129,8 +125,25 @@ def parse_receipt_text(raw_input: str, capture_date: str | None = None) -> dict:
         "date_source": "hóa đơn" if receipt_date else "ngày chụp",
         "total": total,
         "category": _infer_category(receipt_text),
-        "missing_fields": missing,
     }
+
+
+@tool
+def validate_receipt(receipt: dict):
+    """Kiểm ngày và số tiền thực trả trước khi cho xem bản nháp có thể chốt. Chỉ đọc."""
+    missing = []
+    if not receipt["date"]:
+        missing.append("ngày hợp lệ")
+    total = receipt["total"]
+    if total is None or total <= 0:
+        missing.append("số tiền thực trả")
+    return missing
+
+
+@tool
+def draft_save_receipt(receipt: dict, raw_input: str):
+    """Tạo dữ liệu xem nhanh trong phiên; chỉ thao tác Chốt mới ghi sổ."""
+    return {"receipt": receipt, "capture_text": raw_input}
 
 
 @tool
@@ -210,13 +223,36 @@ def get_month_calendar(year_month: str, journal_path=None) -> dict:
     }
 
 
+def period_bounds(kind, key):
+    if kind == "week":
+        year, week = key.split("-W")
+        start = date.fromisocalendar(int(year), int(week), 1)
+        return start, start + timedelta(days=6)
+    if kind == "month":
+        year, month = map(int, key.split("-"))
+        return date(year, month, 1), date(year, month, calendar.monthrange(year, month)[1])
+    if kind == "year":
+        year = int(key)
+        return date(year, 1, 1), date(year, 12, 31)
+    raise ValueError("Kỳ không hợp lệ")
+
+
+def previous_period(kind, key):
+    start, _ = period_bounds(kind, key)
+    day_before = start - timedelta(days=1)
+    if kind == "week":
+        year, week, _ = day_before.isocalendar()
+        return f"{year}-W{week:02}"
+    return day_before.isoformat()[:7 if kind == "month" else 4]
+
+
 @tool
-def analyze_spending(period: str, compare_with: str = "", journal_path=None) -> dict:
-    """Phân tích chi tiêu theo tháng (hoặc so sánh 2 tháng) dựa trên hóa đơn đã lưu bằng code.
-    Input: period ('YYYY-MM'), compare_with ('YYYY-MM' tùy chọn). Output: dict tổng chi, phân bổ nhóm, ngày cao nhất, khoản 'không rõ' và chênh lệch so sánh. Không tác động ra ngoài."""
-    items = [r for r in _all_records(journal_path) if (r.get("date") or "").startswith(period)]
+def aggregate_period(kind, key, journal_path=None):
+    """Tính tổng, nhóm và ngày cao nhất của một tuần ISO, tháng hoặc năm. Chỉ đọc."""
+    start, end = (bound.isoformat() for bound in period_bounds(kind, key))
+    items = [row for row in _all_records(journal_path) if start <= row["date"] <= end]
     if not items:
-        return {"period": period, "has_data": False, "total": 0, "count": 0}
+        return {"period": key, "has_data": False, "total": 0, "count": 0}
 
     by_cat = defaultdict(int)
     daily = defaultdict(int)
@@ -232,7 +268,7 @@ def analyze_spending(period: str, compare_with: str = "", journal_path=None) -> 
     sorted_cats = [{"category": k, "total": v, "pct": round(100.0 * v / total, 2)} for k, v in sorted(by_cat.items(), key=lambda x: -x[1])]
 
     res = {
-        "period": period,
+        "period": key,
         "has_data": True,
         "total": total,
         "count": len(items),
@@ -243,18 +279,18 @@ def analyze_spending(period: str, compare_with: str = "", journal_path=None) -> 
         "unknown_count": unknown_count,
     }
 
-    if compare_with:
-        prev_items = [r for r in _all_records(journal_path) if (r.get("date") or "").startswith(compare_with)]
-        if prev_items:
-            prev_total = sum(int(r["total"]) for r in prev_items)
-            diff = total - prev_total
-            pct_diff = round(100.0 * diff / prev_total, 2) if prev_total else None
-            res["comparison"] = {
-                "other_period": compare_with,
-                "other_total": prev_total,
-                "diff": diff,
-                "pct_diff": pct_diff,
-            }
-        else:
-            res["comparison"] = {"other_period": compare_with, "has_data": False}
     return res
+
+
+@tool
+def compare_periods(kind, current, previous, journal_path=None):
+    """Tính chênh lệch và phần trăm giữa hai kỳ cùng loại; trả căn cứ theo nhóm. Chỉ đọc."""
+    current_summary = aggregate_period(kind, current, journal_path)
+    previous_summary = aggregate_period(kind, previous, journal_path)
+    result = {"current": current_summary, "previous": previous_summary}
+    if not (current_summary["has_data"] and previous_summary["has_data"]):
+        return result
+    diff = current_summary["total"] - previous_summary["total"]
+    previous_total = previous_summary["total"]
+    result.update(diff=diff, pct_diff=round(100 * diff / previous_total, 2) if previous_total else None)
+    return result

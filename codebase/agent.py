@@ -7,11 +7,16 @@ import re
 
 from ai import call_model
 from tools import (
-    analyze_spending,
+    CATEGORY_KEYWORDS,
+    aggregate_period,
+    compare_periods,
+    draft_save_receipt,
     get_day_summary,
-    get_month_calendar,
     parse_receipt_text,
+    parse_vnd_amount,
+    previous_period,
     save_daily_note,
+    validate_receipt,
 )
 from tracing import note
 
@@ -69,8 +74,8 @@ def _extract_dates_and_months(text: str):
 
 
 def _is_receipt_input(text: str) -> bool:
-    low = (text or "").lower()
-    return any(k in low for k in ("chụp hóa đơn", "chup hoa don", "hóa đơn", "hoa don", "tổng cộng", "tong cong", "gửi ảnh", "gui anh"))
+    low = text.casefold().replace("hoá", "hóa")
+    return low.startswith(("chụp hóa đơn", "chup hoa don", "hóa đơn:", "hoa don:", "gửi ảnh", "gui anh"))
 
 
 def _receipt_details(receipt):
@@ -83,14 +88,36 @@ def _receipt_details(receipt):
 
 def _preview_receipt(text, capture_date):
     receipt = parse_receipt_text(text, capture_date)
-    if receipt["missing_fields"]:
-        missing = ", ".join(receipt["missing_fields"])
+    missing = validate_receipt(receipt)
+    if missing:
+        missing = ", ".join(missing)
         note("dừng: thiếu trường hóa đơn")
         return f"Cần đọc lại hóa đơn: {missing}. Chưa ghi khoản chi. Hãy chụp lại rõ phần cần đọc.", None
     return (
         f"Xem nhanh {_receipt_details(receipt)} Chưa ghi khoản chi. Chọn Chốt để lưu.",
-        {"receipt": receipt, "capture_text": text},
+        draft_save_receipt(receipt, text),
     )
+
+
+def _edit_receipt(pending, field, value):
+    if pending is None:
+        return {"output": "Chưa có bản xem nhanh để sửa."}
+    receipt = pending["receipt"].copy()
+    if field == "tiền":
+        amount = parse_vnd_amount(value)
+        if amount is None or amount <= 0:
+            return {"output": "Số tiền chưa hợp lệ. Nhập theo mẫu Sửa tiền: 55.000đ."}
+        receipt["total"] = amount
+    else:
+        categories = (*CATEGORY_KEYWORDS, "không rõ")
+        category = next((option for option in categories if option.casefold() == value.casefold()), None)
+        if category is None:
+            return {"output": "Chọn một nhóm chi: " + ", ".join(categories) + "."}
+        receipt["category"] = category
+    return {
+        "output": f"Đã sửa bản xem nhanh {_receipt_details(receipt)} Chọn Chốt để lưu.",
+        "pending_receipt": {**pending, "receipt": receipt},
+    }
 
 
 def _confirm_receipt(pending_receipt, journal_path):
@@ -108,6 +135,17 @@ def _confirm_receipt(pending_receipt, journal_path):
 def _build_context(text: str, journal_path=None) -> tuple[str, str]:
     """Dựng dữ liệu tra cứu và tổng chi từ các khoản đã lưu."""
     dates, months = _extract_dates_and_months(text)
+    weeks = re.findall(r"\b20\d{2}-W\d{2}\b", text.upper())
+    years = re.findall(r"(?:năm|nam)\s+(20\d{2})\b", text.lower())
+    if weeks or months or (years and not dates):
+        kind, keys = ("week", weeks) if weeks else ("month", months) if months else ("year", years)
+        try:
+            if len(keys) == 1 and "kỳ trước" in text.lower():
+                keys.append(previous_period(kind, keys[0]))
+            return _period_report(kind, keys, journal_path)
+        except ValueError:
+            return "Kỳ không hợp lệ.", "Mốc tuần, tháng hoặc năm chưa hợp lệ."
+
     if dates:
         d = dates[0]
         day_info = get_day_summary(d, journal_path)
@@ -124,46 +162,47 @@ def _build_context(text: str, journal_path=None) -> tuple[str, str]:
         summary = f"Chi tiêu ngày {d}: tổng {_fmt_vnd(day_info['total'])} ({day_info['count']} khoản):\n" + "\n".join(lines) + extra
         return f"get_day_summary={day_info}", summary
 
-    if len(months) >= 2:
-        m1, m2 = months[0], months[1]
-        analysis = analyze_spending(m1, compare_with=m2, journal_path=journal_path)
-        if not analysis.get("has_data"):
-            note("chưa có dữ liệu tháng chính")
-            return f"analyze_spending={analysis}", f"Chưa có dữ liệu chi tiêu cho tháng {m1}."
-        comp = analysis.get("comparison") or {}
-        if not comp.get("other_total") and comp.get("has_data") is False:
-            summary = f"Tháng {m1} tổng chi {_fmt_vnd(analysis['total'])}, nhưng chưa có dữ liệu tháng {m2} để so sánh."
-        else:
-            sign = "+" if comp["diff"] >= 0 else ""
-            summary = (
-                f"So sánh {m1} với {m2}: {m1} chi {_fmt_vnd(analysis['total'])}, "
-                f"{m2} chi {_fmt_vnd(comp['other_total'])} "
-                f"(chênh lệch {sign}{_fmt_vnd(comp['diff'])}, {sign}{comp['pct_diff']}%). "
-                f"Nhóm cao nhất {m1}: {analysis['by_category'][0]['category']} ({_fmt_vnd(analysis['by_category'][0]['total'])})."
-            )
-        note("so sánh 2 tháng")
-        return f"analyze_spending={analysis}", summary
-
-    if len(months) == 1:
-        ym = months[0]
-        cal = get_month_calendar(ym, journal_path)
-        analysis = analyze_spending(ym, journal_path=journal_path)
-        if not analysis.get("has_data"):
-            note("tháng chưa có dữ liệu")
-            return f"get_month_calendar={cal}\nanalyze_spending={analysis}", f"Chưa có dữ liệu chi tiêu trong tháng {ym}."
-        cats = ", ".join(f"{c['category']}: {_fmt_vnd(c['total'])} ({c['pct']}%)" for c in analysis["by_category"][:4])
-        top = analysis["top_day"]
-        note("phân tích chi tiêu tháng")
-        summary = (
-            f"Phân tích tháng {ym}: tổng chi {_fmt_vnd(analysis['total'])} qua {analysis['count']} khoản "
-            f"({analysis['active_days']} ngày có chi tiêu). Các nhóm chính: {cats}. "
-            f"Ngày chi cao nhất: {top['date']} ({_fmt_vnd(top['total'])})."
-        )
-        return f"get_month_calendar={cal}\nanalyze_spending={analysis}", summary
-
     note("dừng: câu hỏi thiếu mốc ngày hoặc tháng")
-    summary = "Câu hỏi chưa rõ ngày hoặc tháng cần xem. Vui lòng cho biết cụ thể ngày (YYYY-MM-DD), tháng (YYYY-MM) hoặc gửi nội dung hóa đơn."
+    summary = "Câu hỏi chưa rõ ngày hoặc tháng cần xem. Cho biết ngày (YYYY-MM-DD), tuần ISO (YYYY-WNN), tháng (YYYY-MM) hoặc năm."
     return "Thiếu tham số ngày/tháng hoặc hóa đơn.", summary
+
+
+def _period_report(kind, keys, journal_path):
+    label = {"week": "tuần", "month": "tháng", "year": "năm"}[kind]
+    current = keys[0]
+    if len(keys) >= 2:
+        result = compare_periods(kind, current, keys[1], journal_path)
+        main, former = result["current"], result["previous"]
+        if not main["has_data"]:
+            return result, f"Chưa có dữ liệu chi tiêu {label} {current}."
+        if not former["has_data"]:
+            return result, (
+                f"{label.title()} {current} tổng chi {_fmt_vnd(main['total'])}. "
+                f"Chưa có dữ liệu {label} {keys[1]} để so sánh."
+            )
+        ratio = "" if result["pct_diff"] is None else f", {result['pct_diff']:+}%"
+        sign = "+" if result["diff"] >= 0 else ""
+        biggest = main["by_category"][0]
+        return result, (
+            f"So sánh {current} với {keys[1]}: {current} chi {_fmt_vnd(main['total'])}, "
+            f"{keys[1]} chi {_fmt_vnd(former['total'])} "
+            f"(chênh lệch {sign}{_fmt_vnd(result['diff'])}{ratio}). "
+            f"Nhóm cao nhất {current}: {biggest['category']} ({_fmt_vnd(biggest['total'])})."
+        )
+
+    data = aggregate_period(kind, current, journal_path)
+    if not data["has_data"]:
+        return data, f"Chưa có dữ liệu chi tiêu trong {label} {current}."
+    top = data["top_day"]
+    categories = ", ".join(
+        f"{cat['category']}: {_fmt_vnd(cat['total'])} ({cat['pct']}%)"
+        for cat in data["by_category"][:4]
+    )
+    return data, (
+        f"Phân tích {label} {current}: tổng chi {_fmt_vnd(data['total'])} qua {data['count']} khoản "
+        f"({data['active_days']} ngày có chi tiêu). Các nhóm chính: {categories}. "
+        f"Ngày chi cao nhất: {top['date']} ({_fmt_vnd(top['total'])})."
+    )
 
 
 def answer(text: str, *, journal_path=None, capture_date=None, pending_receipt=None) -> dict:
@@ -185,6 +224,10 @@ def answer(text: str, *, journal_path=None, capture_date=None, pending_receipt=N
             output["pending_receipt"] = None
         return output
 
+    edit = re.fullmatch(r"sửa\s+(tiền|nhóm)\s*:\s*(.+)", text, flags=re.IGNORECASE)
+    if edit:
+        return _edit_receipt(pending_receipt, edit.group(1).casefold(), edit.group(2).strip())
+
     if _is_receipt_input(text):
         preview, draft = _preview_receipt(text, capture_date)
         reply = call_model(SYSTEM, f"Thông tin đọc được từ OCR:\n{preview}")
@@ -198,4 +241,5 @@ def answer(text: str, *, journal_path=None, capture_date=None, pending_receipt=N
     reply = call_model(SYSTEM, f"Căn cứ từ công cụ:\n{context}\n\nTóm tắt số liệu đã kiểm chứng:\n{summary}\n\nĐầu vào của người dùng:\n{text}")
     if reply["model"] == "fake":
         return {"output": f"[AI giả - CP2] {summary}"}
-    return {"output": reply["text"]}
+    # Số liệu hiển thị đến từ công cụ. Không dùng đoạn diễn giải nếu chưa hậu kiểm được.
+    return {"output": summary}
