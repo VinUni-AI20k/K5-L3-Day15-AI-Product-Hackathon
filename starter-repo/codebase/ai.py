@@ -17,7 +17,10 @@ Chế độ giả (mặc định khi .env chưa có MODEL_PROVIDER, hoặc MODEL
 Nối model thật: điền .env (chép từ .env.example), rồi viết nhánh gọi API ở dưới theo docs/connect-model.md
 (có ví dụ OpenAI, Claude, model chạy trên máy, và cách nối nhà cung cấp khác). Không dán API key vào file này.
 """
+import json
 import os
+import urllib.error
+import urllib.request
 
 from tracing import model_call
 
@@ -43,14 +46,85 @@ MODEL_NAME = (os.environ.get("MODEL_NAME") or "").strip()
 API_KEY = (os.environ.get("API_KEY") or "").strip()
 
 
+SHOW_RAW = False   # True: in nguyên phản hồi của API khi cần tìm tên trường
+MAX_OUT = 8192     # trả về cả một file game HTML nên cần nhiều token ra hơn ví dụ mẫu (1024)
+
+
+def post_json(url, headers, body, timeout=120):
+    """Gửi POST JSON, trả JSON phản hồi. Chỉ dùng thư viện chuẩn. Lời báo lỗi không kèm key."""
+    req = urllib.request.Request(
+        url, data=json.dumps(body).encode("utf-8"), method="POST",
+        headers=dict({"Content-Type": "application/json"}, **headers))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise RuntimeError("HTTP %d: %s" % (e.code, e.read().decode("utf-8", "replace")[:300]))
+    if SHOW_RAW:
+        print(json.dumps(data, ensure_ascii=False, indent=2)[:3000])
+    return data
+
+
+def _messages(system, user):
+    return ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": user}]
+
+
+def call_openai(system, user):
+    data = post_json("https://api.openai.com/v1/chat/completions", {"Authorization": "Bearer " + API_KEY},
+                     {"model": MODEL_NAME, "messages": _messages(system, user)})
+    u = data["usage"]
+    return {"text": data["choices"][0]["message"]["content"],
+            "tokens_in": u["prompt_tokens"], "tokens_out": u["completion_tokens"]}
+
+
+def call_claude(system, user):
+    data = post_json("https://api.anthropic.com/v1/messages",
+                     {"x-api-key": API_KEY, "anthropic-version": "2023-06-01"},
+                     {"model": MODEL_NAME, "max_tokens": MAX_OUT, "system": system or "",
+                      "messages": [{"role": "user", "content": user}]})
+    text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+    u = data["usage"]
+    return {"text": text, "tokens_in": u["input_tokens"], "tokens_out": u["output_tokens"]}
+
+
+def call_ollama(system, user):
+    data = post_json("http://localhost:11434/api/chat", {},
+                     {"model": MODEL_NAME, "messages": _messages(system, user), "stream": False}, timeout=300)
+    return {"text": data["message"]["content"],
+            "tokens_in": data.get("prompt_eval_count", 0), "tokens_out": data.get("eval_count", 0)}
+
+
+def call_gemini(system, user):
+    """Gemini (generativelanguage v1beta). Key đi qua header, không nằm trên URL. Token ra gồm cả token suy nghĩ nếu có."""
+    body = {"contents": [{"role": "user", "parts": [{"text": user}]}],
+            "generationConfig": {"maxOutputTokens": MAX_OUT}}
+    if system:
+        body["systemInstruction"] = {"parts": [{"text": system}]}
+    data = post_json("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent" % MODEL_NAME,
+                     {"x-goog-api-key": API_KEY}, body)
+    cands = data.get("candidates") or []
+    if not cands:
+        raise RuntimeError("Gemini không trả câu trả lời: %s" % json.dumps(data.get("promptFeedback", data), ensure_ascii=False)[:300])
+    text = "".join(p.get("text", "") for p in cands[0].get("content", {}).get("parts", []))
+    u = data.get("usageMetadata") or {}
+    return {"text": text, "tokens_in": u.get("promptTokenCount", 0),
+            "tokens_out": u.get("candidatesTokenCount", 0) + u.get("thoughtsTokenCount", 0)}
+
+
+PROVIDERS = {"openai": call_openai, "anthropic": call_claude, "claude": call_claude,
+             "ollama": call_ollama, "gemini": call_gemini}
+
+
 @model_call
 def call_model(system: str, user: str) -> dict:
     if MODEL_PROVIDER == "fake":
         last = (user.strip().splitlines() or [""])[-1]
         return {"text": "[câu trả lời giả — chưa nối model] " + last[:60], "model": "fake", "tokens_in": 0, "tokens_out": 0}
-
-    # NHÓM VIẾT: gọi model thật ở đây (theo MODEL_PROVIDER, MODEL_NAME, API_KEY) rồi trả đúng 4 khoá.
-    # Ví dụ chép được cho từng nhà cung cấp: docs/connect-model.md mục 2.
-    raise NotImplementedError(
-        "chưa viết phần gọi model thật cho MODEL_PROVIDER=%s trong codebase/ai.py — xem docs/connect-model.md"
-        % MODEL_PROVIDER)
+    fn = PROVIDERS.get(MODEL_PROVIDER)
+    if fn is None:
+        raise NotImplementedError("MODEL_PROVIDER=%s chưa được hỗ trợ (có: %s) — xem docs/connect-model.md mục 2.4"
+                                  % (MODEL_PROVIDER, ", ".join(sorted(PROVIDERS))))
+    if not MODEL_NAME or (MODEL_PROVIDER != "ollama" and not API_KEY):
+        raise RuntimeError("Thiếu MODEL_NAME hoặc API_KEY trong .env (xem .env.example).")
+    r = fn(system, user)
+    return {"text": r["text"], "model": MODEL_NAME, "tokens_in": int(r["tokens_in"]), "tokens_out": int(r["tokens_out"])}
