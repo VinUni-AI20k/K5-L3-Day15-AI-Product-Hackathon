@@ -1,7 +1,7 @@
 # Chuẩn đề xuất tại CP2, đồng bộ với spec.md §7 khi chốt.
 metrics:
   - name: "so_tien_va_ngay"
-    definition: "Với ca đủ dữ liệu, khoản lưu đúng tổng thực trả và ngày. Khi chỉ có ngày chụp, ghi rõ nguồn ngày."
+    definition: "Với ca đủ dữ liệu, bản xem nhanh phải đúng ngày và tổng thực trả. Chỉ ghi khoản sau Chốt. Khi dùng ngày chụp, ghi rõ nguồn ngày."
     grader: "nguoi"
     threshold: "100% ca nhập đủ dữ liệu"
   - name: "tong_va_chi_tiet"

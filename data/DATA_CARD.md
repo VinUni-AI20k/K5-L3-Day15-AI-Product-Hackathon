@@ -8,7 +8,7 @@
 
 | Mục | Nội dung đã dựng |
 |---|---|
-| Mục đích | Thử luồng chụp hóa đơn, quyết định tự ghi hay giữ ở **Cần đọc lại**, chống cộng trùng theo mã lượt chụp, và tổng hợp theo ngày/tháng trên lịch kiểu Locket |
+| Mục đích | Thử luồng chụp hóa đơn, xem nhanh và chỉ ghi sau thao tác Chốt, báo **Cần đọc lại** khi dữ liệu chưa chắc, chống cộng trùng theo mã lượt chụp, và tổng hợp theo ngày/tháng trên lịch kiểu Locket |
 | Nguồn | Nhóm tự dựng bộ dữ liệu tiếng Việt giả lập có `seed = 42` ([seed_expenses.py](seed_expenses.py) → [expenses.json](expenses.json)), tên cửa hàng dựng và đơn vị `VND` |
 | Ca thử | Hóa đơn rõ, ảnh mờ/bị cắt, nhiều mức tổng chưa phân biệt thực trả, thiếu ngày, xử lý lại cùng mã lượt chụp (`capture_id`), ngày không chi tiêu (`0đ`), ngoài phạm vi (đầu tư, OTP/số thẻ) |
 | Nhãn dữ liệu | `id`, `capture_id`, `date` (kèm `date_source`), `merchant`, `category` (6 nhóm + `không rõ`), `items`, `total` (VND nguyên), `note`, `source_type` |
@@ -31,9 +31,9 @@
 |---|---|
 | Dùng để làm gì | Đo chất lượng qua `python run.py eval`. |
 | Từ đâu | Kết hợp tình huống tự viết, seed 42 và 6 tình huống chuyển thể từ [review công khai](../evidence/data-mining.md). Số tiền, mốc ngày và mã lượt chụp trong benchmark là dữ liệu mẫu. |
-| Số dòng | **17** câu thử CP2 (`thuong`: 5 · `kho`: 8 · `tu_choi`: 4, gồm 2 câu tấn công + ca OTP/số thẻ). |
-| Giới hạn | Hiện có 6/17 tình huống chuyển thể từ review. Trước CP3 cần lên 20–30 câu và duy trì tỷ lệ nguồn thật ít nhất 1/3. |
+| Số dòng | **18** câu thử CP2 (`thuong`: 6 · `kho`: 8 · `tu_choi`: 4, gồm 2 câu tấn công + ca OTP/số thẻ). |
+| Giới hạn | Hiện có 6/18 tình huống chuyển thể từ review. Trước CP3 cần lên 20–30 câu và duy trì tỷ lệ nguồn thật ít nhất 1/3. |
 
 ## Lưu trong bản chạy thử
 
-CLI lưu hóa đơn mới vào SQLite trong `data/runtime/`. Mỗi câu eval/simulate dùng sổ tạm riêng để ổn định đáp án.
+CLI lưu hóa đơn sau khi người dùng Chốt vào SQLite trong `data/runtime/`. Mỗi câu eval/simulate dùng sổ tạm riêng để ổn định đáp án.

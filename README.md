@@ -4,26 +4,27 @@
 
 **Bài toán dự kiến.** Người muốn theo dõi chi tiêu hằng ngày phải nhập lại thông tin từ từng hóa đơn, nên dễ bỏ sót khoản chi và mất thời gian khi xem lại đã tiêu vào đâu.
 
-**Lát cắt dự kiến.** Khi người dùng chụp một hóa đơn, AI đọc ngày mua và số tiền thực trả rồi phân loại khoản chi để ứng dụng tự lưu khoản chi vào lịch, giúp người dùng xem tổng tiền và từng khoản theo ngày.
+**Lát cắt dự kiến.** Khi người dùng chụp một hóa đơn, AI đọc ngày mua và số tiền thực trả rồi phân loại khoản chi để người dùng xem nhanh và bấm Chốt một lần trước khi khoản chi xuất hiện trên lịch.
 
-**Trải nghiệm demo.** **Chụp hóa đơn → app tự đọc, phân loại, lưu và cập nhật lịch.** Chạm một ngày để xem tổng; chọn **Xem thêm** để mở từng khoản. **+** mở camera để ghi khoản mới. Kết quả tháng tính từ các khoản đã ghi.
+**Trải nghiệm demo.** **Chụp hóa đơn → xem nhanh số tiền, ngày và nhóm chi → bấm Chốt.** App lưu và cập nhật lịch sau khi chốt. Chạm một ngày để xem tổng; chọn **Xem thêm** để mở từng khoản. **+** mở camera để ghi khoản mới. Kết quả tháng tính từ các khoản đã ghi.
 
 **Thiết kế giao diện.** Lịch tháng ưu tiên điện thoại với ô ngày hiện số tiền. Chạm ngày mở bảng tổng hợp và nút **Xem thêm**. Dùng bố cục và nhận diện riêng cho nhật ký chi tiêu.
 
-**Thay đổi đề tài.** Đổi từ Track D (Thương mại điện tử) ở CP1 sang Track E (Tài chính cá nhân), với lát cắt tự ghi khoản chi ngay sau khi chụp hóa đơn. Thực hiện theo mục đổi track của đề.
+**Thay đổi đề tài.** Đổi từ Track D (Thương mại điện tử) ở CP1 sang Track E (Tài chính cá nhân), với lát cắt ghi khoản chi từ ảnh hóa đơn sau một lần bấm Chốt. Thực hiện theo mục đổi track của đề.
 
-**Chạy thử CP2.** `python3 run.py check` kiểm bảng thành viên và bộ câu thử. Chạy `MODEL_PROVIDER=fake python3 run.py`, nhập hai dòng lần lượt:
+**Chạy thử CP2.** `python3 run.py check` kiểm bảng thành viên và bộ câu thử. Chạy `MODEL_PROVIDER=fake python3 run.py`, nhập ba dòng lần lượt:
 
 ```text
 Chụp hóa đơn: Cửa hàng Mẫu | Ngày: 2026-11-27 | Tổng thanh toán: 55.000đ
+Chốt
 Ấn xem ngày 2026-11-27
 ```
 
-Đầu vào là văn bản OCR mô phỏng. CLI tự lưu khoản vào SQLite trong `data/runtime/` và lần tra sau thấy tổng đã cập nhật. Dùng biến `RECEIPT_JOURNAL` để chọn một sổ mới cho lần demo riêng. Phần camera, lịch bấm và model thật chưa được triển khai.
+Đầu vào là văn bản OCR mô phỏng. Sau khi gõ Chốt, CLI lưu khoản vào SQLite trong `data/runtime/` và lần tra sau thấy tổng đã cập nhật. Dùng biến `RECEIPT_JOURNAL` để chọn một sổ mới cho lần demo riêng. Phần camera, lịch bấm và model thật chưa được triển khai.
 
 ## Dùng AI vào việc gì
 
-Nhóm dùng Codex để soạn lại hồ sơ theo lát cắt tự ghi chi tiêu khi chụp hóa đơn và kiểm tra định dạng. Đội trưởng rà phạm vi, giả thuyết và phân công trước khi nộp. [Khai báo chi tiết](docs/ai-usage.md)
+Nhóm dùng Codex để soạn lại hồ sơ theo lát cắt chụp hóa đơn, xem nhanh và bấm Chốt và kiểm tra định dạng. Đội trưởng rà phạm vi, giả thuyết và phân công trước khi nộp. [Khai báo chi tiết](docs/ai-usage.md)
 
 ---
 

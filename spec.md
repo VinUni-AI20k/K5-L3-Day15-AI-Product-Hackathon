@@ -7,7 +7,7 @@ Theo danh sách phân phòng, nhóm hiển thị là **404 ERROR**, đội **#5*
 
 Track E · Tài chính · Nhật ký chi tiêu cá nhân
 
-**Thay đổi đề tài:** Đổi từ Track D (Thương mại điện tử) ở CP1 sang Track E (Tài chính cá nhân), với lát cắt tự ghi khoản chi ngay sau khi chụp hóa đơn.
+**Thay đổi đề tài:** Đổi từ Track D (Thương mại điện tử) ở CP1 sang Track E (Tài chính cá nhân), với lát cắt ghi khoản chi từ ảnh hóa đơn sau một lần bấm Chốt.
 
 ## §0. Hiện tại việc này diễn ra thế nào *(guide 1.1)*
 
@@ -27,7 +27,7 @@ Track E · Tài chính · Nhật ký chi tiêu cá nhân
 
 | Hướng | Bao nhiêu người gặp | Số lần/người/tháng | Mỗi lần tốn gì | Impact/tháng | Làm kịp? | Chọn? |
 |---|---|---|---|---|---|---|
-| Tự tạo khoản chi sau khi chụp hóa đơn | 30 người thử | 12 hóa đơn | 35 giây có thể tiết kiệm mỗi lần (giả sử từ 60 còn 25 giây thao tác) | **210 phút** | Dự kiến có thể demo từ ảnh mẫu | Chọn làm lát cắt |
+| Tạo khoản chi từ ảnh sau một lần chốt | 30 người thử | 12 hóa đơn | 35 giây có thể tiết kiệm mỗi lần (giả sử từ 60 còn 25 giây thao tác) | **210 phút** | Dự kiến có thể demo từ ảnh mẫu | Chọn làm lát cắt |
 | Tra khoản chi trên lịch | 30 người thử | 8 lượt tra | 20 giây có thể tiết kiệm mỗi lượt | 80 phút | Có thể dùng các khoản đã lưu | Giữ làm đầu ra |
 | Tổng hợp chi tiêu tháng | 30 người thử | 1 lượt tổng hợp | 4 phút có thể tiết kiệm mỗi lượt | 120 phút | Có thể tính từ các khoản đã lưu | Giữ ở mức tổng hợp |
 
@@ -38,18 +38,20 @@ Track E · Tài chính · Nhật ký chi tiêu cá nhân
 - **Đối thủ đã làm gì:** [Sổ Thu Chi MISA](https://play.google.com/store/apps/details?hl=vi&id=vn.com.misa.sothuchi) công bố tính năng chụp hóa đơn và phân loại tự động; [Money Lover](https://play.google.com/store/apps/details?hl=vi&gl=vn&id=com.bookmark.money) có luồng ghi chi tiêu và quét/OCR hóa đơn được người dùng nhắc tới trong review.
 - **Một điều đáng học:** Đưa ảnh hóa đơn làm đầu vào chính để giảm ma sát ghi chép (8/500 review nêu phiền khi nhập tay hoặc muốn nhập tự động) và cho phép sửa nhanh khi OCR đọc nhầm (*“fix OCR errors easily”* — Money Lover · 163).
 - **Một điều đáng né:** Tự động lưu khi đọc sai số tiền hoặc ghi thiếu/trùng gây lệch tổng (12/500 review ở hai app nêu lỗi ghi thiếu, trùng hoặc sai tổng), và thiếu chế độ xem chi tiết từng ngày (*“không hiện được từng ngày cụ thể”* — Money Lover · 147).
-- **Mình khác gì (theo pain 1.2):** Tập trung đúng một lát cắt: chụp một hóa đơn → chỉ tự lưu khi xác định rõ số thực trả và ngày chi (dùng mã lượt chụp chống cộng trùng), ảnh mờ đẩy sang **Cần đọc lại**, và chạm ngày trên lịch mở ngay từng khoản kèm ảnh hóa đơn gốc.
+- **Mình khác gì (theo pain 1.2):** Tập trung đúng một lát cắt: chụp một hóa đơn → xem nhanh số thực trả và ngày chi → bấm Chốt một lần (dùng mã lượt chụp chống cộng trùng), ảnh mờ đẩy sang **Cần đọc lại**, và chạm ngày trên lịch mở ngay từng khoản kèm ảnh hóa đơn gốc.
 
 ## §4. Thiết kế *(guide 2.2, 3.2)*
-- **Lát cắt dự kiến:** Khi người dùng chụp một hóa đơn, AI đọc ngày mua và số tiền thực trả rồi phân loại khoản chi để ứng dụng tự lưu khoản chi vào lịch, giúp người dùng xem tổng tiền và từng khoản theo ngày.
-**Hình dạng: workflow cố định.** Các bước đọc ảnh, kiểm số tiền, lưu và tổng hợp diễn ra theo thứ tự. Ở CP2, văn bản OCR giả đi qua đúng luồng CLI. Đọc ảnh và màn hình lịch dành cho bản tiếp theo.
+- **Lát cắt dự kiến:** Khi người dùng chụp một hóa đơn, AI đọc ngày mua và số tiền thực trả rồi phân loại khoản chi để người dùng xem nhanh và bấm Chốt một lần trước khi khoản chi xuất hiện trên lịch.
+**Hình dạng: workflow cố định.** Các bước đọc ảnh, kiểm số tiền, xem nhanh, chốt và tổng hợp diễn ra theo thứ tự. Ở CP2, văn bản OCR giả đi qua đúng luồng CLI. Đọc ảnh và màn hình lịch dành cho bản tiếp theo.
 
 ```mermaid
 flowchart TD
     U["Chụp hóa đơn · CP2 nhập OCR mẫu"] --> V["Đọc ngày và tổng thực trả"]
     V --> K{"Có đủ căn cứ để ghi?"}
     K -- "Thiếu số hoặc mâu thuẫn" --> P["Báo cần đọc lại · chưa cộng"]
-    K -- "Đủ" --> W["Tự lưu khoản vào sổ cục bộ"]
+    K -- "Đủ" --> V2["Xem nhanh ngày, tổng, nơi mua và nhóm chi"]
+    V2 --> C["Người dùng bấm Chốt một lần"]
+    C --> W["Lưu khoản vào sổ cục bộ"]
     W --> D["Xem từng khoản theo ngày"]
     W --> M["Tổng ngày và tháng tính bằng code"]
 ```
@@ -57,15 +59,15 @@ flowchart TD
 | Công cụ CP2 | Input | Output | Tác động |
 |---|---|---|---|
 | `parse_receipt_text` | OCR mẫu, ngày chụp nếu cần | Ngày, tổng thực trả, nơi mua, nhóm và trường thiếu | Chỉ đọc |
-| `save_daily_note` | Khoản đã kiểm, OCR mẫu, sổ phiên | Bản ghi, trạng thái trùng và tổng ngày | Ghi SQLite cục bộ ở CLI; eval dùng sổ tạm |
+| `save_daily_note` | Bản xem nhanh đã được người dùng chốt, OCR mẫu, sổ phiên | Bản ghi, trạng thái trùng và tổng ngày | Ghi SQLite cục bộ ở CLI; eval dùng sổ tạm |
 | `get_day_summary`, `get_month_calendar`, `analyze_spending` | Ngày hoặc tháng | Tổng, chi tiết, nhóm chi và ngày chi nhiều nhất | Chỉ đọc |
 
 - **G10:** nếu tổng thực trả không xác định được, báo cần đọc lại và giữ nguyên tổng. **G1:** CLI nói rõ đầu vào là OCR mẫu và model giả. **G11:** hiển thị tổng, từng khoản và nguồn ngày chụp nếu phải dùng ngày mặc định.
-- Người dùng chụp một lần trong luồng dự kiến. Chỉ khi thông tin không đọc được, app mới hỏi chụp lại. CLI hiện hiển thị thông báo, phần lưu ảnh chờ đọc lại thuộc màn hình ảnh sau CP2.
+- Người dùng chụp một lần, xem nhanh và bấm Chốt nếu thông tin đúng. Nếu thông tin không đọc được hoặc người dùng thấy sai, chụp lại để tạo bản xem nhanh mới. CLI hiện hiển thị thông báo, phần lưu ảnh chờ đọc lại thuộc màn hình ảnh sau CP2.
 
-- **Luồng đề xuất:** mở camera → chụp một hóa đơn. Ngay sau khi chụp, app tự chuyển ảnh vào luồng đọc, phân loại, lưu khoản đủ dữ liệu và cập nhật lịch.
+- **Luồng đề xuất:** mở camera → chụp hóa đơn → app đọc và hiển thị bản xem nhanh → bấm Chốt một lần → app lưu khoản chi, cập nhật lịch và tổng tiền.
 - **Dữ liệu mỗi khoản:** số thực trả (VND nguyên), ngày chi, nơi mua nếu đọc được, nhóm chi và ảnh hóa đơn. Dùng nhóm Chưa phân loại nếu thiếu căn cứ xếp nhóm. Dùng ngày chụp theo múi giờ người dùng nếu hóa đơn không ghi ngày và đánh dấu nguồn ngày.
-- **Tự ghi khoản chi:** ghi tự động khi hóa đơn có số thực trả rõ và xác định được ngày chi. Nếu ảnh mờ hoặc có nhiều mức tổng chưa phân biệt được, giữ ảnh ở **Cần đọc lại** và báo có thể chụp lại. Chỉ cộng khoản đã đọc được. Dùng mã lượt chụp để xử lý lại cùng ảnh mà không cộng trùng.
+- **Điều kiện lưu:** cần có số thực trả rõ, ngày chi và thao tác Chốt. Nếu ảnh mờ hoặc có nhiều mức tổng chưa phân biệt được, hiển thị **Cần đọc lại** và hướng dẫn chụp lại. Bản xem nhanh chưa chốt không đi vào sổ. Dùng mã lượt chụp để xử lý lại cùng ảnh mà không cộng trùng.
 - **Giao diện:** mỗi ô lịch hiện tổng tiền ngày đó. Chạm ngày mở tổng và nhóm chi; **Xem thêm** mở từng khoản và ảnh hóa đơn. **+** mở camera để thêm ảnh. Màn hình tháng tính tổng, tổng theo nhóm và ngày chi nhiều nhất từ các khoản đã ghi.
 - **Phạm vi demo:** mỗi ảnh hóa đơn giả lập tương ứng một khoản VND. Tính tổng ngày và tháng bằng code từ các khoản đã lưu.
 
@@ -74,10 +76,11 @@ flowchart TD
 
 | Kịch bản | Lớp | Hành vi mong muốn | Câu thử |
 |---|---|---|---|
+| Xem nhanh nhưng chưa Chốt | 4 | Hiện thông tin và chưa ghi vào sổ | B18 |
 | Có khoản trong ngày | 1 | Hiện đúng tổng và từng khoản | B03 |
 | Ngày hoặc tháng trống | 1 | Báo chưa có dữ liệu | B06, B10 |
 | Mờ số tiền | 2 | Yêu cầu chụp lại và giữ nguyên tổng | B07 |
-| Thiếu ngày trên hóa đơn | 2 | Dùng ngày chụp và hiển thị nguồn ngày | B08 |
+| Thiếu ngày trên hóa đơn | 2 | Hiện nguồn ngày chụp ngay ở màn xem nhanh để người dùng kiểm trước khi Chốt | B08 |
 | Tư vấn đầu tư | 3 | Từ chối | B12 |
 | Xem nhật ký người khác | 3 | Từ chối | B13 |
 | Nhiều mức tổng chưa xác định thực trả | 4 | Không ghi và báo đọc lại | B15 |
@@ -89,14 +92,14 @@ flowchart TD
 
 ## §6. Đường đi của trải nghiệm
 
-- **Đủ dữ liệu:** app tự ghi và hiển thị ngày, số thực trả và tổng ngày.
+- **Đủ dữ liệu:** app hiển thị ngày, số thực trả và nhóm chi. Sau khi bấm Chốt, app ghi khoản và hiện tổng ngày.
 - **Thiếu hoặc mâu thuẫn:** hiện Cần đọc lại, hướng dẫn chụp lại và giữ nguyên tổng.
 - **Chưa có dữ liệu:** báo rõ ngày hoặc tháng chưa có khoản ghi nhận.
 - **Trùng hoặc ngoài phạm vi:** báo không ghi lại, từ chối trước khi gọi model. Luồng sửa/xóa khoản trên giao diện thuộc bản sau.
 
 ## §7. Đánh giá & chuẩn "đạt" *(guide 2.4, 4.1)*
-- Data Card: `data/DATA_CARD.md`. Benchmark CP2 có **17 câu** (5 thường, 8 khó, 4 từ chối) và **4 metric**. Có 6/17 tình huống chuyển thể từ review công khai (35,3%); giá, ngày và sổ mẫu là giả lập.
-- **Chuẩn đạt đề xuất để đội trưởng chốt ở CP2:** ít nhất **85% câu đạt**. Ca nhập đủ dữ liệu phải ghi đúng ngày và tổng thực trả, ca truy vấn có dữ liệu phải khớp số liệu, ca thiếu căn cứ không được ghi sai và **100% câu từ chối** phải từ chối đúng. Với 17 câu hiện tại, 85% tương đương **ít nhất 15/17 câu**. Giữ nguyên chuẩn sau khi nộp CP2.
+- Data Card: `data/DATA_CARD.md`. Benchmark CP2 có **18 câu** (6 thường, 8 khó, 4 từ chối) và **4 metric**. Có 6/18 tình huống chuyển thể từ review công khai (33,3%); giá, ngày và sổ mẫu là giả lập.
+- **Chuẩn đạt đề xuất để đội trưởng chốt ở CP2:** ít nhất **85% câu đạt**. Ca nhập đủ dữ liệu phải hiển thị đúng ngày và tổng thực trả, chỉ ghi sau khi Chốt, ca truy vấn có dữ liệu phải khớp số liệu, ca thiếu căn cứ không được ghi sai và **100% câu từ chối** phải từ chối đúng. Với 18 câu hiện tại, 85% tương đương **ít nhất 16/18 câu**. Giữ nguyên chuẩn sau khi nộp CP2.
 - Kết quả: lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*

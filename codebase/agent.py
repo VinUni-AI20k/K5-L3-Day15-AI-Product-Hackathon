@@ -73,27 +73,40 @@ def _is_receipt_input(text: str) -> bool:
     return any(k in low for k in ("chụp hóa đơn", "chup hoa don", "hóa đơn", "hoa don", "tổng cộng", "tong cong", "gửi ảnh", "gui anh"))
 
 
-def _build_context(text: str, journal_path=None, capture_date=None) -> tuple[str, str]:
-    """Chạy công cụ theo luồng cố định, trả về (context_for_model, deterministic_summary)."""
-    if _is_receipt_input(text):
-        parsed = parse_receipt_text(text, capture_date)
-        if parsed["missing_fields"]:
-            missing = ", ".join(parsed["missing_fields"])
-            note("dừng: thiếu trường hóa đơn (%s)" % missing)
-            summary = f"Cần đọc lại hóa đơn: {missing}. Chưa ghi khoản chi. Hãy chụp lại rõ phần cần đọc."
-            return f"Kết quả parse_receipt_text: {parsed}", summary
+def _receipt_details(receipt):
+    date_label = " (ngày chụp)" if receipt.get("date_source") == "ngày chụp" else ""
+    return (
+        f"ngày {receipt['date']}{date_label}: {receipt['merchant']} · "
+        f"{_fmt_vnd(receipt['total'])} · nhóm {receipt['category']}."
+    )
 
-        saved = save_daily_note(parsed, text, journal_path)
-        record = saved["record"]
-        status = "Khoản đã có, không ghi trùng" if saved["duplicate"] else "Đã tự lưu khoản chi"
-        date_label = " (ngày chụp)" if record.get("date_source") == "ngày chụp" else ""
-        summary = (
-            f"{status} ngày {record['date']}{date_label}: {record['merchant']} · "
-            f"{_fmt_vnd(record['total'])} · nhóm {record['category']}. "
-            f"Tổng chi ngày {record['date']}: {_fmt_vnd(saved['new_day_total'])} ({saved['new_day_count']} khoản)."
-        )
-        return f"parse_receipt_text={parsed}\nsave_daily_note={saved}", summary
 
+def _preview_receipt(text, capture_date):
+    receipt = parse_receipt_text(text, capture_date)
+    if receipt["missing_fields"]:
+        missing = ", ".join(receipt["missing_fields"])
+        note("dừng: thiếu trường hóa đơn")
+        return f"Cần đọc lại hóa đơn: {missing}. Chưa ghi khoản chi. Hãy chụp lại rõ phần cần đọc.", None
+    return (
+        f"Xem nhanh {_receipt_details(receipt)} Chưa ghi khoản chi. Chọn Chốt để lưu.",
+        {"receipt": receipt, "capture_text": text},
+    )
+
+
+def _confirm_receipt(pending_receipt, journal_path):
+    if pending_receipt is None:
+        return "Chưa có hóa đơn để chốt."
+    saved = save_daily_note(pending_receipt["receipt"], pending_receipt["capture_text"], journal_path)
+    record = saved["record"]
+    status = "Khoản đã có, không ghi trùng" if saved["duplicate"] else "Đã chốt và lưu khoản chi"
+    return (
+        f"{status} {_receipt_details(record)} "
+        f"Tổng chi ngày {record['date']}: {_fmt_vnd(saved['new_day_total'])} ({saved['new_day_count']} khoản)."
+    )
+
+
+def _build_context(text: str, journal_path=None) -> tuple[str, str]:
+    """Dựng dữ liệu tra cứu và tổng chi từ các khoản đã lưu."""
     dates, months = _extract_dates_and_months(text)
     if dates:
         d = dates[0]
@@ -153,14 +166,35 @@ def _build_context(text: str, journal_path=None, capture_date=None) -> tuple[str
     return "Thiếu tham số ngày/tháng hoặc hóa đơn.", summary
 
 
-def answer(text: str, *, journal_path=None, capture_date=None) -> dict:
-    """Điểm vào duy nhất cho run.py, run.py eval và run.py simulate."""
+def answer(text: str, *, journal_path=None, capture_date=None, pending_receipt=None) -> dict:
+    """CLI giữ bản xem nhanh giữa hai lượt. Eval mô phỏng nút Chốt bằng dòng riêng."""
+    text = text.strip()
+    if text.casefold() == "chốt":
+        return {"output": _confirm_receipt(pending_receipt, journal_path), "pending_receipt": None}
+
+    receipt_text, separator, action = text.rpartition("\n")
+    confirm_in_eval = journal_path is None and separator and action.strip().casefold() == "chốt"
+    if confirm_in_eval:
+        text = receipt_text.strip()
+
     blocked = _check_safety_or_scope(text)
     if blocked:
         note("chặn bởi luật an toàn/phạm vi")
-        return {"output": blocked}
+        output = {"output": blocked}
+        if _is_receipt_input(text):
+            output["pending_receipt"] = None
+        return output
 
-    context, summary = _build_context(text, journal_path, capture_date)
+    if _is_receipt_input(text):
+        preview, draft = _preview_receipt(text, capture_date)
+        reply = call_model(SYSTEM, f"Thông tin đọc được từ OCR:\n{preview}")
+        prefix = "[AI giả - CP2] " if reply["model"] == "fake" else ""
+        if confirm_in_eval and draft is not None:
+            result = _confirm_receipt(draft, journal_path)
+            return {"output": f"{prefix}{preview}\n{result}", "pending_receipt": None}
+        return {"output": prefix + preview, "pending_receipt": draft}
+
+    context, summary = _build_context(text, journal_path)
     reply = call_model(SYSTEM, f"Căn cứ từ công cụ:\n{context}\n\nTóm tắt số liệu đã kiểm chứng:\n{summary}\n\nĐầu vào của người dùng:\n{text}")
     if reply["model"] == "fake":
         return {"output": f"[AI giả - CP2] {summary}"}

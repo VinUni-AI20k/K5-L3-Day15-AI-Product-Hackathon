@@ -36,8 +36,9 @@ def main() -> int:
         print("Không nạp được codebase/ — lỗi ở %s: %s: %s" % (_where(e), type(e).__name__, e))
         print("Sửa lỗi rồi chạy lại. Cách nối model: docs/connect-model.md")
         return 1
-    print("Bản chạy thử CP2 — nhập văn bản OCR mẫu hoặc yêu cầu xem ngày/tháng, rồi Enter. Thoát bằng Ctrl+C.")
+    print("Bản chạy thử CP2 — nhập văn bản OCR mẫu, xem nhanh rồi gõ Chốt để lưu. Có thể nhập ngày/tháng để xem. Thoát bằng Ctrl+C.")
     journal = Path(os.environ.get("RECEIPT_JOURNAL") or Path(__file__).resolve().parents[1] / "data" / "runtime" / "receipts.sqlite")
+    pending_receipt = None
     blank = 0
     while True:
         try:
@@ -53,12 +54,19 @@ def main() -> int:
         blank = 0
         tracing.begin("app")
         try:
-            result = answer(text, journal_path=journal, capture_date=date.today().isoformat())
+            result = answer(
+                text, journal_path=journal, capture_date=date.today().isoformat(),
+                pending_receipt=pending_receipt,
+            )
+            if "pending_receipt" in result:
+                pending_receipt = result["pending_receipt"]
         except NotImplementedError as e:
             tracing.end()
             print("Chưa nối model: %s" % e)
             return 1
         except Exception as e:  # lỗi gọi model: báo rồi cho hỏi tiếp
+            if text.casefold() != "chốt":
+                pending_receipt = None
             tracing.end()
             print("[lỗi] %s: %s" % (type(e).__name__, e))
             continue
