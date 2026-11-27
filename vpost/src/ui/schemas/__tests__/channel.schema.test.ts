@@ -30,7 +30,7 @@ const LIVE_LIST_PAYLOAD = {
       name: "VPOST Hàng Thiết Kế",
       externalId: "102938475610293",
       status: "active",
-      tokenExpiresAt: "2026-11-30T10:00:00.000Z",
+      tokenExpiresAt: "2054-11-30T10:00:00.000Z",
     },
     {
       channelId: "fb-page-beta",

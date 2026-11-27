@@ -31,8 +31,8 @@ function group(overrides: Partial<ChannelGroup> = {}): ChannelGroup {
     name: "Nhóm sáng",
     channelIds: ["fb-1121597217877301"],
     channelCount: 1,
-    createdAt: "2026-08-01T00:00:00.000Z",
-    updatedAt: "2026-08-01T00:00:00.000Z",
+    createdAt: "2054-08-01T00:00:00.000Z",
+    updatedAt: "2054-08-01T00:00:00.000Z",
     ...overrides,
   };
 }
