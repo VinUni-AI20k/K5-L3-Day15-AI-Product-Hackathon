@@ -47,3 +47,6 @@ traces/simulate-error.jsonl
 traces/simulate-stopped.jsonl
 evidence/**/raw-*
 data-btc
+
+# Sổ chi tiêu cục bộ của bản demo
+/data/runtime/

@@ -12,7 +12,14 @@
 
 **Thay đổi đề tài.** Đổi từ Track D (Thương mại điện tử) ở CP1 sang Track E (Tài chính cá nhân), với lát cắt tự ghi khoản chi ngay sau khi chụp hóa đơn. Thực hiện theo mục đổi track của đề.
 
-**Chạy khung.** `python3 run.py check` kiểm bảng thành viên và bộ câu thử. `python3 run.py` hiện chạy ví dụ starter với model giả.
+**Chạy thử CP2.** `python3 run.py check` kiểm bảng thành viên và bộ câu thử. Chạy `MODEL_PROVIDER=fake python3 run.py`, nhập hai dòng lần lượt:
+
+```text
+Chụp hóa đơn: Cửa hàng Mẫu | Ngày: 2026-11-27 | Tổng thanh toán: 55.000đ
+Ấn xem ngày 2026-11-27
+```
+
+Đầu vào là văn bản OCR mô phỏng. CLI tự lưu khoản vào SQLite trong `data/runtime/` và lần tra sau thấy tổng đã cập nhật. Dùng biến `RECEIPT_JOURNAL` để chọn một sổ mới cho lần demo riêng. Phần camera, lịch bấm và model thật chưa được triển khai.
 
 ## Dùng AI vào việc gì
 

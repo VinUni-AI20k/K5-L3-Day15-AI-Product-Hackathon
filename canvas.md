@@ -9,4 +9,4 @@
 | 5 | Lát cắt một câu | Khi người dùng chụp một hóa đơn, AI đọc ngày mua và số tiền thực trả rồi phân loại khoản chi để ứng dụng tự lưu khoản chi vào lịch, giúp người dùng xem tổng tiền và từng khoản theo ngày. |
 | 6 | AI tự làm đến đâu + lý do | Ngay sau khi chụp, AI đọc hóa đơn và gợi ý nhóm chi. App tự lưu khi xác định được số thực trả. Nếu ảnh mờ hoặc số tiền chưa rõ, app giữ ảnh ở mục Cần đọc lại và báo chụp lại. Tổng chi chỉ tính các khoản đã đọc được. |
 | 7 | Phân công có tên | Nguyễn Quang Vũ code luồng nhận ảnh, tích hợp model và giao diện. Trịnh Công Đức viết spec, code kiểm dữ liệu nhập, lưu và tổng hợp. Nguyễn Tiến Đạt dựng hóa đơn mẫu và viết benchmark. Nguyễn Tuấn Kiệt phỏng vấn người dùng và viết tiêu chí chấm. |
-| — | Thay đổi sau CP1 | Đổi từ Track D (Thương mại điện tử) ở CP1 sang Track E (Tài chính cá nhân), với lát cắt tự ghi khoản chi ngay sau khi chụp hóa đơn. |
+| — | Đã đổi gì so với CP1 | Chuyển từ Track D sang Track E theo lát cắt chụp hóa đơn rồi tự ghi. Sàng 500 review, viết 17 câu thử và chạy mô phỏng OCR/AI bằng CLI. Sau khi ghi, mở lại ngày sẽ thấy khoản mới và tổng cập nhật. |

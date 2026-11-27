@@ -1,4 +1,4 @@
-"""Luồng chính của ứng dụng AI nhận hóa đơn, lưu note ngày kiểu Locket và phân tích chi tiêu.
+"""Luồng chính của ứng dụng AI nhận hóa đơn, lưu note ngày theo ngày và phân tích chi tiêu.
 
 Hình dạng: Workflow cố định có bước chặn an toàn bằng code + phân luồng công cụ + gọi AI tổng hợp.
 Mọi con số đều được tính trước bằng code trong codebase/tools.py; model không tự cộng trừ hay bịa số.
@@ -16,12 +16,12 @@ from tools import (
 from tracing import note
 
 SYSTEM = (
-    "Bạn là trợ lý tài chính cá nhân giúp người dùng nhận diện hóa đơn, lưu note chi tiêu hằng ngày kiểu Locket "
+    "Bạn là trợ lý tài chính cá nhân giúp người dùng nhận diện hóa đơn, lưu note chi tiêu hằng ngày theo ngày "
     "và phân tích chi tiêu ngày/tháng. "
     "Quy tắc bắt buộc: (1) Chỉ dùng đúng các con số từ phần Căn cứ công cụ, không tự cộng trừ hay bịa số; "
-    "(2) Nếu thiếu ngày, thiếu tổng tiền, hóa đơn mờ hoặc có nhiều mức tổng chưa rõ thực trả thì đưa vào 'Cần đọc lại' và hỏi lại; "
-    "(3) Không cộng trùng khi gặp lại cùng mã lượt chụp; nếu chưa có dữ liệu kỳ được hỏi thì nói rõ chưa có dữ liệu; "
-    "(4) Từ chối tư vấn đầu tư/cổ phiếu/coin, từ chối xem dữ liệu người khác, từ chối ghi khống số tiền, và không thu thập hay lặp lại OTP, mật khẩu, số thẻ đầy đủ."
+    "(2) Nếu thiếu ngày, thiếu tổng tiền hoặc hóa đơn mờ thì hỏi lại đúng thông tin thiếu; "
+    "(3) Nếu chưa có dữ liệu của ngày/tháng được hỏi thì nói rõ chưa có dữ liệu; "
+    "(4) Từ chối tư vấn đầu tư/cổ phiếu/coin, từ chối xem dữ liệu người khác và từ chối ghi khống số tiền."
 )
 
 
@@ -30,7 +30,7 @@ def _fmt_vnd(amount: int) -> str:
 
 
 def _check_safety_or_scope(text: str) -> str | None:
-    """Chặn yêu cầu ngoài phạm vi, lộ OTP/số thẻ/mật khẩu, prompt injection hoặc ép ghi khống số liệu bằng code."""
+    """Chặn yêu cầu ngoài phạm vi, prompt injection hoặc ép ghi khống số liệu bằng code."""
     low = (text or "").lower()
     # Chặn OTP, mật khẩu, CVV hoặc dãy số thẻ dài (13-19 chữ số) — tuyệt đối không lặp lại thông tin nhạy cảm
     has_long_card = bool(re.search(r"\b(?:\d[ -]?){13,19}\b", text or ""))
@@ -73,49 +73,31 @@ def _is_receipt_input(text: str) -> bool:
     return any(k in low for k in ("chụp hóa đơn", "chup hoa don", "hóa đơn", "hoa don", "tổng cộng", "tong cong", "gửi ảnh", "gui anh"))
 
 
-def _build_context(text: str) -> tuple[str, str]:
+def _build_context(text: str, journal_path=None, capture_date=None) -> tuple[str, str]:
     """Chạy công cụ theo luồng cố định, trả về (context_for_model, deterministic_summary)."""
     if _is_receipt_input(text):
-        parsed = parse_receipt_text(text)
-        if parsed.get("duplicate_of"):
-            day_info = get_day_summary(parsed["date"]) if parsed.get("date") else {"total": 0}
-            note("trùng mã lượt chụp: không cộng đúp")
-            summary = (
-                f"Mã lượt chụp {parsed['capture_id']} đã được ghi nhận trước đó ({parsed['duplicate_of']}), "
-                f"hệ thống không cộng trùng. Tổng chi ngày {parsed['date'] or 'liên quan'} vẫn giữ nguyên là {_fmt_vnd(day_info['total'])}."
-            )
-            return f"parse_receipt_text={parsed}\nget_day_summary={day_info}", summary
+        parsed = parse_receipt_text(text, capture_date)
         if parsed["missing_fields"]:
             missing = ", ".join(parsed["missing_fields"])
-            note("Cần đọc lại: thiếu hoặc mờ trường hóa đơn (%s)" % missing)
-            summary = (
-                f"Giữ ảnh ở mục Cần đọc lại vì hóa đơn còn thiếu/mờ: {missing}. "
-                f"(Đã nhận diện tạm: nơi chi={parsed['merchant']}, ngày={parsed['date'] or 'chưa rõ'}, "
-                f"tổng={_fmt_vnd(parsed['total']) if parsed['total'] is not None else 'chưa rõ'}). "
-                f"Vui lòng bổ sung {missing} hoặc chụp lại ảnh rõ hơn để lưu note ngày."
-            )
+            note("dừng: thiếu trường hóa đơn (%s)" % missing)
+            summary = f"Cần đọc lại hóa đơn: {missing}. Chưa ghi khoản chi. Hãy chụp lại rõ phần cần đọc."
             return f"Kết quả parse_receipt_text: {parsed}", summary
 
-        saved = save_daily_note(
-            date=parsed["date"],
-            merchant=parsed["merchant"],
-            total=parsed["total"],
-            category=parsed["category"],
-            note=f"Lưu từ hóa đơn {parsed['merchant']}",
-            capture_id=parsed.get("capture_id") or "",
-        )
-        note("lưu note hóa đơn thành công")
+        saved = save_daily_note(parsed, text, journal_path)
+        record = saved["record"]
+        status = "Khoản đã có, không ghi trùng" if saved["duplicate"] else "Đã tự lưu khoản chi"
+        date_label = " (ngày chụp)" if record.get("date_source") == "ngày chụp" else ""
         summary = (
-            f"Đã nhận diện và tạo note ngày {parsed['date']}: {parsed['merchant']} · "
-            f"{_fmt_vnd(parsed['total'])} · nhóm {parsed['category']}. "
-            f"Tổng chi ngày {parsed['date']} sau khi thêm là {_fmt_vnd(saved['new_day_total'])} ({saved['new_day_count']} khoản)."
+            f"{status} ngày {record['date']}{date_label}: {record['merchant']} · "
+            f"{_fmt_vnd(record['total'])} · nhóm {record['category']}. "
+            f"Tổng chi ngày {record['date']}: {_fmt_vnd(saved['new_day_total'])} ({saved['new_day_count']} khoản)."
         )
         return f"parse_receipt_text={parsed}\nsave_daily_note={saved}", summary
 
     dates, months = _extract_dates_and_months(text)
     if dates:
         d = dates[0]
-        day_info = get_day_summary(d)
+        day_info = get_day_summary(d, journal_path)
         if day_info["count"] == 0:
             note("ngày chưa có dữ liệu")
             summary = f"Ngày {d} trên lịch chưa ghi nhận khoản chi nào (0đ)."
@@ -125,13 +107,13 @@ def _build_context(text: str) -> tuple[str, str]:
         if day_info["unknown_items"]:
             unk = ", ".join(f"{u['merchant']} ({_fmt_vnd(u['total'])})" for u in day_info["unknown_items"])
             extra = f" Lưu ý: có khoản gắn nhãn 'không rõ' ({unk}), bạn có thể bổ sung nhóm chi."
-        note("trả chi tiết ngày kiểu Locket")
+        note("trả chi tiết ngày theo ngày")
         summary = f"Chi tiêu ngày {d}: tổng {_fmt_vnd(day_info['total'])} ({day_info['count']} khoản):\n" + "\n".join(lines) + extra
         return f"get_day_summary={day_info}", summary
 
     if len(months) >= 2:
         m1, m2 = months[0], months[1]
-        analysis = analyze_spending(m1, compare_with=m2)
+        analysis = analyze_spending(m1, compare_with=m2, journal_path=journal_path)
         if not analysis.get("has_data"):
             note("chưa có dữ liệu tháng chính")
             return f"analyze_spending={analysis}", f"Chưa có dữ liệu chi tiêu cho tháng {m1}."
@@ -151,8 +133,8 @@ def _build_context(text: str) -> tuple[str, str]:
 
     if len(months) == 1:
         ym = months[0]
-        cal = get_month_calendar(ym)
-        analysis = analyze_spending(ym)
+        cal = get_month_calendar(ym, journal_path)
+        analysis = analyze_spending(ym, journal_path=journal_path)
         if not analysis.get("has_data"):
             note("tháng chưa có dữ liệu")
             return f"get_month_calendar={cal}\nanalyze_spending={analysis}", f"Chưa có dữ liệu chi tiêu trong tháng {ym}."
@@ -171,17 +153,14 @@ def _build_context(text: str) -> tuple[str, str]:
     return "Thiếu tham số ngày/tháng hoặc hóa đơn.", summary
 
 
-def answer(text: str) -> dict:
+def answer(text: str, *, journal_path=None, capture_date=None) -> dict:
     """Điểm vào duy nhất cho run.py, run.py eval và run.py simulate."""
     blocked = _check_safety_or_scope(text)
     if blocked:
         note("chặn bởi luật an toàn/phạm vi")
-        reply = call_model(SYSTEM, f"Tình huống bị từ chối theo quy tắc:\n{blocked}\n\nĐầu vào:\n{text}")
-        if reply["model"] == "fake":
-            return {"output": f"[AI giả - CP2] {blocked}"}
-        return {"output": reply["text"]}
+        return {"output": blocked}
 
-    context, summary = _build_context(text)
+    context, summary = _build_context(text, journal_path, capture_date)
     reply = call_model(SYSTEM, f"Căn cứ từ công cụ:\n{context}\n\nTóm tắt số liệu đã kiểm chứng:\n{summary}\n\nĐầu vào của người dùng:\n{text}")
     if reply["model"] == "fake":
         return {"output": f"[AI giả - CP2] {summary}"}

@@ -4,7 +4,9 @@ Chạy bằng: python run.py   (macOS/Linux có thể là python3, Windows có t
 Nhóm thay bằng giao diện của mình (web, bot…) nhưng giữ `python run.py` là lệnh duy nhất
 để chạy bản chạy thử (sửa hàm run_app() trong run.py nếu cần).
 """
+from datetime import date
 import os
+from pathlib import Path
 import sys
 
 for _stream in (sys.stdout, sys.stderr, sys.stdin):
@@ -34,7 +36,8 @@ def main() -> int:
         print("Không nạp được codebase/ — lỗi ở %s: %s: %s" % (_where(e), type(e).__name__, e))
         print("Sửa lỗi rồi chạy lại. Cách nối model: docs/connect-model.md")
         return 1
-    print("Bản chạy thử — gõ đầu vào rồi Enter. Thoát: Ctrl+C (hoặc Enter 2 lần với dòng trống).")
+    print("Bản chạy thử CP2 — nhập văn bản OCR mẫu hoặc yêu cầu xem ngày/tháng, rồi Enter. Thoát bằng Ctrl+C.")
+    journal = Path(os.environ.get("RECEIPT_JOURNAL") or Path(__file__).resolve().parents[1] / "data" / "runtime" / "receipts.sqlite")
     blank = 0
     while True:
         try:
@@ -50,7 +53,7 @@ def main() -> int:
         blank = 0
         tracing.begin("app")
         try:
-            result = answer(text)
+            result = answer(text, journal_path=journal, capture_date=date.today().isoformat())
         except NotImplementedError as e:
             tracing.end()
             print("Chưa nối model: %s" % e)

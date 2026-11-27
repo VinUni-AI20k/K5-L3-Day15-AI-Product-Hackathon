@@ -30,6 +30,10 @@
 | | |
 |---|---|
 | Dùng để làm gì | Đo chất lượng qua `python run.py eval`. |
-| Từ đâu | Nhóm tự viết (`tu_viet`) kết hợp truy vấn đối chiếu số từ `data/expenses.json` (`sinh_seed`, `seed = 42`). |
+| Từ đâu | Kết hợp tình huống tự viết, seed 42 và 6 tình huống chuyển thể từ [review công khai](../evidence/data-mining.md). Số tiền, mốc ngày và mã lượt chụp trong benchmark là dữ liệu mẫu. |
 | Số dòng | **17** câu thử CP2 (`thuong`: 5 · `kho`: 8 · `tu_choi`: 4, gồm 2 câu tấn công + ca OTP/số thẻ). |
-| Giới hạn | Cần bổ sung thêm câu từ người dùng thật (`nguoi_dung` / `data_that` ≥1/3 tổng số câu) khi nâng lên 20–30 câu ở CP3. |
+| Giới hạn | Hiện có 6/17 tình huống chuyển thể từ review. Trước CP3 cần lên 20–30 câu và duy trì tỷ lệ nguồn thật ít nhất 1/3. |
+
+## Lưu trong bản chạy thử
+
+CLI lưu hóa đơn mới vào SQLite trong `data/runtime/`. Mỗi câu eval/simulate dùng sổ tạm riêng để ổn định đáp án.
