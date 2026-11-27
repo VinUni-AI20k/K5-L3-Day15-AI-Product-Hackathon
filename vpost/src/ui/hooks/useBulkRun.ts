@@ -1,0 +1,456 @@
+"use client";
+
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { DEFAULT_CAPTION_TONE, type CaptionTone } from "@/shared/caption-tone";
+
+import {
+  isBulkSkipCode,
+  renderCaptionTemplate,
+  type BulkCaptionMode,
+  type BulkRowStatus,
+} from "@/ui/schemas/bulk.schema";
+import { COMPOSE_CHANNELS } from "@/ui/schemas/compose.schema";
+import { useActiveTenant } from "@/ui/hooks/useMe";
+import { ApiError } from "@/ui/services/api-error";
+import { composePost, createPostBatch, generateCaptions } from "@/ui/services/post.api";
+
+/**
+ * Logic layer of "Chạy hàng loạt" (E10.5), docs/07 §4.1.
+ *
+ * Why a hand-written sequential loop and not a TanStack mutation per code:
+ * the run is ORDERED and must survive a failing code. Business rule 6 says one
+ * channel failing never stops another; the same reasoning one level up says one
+ * PRODUCT failing never stops the batch. So every code is tried, its outcome is
+ * recorded on its own row, and the loop moves on.
+ *
+ * Where each rule is enforced — none of it here:
+ *  - stock gate: `composePost` (server) refuses a sold-out code, twice more
+ *    before the Graph call. This hook only reads the refusal and skips.
+ *  - whitelist (rule 2): the manual template can only reference {code}/{name};
+ *    the AI path sends `composed.content`, which has no price/stock field.
+ *  - duplicate lock: `createPostBatch` (server) owns it.
+ *
+ * Honest limitation, stated on the screen too: the loop runs IN THE BROWSER.
+ * Closing the tab stops the remaining codes — batches already created keep
+ * running on the server. A server-side bulk job is a later epic.
+ */
+
+/** Phase 1 generates one caption (Facebook) and shares it across the channels. */
+const BASE_CHANNEL_ID = COMPOSE_CHANNELS[0].id;
+
+export interface BulkRunRow {
+  /** Vị trí trong lượt chạy — khoá ổn định khi bảng đang lọc. */
+  index: number;
+  code: string;
+  status: BulkRowStatus;
+  /** VPOST: bài AI viết, người duyệt sửa được trước khi duyệt. */
+  caption: string | null;
+  /** VPOST: người duyệt đã bấm Duyệt — chỉ những dòng này được lên lịch. */
+  approved: boolean;
+  media: readonly { driveFileId: string; fileName?: string; kind?: string }[];
+  /** Filled in once the product was found — helps recognise the code. */
+  productName: string | null;
+  /** Vietnamese sentence: why it was skipped or what failed. */
+  reason: string | null;
+  errorCode: string | null;
+  /** Set only on success — links to /batches/[id]. */
+  batchId: string | null;
+  channelCount: number;
+}
+
+export interface BulkRunInput {
+  codes: readonly string[];
+  channelIds: readonly string[];
+  captionMode: BulkCaptionMode;
+  /** Tông giọng gửi kèm mỗi lời gọi AI. Mặc định = không thêm gì vào prompt. */
+  captionTone?: CaptionTone;
+  captionTemplate: string;
+  /**
+   * E8.1 — one publish instant (ISO) for EVERY code and channel of this run;
+   * null = đăng ngay. The spacing gate still keeps the posts of one channel
+   * apart, so a run of 20 codes hẹn cùng giờ goes out in order, not at once.
+   */
+  scheduledAt?: string | null;
+  /** Giãn cách riêng của lô, mili-giây. Bỏ trống = theo cấu hình công ty. */
+  spacingMs?: number | null;
+}
+
+export type BulkRunPhase = "idle" | "running" | "stopping" | "finished";
+
+export interface BulkRunSummary {
+  total: number;
+  /** Đã viết, đang chờ người duyệt. */
+  review: number;
+  /** Trong số đang chờ, đã bấm Duyệt. */
+  approved: number;
+  done: number;
+  skipped: number;
+  failed: number;
+  cancelled: number;
+  /** Rows already settled — the "12/50" of the progress line. */
+  processed: number;
+}
+
+function initialRows(codes: readonly string[], channelCount: number): BulkRunRow[] {
+  return codes.map((code, index) => ({
+    index,
+    code,
+    status: "pending" as BulkRowStatus,
+    caption: null,
+    approved: false,
+    media: [],
+    productName: null,
+    reason: null,
+    errorCode: null,
+    batchId: null,
+    channelCount,
+  }));
+}
+
+function summarise(rows: readonly BulkRunRow[]): BulkRunSummary {
+  const count = (status: BulkRowStatus) => rows.filter((row) => row.status === status).length;
+  const done = count("done");
+  const skipped = count("skipped");
+  const failed = count("error");
+  const cancelled = count("cancelled");
+  const review = count("review");
+  return {
+    total: rows.length,
+    review,
+    approved: rows.filter((row) => row.status === "review" && row.approved).length,
+    done,
+    skipped,
+    failed,
+    cancelled,
+    processed: done + skipped + failed + cancelled + review,
+  };
+}
+
+/** Nothing is thrown out of the loop: every failure becomes a row outcome. */
+function outcomeFromError(error: unknown): Pick<BulkRunRow, "status" | "reason" | "errorCode"> {
+  if (ApiError.is(error)) {
+    return {
+      status: isBulkSkipCode(error.code) ? "skipped" : "error",
+      reason: error.userMessage,
+      errorCode: error.code,
+    };
+  }
+  // Should not happen (the data layer only throws ApiError) — but an unknown
+  // throwable must still land on the row instead of killing the whole run.
+  return {
+    status: "error",
+    reason:
+      error instanceof Error && error.message
+        ? `Lỗi không xác định: ${error.message}`
+        : "Lỗi không xác định khi xử lý mã này.",
+    errorCode: "UNKNOWN",
+  };
+}
+
+export function useBulkRun() {
+  const queryClient = useQueryClient();
+  const { tenantKey } = useActiveTenant();
+  const [rows, setRows] = useState<BulkRunRow[]>([]);
+  const [phase, setPhase] = useState<BulkRunPhase>("idle");
+  /**
+   * Máy chủ đã từ chối trường `tone` và lời gọi phải chạy lại KHÔNG có nó.
+   * Rule 5 — không im lặng bỏ qua: caption viết bằng giọng mặc định trong khi
+   * ô chọn nói khác là đúng thứ luật đó cấm, nên cờ này phải nổi lên màn hình.
+   */
+  const [toneDropped, setToneDropped] = useState(false);
+
+  const stopRef = useRef(false);
+  /** Guards against a second "Chạy" click and against a stale run writing rows. */
+  const runIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  /** Batches this run actually created — the only reason to touch the cache. */
+  const createdCountRef = useRef(0);
+  /** VPOST: kênh + giờ của lượt soạn, dùng lại khi lên lịch các bài đã duyệt. */
+  const inputRef = useRef<BulkRunInput | null>(null);
+
+  /**
+   * The loop writes through the same API the wizard uses, but nothing in it
+   * goes through a TanStack mutation, so the job log would keep showing the
+   * state from before the run until somebody pressed refresh — the complaint
+   * this change exists to fix.
+   *
+   * Prefix key, written out rather than built from `postKeys.jobs`: the factory
+   * takes a filter and returns the FULL key, and this has to match every filter
+   * the log may be sitting on. Same literal as the three other call sites
+   * (usePostBatch, usePostJobs, useScheduledJobs).
+   */
+  const flushJobLogCache = useCallback(() => {
+    if (createdCountRef.current === 0) return;
+    createdCountRef.current = 0;
+    void queryClient.invalidateQueries({ queryKey: ["posts", tenantKey, "jobs"] });
+  }, [queryClient, tenantKey]);
+
+  // The loop lives in this tab: leaving mid-run abandons the remaining codes,
+  // so warn (web-bulk-actions rule 7 — warn for synchronous work, not for a
+  // server-side job). Nothing already created is lost either way.
+  useEffect(() => {
+    if (phase !== "running" && phase !== "stopping") return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [phase]);
+
+  // Unmount mid-run: stop the loop and drop the in-flight request.
+  useEffect(
+    () => () => {
+      stopRef.current = true;
+      runIdRef.current += 1;
+      abortRef.current?.abort();
+    },
+    [],
+  );
+
+  const patchRow = useCallback((runId: number, index: number, patch: Partial<BulkRunRow>) => {
+    if (runId !== runIdRef.current) return;
+    setRows((current) =>
+      current.map((row, position) => (position === index ? { ...row, ...patch } : row)),
+    );
+  }, []);
+
+  const stop = useCallback(() => {
+    if (!stopRef.current) stopRef.current = true;
+    setPhase((current) => (current === "running" ? "stopping" : current));
+  }, []);
+
+  const reset = useCallback(() => {
+    if (phase === "running" || phase === "stopping") return;
+    runIdRef.current += 1;
+    setRows([]);
+    setPhase("idle");
+    setToneDropped(false);
+  }, [phase]);
+
+  const start = useCallback(
+    async (input: BulkRunInput) => {
+      // --- Edge cases first: a run with nothing to do must not start --------
+      if (phase === "running" || phase === "stopping") return;
+      if (input.codes.length === 0 || input.channelIds.length === 0) return;
+
+      const runId = runIdRef.current + 1;
+      runIdRef.current = runId;
+      stopRef.current = false;
+      // Lượt mới, cảnh báo cũ không được dính lại.
+      setToneDropped(false);
+      // Per-run counter: the `finally` of the previous run already flushed what
+      // it created, and starting from a clean 0 means nobody has to reason
+      // across runs about who owes the cache an invalidation.
+      createdCountRef.current = 0;
+      abortRef.current = new AbortController();
+      const signal = abortRef.current.signal;
+
+      setRows(initialRows(input.codes, input.channelIds.length));
+      inputRef.current = input;
+      setPhase("running");
+
+      try {
+        for (let index = 0; index < input.codes.length; index += 1) {
+          if (runId !== runIdRef.current) return;
+
+          // Cancellation is checked BEFORE the next code, never in the middle of
+          // one: a half-created batch would be worse than one extra post.
+          if (stopRef.current) {
+            setRows((current) =>
+              current.map((row, position) =>
+                position >= index && row.status === "pending"
+                  ? {
+                      ...row,
+                      status: "cancelled" as BulkRowStatus,
+                      reason: "Đã dừng trước khi chạy mã này — mã chưa bị ảnh hưởng gì.",
+                    }
+                  : row,
+              ),
+            );
+            break;
+          }
+
+          const code = input.codes[index];
+          try {
+            patchRow(runId, index, { status: "composing", reason: null, errorCode: null });
+            const composed = await composePost({ productCode: code }, signal);
+
+            if (runId !== runIdRef.current) return;
+            patchRow(runId, index, { status: "captioning", productName: composed.content.name });
+
+            let caption = "";
+            if (input.captionMode === "template") {
+              caption = renderCaptionTemplate(input.captionTemplate, {
+                code: composed.content.code,
+                name: composed.content.name,
+              }).trim();
+            } else {
+              const captions = await generateCaptions(
+                {
+                  content: composed.content,
+                  channels: [BASE_CHANNEL_ID],
+                  tone: input.captionTone ?? DEFAULT_CAPTION_TONE,
+                },
+                signal,
+              );
+              if (captions.toneDropped) setToneDropped(true);
+              caption =
+                captions.generated.find((item) => item.channelId === BASE_CHANNEL_ID)?.text.trim() ??
+                "";
+              if (caption.length === 0) {
+                // A failed channel is reported by the usecase with a reason —
+                // never dropped (business rule 5).
+                const failure = captions.failed[0];
+                patchRow(runId, index, {
+                  status: "error",
+                  reason: failure
+                    ? `AI không viết được caption: ${failure.reason}`
+                    : "AI không trả về caption nào cho mã này.",
+                  errorCode: failure?.code ?? "CAPTION_EMPTY",
+                });
+                continue;
+              }
+            }
+
+            if (caption.length === 0) {
+              patchRow(runId, index, {
+                status: "error",
+                reason: "Mẫu caption cho mã này ra rỗng — kiểm tra lại mẫu dùng chung.",
+                errorCode: "CAPTION_EMPTY",
+              });
+              continue;
+            }
+
+            if (runId !== runIdRef.current) return;
+            // VPOST: dừng ở đây — chỉ bài người duyệt mới được tạo lô (publishApproved).
+            patchRow(runId, index, {
+              status: "review",
+              caption,
+              approved: false,
+              // Cover first — `composePost` already ordered the album that way.
+              media: composed.media.map((asset) => ({
+                driveFileId: asset.driveFileId,
+                fileName: asset.fileName,
+                kind: asset.kind,
+              })),
+              reason: composed.warnings.length > 0 ? composed.warnings.join(" · ") : null,
+            });
+          } catch (error) {
+            // Never rethrown: the row carries the failure and the run continues.
+            if (signal.aborted || runId !== runIdRef.current) return;
+            patchRow(runId, index, outcomeFromError(error));
+          }
+        }
+      } finally {
+        // Every exit of the loop lands here — finished, stopped, unmounted,
+        // or superseded by a newer run. Batches already created keep running
+        // on the server, so the log must be refreshed even when the run did
+        // not reach the last code.
+        flushJobLogCache();
+      }
+
+      if (runId === runIdRef.current) setPhase("finished");
+    },
+    [flushJobLogCache, patchRow, phase],
+  );
+
+  /** VPOST: người duyệt sửa bài của một dòng đang chờ duyệt. Sửa xong phải bấm Duyệt lại. */
+  const editCaption = useCallback((index: number, caption: string) => {
+    setRows((current) =>
+      current.map((row) =>
+        row.index === index && row.status === "review" ? { ...row, caption, approved: false } : row,
+      ),
+    );
+  }, []);
+
+  /** VPOST: bấm Duyệt / Bỏ duyệt. Bài rỗng không duyệt được. */
+  const setApproved = useCallback((index: number, approved: boolean) => {
+    setRows((current) =>
+      current.map((row) =>
+        row.index === index && row.status === "review"
+          ? { ...row, approved: approved && Boolean(row.caption?.trim()) }
+          : row,
+      ),
+    );
+  }, []);
+
+  /** VPOST: người duyệt bỏ hẳn một dòng — không lên lịch, ghi rõ lý do trên dòng. */
+  const rejectRow = useCallback((index: number) => {
+    setRows((current) =>
+      current.map((row) =>
+        row.index === index && row.status === "review"
+          ? { ...row, status: "cancelled" as BulkRowStatus, approved: false, reason: "Người duyệt đã bỏ bài này." }
+          : row,
+      ),
+    );
+  }, []);
+
+  /**
+   * VPOST: tạo lô cho đúng các dòng đã duyệt, theo kênh + giờ đã chọn lúc soạn.
+   * Dòng chưa duyệt giữ nguyên "Chờ duyệt"; một dòng lỗi không dừng dòng khác.
+   */
+  const publishApproved = useCallback(async () => {
+    const input = inputRef.current;
+    if (!input || phase === "running" || phase === "stopping") return;
+    const targets = rows.filter((row) => row.status === "review" && row.approved && row.caption?.trim());
+    if (targets.length === 0) return;
+
+    const runId = runIdRef.current;
+    stopRef.current = false;
+    abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
+    setPhase("running");
+    try {
+      for (const row of targets) {
+        if (runId !== runIdRef.current || stopRef.current) break;
+        patchRow(runId, row.index, { status: "creating" });
+        try {
+          const captionByChannel: Record<string, string> = {};
+          for (const channelId of input.channelIds) captionByChannel[channelId] = row.caption!.trim();
+          const batch = await createPostBatch(
+            {
+              productCode: row.code,
+              channelIds: input.channelIds,
+              captionByChannel,
+              scheduledAt: input.scheduledAt ?? null,
+              // `?? null` chứ không `||`: 0 là "đăng liên tục", một lựa chọn thật.
+              spacingMs: input.spacingMs ?? null,
+              media: row.media,
+            },
+            signal,
+          );
+          // Đếm TRƯỚC khi sửa dòng: lô đã tồn tại trên máy chủ từ đây.
+          createdCountRef.current += 1;
+          patchRow(runId, row.index, {
+            status: "done",
+            batchId: batch.batchId,
+            reason: batch.warnings.length > 0 ? batch.warnings.join(" · ") : null,
+          });
+        } catch (error) {
+          if (signal.aborted || runId !== runIdRef.current) return;
+          patchRow(runId, row.index, outcomeFromError(error));
+        }
+      }
+    } finally {
+      flushJobLogCache();
+    }
+    if (runId === runIdRef.current) setPhase("finished");
+  }, [flushJobLogCache, patchRow, phase, rows]);
+
+  return {
+    rows,
+    phase,
+    toneDropped,
+    summary: summarise(rows),
+    isRunning: phase === "running" || phase === "stopping",
+    start,
+    stop,
+    reset,
+    editCaption,
+    setApproved,
+    rejectRow,
+    publishApproved,
+  };
+}
+
+export type BulkRun = ReturnType<typeof useBulkRun>;

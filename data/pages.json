@@ -1,0 +1,31 @@
+{
+  "_nguon": "Dựng lại từ sheet 'QUY ĐỊNH CHỌN HÀNG' (gu page, giá tệ tối thiểu × 13.500) và sheet 'Lịch đăng bài' (khung giờ) trong file vận hành của shop, xem ngày 27/11/2026. Tên page đã đổi thành tên dựng; floor_vnd và slots giữ đúng mức của page gốc tương ứng.",
+  "global": {
+    "footer": "🌸 Được kiểm tra hàng trước khi thanh toán\n🔰 Hỗ trợ đổi hàng",
+    "banned": ["chính hãng", "auth", "real 100%", "hàng hiệu", "hàng xịn", "like auth", "super fake", "rep 1:1", "rẻ nhất", "tốt nhất", "số 1", "duy nhất", "cam kết", "đảm bảo 100%", "siêu rẻ", "không đâu rẻ hơn", "hoàn tiền 100%"],
+    "brands": ["chanel", "dior", "gucci", "zara", "louis vuitton", "prada", "hermes", "hermès", "versace", "balenciaga", "uniqlo", "h&m", "mango", "burberry"],
+    "conditional": ["freeship", "miễn phí ship", "miễn phí vận chuyển", "giảm giá", "khuyến mãi", "sale", "giảm %", "tặng kèm", "quà tặng", "trả góp", "hỏa tốc", "hoả tốc", "đổi trả 30 ngày", "bảo hành"]
+  },
+  "pages": [
+    {"id": "nang-tho", "name": "Nàng Thơ Boutique",
+     "gu": "Váy áo nữ phong cách sang chảnh, quý phái; câu chữ chậm, chọn lọc, gợi cảm giác tinh tế.",
+     "xung_ho": "nàng", "max_emoji": 3, "floor_vnd": 675000,
+     "slots": ["09:00", "11:00", "16:00", "18:00", "21:00"]},
+    {"id": "diu-may", "name": "Dịu Mây",
+     "gu": "Váy, áo, set bộ nữ trẻ trung, nhẹ nhàng; giọng thân thiện như bạn bè.",
+     "xung_ho": "bạn", "max_emoji": 3, "floor_vnd": 540000,
+     "slots": ["08:00", "10:00", "14:00", "16:00", "20:00"]},
+    {"id": "pho-xinh", "name": "Phố Xinh",
+     "gu": "Quần áo, váy, set bộ cá tính, năng động cho đi chơi, dạo phố; câu ngắn, có nhịp.",
+     "xung_ho": "bạn", "max_emoji": 3, "floor_vnd": 540000,
+     "slots": ["09:00", "11:00", "14:00", "18:00", "20:00"]},
+    {"id": "thanh-lich", "name": "Thanh Lịch U40",
+     "gu": "Váy, set bộ cho phụ nữ trung niên: kín đáo, thanh lịch, dễ mặc đi làm và đi tiệc.",
+     "xung_ho": "chị", "max_emoji": 2, "floor_vnd": 540000,
+     "slots": ["08:00", "11:00", "16:00"]},
+    {"id": "tu-tin", "name": "Tự Tin Bigsize",
+     "gu": "Quần áo, váy, bộ bigsize; nhấn vào phom thoải mái, che khuyết điểm, không chê cơ thể.",
+     "xung_ho": "nàng", "max_emoji": 3, "floor_vnd": 540000,
+     "slots": ["08:00", "14:00", "20:00"]}
+  ]
+}

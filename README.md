@@ -8,6 +8,52 @@
 
 ---
 
+## Chạy VPOST (giao diện mới + backend Python)
+
+Backend Python (`codebase/server.py`) phục vụ API theo đúng hợp đồng của giao diện VPOST trong `vpost/` (bản dựa trên MYSP nhánh `dev`). Giao diện chỉ chạy phần Next.js: không Docker, không Postgres/Redis, mọi `/api/*` chuyển sang Python.
+
+```bash
+python codebase/server.py                       # backend: http://127.0.0.1:8020 (lần đầu tự nạp data/demo_products.xlsx)
+cd vpost
+# tạo vpost/.env.local với 4 dòng:
+#   DEV_FAKE_SESSION=1
+#   AUTH_URL=http://localhost:3010
+#   SESSION_SECRET=<chuỗi ngẫu nhiên 64 ký tự hex>
+#   VPOST_API_URL=http://127.0.0.1:8020
+npx pnpm@11.21.0 install
+npx pnpm@11.21.0 dev -p 3010                    # giao diện: http://localhost:3010/products
+```
+
+- **Sản phẩm** (`/products`): các dòng của file đã tải; dòng bị chặn có lý do (thiếu giá/size, mâu thuẫn, hết hàng, thiếu ảnh).
+- **Chạy hàng loạt** (`/bulk`) và **Soạn bài** (`/compose?code=…`): làm theo thứ tự sau.
+  - `compose`: code kiểm dòng, kiểm tồn và ảnh.
+  - `captions`: AI viết bài hoặc đánh dấu dòng.
+  - Người duyệt, rồi `batches`: lên lịch.
+- **Bài đăng** (`/posts`): bài đã hẹn (đổi giờ, huỷ) và nhật ký.
+- **Kênh** (`/channels`): nối Page Facebook thật qua OAuth.
+  1. Ở app Facebook, mục *Facebook Login (for Business) → Settings → Valid OAuth Redirect URIs*, thêm `http://localhost:3010/api/channels/callback`.
+  2. Điền `FB_APP_ID`, `FB_APP_SECRET` vào `.env` ở gốc repo, rồi chạy lại backend.
+  3. Bấm nối kênh, tự đăng nhập Facebook và cho phép. Mỗi Page có token sẽ thành một kênh `fb-<id>`; bài hẹn giờ trên kênh đó lên Page thật.
+  - Token lưu trong `data/app.db` (không commit). Cách khác: dán User Access Token vào ô nhập token (`POST /api/channels/import`).
+- Tải file sản phẩm mới: `POST /api/vpost/catalog` (multipart, field `file`). Giao diện chưa có nút cho bước này.
+- API nằm ở `codebase/vpost_api.py`. Test: `python -m pytest tests -q`.
+
+## Chạy bản chạy thử (web app cũ)
+
+```bash
+python -m pip install -r requirements.txt
+copy .env.example .env        # macOS/Linux: cp — điền MODEL_PROVIDER=openai, MODEL_NAME=gpt-5.6-luna, API_KEY=...
+python codebase/server.py     # mở http://127.0.0.1:8020
+```
+
+1. **Tải file:** chọn page mặc định, kéo file `.xlsx`/`.csv` vào. Bấm "Tải file mẫu" để lấy `data/demo_products.xlsx` (30 dòng váy, có cài lỗi).
+2. **Bảng nháp:** mỗi dòng là bài nháp hoặc dòng bị đánh dấu (kèm lý do theo từng trường). Ở đây sửa bài, thêm/xoá ảnh, duyệt (cần ≥1 ảnh), bỏ, hoặc sửa dữ liệu rồi soạn lại. Phím: ↑/↓ chuyển dòng, A duyệt.
+3. **Lịch đăng:** bài đã duyệt nằm ở khung giờ trống gần nhất của page.
+
+- Luồng mỗi dòng (sơ đồ ở `spec.md` §4): kiểm dòng (code) → kiểm tồn kho (code) → 1 lần gọi AI (viết hay đánh dấu) → soát bài (code) → viết lại ≤1 lần.
+- Cột của file sản phẩm: `ma_sp, ten_sp, loai, gia_ban, gia_te, size, mau, chat_lieu, mo_ta, anh, page, prompt`. Tên cột quen của shop (`Mã`, `Giá bán (theo ẢNH)`, `Màu 1..5`, `Link ảnh info`…) cũng đọc được.
+- Cột `anh` nhận link ảnh, link Google Drive, `=IMAGE("…")` và JSON ảnh Drive.
+- Test: `python -m pytest tests -q`. Dựng lại data từ file Excel gốc (để ngoài repo): `python scripts/build_data.py --raw ..`.
 
 ## Nhóm làm gì, khung làm gì
 
@@ -84,8 +130,12 @@ Nhóm dùng stack khác (Node, Streamlit, notebook…): sửa hàm `run_app()` t
 
 | Thành phần | Thật / Giả | Ghi chú |
 |---|---|---|
-| Lời gọi AI ở quyết định trung tâm | **Thật** (bắt buộc từ CP3) | Model: ____ |
-|  |  |  |
+| Lời gọi AI ở quyết định trung tâm | **Thật** (bắt buộc từ CP3) | Model: `gpt-5.6-luna` (OpenAI), 1 lần gọi / dòng, viết lại ≤1 lần |
+| Dữ liệu sản phẩm demo (`data/demo_products.xlsx`) | **Thật**, có sửa | 30 dòng váy lấy từ catalog hàng order của shop (mã, giá, size, màu, chất liệu, ảnh thật). ~1/2 số dòng được sửa có chủ đích để cài lỗi — xem `data/demo_products_answer_key.csv` |
+| Ảnh sản phẩm | **Thật** | Link ảnh công khai của shop (Google Drive). Ảnh không tải được bị bỏ khi dựng data và khi xử lý từng dòng |
+| Tồn kho (`data/inventory.csv`) | **Giả** (dựng, seed 42) | Thay POS thật; người dùng tải file tồn mới được trong app |
+| Giọng page, giá sàn, khung giờ (`data/pages.json`) | Dựng từ quy định thật | Tên page đã đổi; giá sàn, khung giờ giữ đúng mức của page gốc |
+| Lên lịch đăng | Lịch trong app | Facebook Graph API (bài hẹn giờ, chưa đăng) chạy khi kênh là Page nối qua OAuth (màn Kênh) hoặc `.env` có token Fanpage thử. OAuth mới thử bằng test giả lập, chưa nối Page thật |
 
 ## Dùng AI vào việc gì
 

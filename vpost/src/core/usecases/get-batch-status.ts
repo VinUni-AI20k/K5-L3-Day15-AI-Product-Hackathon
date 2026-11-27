@@ -1,0 +1,386 @@
+import { AppError } from "@/core/domain/errors";
+import {
+  postJobOperatorMessage,
+  postJobProductOrigin,
+  type PostBatchStatus,
+  type PostFormat,
+  type PostJobStatus,
+} from "@/core/domain/post-job";
+import {
+  POST_JOB_PROGRESS_STEPS,
+  PROGRESS_STEP_NONE,
+  postJobProgressMessage,
+  progressStepIndex,
+  type PostJobProgress,
+  type PostJobStage,
+} from "@/core/domain/post-job-progress";
+import type { ProductOrigin } from "@/core/domain/product";
+import { isTenantId } from "@/core/domain/tenant";
+import type { Logger } from "@/core/ports/infra";
+import type { JobProgressStore } from "@/core/ports/job-progress";
+import type { PostJobRepo } from "@/core/ports/post-job-repo";
+import { normalizeTenantId, type TenantId } from "@/core/domain/tenant-context";
+
+/**
+ * E7.5 — the end-of-run table of brief §3 + §6: one line per channel plus the
+ * batch totals. READ ONLY: it never transitions a job and never calls a channel,
+ * so an operator can refresh it as often as they like.
+ *
+ * Every line carries a Vietnamese `userMessage`, because the whole point of this
+ * screen is answering "vì sao bài này không lên?" without opening a log file.
+ * The message comes from the job row (written by whoever blocked/failed it), so
+ * the API, the UI and the smoke script all say exactly the same thing.
+ */
+
+/**
+ * E7.5 — where this post stands INSIDE its current status (design §5.7).
+ *
+ * Decoration on top of `status`, never a second truth: it is null far more often
+ * than it is set, and every consumer must render fine without it.
+ */
+export interface BatchChannelProgress {
+  readonly stage: PostJobStage;
+  /** Position on the stepper; already 0-based and on the line (never -1 here). */
+  readonly stepIndex: number;
+  /** Vietnamese sentence from the domain — the UI writes none of its own. */
+  readonly label: string;
+  /** Only the media-upload stage counts anything (§3.2). */
+  readonly doneCount: number | null;
+  readonly totalCount: number | null;
+  readonly currentItem: string | null;
+  readonly stageStartedAt: Date;
+  /** A deadline the system COMPUTED. Null = there is no countdown to show. */
+  readonly waitUntil: Date | null;
+}
+
+export interface BatchChannelStatus {
+  readonly channelId: string;
+  readonly postJobId: string;
+  readonly status: PostJobStatus;
+  /**
+   * Where the product text of THIS post came from, as stamped when the job was
+   * created. On the line, not only on the batch: it is the answer to "bài này
+   * lấy dữ liệu từ đâu" and it must be readable next to the row that failed,
+   * without a trip to the database.
+   */
+  readonly productOrigin: ProductOrigin;
+  readonly attemptCount: number;
+  readonly publishedPostId: string | null;
+  /** Link to the live post — the operator's proof (brief §6). */
+  readonly publishedUrl: string | null;
+  readonly publishedAt: Date | null;
+  readonly lastErrorCode: string | null;
+  /** Vietnamese, always present, for every status (not only failures). */
+  readonly userMessage: string;
+  /**
+   * LAW 3.1 APPLIED HERE, not in the screen: null unless `status` is one of
+   * `queued | publishing`. A job that already failed keeps no progress even when
+   * a Redis key still says "uploading 3/10" — a worker dying mid-album is a real
+   * situation, and a screen saying "đang tải ảnh" about a dead post is worse
+   * than a screen saying nothing.
+   */
+  readonly progress: BatchChannelProgress | null;
+}
+
+export interface BatchTotals {
+  readonly total: number;
+  readonly published: number;
+  readonly failed: number;
+  readonly blocked: number;
+  readonly queued: number;
+  readonly publishing: number;
+  /** E8.6 — handed to Facebook, waiting for its hour. Nothing is live yet. */
+  readonly scheduledOnFacebook: number;
+  readonly draft: number;
+  /** draft + queued + publishing + scheduled_on_facebook — "còn đang chạy". */
+  readonly inProgress: number;
+}
+
+export interface GetBatchStatusInput {
+  readonly tenantId: TenantId;
+  readonly batchId: string;
+}
+
+export interface GetBatchStatusResult {
+  readonly tenantId: TenantId;
+  readonly batchId: string;
+  readonly productCode: string;
+  /**
+   * Origin of the whole batch: every job of a batch is built from the same
+   * product, so this is the first job's stamp. Empty batch = `sheet`, the same
+   * historical default the domain helper applies.
+   */
+  readonly productOrigin: ProductOrigin;
+  readonly color: string;
+  readonly format: PostFormat;
+  readonly status: PostBatchStatus;
+  readonly totals: BatchTotals;
+  readonly startedAt: Date;
+  readonly finishedAt: Date | null;
+  readonly durationMs: number | null;
+  readonly channels: readonly BatchChannelStatus[];
+  /** One Vietnamese line summarising the run, for the top of the table. */
+  readonly summaryMessage: string;
+  /**
+   * Labels of the stepper, in order, straight from the domain. Sent with the
+   * payload so the screen keeps NO copy of them: `ui/` may not import `core/`
+   * (docs/07 §2), and a second list would be the thing that drifts the day a
+   * stage is added. Five short strings per poll is the cheaper half of that
+   * trade.
+   */
+  readonly progressSteps: readonly string[];
+}
+
+export interface GetBatchStatusDeps {
+  postJobs: PostJobRepo;
+  /**
+   * Live progress of the jobs still running. Best-effort by contract: a store
+   * that is down costs the decoration, never the table (design §5.7).
+   */
+  progress: JobProgressStore;
+  logger: Logger;
+}
+
+export function makeGetBatchStatus(deps: GetBatchStatusDeps) {
+  return async function getBatchStatus(
+    input: GetBatchStatusInput,
+  ): Promise<GetBatchStatusResult> {
+    // --- Edge cases first ---------------------------------------------------
+    const rawTenantId = str(input?.tenantId);
+    const batchId = str(input?.batchId);
+    if (!isTenantId(rawTenantId) || batchId.length === 0) {
+      throw new AppError("INVALID_INPUT", {
+        message: "getBatchStatus requires a tenant UUID and a batch id",
+        userMessage: "Yêu cầu xem kết quả lô bài đăng thiếu thông tin định danh.",
+        context: { tenant_id: rawTenantId || null, batch_id: batchId || null },
+      });
+    }
+    const tenantId = normalizeTenantId(input.tenantId);
+
+    const summary = await deps.postJobs.getBatchSummary(tenantId, batchId);
+    if (!summary) {
+      // Also the "batch of another tenant" case: the repo is tenant-scoped, so a
+      // foreign batch simply has no rows here — one code, no information leak
+      // about whether it exists elsewhere.
+      // Bug B5 (doc 10 §7): now its own 404 code. It used to be an
+      // INVALID_INPUT 400, which told the caller their REQUEST was malformed
+      // when the request was fine and the batch simply is not theirs.
+      throw new AppError("BATCH_NOT_FOUND", {
+        message: "Post batch not found for this tenant",
+        userMessage: "Không tìm thấy lô bài đăng này.",
+        context: { tenant_id: tenantId, batch_id: batchId, reason: "BATCH_NOT_FOUND" },
+      });
+    }
+
+    const totals: BatchTotals = {
+      total: summary.total,
+      published: summary.byStatus.published,
+      failed: summary.byStatus.failed,
+      blocked: summary.byStatus.blocked,
+      queued: summary.byStatus.queued,
+      publishing: summary.byStatus.publishing,
+      scheduledOnFacebook: summary.byStatus.scheduled_on_facebook,
+      draft: summary.byStatus.draft,
+      inProgress:
+        summary.byStatus.draft +
+        summary.byStatus.queued +
+        summary.byStatus.publishing +
+        // Waiting on Facebook is still "running": the post is not live.
+        summary.byStatus.scheduled_on_facebook,
+    };
+
+    // ONE read for the whole batch (design §5.7). The id list is narrowed to the
+    // statuses allowed to show progress, so law 3.1 also saves the round trip:
+    // a finished batch — which is what this screen mostly shows — never touches
+    // the progress store at all.
+    const liveJobIds = summary.jobs
+      .filter((job) => canShowProgress(job.status))
+      .map((job) => job.id);
+    const progressById = await readProgress(deps, {
+      tenantId,
+      batchId: summary.batchId,
+      postJobIds: liveJobIds,
+    });
+
+    const channels: BatchChannelStatus[] = summary.jobs.map((job) => ({
+      channelId: job.channelId,
+      postJobId: job.id,
+      status: job.status,
+      productOrigin: postJobProductOrigin(job),
+      attemptCount: job.attemptCount,
+      publishedPostId: job.publishedPostId,
+      publishedUrl: job.publishedUrl,
+      publishedAt: job.publishedAt,
+      lastErrorCode: job.lastErrorCode,
+      userMessage: postJobOperatorMessage(job),
+      // `liveJobIds` already applied law 3.1; a settled job has no entry here.
+      progress: toChannelProgress(progressById.get(job.id), job.status),
+    }));
+
+    const first = summary.jobs[0];
+    const result: GetBatchStatusResult = {
+      tenantId,
+      batchId: summary.batchId,
+      productCode: summary.productCode,
+      productOrigin: postJobProductOrigin(first),
+      color: first?.color ?? "",
+      format: first?.format ?? "image_post",
+      status: summary.status,
+      totals,
+      startedAt: summary.startedAt,
+      finishedAt: summary.finishedAt,
+      durationMs: summary.finishedAt
+        ? summary.finishedAt.getTime() - summary.startedAt.getTime()
+        : null,
+      channels,
+      summaryMessage: summaryMessage(summary.status, totals),
+      progressSteps: [...POST_JOB_PROGRESS_STEPS],
+    };
+
+    deps.logger.info("Batch status read", {
+      tenant_id: tenantId,
+      batch_id: summary.batchId,
+      product_code: summary.productCode,
+      product_origin: result.productOrigin,
+      batch_status: summary.status,
+      totals,
+      // Enough to answer "why is this post not live?" straight from the log.
+      channels: channels.map((channel) => ({
+        channel: channel.channelId,
+        status: channel.status,
+        product_origin: channel.productOrigin,
+        attempts: channel.attemptCount,
+        error_code: channel.lastErrorCode,
+        published_post_id: channel.publishedPostId,
+        // Which step a still-running post sits on, so the log answers "nó đang
+        // kẹt ở đâu?" as well as "vì sao nó không lên?".
+        stage: channel.progress?.stage ?? null,
+      })),
+    });
+
+    return result;
+  };
+}
+
+export type GetBatchStatus = ReturnType<typeof makeGetBatchStatus>;
+
+// --- progress (decoration) --------------------------------------------------
+
+/**
+ * LAW 3.1: the statuses whose progress still means something.
+ *
+ * `scheduled_on_facebook` was added on PM's decision (19/08/2026). It is the ONE
+ * case where the system knows the remaining time exactly — the hour the operator
+ * picked — and hiding it made the most reassuring line on the screen invisible:
+ * the post is on Facebook, and it goes out at that hour whether or not this
+ * server is running.
+ */
+const LIVE_STATUSES: readonly PostJobStatus[] = ["queued", "publishing", "scheduled_on_facebook"];
+
+/**
+ * Which stage may be shown for a status. Only `scheduled_on_facebook` is pinned,
+ * and it is pinned because its status is STABLE: the row can sit there for days,
+ * so a stale key (the `waiting_on_facebook` write is best-effort and may have
+ * failed) would keep claiming "đang tải ảnh 3/10" about a post Facebook already
+ * holds — for days. The two moving statuses are left unpinned on purpose: their
+ * keys are rewritten seconds later anyway, and pinning them would drop a
+ * perfectly good stage over a harmless race.
+ */
+const PINNED_STAGE: Partial<Record<PostJobStatus, PostJobStage>> = {
+  scheduled_on_facebook: "waiting_on_facebook",
+};
+
+const NO_PROGRESS: ReadonlyMap<string, PostJobProgress> = new Map();
+
+function canShowProgress(status: PostJobStatus): boolean {
+  return LIVE_STATUSES.includes(status);
+}
+
+/**
+ * Progress of the given jobs, or an empty map. NEVER throws and never fails the
+ * read: the port promises as much, and this guard makes the promise something
+ * the screen does not have to trust. A dead store costs the stepper and a warn
+ * line — the table keeps every status, every reason and every link it has today
+ * (design §5.7).
+ */
+async function readProgress(
+  deps: GetBatchStatusDeps,
+  input: { tenantId: TenantId; batchId: string; postJobIds: readonly string[] },
+): Promise<ReadonlyMap<string, PostJobProgress>> {
+  if (input.postJobIds.length === 0) return NO_PROGRESS;
+
+  try {
+    const map = await deps.progress.read(input.tenantId, input.postJobIds);
+    // A store returning something that is not a map is a bug in the store, not
+    // a reason to break a read-only screen.
+    return map && typeof map.get === "function" ? map : NO_PROGRESS;
+  } catch (error) {
+    deps.logger.warn("Could not read job progress — the batch table drops the stepper only", {
+      err: AppError.from(error, "QUEUE_ERROR", {
+        tenant_id: input.tenantId,
+        batch_id: input.batchId,
+        operation: "getBatchStatus.progress.read",
+      }),
+      tenant_id: input.tenantId,
+      batch_id: input.batchId,
+      post_job_count: input.postJobIds.length,
+      error_code: "QUEUE_ERROR",
+    });
+    return NO_PROGRESS;
+  }
+}
+
+function toChannelProgress(
+  progress: PostJobProgress | undefined,
+  status: PostJobStatus,
+): BatchChannelProgress | null {
+  if (!progress) return null;
+
+  // A status that pins a stage rejects everything else: see PINNED_STAGE for why
+  // only the stable status does this.
+  const pinned = PINNED_STAGE[status];
+  if (pinned && progress.stage !== pinned) return null;
+
+  const stepIndex = progressStepIndex(progress.stage);
+  // Off the stepper (`stopped`, or a stage this build cannot read) while the row
+  // is still live means a stale key contradicting the status. The status wins,
+  // and drawing nothing is the honest outcome.
+  if (stepIndex === PROGRESS_STEP_NONE) return null;
+
+  return {
+    stage: progress.stage,
+    stepIndex,
+    label: postJobProgressMessage(progress),
+    doneCount: progress.doneCount,
+    totalCount: progress.totalCount,
+    currentItem: progress.currentItem,
+    stageStartedAt: progress.stageStartedAt,
+    waitUntil: progress.waitUntil,
+  };
+}
+
+// --- helpers ----------------------------------------------------------------
+
+/** Vietnamese headline. `blocked` is deliberately NOT worded as a failure. */
+function summaryMessage(status: PostBatchStatus, totals: BatchTotals): string {
+  switch (status) {
+    case "pending":
+      return `Lô có ${totals.total} bài, chưa bài nào được đưa vào hàng đợi`;
+    case "running":
+      return `Đang chạy: ${totals.published}/${totals.total} bài đã lên, còn ${totals.inProgress} bài đang xử lý`;
+    case "completed":
+      return `Hoàn tất: cả ${totals.total} bài đã lên kênh`;
+    case "partial":
+      return `Lên một phần: ${totals.published}/${totals.total} bài đã lên, ${totals.blocked} bài bị chặn, ${totals.failed} bài lỗi`;
+    case "blocked":
+      return `Không bài nào được gửi đi: cả ${totals.blocked} bài đều bị chặn trước khi đăng (xem lý do từng kênh)`;
+    case "failed":
+      return `Không bài nào lên được: ${totals.failed} bài lỗi, ${totals.blocked} bài bị chặn`;
+    default:
+      return `Trạng thái lô không xác định (${totals.total} bài)`;
+  }
+}
+
+function str(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}

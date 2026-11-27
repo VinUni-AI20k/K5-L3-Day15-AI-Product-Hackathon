@@ -36,3 +36,10 @@ evidence/**/raw-*
 data-btc
 data-btc/
 drafts.db
+
+# App
+data/app.db
+data/app.db-*
+data/inventory.local.csv
+.playwright-mcp/
+data/uploads/

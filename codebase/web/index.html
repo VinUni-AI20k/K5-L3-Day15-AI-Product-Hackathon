@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xưởng bài — soạn bài Fanpage từ file sản phẩm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&display=swap&subset=vietnamese" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 4h18l-3 7 5 17H5l5-17z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="9" r="1.6" fill="currentColor"/></svg>
+    <span>Xưởng bài</span>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Màn hình">
+    <button role="tab" data-view="upload" aria-selected="true">Tải file</button>
+    <button role="tab" data-view="review" aria-selected="false">Bảng nháp</button>
+    <button role="tab" data-view="calendar" aria-selected="false">Lịch đăng</button>
+  </nav>
+  <div class="meta" id="meta"></div>
+</header>
+
+<main>
+  <!-- 1. Tải file -->
+  <section class="view" id="view-upload">
+    <div class="upload-grid">
+      <form class="drop" id="upload-form">
+        <h1>Đưa file sản phẩm vào, nhận lại bài nháp cho từng dòng</h1>
+        <p class="lead">Mỗi dòng là một sản phẩm: tên, giá, size, màu, chất liệu, mô tả, và yêu cầu viết. Dòng thiếu hoặc mâu thuẫn sẽ bị đánh dấu thay vì đoán.</p>
+        <label class="field">
+          <span>Đăng lên page nào (khi dòng không ghi page)</span>
+          <select id="default-page" required></select>
+        </label>
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="file" accept=".xlsx,.csv" required>
+          <strong>Kéo file .xlsx hoặc .csv vào đây</strong>
+          <span id="file-name">hoặc bấm để chọn file, tối đa 200 dòng</span>
+        </label>
+        <div class="row-actions">
+          <button class="btn primary" type="submit" id="upload-btn">Soạn bài cho cả file</button>
+          <a class="btn ghost" href="/api/sample">Tải file mẫu</a>
+        </div>
+        <p class="form-error" id="upload-error" role="alert"></p>
+      </form>
+
+      <aside class="side">
+        <section class="panel">
+          <h2>Tồn kho</h2>
+          <p class="muted" id="inv-info">Đang đọc…</p>
+          <p class="muted small">Trước khi viết, mỗi dòng được đối chiếu tồn theo màu × size. Hết hàng thì không soạn; còn một phần thì bài chỉ nhắc phần còn.</p>
+          <label class="btn ghost file-btn">
+            <input type="file" id="inv-file" accept=".xlsx,.csv">Cập nhật file tồn
+          </label>
+          <p class="form-error" id="inv-error" role="alert"></p>
+        </section>
+        <section class="panel">
+          <h2>Các lần đã tải</h2>
+          <ul class="batches" id="batches"><li class="muted">Chưa có file nào.</li></ul>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <!-- 2. Bảng nháp -->
+  <section class="view" id="view-review" hidden>
+    <div class="review-head">
+      <div>
+        <h1 id="batch-title">Chưa chọn file</h1>
+        <p class="muted" id="batch-sub"></p>
+      </div>
+      <div class="filters" role="group" aria-label="Lọc theo trạng thái" id="filters"></div>
+    </div>
+    <div class="tape-wrap">
+      <div class="tape" id="tape" aria-label="Tiến độ xử lý từng dòng"></div>
+    </div>
+    <div class="review-body">
+      <ol class="rack" id="rack" aria-label="Danh sách dòng"></ol>
+      <article class="detail" id="detail" aria-live="polite">
+        <p class="empty">Chọn một dòng bên trái. Phím ↑ ↓ để chuyển dòng, A để duyệt bài đang mở.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- 3. Lịch đăng -->
+  <section class="view" id="view-calendar" hidden>
+    <div class="review-head">
+      <div>
+        <h1>Lịch đăng</h1>
+        <p class="muted" id="cal-sub"></p>
+      </div>
+      <div class="row-actions">
+        <button class="btn ghost" id="cal-prev">Tuần trước</button>
+        <button class="btn ghost" id="cal-today">Tuần này</button>
+        <button class="btn ghost" id="cal-next">Tuần sau</button>
+      </div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="week" id="week"></div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

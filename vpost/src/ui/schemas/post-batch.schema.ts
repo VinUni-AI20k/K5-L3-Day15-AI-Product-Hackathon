@@ -1,0 +1,371 @@
+import { z } from "zod";
+
+import { ProductOriginSchema } from "@/ui/schemas/product-origin.schema";
+
+/**
+ * Contracts of the publish screens (E7.5 theo dõi lô + E11.1 nhật ký job).
+ *
+ * `ui/` may not import `core/` (one-way dependency law, docs/07 §2), so these
+ * MIRROR `core/domain/post-job.ts` (statuses), `core/usecases/get-batch-status`,
+ * `core/usecases/list-post-jobs` and `core/usecases/create-post-batch`. The
+ * runtime parse in `http-client` is what makes a drift loud instead of silent.
+ *
+ * Business rule 2 (whitelist): nothing here has a field for stock, price or
+ * production notes. `warnings[]` is the internal operator channel — rendered in
+ * its own block, never inside a caption preview.
+ */
+
+// --- Statuses (mirror of the domain state machine) --------------------------
+
+export const POST_JOB_STATUSES = [
+  "draft",
+  "queued",
+  "publishing",
+  /**
+   * E8.6 — the post exists on Facebook as an unpublished, scheduled object and
+   * Facebook itself will publish it at the hour. Deliberately NOT merged into
+   * `queued`: "the queue job finished" is not "the platform accepted the
+   * schedule", and only the reconciliation sweep may turn this into `published`.
+   */
+  "scheduled_on_facebook",
+  "published",
+  "failed",
+  "blocked",
+] as const;
+export const PostJobStatusSchema = z.enum(POST_JOB_STATUSES);
+export type PostJobStatus = z.infer<typeof PostJobStatusSchema>;
+
+export const POST_BATCH_STATUSES = [
+  "pending",
+  "running",
+  "completed",
+  "partial",
+  "blocked",
+  "failed",
+] as const;
+export const PostBatchStatusSchema = z.enum(POST_BATCH_STATUSES);
+export type PostBatchStatus = z.infer<typeof PostBatchStatusSchema>;
+
+export const PostFormatSchema = z.enum(["image_post", "video_post", "reels"]);
+export type PostFormat = z.infer<typeof PostFormatSchema>;
+
+/**
+ * There is deliberately NO "retryable statuses" list here. The status alone has
+ * not decided that since E8.6: a `failed` job the platform may hold a post for
+ * is refused too, and only the server knows (the API sends `canRetry` per row).
+ * A screen that drew the button from a status list would re-open exactly the
+ * duplicate door that guard closed.
+ */
+
+/**
+ * Nothing is running any more — mirrors SETTLED_POST_JOB_STATUSES.
+ * `scheduled_on_facebook` is NOT settled: nothing is live yet, and the sweep
+ * still has to confirm what Facebook did with it.
+ */
+const SETTLED_POST_JOB_STATUSES: readonly PostJobStatus[] = ["published", "failed", "blocked"];
+
+/** A batch nobody is working on any more: polling must stop here. */
+const SETTLED_BATCH_STATUSES: readonly PostBatchStatus[] = [
+  "completed",
+  "partial",
+  "blocked",
+  "failed",
+];
+
+export function isSettledJobStatus(status: PostJobStatus): boolean {
+  return SETTLED_POST_JOB_STATUSES.includes(status);
+}
+
+export function isSettledBatchStatus(status: PostBatchStatus): boolean {
+  return SETTLED_BATCH_STATUSES.includes(status);
+}
+
+// --- Labels + tones (one mapping, reused by every screen) -------------------
+
+export const POST_JOB_STATUS_LABELS: Record<PostJobStatus, string> = {
+  draft: "Nháp",
+  queued: "Chờ đăng",
+  publishing: "Đang đăng",
+  // Three different waits, three different words. "Chờ đăng" = OUR system is
+  // holding it; "Facebook giữ lịch" = the post is already on Facebook and
+  // Facebook will publish it; "Đã đăng" = it is live. Reusing one label for the
+  // first two would hide the only fact that matters when something goes wrong:
+  // who is holding the post right now.
+  scheduled_on_facebook: "Facebook giữ lịch",
+  published: "Đã đăng",
+  failed: "Lỗi",
+  blocked: "Bị chặn",
+};
+
+export const POST_BATCH_STATUS_LABELS: Record<PostBatchStatus, string> = {
+  pending: "Chưa chạy",
+  running: "Đang chạy",
+  completed: "Đã đăng đủ",
+  partial: "Đăng một phần",
+  blocked: "Bị chặn",
+  failed: "Lỗi",
+};
+
+/** Badge tone per status — mirrors the `BadgeTone` union of ui/components/ui/badge. */
+export type StatusTone = "neutral" | "success" | "warning" | "danger" | "info";
+
+export const POST_JOB_STATUS_TONES: Record<PostJobStatus, StatusTone> = {
+  draft: "neutral",
+  queued: "info",
+  publishing: "info",
+  // Not `success`: nothing is live yet. It is on track, like `queued`, so it
+  // gets the same neutral-positive tone — the LABEL carries the difference,
+  // never the colour (core-accessibility).
+  scheduled_on_facebook: "info",
+  published: "success",
+  failed: "danger",
+  // Blocked is a RULE saying no (hết hàng, kênh chưa cấu hình), not a crash.
+  blocked: "warning",
+};
+
+export const POST_BATCH_STATUS_TONES: Record<PostBatchStatus, StatusTone> = {
+  pending: "neutral",
+  running: "info",
+  completed: "success",
+  partial: "warning",
+  blocked: "warning",
+  failed: "danger",
+};
+
+// --- Create a batch (POST /api/posts/batches) -------------------------------
+
+export const CreateBatchChannelResultSchema = z.object({
+  channelId: z.string().min(1),
+  postJobId: z.string().min(1),
+  status: PostJobStatusSchema,
+  queued: z.boolean(),
+  queueJobId: z.string().nullable(),
+  errorCode: z.string().nullable(),
+  userMessage: z.string().nullable(),
+  /** E8.1 — publish time actually stored for this channel; null = đăng ngay. */
+  scheduledAt: z.iso.datetime().nullable(),
+});
+export type CreateBatchChannelResult = z.infer<typeof CreateBatchChannelResultSchema>;
+
+export const CreateBatchResponseSchema = z.object({
+  tenantId: z.string().min(1),
+  batchId: z.string().min(1),
+  productCode: z.string().min(1),
+  color: z.string(),
+  format: PostFormatSchema,
+  batchStatus: PostBatchStatusSchema,
+  channels: z.array(CreateBatchChannelResultSchema),
+  /** Internal operator notes (sắp hết hàng…). Never part of a caption. */
+  warnings: z.array(z.string()),
+});
+export type CreateBatchResponse = z.infer<typeof CreateBatchResponseSchema>;
+
+// --- Batch status (GET /api/posts/batches/:id) ------------------------------
+
+/**
+ * E7.5 — where a still-running post stands (design §5.9).
+ *
+ * `stage` is deliberately a plain string, not an enum mirroring the domain: the
+ * screen renders `label` and `stepIndex` and branches on NEITHER, so a second
+ * copy of the stage list here would only be one more thing to drift. The two
+ * fields the screen does use are validated properly.
+ *
+ * `waitUntil` is the ONLY source of a countdown (design §3.2). Null means the
+ * system has no deadline for this step — the screen then says how long the step
+ * has been running and nothing more. No percentage, no "còn khoảng…", ever.
+ */
+export const BatchChannelProgressSchema = z.object({
+  stage: z.string().min(1),
+  /** 0-based position on the stepper; the server never sends an off-line stage. */
+  stepIndex: z.number().int(),
+  label: z.string().min(1),
+  /** Only the media-upload step counts anything; null everywhere else. */
+  doneCount: z.number().nullable(),
+  totalCount: z.number().nullable(),
+  currentItem: z.string().nullable(),
+  stageStartedAt: z.iso.datetime(),
+  waitUntil: z.iso.datetime().nullable(),
+});
+export type BatchChannelProgress = z.infer<typeof BatchChannelProgressSchema>;
+
+/**
+ * Where a post's product TEXT came from — mirrors `ProductOrigin`
+ * (core/domain/product), stamped on the job row when it was created.
+ *
+ * `.default("sheet")` rather than required, and the reason is the opposite of
+ * the compose response's: that one is produced by the very server that served
+ * the page, while these rows can be MONTHS old and are read back long after the
+ * build that wrote them. Every job created before onboarding phase 3 carries no
+ * stamp at all, and "sheet" is the historical truth for all of them — the same
+ * default `productOrigin()` applies in the domain.
+ */
+const JobProductOriginSchema = ProductOriginSchema.default("sheet");
+
+export const BatchChannelStatusSchema = z.object({
+  channelId: z.string().min(1),
+  postJobId: z.string().min(1),
+  status: PostJobStatusSchema,
+  /** On the LINE, not only on the batch: it is read next to the row that failed. */
+  productOrigin: JobProductOriginSchema,
+  attemptCount: z.number(),
+  publishedPostId: z.string().nullable(),
+  publishedUrl: z.url().nullable(),
+  publishedAt: z.iso.datetime().nullable(),
+  lastErrorCode: z.string().nullable(),
+  /** Vietnamese sentence built by the usecase — always populated. */
+  userMessage: z.string(),
+  /**
+   * Decoration, absent far more often than present: the server already dropped
+   * it for every status outside `queued | publishing` (law 3.1). Defaulted so a
+   * server that does not send the block at all still parses.
+   */
+  progress: BatchChannelProgressSchema.nullable().default(null),
+});
+export type BatchChannelStatus = z.infer<typeof BatchChannelStatusSchema>;
+
+export const BatchTotalsSchema = z.object({
+  total: z.number(),
+  published: z.number(),
+  failed: z.number(),
+  blocked: z.number(),
+  queued: z.number(),
+  publishing: z.number(),
+  /** E8.6 — handed to Facebook, waiting for its hour. Counted inside inProgress. */
+  scheduledOnFacebook: z.number(),
+  draft: z.number(),
+  inProgress: z.number(),
+});
+export type BatchTotals = z.infer<typeof BatchTotalsSchema>;
+
+export const BatchStatusResponseSchema = z.object({
+  tenantId: z.string().min(1),
+  batchId: z.string().min(1),
+  productCode: z.string().min(1),
+  /** Every job of a batch is built from the same product, so one stamp covers it. */
+  productOrigin: JobProductOriginSchema,
+  color: z.string(),
+  format: PostFormatSchema,
+  status: PostBatchStatusSchema,
+  totals: BatchTotalsSchema,
+  startedAt: z.iso.datetime(),
+  finishedAt: z.iso.datetime().nullable(),
+  durationMs: z.number().nullable(),
+  channels: z.array(BatchChannelStatusSchema),
+  summaryMessage: z.string(),
+  /**
+   * Stepper labels, in order, as the DOMAIN spells them (design §5.9: the screen
+   * hardcodes none of them). `ui/` may not import `core/`, so they travel with
+   * the payload instead of being copied here — an empty array simply means no
+   * stepper is drawn, never an invented one.
+   */
+  progressSteps: z.array(z.string().min(1)).default([]),
+});
+export type BatchStatusResponse = z.infer<typeof BatchStatusResponseSchema>;
+
+// --- Job log (GET /api/posts/jobs) ------------------------------------------
+
+export const PostJobLogEntrySchema = z.object({
+  postJobId: z.string().min(1),
+  batchId: z.string().min(1),
+  productCode: z.string().min(1),
+  /**
+   * THE answer to "bài này lấy dữ liệu từ đâu", months later. Read from the job
+   * row itself, never joined from `product` — by then that row may be gone.
+   */
+  productOrigin: JobProductOriginSchema,
+  color: z.string(),
+  channelId: z.string().min(1),
+  format: PostFormatSchema,
+  status: PostJobStatusSchema,
+  attemptCount: z.number(),
+  lastErrorCode: z.string().nullable(),
+  userMessage: z.string(),
+  publishedPostId: z.string().nullable(),
+  publishedUrl: z.url().nullable(),
+  publishedAt: z.iso.datetime().nullable(),
+  scheduledAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+  /** Decided by the server (failed/blocked only) — the UI never guesses it. */
+  canRetry: z.boolean(),
+});
+export type PostJobLogEntry = z.infer<typeof PostJobLogEntrySchema>;
+
+export const PostJobLogResponseSchema = z.object({
+  tenantId: z.string().min(1),
+  items: z.array(PostJobLogEntrySchema),
+  /** Opaque; `null` means this was the last page. */
+  nextCursor: z.string().nullable(),
+  limit: z.number(),
+});
+export type PostJobLogResponse = z.infer<typeof PostJobLogResponseSchema>;
+
+// --- Retry (POST /api/posts/jobs/:id/retry) ---------------------------------
+
+export const RetryPostJobResponseSchema = z.object({
+  tenantId: z.string().min(1),
+  postJobId: z.string().min(1),
+  batchId: z.string().min(1),
+  channelId: z.string().min(1),
+  productCode: z.string().min(1),
+  previousStatus: PostJobStatusSchema,
+  status: PostJobStatusSchema,
+  queueJobId: z.string().min(1),
+  attemptCount: z.number(),
+  userMessage: z.string(),
+});
+export type RetryPostJobResponse = z.infer<typeof RetryPostJobResponseSchema>;
+
+// --- Job log filter (URL is the source of truth, core-data-list-query) ------
+
+export const JOB_LOG_DEFAULT_LIMIT = 25;
+
+export interface JobLogFilter {
+  /** `null` = every status (the default, which is NOT written to the URL). */
+  status: PostJobStatus | null;
+  batchId: string | null;
+}
+
+/** Parses `?status=&batchId=`; an invalid value falls back to the default. */
+export function parseJobLogFilter(params: URLSearchParams): JobLogFilter {
+  const rawStatus = params.get("status");
+  const status = PostJobStatusSchema.safeParse(rawStatus);
+  const batchId = params.get("batchId")?.trim() ?? "";
+  return {
+    status: status.success ? status.data : null,
+    batchId: batchId.length > 0 ? batchId : null,
+  };
+}
+
+/**
+ * THE single query-string builder for the job log (core-data-list-query rule 2).
+ * Defaults are omitted so a shared link stays clean.
+ */
+export function jobLogSearchParams(filter: JobLogFilter): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filter.status) params.set("status", filter.status);
+  if (filter.batchId) params.set("batchId", filter.batchId);
+  return params;
+}
+
+/** Facebook post permalink; used when the server did not store one. */
+export function facebookPostUrl(publishedPostId: string): string {
+  return `https://www.facebook.com/${publishedPostId}`;
+}
+
+/** Same wording as the sync screen so one app does not speak two dialects. */
+export function formatDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "medium" }).format(date);
+}
+
+/** "2 phút 5 giây" — a duration an operator can read out loud. */
+export function formatDurationMs(durationMs: number): string {
+  const totalSeconds = Math.max(0, Math.round(durationMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${seconds} giây`;
+  return `${minutes} phút ${seconds} giây`;
+}
