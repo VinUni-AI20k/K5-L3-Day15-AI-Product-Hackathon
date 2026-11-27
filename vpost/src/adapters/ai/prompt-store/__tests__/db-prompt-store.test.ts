@@ -43,7 +43,7 @@ const TENANT_ROW: PromptTemplateRecord = {
   name: "Giọng shop",
   variables: ["product.name", "constraints"],
   createdBy: "op@example.com",
-  createdAt: "2026-08-13T02:00:00.000Z",
+  createdAt: "2054-08-13T02:00:00.000Z",
 };
 
 describe("db prompt store", () => {

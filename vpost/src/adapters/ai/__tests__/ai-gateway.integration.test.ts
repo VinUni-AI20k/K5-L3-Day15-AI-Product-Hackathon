@@ -51,7 +51,7 @@ const secondChannelOutput = {
 };
 
 /**
- * Single-provider stack (owner decision 15/08/2026): the shipped registry lists
+ * Single-provider stack (owner decision 27/11/2026): the shipped registry lists
  * OpenAI models only. Google is still WIRED here on purpose — the tests must
  * show the engine never wanders to a provider the registry did not name.
  */

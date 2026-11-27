@@ -210,7 +210,7 @@ describe("YAML model policy store — config/ai-models.yaml", () => {
   });
 
   /**
-   * Guards the owner decision of 15/08/2026 rather than a mechanism: putting a
+   * Guards the owner decision of 27/11/2026 rather than a mechanism: putting a
    * Google model back into a tier while GOOGLE_AI_API_KEY is unset would fail at
    * generation time, not at load time. Delete this test in the same change that
    * re-enables Google.
@@ -230,7 +230,7 @@ describe("YAML model policy store — config/ai-models.yaml", () => {
   });
 
   /**
-   * Verified against the live API on 15/08/2026: sending `temperature` to a
+   * Verified against the live API on 27/11/2026: sending `temperature` to a
    * GPT-5 model is a hard 400 ("Unsupported parameter"), classified
    * `bad_request` — terminal, no retry, no escalation, the whole post blocked.
    * `capabilities.temperature` defaults to TRUE in the schema, so a gpt-5 entry
@@ -279,7 +279,7 @@ describe("YAML model policy store — config/ai-models.yaml", () => {
 
   /**
    * The output budget is shared by reasoning tokens and the answer. 900 left
-   * gpt-5-mini emitting nothing at all on 4 of 4 real runs (15/08/2026), so the
+   * gpt-5-mini emitting nothing at all on 4 of 4 real runs (27/11/2026), so the
    * floor is pinned here rather than left to drift back down.
    */
   it("gives the caption task enough output budget for a reasoning model", async () => {

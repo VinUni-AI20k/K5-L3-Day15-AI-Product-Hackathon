@@ -70,7 +70,7 @@ function makeMemoryRepo(seed: PromptTemplateRecord[] = []): PromptTemplateRepo &
         name: input.name,
         variables: [...input.variables],
         createdBy: input.createdBy ?? null,
-        createdAt: "2026-08-13T02:00:00.000Z",
+        createdAt: "2054-08-13T02:00:00.000Z",
       };
       rows.push(record);
       return record;

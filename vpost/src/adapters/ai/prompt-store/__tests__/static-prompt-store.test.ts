@@ -97,7 +97,7 @@ describe("built-in Facebook template", () => {
    * labels (core/ai/validation/claim.ts, built from SHEET_COLUMNS). The two
    * lists live in different layers, so nothing but this test stops a future
    * version from renaming a label here and silently switching the stripping off
-   * — which is the bug that blocked 3 of 4 real generations on 15/08/2026.
+   * — which is the bug that blocked 3 of 4 real generations on 27/11/2026.
    */
   it("prints the labels stage 3 knows how to strip", () => {
     const active = BUILT_IN_TEMPLATES.find((item) => item.status === "active");

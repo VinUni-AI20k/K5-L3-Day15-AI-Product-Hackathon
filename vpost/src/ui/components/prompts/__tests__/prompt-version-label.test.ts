@@ -35,7 +35,7 @@ describe("describePromptVersions", () => {
         version: 2,
         source: "tenant",
         status: "active",
-        createdAt: "2026-08-20T07:30:00.000Z",
+        createdAt: "2054-08-20T07:30:00.000Z",
       }),
       makeVersion({ version: 2, source: "built_in", status: "retired" }),
     ]);
@@ -49,7 +49,7 @@ describe("describePromptVersions", () => {
     expect(tenant.label.origin).toBe("Bản của đơn vị");
     expect(builtIn.label.origin).toBe("Mẫu hệ thống");
     // And the timestamps are different facts, not two dashes.
-    expect(tenant.label.stamp).toBe(formatPromptDate("2026-08-20T07:30:00.000Z"));
+    expect(tenant.label.stamp).toBe(formatPromptDate("2054-08-20T07:30:00.000Z"));
     expect(builtIn.label.stamp).toBe("Đi kèm phần mềm");
     expect(tenant.label.stamp).not.toBe(builtIn.label.stamp);
     expect(builtIn.label.supersededNote).toBe("Đã thay bằng bản riêng của đơn vị (v2)");
