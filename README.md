@@ -1,5 +1,5 @@
 > Đây là khung repo nộp bài. Điền mọi chỗ `____`, giữ nguyên tên các mục.
-> Bộ đề gốc: [README-de-goc.md](README-de-goc.md), `02-guide.md`, `03-rubric.md`. Track D1; prototype nghiệp vụ chưa triển khai.
+> Bộ đề gốc: [README-de-goc.md](README-de-goc.md), `02-guide.md`, `03-rubric.md`. Track D1; prototype nghiệp vụ là mock, dùng dữ liệu và chính sách giả lập, chưa nối AI thật. Chạy `MODEL_PROVIDER=fake python3 run.py`, nhập ví dụ `D100 thiếu trà`; đầu ra là đề xuất, không hoàn tiền. Từ khóa chỉ bao phủ tình huống hạn chế, không bảo đảm an toàn tuyệt đối.
 
 # ChickenVietnamese — Food Order Complaint Assistant
 
@@ -89,9 +89,7 @@ Nhóm dùng stack khác (Node, Streamlit, notebook…): sửa hàm `run_app()` t
 
 ## Dùng AI vào việc gì
 
-2–3 dòng (bắt buộc): nhóm dùng công cụ AI nào để làm gì, người kiểm lại phần nào. Chi tiết: [docs/ai-usage.md](docs/ai-usage.md). Coding agent đọc [AGENTS.md](AGENTS.md).
-
-____
+Nhóm sử dụng AI hỗ trợ xây dựng bản thử nghiệm và tài liệu; chi tiết tại [docs/ai-usage.md](docs/ai-usage.md).
 
 ## File mẫu — điền ở bước nào
 

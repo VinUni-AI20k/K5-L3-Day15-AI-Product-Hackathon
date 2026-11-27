@@ -1,29 +1,37 @@
-"""Luồng chính của bản chạy thử — NHÓM VIẾT. Điền ở guide bước 3.2.
-
-`python run.py`, `python run.py eval` và `python run.py simulate` đều gọi answer(text).
-
-Hợp đồng:
-    answer(text: str) -> dict có khoá "output" (str): kết quả đưa cho người dùng.
-    Token, tên model, số lần gọi model / công cụ: khung tự đếm qua call_model và @tool — không cần trả.
-    Bộ chạy gửi NGUYÊN ô input của câu thử vào text. Dữ liệu nền (bài học, thông báo, lịch…)
-    do luồng của nhóm tự đọc qua công cụ trong tools.py.
-
-Hình dạng: đúng như sơ đồ ở spec.md §4 (guide bước 2.2) — workflow cố định, một agent, hay nhiều agent.
-Khung dưới đây là một workflow 2 bước VÍ DỤ, chỉ để luồng chạy hết từ trước CP2. Thay bằng luồng của nhóm.
-Nếu viết vòng lặp agent (AI tự chọn bước tiếp): đặt giới hạn MAX_STEPS và ghi lý do dừng bằng note("dừng: …").
-"""
+"""Workflow mock chỉ đọc; không thực hiện giao dịch hoặc gửi yêu cầu."""
+import re
+import json
 from ai import call_model
-from tools import search_example
-from tracing import note  # noqa: F401
-
-SYSTEM = ""     # NHÓM VIẾT: hướng dẫn hệ thống cho model (vai trò, phạm vi, khi nào nói "không có")
-MAX_STEPS = 5   # dùng khi viết vòng lặp agent
+from tools import get_order, get_policy
 
 
 def answer(text: str) -> dict:
-    # Bước 1 (ví dụ): lấy căn cứ từ dữ liệu / công cụ của bài toán
-    found = search_example(text)
-    context = "\n".join("[%s] %s" % (p["code"], p["text"]) for p in found)
-    # Bước 2 (ví dụ): model quyết định dựa trên căn cứ
-    reply = call_model(SYSTEM, "Căn cứ:\n%s\n\nĐầu vào của người dùng:\n%s" % (context, text))
-    return {"output": reply["text"]}
+    s = text.lower()
+    if any(x in s for x in ('dị vật', 'ngộ độc', 'dị ứng')):
+        return {'output': 'Chuyển nhân viên ngay: có nguy cơ an toàn; không đề xuất hoàn tiền tự động.'}
+    if any(x in s for x in ('số điện thoại', 'địa chỉ', 'bỏ qua chính sách', 'bỏ qua hạn mức')):
+        return {'output': 'Từ chối yêu cầu bỏ qua chính sách hoặc tiết lộ thông tin cá nhân; chuyển nhân viên khi cần.'}
+    matches = re.findall(r'\bD\d{3}\b', text, re.I)
+    if len(set(x.upper() for x in matches)) > 1:
+        return {'output': 'Có nhiều mã đơn; vui lòng xác nhận một mã đơn.'}
+    if not matches:
+        return {'output': 'Vui lòng cung cấp mã đơn và tên món thiếu; chưa có căn cứ xử lý.'}
+    try:
+        order = get_order(matches[0].upper())
+        if not order:
+            return {'output': 'Không tìm thấy đơn; vui lòng kiểm tra mã hoặc liên hệ nhân viên.'}
+        found = [item for item in order['items'] if item['name'].lower() in s]
+        if len(found) != 1:
+            return {'output': 'Vui lòng xác nhận đúng một món thiếu thuộc đơn; không tự suy đoán.'}
+        item = found[0]
+        policy = get_policy()
+        # Model giả trả JSON quyết định; mọi giá trị đều được kiểm lại bằng code.
+        reply = call_model('D1_MOCK_DECISION', json.dumps({'item': item['name'], 'price': item['price'], 'max_vnd': policy['max_vnd']}, ensure_ascii=False))
+        decision = json.loads(reply['text'])
+        limit = min(item['price'], policy['max_vnd'])
+        amount = decision.get('amount')
+        if decision.get('action') != 'propose' or decision.get('item') != item['name'] or type(amount) is not int or not 0 <= amount <= limit:
+            return {'output': 'Đề xuất không hợp lệ; chuyển nhân viên, không thực hiện giao dịch.'}
+        return {'output': f"Bản nháp mock: món {item['name']}, giá {item['price']} VND; đề xuất tối đa {amount} VND theo chính sách giả lập. Nhân viên quyết định; chưa hoàn tiền."}
+    except Exception:
+        return {'output': 'Không thể kiểm tra dữ liệu hoặc model; chuyển nhân viên, không thực hiện giao dịch.'}

@@ -4,20 +4,18 @@
 > Một trang. Mỗi dataset một mục. Dữ liệu chạy thử (bài mẫu, thông báo mẫu, đoạn transcript…) để trong thư mục `data/` này.
 > Không commit nguyên tài liệu khoá, dữ liệu cá nhân thật hay nguyên file data BTC cấp — chỉ đoạn trích ngắn, bản viết lại, hoặc số đã tổng hợp.
 
-## Dataset 1 · [tên]
+## Dataset 1 · Đơn và chính sách D1 giả lập
 
 | | |
 |---|---|
-| Dùng để làm gì | nguồn cho công cụ `…` · bộ câu thử · đào bằng chứng |
-| Từ đâu | data BTC cấp (`…` trong repo đề) · tài liệu khoá (trích / viết lại) · nhóm tự viết · sinh có seed |
-| Xử lý những bước gì | lọc __ · làm sạch __ · ẩn danh __ · chia __ (script: `…`) |
-| Số dòng / số đoạn | __ |
-| Phiên bản / ngày lấy | __ |
-| Nhãn | thật · `synthetic` |
-| Giới hạn | thiếu gì, lệch về phía nào |
+| Dùng để làm gì | nguồn cho công cụ và bộ thử; không dùng làm bằng chứng pain |
+| Từ đâu | Dữ liệu giả lập viết với hỗ trợ AI; không dùng data BTC hay đơn thật |
+| Xử lý những bước gì | Viết tay JSON; không dùng ngẫu nhiên nên không có seed; không chia tập |
+| Số dòng / số đoạn | 2 đơn, 4 món, 1 chính sách |
+| Phiên bản / ngày lấy | bản nháp CP2 |
+| Nhãn | `synthetic` |
+| Giới hạn | chỉ hai đơn, chưa phản ánh phân bố thực; không chứa dữ liệu cá nhân. Schema: orders[id, items[name, price]], policy[max_vnd, description]; giá VND. Kiểm tra cấu trúc và số lượng bằng code; chưa có kết quả kiểm tra thủ công của thành viên. |
 
-**Data `synthetic` (nhóm tự sinh):** ghi cách sinh (prompt / script), seed, người kiểm, số dòng đã kiểm tay. Data tự dựng **không phải bằng chứng pain**.
+**Data `synthetic` (nhóm tự sinh):** viết tay; seed không áp dụng; người kiểm và số dòng đã kiểm tay: chưa xác nhận. Data tự dựng **không phải bằng chứng pain**.
 
-## Dataset 2 · [tên]
-
-…
+## Dataset 2 · Chưa có

@@ -45,6 +45,12 @@ API_KEY = (os.environ.get("API_KEY") or "").strip()
 
 @model_call
 def call_model(system: str, user: str) -> dict:
+    if MODEL_PROVIDER == "fake" and system == "D1_MOCK_DECISION":
+        # Mock phân loại một tình huống đã được kiểm tra; không gọi API.
+        import json
+        data = json.loads(user)
+        decision = {"action": "propose", "item": data["item"], "amount": min(data["price"], data["max_vnd"])}
+        return {"text": json.dumps(decision, ensure_ascii=False), "model": "fake", "tokens_in": 0, "tokens_out": 0}
     if MODEL_PROVIDER == "fake":
         last = (user.strip().splitlines() or [""])[-1]
         return {"text": "[câu trả lời giả — chưa nối model] " + last[:60], "model": "fake", "tokens_in": 0, "tokens_out": 0}
