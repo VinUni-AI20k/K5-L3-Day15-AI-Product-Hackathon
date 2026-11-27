@@ -1,0 +1,35 @@
+{
+  "status": "Đoạn tài liệu MẪU do nhóm tự viết lại, ngắn, chỉ để chạy thử và chấm. Chưa phải trích từ tài liệu khoá thật.",
+  "passages": [
+    {
+      "code": "ON-01",
+      "title": "Hồi quy và phân loại",
+      "text": "Trong ví dụ này, hồi quy tuyến tính dự đoán một giá trị số liên tục. Mô hình phân loại dự đoán nhãn."
+    },
+    {
+      "code": "ON-02",
+      "title": "Tập test",
+      "text": "Tập test được giữ riêng, không dùng để huấn luyện. Kết quả trên tập test giúp đánh giá mô hình dự đoán tốt đến đâu trên dữ liệu mới."
+    },
+    {
+      "code": "ON-03",
+      "title": "Quá khớp",
+      "text": "Quá khớp (overfitting) xảy ra khi mô hình học quá sát dữ liệu huấn luyện, kể cả nhiễu. Khi đó điểm trên tập huấn luyện cao nhưng điểm trên dữ liệu mới thấp."
+    },
+    {
+      "code": "ON-04",
+      "title": "Tập validation",
+      "text": "Tập validation được tách khỏi tập huấn luyện để chọn siêu tham số và so sánh các mô hình trong lúc phát triển. Tập test chỉ dùng sau cùng để đánh giá lần cuối."
+    },
+    {
+      "code": "ON-05",
+      "title": "Gradient descent",
+      "text": "Gradient descent cập nhật tham số theo hướng làm giảm hàm mất mát. Tốc độ học (learning rate) quyết định bước cập nhật: quá lớn có thể không hội tụ, quá nhỏ thì học rất chậm."
+    },
+    {
+      "code": "ON-06",
+      "title": "Chuẩn hoá dữ liệu",
+      "text": "Chuẩn hoá đưa các đặc trưng về cùng thang đo, ví dụ trừ trung bình rồi chia độ lệch chuẩn. Trung bình và độ lệch chuẩn phải tính từ tập huấn luyện rồi áp dụng cho tập test."
+    }
+  ]
+}
