@@ -8,6 +8,22 @@
 
 ---
 
+## Chạy bản chạy thử (web app)
+
+```bash
+python -m pip install -r requirements.txt
+copy .env.example .env        # macOS/Linux: cp — điền MODEL_PROVIDER=openai, MODEL_NAME=gpt-5.6-luna, API_KEY=...
+python codebase/server.py     # mở http://127.0.0.1:8020
+```
+
+1. **Tải file:** chọn page mặc định, kéo file `.xlsx`/`.csv` vào. Bấm "Tải file mẫu" để lấy `data/demo_products.xlsx` (30 dòng váy, có cài lỗi).
+2. **Bảng nháp:** mỗi dòng là bài nháp hoặc dòng bị đánh dấu (kèm lý do theo từng trường). Ở đây sửa bài, thêm/xoá ảnh, duyệt (cần ≥1 ảnh), bỏ, hoặc sửa dữ liệu rồi soạn lại. Phím: ↑/↓ chuyển dòng, A duyệt.
+3. **Lịch đăng:** bài đã duyệt nằm ở khung giờ trống gần nhất của page.
+
+- Luồng mỗi dòng (sơ đồ ở `spec.md` §4): kiểm dòng (code) → kiểm tồn kho (code) → 1 lần gọi AI (viết hay đánh dấu) → soát bài (code) → viết lại ≤1 lần.
+- Cột của file sản phẩm: `ma_sp, ten_sp, loai, gia_ban, gia_te, size, mau, chat_lieu, mo_ta, anh, page, prompt`. Tên cột quen của shop (`Mã`, `Giá bán (theo ẢNH)`, `Màu 1..5`, `Link ảnh info`…) cũng đọc được.
+- Cột `anh` nhận link ảnh, link Google Drive, `=IMAGE("…")` và JSON ảnh Drive.
+- Test: `python -m pytest tests -q`. Dựng lại data từ file Excel gốc (để ngoài repo): `python scripts/build_data.py --raw ..`.
 
 ## Nhóm làm gì, khung làm gì
 
@@ -84,8 +100,12 @@ Nhóm dùng stack khác (Node, Streamlit, notebook…): sửa hàm `run_app()` t
 
 | Thành phần | Thật / Giả | Ghi chú |
 |---|---|---|
-| Lời gọi AI ở quyết định trung tâm | **Thật** (bắt buộc từ CP3) | Model: ____ |
-|  |  |  |
+| Lời gọi AI ở quyết định trung tâm | **Thật** (bắt buộc từ CP3) | Model: `gpt-5.6-luna` (OpenAI), 1 lần gọi / dòng, viết lại ≤1 lần |
+| Dữ liệu sản phẩm demo (`data/demo_products.xlsx`) | **Thật**, có sửa | 30 dòng váy lấy từ catalog hàng order của shop (mã, giá, size, màu, chất liệu, ảnh thật). ~1/2 số dòng được sửa có chủ đích để cài lỗi — xem `data/demo_products_answer_key.csv` |
+| Ảnh sản phẩm | **Thật** | Link ảnh công khai của shop (Google Drive). Ảnh không tải được bị bỏ khi dựng data và khi xử lý từng dòng |
+| Tồn kho (`data/inventory.csv`) | **Giả** (dựng, seed 42) | Thay POS thật; người dùng tải file tồn mới được trong app |
+| Giọng page, giá sàn, khung giờ (`data/pages.json`) | Dựng từ quy định thật | Tên page đã đổi; giá sàn, khung giờ giữ đúng mức của page gốc |
+| Lên lịch đăng | Lịch trong app | Facebook Graph API (bài hẹn giờ, chưa đăng) chỉ chạy khi `.env` có token Fanpage thử — chưa thử với Fanpage thật |
 
 ## Dùng AI vào việc gì
 

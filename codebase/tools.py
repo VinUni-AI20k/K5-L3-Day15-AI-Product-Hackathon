@@ -1,18 +1,173 @@
-"""Công cụ của bài toán — NHÓM VIẾT. Điền ở guide bước 2.2 (thiết kế) và 3.2 (code).
+"""Công cụ của bài toán. Mỗi công cụ một hàm có @tool (khung tự ghi vào trace).
 
-Mỗi công cụ là một hàm Python có @tool. Docstring ghi đúng 4 ý như sơ đồ ở spec.md §4:
-    tên · input · output · có tác động ra ngoài không (gửi tin, sửa dữ liệu, chấm điểm…)
-Khung tự ghi mỗi lần gọi công cụ vào trace (tên, input, output rút gọn, thời gian, lỗi).
-
-Số công cụ, kiểu công cụ do thiết kế của nhóm quyết định — có bài chỉ cần một công cụ tra cứu.
-Công cụ có tác động ra ngoài: KHÔNG tự làm. Trả về bản nháp chờ người duyệt (guide bước 2.2, "chỗ người duyệt").
-Dữ liệu công cụ đọc (bài mẫu, thông báo mẫu, lịch…): để trong data/ và mô tả ở data/DATA_CARD.md.
+Docstring: tên · input · output · có tác động ra ngoài không. Luật nằm ở rules.py (hàm thuần, có test).
 """
-from tracing import tool, TOOLS  # noqa: F401  (TOOLS: danh sách công cụ đã đăng ký, dùng khi viết vòng lặp agent)
+import json
+import os
+import re
+
+import rules
+from tracing import tool, TOOLS  # noqa: F401
+
+GLOB, PAGES = rules.load_config()
+DEFAULT_PAGE = "diu-may"
+_inv = {"key": None, "data": {}}
+DEMO_INVENTORY = os.path.join(rules.DATA, "inventory.csv")          # tồn dựng, có trong repo
+LOCAL_INVENTORY = os.path.join(rules.DATA, "inventory.local.csv")   # file tồn người dùng tải lên (không commit)
+INV_ALIASES = {"ma_sp": ["ma_sp", "ma", "ma san pham", "ma hang"], "mau": ["mau", "mau sac"], "size": ["size", "kich co"],
+               "ton": ["ton", "co the ban", "so luong", "ton kho"], "trang_thai": ["trang_thai", "trang thai", "luu y nhan sx 1c"]}
+
+
+def inventory_path():
+    return LOCAL_INVENTORY if os.path.exists(LOCAL_INVENTORY) else DEMO_INVENTORY
+
+
+def inventory():
+    """Đọc lại file tồn khi file đổi (người dùng tải file tồn mới qua API)."""
+    path = inventory_path()
+    key = (path, os.path.getmtime(path)) if os.path.exists(path) else None
+    if key != _inv["key"]:
+        _inv.update(key=key, data=rules.load_inventory(path))
+    return _inv["data"]
+
+
+def save_inventory(data, filename):
+    """File tồn mới (.csv/.xlsx: mã, màu, size, tồn, trạng thái) → data/inventory.local.csv. Trả số biến thể."""
+    import csv
+    import io
+    if filename.lower().endswith((".xlsx", ".xlsm")):
+        import openpyxl
+        ws = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True).worksheets[0]
+        rows = [[rules._cell(c) for c in r] for r in ws.iter_rows(values_only=True)]
+    elif filename.lower().endswith(".csv"):
+        rows = list(csv.reader(io.StringIO(data.decode("utf-8-sig"))))
+    else:
+        raise ValueError("chỉ nhận .xlsx hoặc .csv")
+    rows = [r for r in rows if any(str(c).strip() for c in r)]
+    if len(rows) < 2:
+        raise ValueError("file tồn trống")
+    alias = {a: k for k, v in INV_ALIASES.items() for a in v}
+    head = [alias.get(rules.fold(h)) for h in rows[0]]
+    if "ma_sp" not in head or "ton" not in head:
+        raise ValueError("file tồn cần ít nhất cột mã sản phẩm và tồn")
+    out = []
+    for r in rows[1:]:
+        d = {k: str(v).strip() for k, v in zip(head, r) if k}
+        try:
+            d["ton"] = int(float(d.get("ton") or 0))
+        except ValueError:
+            raise ValueError("cột tồn có giá trị không phải số: %r" % d.get("ton"))
+        if d.get("ma_sp"):
+            out.append(d)
+    with open(LOCAL_INVENTORY, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["ma_sp", "mau", "size", "ton", "trang_thai"], extrasaction="ignore")
+        w.writeheader()
+        w.writerows(out)
+    return len(out)
+
+
+def page_for(row, default=None):
+    """Cột page của dòng thắng nếu khớp; trống/lạ → page mặc định (kèm cảnh báo)."""
+    pid = (row.get("page") or "").strip()
+    if pid in PAGES:
+        return PAGES[pid], None
+    for p in PAGES.values():  # cho phép ghi tên page thay vì id
+        if pid and rules.fold(pid) == rules.fold(p["name"]):
+            return p, None
+    d = PAGES.get(default) or PAGES[DEFAULT_PAGE]
+    return d, (("page", "page '%s' không có — dùng page %s" % (pid, d["name"])) if pid else None)
 
 
 @tool
-def search_example(query: str) -> list:
-    """(ví dụ — thay bằng công cụ của nhóm) Tra dữ liệu mẫu theo câu hỏi.
-    Input: câu hỏi (str). Output: danh sách đoạn {"code", "text"}. Không tác động ra ngoài."""
-    return [{"code": "VD-1", "text": "(ví dụ) đoạn dữ liệu giả — thay bằng dữ liệu thật của bài toán"}]
+def read_products(data: bytes, filename: str) -> list:
+    """read_products · input: nội dung file .xlsx/.csv + tên file · output: danh sách dòng đã chuẩn hoá tên cột
+    · không tác động ra ngoài. Lỗi định dạng → ValueError."""
+    return rules.read_table(data, filename)
+
+
+@tool
+def check_product(row: dict, page: dict) -> dict:
+    """check_product · input: 1 dòng + page · output: {"hard": [(trường, vấn đề)], "warn": [...]} · không tác động ra ngoài."""
+    return rules.check_product(row, page, GLOB)
+
+
+@tool
+def check_stock(row: dict) -> dict:
+    """check_stock · input: 1 dòng (mã, màu, size) · output: lỗi hết hàng / màu, size còn tồn / cảnh báo sắp hết
+    · không tác động ra ngoài (chỉ đọc data/inventory.csv)."""
+    return rules.check_stock(row, inventory())
+
+
+@tool
+def verify_post(text: str, allowed: dict) -> dict:
+    """verify_post · input: bài + dữ kiện được phép · output: {"block": [...], "warn": [...]} · không tác động ra ngoài."""
+    return rules.verify_post(text, allowed)
+
+
+@tool
+def save_drafts(batch_id: int, results: list) -> int:
+    """save_drafts · input: mã lô + kết quả từng dòng · output: số dòng đã lưu · chỉ ghi DB nội bộ của app."""
+    import store
+    for r in results:
+        store.save_result(r["row_id"], r["result"])
+    return len(results)
+
+
+UPLOADS = os.path.join(rules.DATA, "uploads")           # ảnh người dùng tải lên trong app (không commit)
+
+
+@tool
+def check_images(urls: list) -> dict:
+    """check_images · input: danh sách link ảnh · output: {"ok": [...], "broken": [...]} — ảnh không tải được
+    (lỗi mạng, không phải ảnh, không công khai) vào broken · chỉ đọc (GET link ảnh), không tác động ra ngoài."""
+    import httpx
+    ok, broken = [], []
+    with httpx.Client(timeout=10, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"}) as c:
+        for url in urls:
+            path = local_image(url)
+            if path:
+                (ok if os.path.exists(path) else broken).append(url)
+                continue
+            try:
+                with c.stream("GET", url) as r:
+                    good = r.status_code == 200 and r.headers.get("content-type", "").startswith("image/")
+            except httpx.HTTPError:
+                good = False
+            (ok if good else broken).append(url)
+    return {"ok": ok, "broken": broken}
+
+
+def local_image(url):
+    """'/uploads/x.png' (ảnh tải lên trong app) → đường dẫn file trên máy; link ngoài → None."""
+    m = re.match(r"/uploads/([\w.-]+)$", url or "")
+    return os.path.join(UPLOADS, m.group(1)) if m else None
+
+
+@tool
+def schedule_post(text: str, when_ts: int, images: list) -> dict:
+    """schedule_post · input: bài đã DUYỆT + thời điểm (unix) + danh sách ảnh · output: {"mode": "app"|"facebook", "fb_post_id"}
+    · CÓ tác động ra ngoài khi .env có FB_PAGE_ID + FB_PAGE_TOKEN: tải ảnh lên Fanpage thử ở dạng chưa đăng, rồi tạo
+    bài HẸN GIỜ (published=false) kèm các ảnh đó, huỷ được. Chỉ được gọi từ nút Duyệt của người, agent không tự gọi."""
+    page_id, token = os.environ.get("FB_PAGE_ID", "").strip(), os.environ.get("FB_PAGE_TOKEN", "").strip()
+    if not (page_id and token):
+        return {"mode": "app", "fb_post_id": None}
+    import httpx
+    base = "https://graph.facebook.com/%s/%s" % (os.environ.get("FB_GRAPH_VERSION", "v23.0"), page_id)
+    media = []
+    with httpx.Client(timeout=60) as c:
+        for url in images:
+            data = {"published": "false", "temporary": "true", "access_token": token}
+            path = local_image(url)
+            if path:
+                with open(path, "rb") as f:
+                    r = c.post(base + "/photos", data=data, files={"source": (os.path.basename(path), f)})
+            else:
+                r = c.post(base + "/photos", data=dict(data, url=url))
+            r.raise_for_status()
+            media.append(r.json()["id"])
+        body = {"message": text, "published": "false", "scheduled_publish_time": str(when_ts), "access_token": token}
+        for i, mid in enumerate(media):
+            body["attached_media[%d]" % i] = json.dumps({"media_fbid": mid})
+        r = c.post(base + "/feed", data=body)
+        r.raise_for_status()
+        return {"mode": "facebook", "fb_post_id": r.json().get("id")}

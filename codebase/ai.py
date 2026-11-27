@@ -17,6 +17,7 @@ Chế độ giả (mặc định khi .env chưa có MODEL_PROVIDER, hoặc MODEL
 Nối model thật: điền .env (chép từ .env.example), rồi viết nhánh gọi API ở dưới theo docs/connect-model.md
 (có ví dụ OpenAI, Claude, model chạy trên máy, và cách nối nhà cung cấp khác). Không dán API key vào file này.
 """
+import json
 import os
 
 from tracing import model_call
@@ -43,14 +44,33 @@ MODEL_NAME = (os.environ.get("MODEL_NAME") or "").strip()
 API_KEY = (os.environ.get("API_KEY") or "").strip()
 
 
-@model_call
-def call_model(system: str, user: str) -> dict:
-    if MODEL_PROVIDER == "fake":
-        last = (user.strip().splitlines() or [""])[-1]
-        return {"text": "[câu trả lời giả — chưa nối model] " + last[:60], "model": "fake", "tokens_in": 0, "tokens_out": 0}
+_client = None
 
-    # NHÓM VIẾT: gọi model thật ở đây (theo MODEL_PROVIDER, MODEL_NAME, API_KEY) rồi trả đúng 4 khoá.
-    # Ví dụ chép được cho từng nhà cung cấp: docs/connect-model.md mục 2.
-    raise NotImplementedError(
-        "chưa viết phần gọi model thật cho MODEL_PROVIDER=%s trong codebase/ai.py — xem docs/connect-model.md"
-        % MODEL_PROVIDER)
+
+@model_call
+def call_model(system: str, user: str, schema: dict = None) -> dict:
+    """schema (tuỳ chọn): JSON schema — model bắt buộc trả JSON đúng schema (OpenAI structured outputs)."""
+    if MODEL_PROVIDER == "fake":
+        if schema:  # chế độ giả vẫn trả JSON hợp lệ để luồng chạy hết
+            text = json.dumps({"decision": "write", "flag_reasons": [], "hook": "[bài giả — chưa nối model]",
+                               "body": "", "cta": "", "hashtags": [], "facts_used": []}, ensure_ascii=False)
+        else:
+            text = "[câu trả lời giả — chưa nối model] " + (user.strip().splitlines() or [""])[-1][:60]
+        return {"text": text, "model": "fake", "tokens_in": 0, "tokens_out": 0}
+
+    if MODEL_PROVIDER == "openai":
+        global _client
+        if _client is None:
+            from openai import OpenAI
+            _client = OpenAI(api_key=API_KEY, timeout=90)
+        kw = {}
+        if schema:
+            kw["response_format"] = {"type": "json_schema", "json_schema": {"name": "result", "strict": True, "schema": schema}}
+        r = _client.chat.completions.create(
+            model=MODEL_NAME, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            max_completion_tokens=4000, **kw)
+        # model = tên đã cấu hình (không lấy bản có ngày) để khớp bảng giá trong cost/personas.yaml
+        return {"text": r.choices[0].message.content or "", "model": MODEL_NAME,
+                "tokens_in": r.usage.prompt_tokens, "tokens_out": r.usage.completion_tokens}
+
+    raise NotImplementedError("MODEL_PROVIDER=%s chưa hỗ trợ — dùng openai hoặc fake" % MODEL_PROVIDER)

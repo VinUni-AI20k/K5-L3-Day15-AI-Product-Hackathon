@@ -35,13 +35,57 @@ Data BTC cấp đã dùng (nếu có — không commit nguyên file): __
 ## §4. Thiết kế *(guide 2.2, 3.2)*
 - **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả):
 - Không làm (≥3 điều):
-- **Sơ đồ** (ảnh / Mermaid / draw.io): [chèn ở đây]
-- **Hình dạng:** [ ] workflow cố định · [ ] một agent · [ ] nhiều agent — 2 dòng lý do, và vì sao **không** chọn hình dạng phức tạp hơn:
+- **Sơ đồ** (Mermaid, GitHub tự vẽ):
+
+```mermaid
+flowchart TD
+  U["👤 Nhân viên soạn bài<br/>chọn page mặc định, tải file Excel/CSV"] --> R["read_products · code<br/>đọc file, gộp tên cột, tách từng dòng"]
+  R -->|mỗi dòng| C1["① check_product · code<br/>thiếu giá/size · giá sai dạng · giá dưới giá tệ × 13.500<br/>dưới giá sàn page · mô tả mâu thuẫn · prompt đòi 'chính hãng', chèn lệnh<br/><i>căn cứ: pages.json</i>"]
+  C1 -->|ok| C2["② check_stock · code<br/>tra tồn từng màu × size, trạng thái sản xuất<br/><i>căn cứ: inventory.csv</i>"]
+  C2 -->|còn hàng: chỉ giữ màu/size còn tồn| W["③ write_or_flag · AI (gpt-5.6-luna)<br/>1 lần gọi, JSON: viết hay đánh dấu + lý do + bài + dữ kiện đã dùng<br/><i>căn cứ: dữ kiện của dòng, giọng page, bài mẫu đã đăng</i>"]
+  W -->|viết| V["④ verify_post · code<br/>giá lệch ≤ 2% · màu/size/chất liệu phải có trong dòng<br/>cụm cấm · tên thương hiệu · freeship/giảm giá chỉ khi file có"]
+  V -->|lỗi lần 1: gửi lại danh sách SỬA LỖI BẮT BUỘC| W
+  V -->|sạch| D["📝 Bài nháp<br/>+ khối cam kết cố định do code gắn"]
+
+  C1 -->|lỗi cứng, không gọi AI| F["🚩 Dòng bị đánh dấu<br/>lý do theo từng trường, không bịa"]
+  C2 -->|hết hàng / mã không có trong kho| F
+  W -->|đánh dấu| F
+  V -->|vẫn lỗi sau lần 2| F
+
+  D --> T[("save_drafts · SQLite<br/>bảng nháp của lô")]
+  F --> T
+  T --> H{"👤 Nhân viên duyệt<br/>sửa · duyệt · bỏ · viết lại"}
+  H -->|duyệt| S["schedule_post · code<br/>khung giờ trống gần nhất của page, sau ≥ 10 phút"]
+  H -->|bỏ, hoặc dòng bị đánh dấu| X["Không lên lịch"]
+  S --> CAL["📅 Lịch đăng trong app"]
+  S -.->|chỉ khi .env có token Fanpage thử| FB["Facebook Graph API<br/>bài hẹn giờ, chưa đăng, huỷ được"]
+
+  classDef code fill:#e3ecf8,stroke:#2f5a8f,color:#14243a
+  classDef llm fill:#ece3fa,stroke:#6a3fa0,color:#22123a
+  classDef human fill:#fdf0cf,stroke:#9a6700,color:#2b1d00
+  classDef stop fill:#fbe1dd,stroke:#b3261e,color:#3a0d0a
+  classDef ok fill:#e2f2e2,stroke:#2e7d32,color:#0f2a10
+  classDef ext fill:#ffffff,stroke:#6b6b6b,stroke-dasharray:4 3,color:#222222
+  class R,C1,C2,V,T,S code
+  class W llm
+  class U,H human
+  class F,X stop
+  class D,CAL ok
+  class FB ext
+```
+
+  Màu: xanh dương = code xác định · tím = AI (chỗ duy nhất gọi model) · vàng = người · đỏ = chỗ chặn · viền đứt = tác động ra ngoài. Ảnh cho slide: [docs/kien-truc-ai.png](docs/kien-truc-ai.png).
+- **Hình dạng:** [x] workflow cố định · [ ] một agent · [ ] nhiều agent — Mỗi dòng sản phẩm luôn đi cùng một chuỗi bước. AI chỉ có một quyết định: viết hay đánh dấu, và viết thế nào. Giá, tồn kho, luật đăng bài là việc sai thì mất tiền, nên do code làm và luôn chạy, không để AI tự chọn có gọi hay không. **Không chọn một agent tự gọi công cụ**: model có thể bỏ qua bước kiểm giá, kiểm tồn, và số bước mỗi dòng không cố định nên khó tính chi phí. **Không chọn nhiều agent** (lập kế hoạch → viết → kiểm duyệt): mỗi dòng đã tự nói cần viết gì, nên vai lập kế hoạch không có việc. Vai kiểm duyệt đã là code `verify_post`, chạy chắc chắn và rẻ hơn một agent.
 - **AI dựa vào đâu** — mỗi công cụ (khớp `codebase/tools.py`):
 
   | Công cụ | Input | Output | Tác động ra ngoài? |
   |---|---|---|---|
-  |  |  |  |  |
+  | `read_products` | file Excel / CSV | danh sách dòng đã chuẩn hoá tên cột + dòng lỗi định dạng | Không |
+  | `check_product` | 1 dòng + page | lỗi cứng / cảnh báo theo từng trường (giá, size, mâu thuẫn, prompt cấm) | Không |
+  | `check_stock` | mã, màu, size của dòng | tồn từng biến thể, màu/size còn hàng, lỗi hết hàng | Không |
+  | `verify_post` | bài + dòng (đã thu hẹp theo tồn) | lỗi chặn / cảnh báo | Không |
+  | `save_drafts` | kết quả từng dòng | bản nháp trong SQLite của app | Không (chỉ DB nội bộ) |
+  | `schedule_post` | bài đã duyệt + page | giờ đăng; id bài hẹn giờ trên Fanpage thử nếu có token | **Có**: chỉ chạy khi nhân viên bấm duyệt; tạo bài hẹn giờ (`published=false`), huỷ được |
 
 - **Mức tự động:** [ ] AI gợi ý, người quyết · [ ] AI tự làm khi chắc, chuyển người khi không · [ ] AI tự làm — lý do (sai thì ai chịu gì, sửa đắt hay rẻ):
 - **Chỗ chặn rủi ro** (rủi ro lớn nhất của lát cắt bị chặn ở đâu, bằng gì):
