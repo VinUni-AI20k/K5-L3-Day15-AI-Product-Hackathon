@@ -9,7 +9,7 @@ import { makeHealthcheckTenant, type HealthcheckTenantInput } from "../healthche
 import { testTenantId } from "@/core/domain/tenant-context.testing";
 
 const DEMO_ID = testTenantId("00000000-0000-0000-0000-000000000001");
-const FROZEN_AT = new Date("2026-08-12T03:04:05.000Z");
+const FROZEN_AT = new Date("2054-08-12T03:04:05.000Z");
 
 function fakeClock(at: Date = FROZEN_AT): Clock {
   return { now: () => at, nowMs: () => at.getTime() };
@@ -114,7 +114,7 @@ describe("healthcheckTenant — happy path", () => {
       tenantId: DEMO_ID,
       name: "Demo Tenant",
       status: "active",
-      checkedAt: "2026-08-12T03:04:05.000Z",
+      checkedAt: "2054-08-12T03:04:05.000Z",
     });
     // Trimmed id must reach the repo, not the padded input.
     expect(repo.findById).toHaveBeenCalledWith(DEMO_ID);

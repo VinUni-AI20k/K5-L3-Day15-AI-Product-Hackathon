@@ -48,8 +48,8 @@ function recordingLogger(lines: LogLine[]): Logger {
 }
 
 const CLOCK: Clock = {
-  now: () => new Date("2026-08-13T02:00:00.000Z"),
-  nowMs: () => Date.parse("2026-08-13T02:00:00.000Z"),
+  now: () => new Date("2054-08-13T02:00:00.000Z"),
+  nowMs: () => Date.parse("2054-08-13T02:00:00.000Z"),
 };
 
 function makeJob(overrides: Partial<PostJob> = {}): PostJob {

@@ -23,7 +23,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
  */
 
 const TENANT = testTenantId("11111111-1111-4111-8111-111111111111");
-const NOW = new Date("2026-08-17T10:00:00.000Z");
+const NOW = new Date("2054-08-17T10:00:00.000Z");
 
 interface LogLine {
   level: string;

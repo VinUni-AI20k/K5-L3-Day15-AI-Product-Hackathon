@@ -30,21 +30,21 @@ import {
  * out of a URL somebody edited by hand.
  */
 
-const NOW = new Date("2026-08-13T10:00:00+07:00").getTime();
+const NOW = new Date("2054-08-13T10:00:00+07:00").getTime();
 
 describe("isDateOnly", () => {
   it("rejects non-strings, wrong shapes and impossible days", () => {
     expect(isDateOnly(undefined)).toBe(false);
     expect(isDateOnly("")).toBe(false);
     expect(isDateOnly("2026-8-13")).toBe(false);
-    expect(isDateOnly("13/08/2026")).toBe(false);
+    expect(isDateOnly("13/08/2054")).toBe(false);
     expect(isDateOnly("2026-02-31")).toBe(false);
     expect(isDateOnly("2026-13-01")).toBe(false);
   });
 
   it("accepts a real calendar day", () => {
-    expect(isDateOnly("2026-08-13")).toBe(true);
-    expect(isDateOnly("2028-02-29")).toBe(true);
+    expect(isDateOnly("2054-08-13")).toBe(true);
+    expect(isDateOnly("2056-02-29")).toBe(true);
   });
 });
 
@@ -59,18 +59,18 @@ describe("parseScheduledFilter", () => {
 
   it("drops an inverted window rather than returning an empty list forever", () => {
     const filter = parseScheduledFilter(
-      new URLSearchParams({ from: "2026-08-20", to: "2026-08-10" }),
+      new URLSearchParams({ from: "2054-08-20", to: "2054-08-10" }),
     );
-    expect(filter.from).toBe("2026-08-20");
+    expect(filter.from).toBe("2054-08-20");
     expect(filter.to).toBeNull();
   });
 
   it("round-trips through the query-string builder", () => {
     const filter = parseScheduledFilter(
-      new URLSearchParams({ channelId: "fbpage-a", from: "2026-08-13", to: "2026-08-14" }),
+      new URLSearchParams({ channelId: "fbpage-a", from: "2054-08-13", to: "2054-08-14" }),
     );
     expect(scheduledSearchParams(filter).toString()).toBe(
-      "channelId=fbpage-a&from=2026-08-13&to=2026-08-14",
+      "channelId=fbpage-a&from=2054-08-13&to=2054-08-14",
     );
     expect(scheduledSearchParams({ channelId: null, from: null, to: null }).toString()).toBe("");
   });
@@ -82,12 +82,12 @@ describe("isMonthKey", () => {
     expect(isMonthKey("2026-00")).toBe(false);
     expect(isMonthKey("2026-13")).toBe(false);
     expect(isMonthKey("2026-8")).toBe(false);
-    expect(isMonthKey("2026-08-13")).toBe(false);
+    expect(isMonthKey("2054-08-13")).toBe(false);
   });
 
   it("accepts a padded month", () => {
-    expect(isMonthKey("2026-01")).toBe(true);
-    expect(isMonthKey("2026-12")).toBe(true);
+    expect(isMonthKey("2054-01")).toBe(true);
+    expect(isMonthKey("2054-12")).toBe(true);
   });
 });
 
@@ -108,9 +108,9 @@ describe("parseScheduledView", () => {
   it("reads the calendar with its anchored month and open day", () => {
     expect(
       parseScheduledView(
-        new URLSearchParams({ "che-do": "lich", thang: "2026-08", ngay: "2026-08-13" }),
+        new URLSearchParams({ "che-do": "lich", thang: "2054-08", ngay: "2054-08-13" }),
       ),
-    ).toEqual({ view: "calendar", month: "2026-08", day: "2026-08-13" });
+    ).toEqual({ view: "calendar", month: "2054-08", day: "2054-08-13" });
   });
 
   it("keeps the view even when the month is unusable — the screen resolves one", () => {
@@ -124,11 +124,11 @@ describe("parseScheduledView", () => {
   it("round-trips through the query-string builder, and the list carries no calendar cruft", () => {
     const filter = parseScheduledFilter(new URLSearchParams({ channelId: "fbpage-a" }));
     const view = parseScheduledView(
-      new URLSearchParams({ "che-do": "lich", thang: "2026-08", ngay: "2026-08-13" }),
+      new URLSearchParams({ "che-do": "lich", thang: "2054-08", ngay: "2054-08-13" }),
     );
 
     const query = scheduledSearchParams(filter, view);
-    expect(query.toString()).toBe("channelId=fbpage-a&che-do=lich&thang=2026-08&ngay=2026-08-13");
+    expect(query.toString()).toBe("channelId=fbpage-a&che-do=lich&thang=2054-08&ngay=2054-08-13");
     expect(parseScheduledView(query)).toEqual(view);
 
     // Back to the list: the month and the open day mean nothing there.
@@ -145,8 +145,8 @@ describe("dayStartIso / dayEndIso", () => {
   });
 
   it("covers the whole selected day (end bound is the next midnight)", () => {
-    const start = dayStartIso("2026-08-13");
-    const end = dayEndIso("2026-08-13");
+    const start = dayStartIso("2054-08-13");
+    const end = dayEndIso("2054-08-13");
     expect(start).not.toBeNull();
     expect(end).not.toBeNull();
     expect(new Date(end as string).getTime() - new Date(start as string).getTime()).toBe(
@@ -234,8 +234,8 @@ describe("formatScheduledTime", () => {
     // ignores `scheduledAt`. Two rows a day apart would compare equal and the
     // caveat would go missing; only the per-day rendering keeps that off the
     // table.
-    const today = formatScheduledTime("2026-08-13T20:00:00+07:00");
-    expect(today).toBe(formatScheduledTime("2026-08-14T20:00:00+07:00"));
+    const today = formatScheduledTime("2054-08-13T20:00:00+07:00");
+    expect(today).toBe(formatScheduledTime("2054-08-14T20:00:00+07:00"));
     // …and it really is the hour that came back, not an empty string.
     expect(today).toMatch(/^\d{2}:\d{2}$/);
   });
@@ -266,9 +266,9 @@ describe("groupScheduledByDay", () => {
   });
 
   it("keeps the timeline order and starts a new group per local day", () => {
-    const first = new Date(2026, 7, 13, 9, 0).toISOString();
-    const second = new Date(2026, 7, 13, 18, 0).toISOString();
-    const third = new Date(2026, 7, 14, 8, 0).toISOString();
+    const first = new Date(2054, 7, 13, 9, 0).toISOString();
+    const second = new Date(2054, 7, 13, 18, 0).toISOString();
+    const third = new Date(2054, 7, 14, 8, 0).toISOString();
 
     const groups = groupScheduledByDay([
       entry("a", first),
@@ -292,7 +292,7 @@ describe("a post Facebook is holding (E8.6)", () => {
     channelId: "fbpage-a",
     format: "image_post",
     status: "scheduled_on_facebook",
-    scheduledAt: "2026-08-14T02:00:00.000Z",
+    scheduledAt: "2054-08-14T02:00:00.000Z",
     startsInMs: 3_600_000,
     overdue: false,
     captionPreview: "Váy hoa mùa hè…",
@@ -300,7 +300,7 @@ describe("a post Facebook is holding (E8.6)", () => {
     userMessage: "Facebook đã nhận lịch và sẽ tự đăng.",
     canReschedule: false,
     canCancel: true,
-    createdAt: "2026-08-13T02:00:00.000Z",
+    createdAt: "2054-08-13T02:00:00.000Z",
   };
 
   it("parses instead of breaking the screen", () => {
@@ -346,7 +346,7 @@ describe("a post Facebook is holding (E8.6)", () => {
       batchId: "batch-1",
       channelId: "fbpage-a",
       status: "blocked",
-      scheduledAt: "2026-08-14T02:00:00.000Z",
+      scheduledAt: "2054-08-14T02:00:00.000Z",
       queueEntryRemoved: false,
       userMessage: "Đã huỷ.",
     };

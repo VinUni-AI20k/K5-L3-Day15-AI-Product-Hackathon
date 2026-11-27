@@ -34,7 +34,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 
 const url = process.env.TEST_DATABASE_URL;
 
-const NOW = new Date("2026-08-17T10:00:00.000Z");
+const NOW = new Date("2054-08-17T10:00:00.000Z");
 const MINUTE = 60_000;
 
 describe.skipIf(!url)("DrizzlePostJobRepo.countUntouchedQueued (real database)", () => {

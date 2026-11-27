@@ -276,7 +276,7 @@ export function hasScheduledFilter(filter: ScheduledFilter): boolean {
 
 // --- Pure date <-> instant (only place that crosses the line) ---------------
 
-/** Start of that local day as an instant, e.g. "2026-08-13" -> 00:00 local. */
+/** Start of that local day as an instant, e.g. "2026-11-27" -> 00:00 local. */
 export function dayStartIso(dateOnly: string): string | null {
   if (!isDateOnly(dateOnly)) return null;
   const [year, month, day] = dateOnly.split("-").map(Number);
@@ -285,7 +285,7 @@ export function dayStartIso(dateOnly: string): string | null {
 
 /**
  * Exclusive upper bound covering the WHOLE selected day: the operator picking
- * "đến 13/08" means "kể cả 23:59 ngày 13/08", not "tới 00:00 ngày 13/08".
+ * "đến 27/11" means "kể cả 23:59 ngày 27/11", not "tới 00:00 ngày 27/11".
  */
 export function dayEndIso(dateOnly: string): string | null {
   if (!isDateOnly(dateOnly)) return null;
@@ -360,7 +360,7 @@ export function validateScheduleInput(value: string, nowMs: number): ScheduleInp
 
 // --- Display ----------------------------------------------------------------
 
-/** "13/08/2026 15:30" in the operator's own zone. */
+/** "27/11/2026 15:30" in the operator's own zone. */
 export function formatScheduledAt(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
@@ -371,7 +371,7 @@ export function formatScheduledAt(iso: string): string {
 }
 
 /**
- * "2026-08-13" -> "13/08/2026", for a date FIELD.
+ * "2026-11-27" -> "27/11/2026", for a date FIELD.
  *
  * Pure string work on purpose (core-form-inputs): a pure date must never go
  * through `new Date()`, which is the one and only cause of the classic
@@ -452,7 +452,7 @@ export function localDayKey(iso: string): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** "Hôm nay · Thứ Năm, 13/08/2026" — the heading of one day group. */
+/** "Hôm nay · Thứ Năm, 27/11/2026" — the heading of one day group. */
 export function formatDayHeading(dayKey: string, nowMs: number): string {
   if (!isDateOnly(dayKey)) return dayKey;
   const [year, month, day] = dayKey.split("-").map(Number);

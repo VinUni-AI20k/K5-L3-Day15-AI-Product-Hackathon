@@ -15,7 +15,7 @@ import type { ScheduledJobEntry } from "@/ui/schemas/scheduled.schema";
  * loading — is visible in server-rendered HTML.
  */
 
-const NOW = new Date(2026, 7, 13, 10, 0).getTime();
+const NOW = new Date(2054, 7, 13, 10, 0).getTime();
 
 function entry(overrides: Partial<ScheduledJobEntry> = {}): ScheduledJobEntry {
   return {
@@ -26,7 +26,7 @@ function entry(overrides: Partial<ScheduledJobEntry> = {}): ScheduledJobEntry {
     channelId: "fb-1121597217877301",
     format: "image_post",
     status: "queued",
-    scheduledAt: new Date(2026, 7, 13, 20, 0).toISOString(),
+    scheduledAt: new Date(2054, 7, 13, 20, 0).toISOString(),
     startsInMs: 3_600_000,
     overdue: false,
     captionPreview: "Váy hoa mùa hè…",
@@ -34,7 +34,7 @@ function entry(overrides: Partial<ScheduledJobEntry> = {}): ScheduledJobEntry {
     userMessage: "Chờ tới giờ đăng.",
     canReschedule: true,
     canCancel: true,
-    createdAt: new Date(2026, 7, 12, 9, 0).toISOString(),
+    createdAt: new Date(2054, 7, 12, 9, 0).toISOString(),
     ...overrides,
   };
 }
@@ -156,7 +156,7 @@ describe("ScheduledJobTable folding", () => {
         entry({
           postJobId: "job-2",
           channelId: "fb-2",
-          scheduledAt: new Date(2026, 7, 13, 20, 5).toISOString(),
+          scheduledAt: new Date(2054, 7, 13, 20, 5).toISOString(),
         }),
       ],
       [channel(), OTHER],
@@ -171,7 +171,7 @@ describe("ScheduledJobTable folding", () => {
         entry({
           postJobId: "job-2",
           channelId: "fb-2",
-          scheduledAt: new Date(2026, 7, 13, 20, 0, 0, 41).toISOString(),
+          scheduledAt: new Date(2054, 7, 13, 20, 0, 0, 41).toISOString(),
         }),
       ],
       [channel(), OTHER],

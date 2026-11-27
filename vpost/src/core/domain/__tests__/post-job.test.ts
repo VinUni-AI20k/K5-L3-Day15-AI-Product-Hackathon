@@ -167,7 +167,7 @@ describe("transitionPostJob — allowed edges", () => {
       errorMessage: "Facebook từ chối bài đăng",
       publishedPostId: "123_456",
       publishedUrl: "https://facebook.com/123_456",
-      publishedAt: new Date("2026-08-13T02:00:00.000Z"),
+      publishedAt: new Date("2054-08-13T02:00:00.000Z"),
     });
     expect(next.status).toBe(to);
   });
@@ -198,7 +198,7 @@ describe("transitionPostJob — allowed edges", () => {
     const published = transitionPostJob(job, "published", {
       publishedPostId: " 123_456 ",
       publishedUrl: "https://facebook.com/123_456",
-      publishedAt: new Date("2026-08-13T02:00:00.000Z"),
+      publishedAt: new Date("2054-08-13T02:00:00.000Z"),
     });
     expect(published).toMatchObject({
       status: "published",
@@ -366,7 +366,7 @@ describe("postJobOperatorMessage", () => {
 // --- Scheduling (E8) --------------------------------------------------------
 
 describe("evaluateScheduledAt", () => {
-  const NOW = Date.parse("2026-08-13T02:00:00.000Z");
+  const NOW = Date.parse("2054-08-13T02:00:00.000Z");
 
   it.each([
     ["null", null],
@@ -397,9 +397,9 @@ describe("evaluateScheduledAt", () => {
   });
 
   it("accepts an ISO string (a JSON body never carries a Date)", () => {
-    const verdict = evaluateScheduledAt("2026-08-13T03:00:00.000Z", NOW);
+    const verdict = evaluateScheduledAt("2054-08-13T03:00:00.000Z", NOW);
     expect(verdict.ok).toBe(true);
-    expect(verdict.at?.toISOString()).toBe("2026-08-13T03:00:00.000Z");
+    expect(verdict.at?.toISOString()).toBe("2054-08-13T03:00:00.000Z");
   });
 
   it("gives every rejection a Vietnamese sentence", () => {
@@ -411,7 +411,7 @@ describe("evaluateScheduledAt", () => {
 });
 
 describe("isPendingSchedule", () => {
-  const NOW = Date.parse("2026-08-13T02:00:00.000Z");
+  const NOW = Date.parse("2054-08-13T02:00:00.000Z");
 
   it("is true only for a queued job whose time is still ahead", () => {
     expect(isPendingSchedule({ status: "queued", scheduledAt: new Date(NOW + 1) }, NOW)).toBe(true);
@@ -512,7 +512,7 @@ describe("transitionPostJob — scheduled_on_facebook (E8.6)", () => {
 });
 
 describe("planScheduledPublish (E8.6 window)", () => {
-  const NOW = Date.parse("2026-08-13T02:00:00.000Z");
+  const NOW = Date.parse("2054-08-13T02:00:00.000Z");
   const at = (offsetMs: number): Date => new Date(NOW + offsetMs);
 
   // --- Edge cases first ------------------------------------------------------
@@ -581,7 +581,7 @@ describe("planScheduledPublish (E8.6 window)", () => {
 });
 
 describe("nextHandoffAttemptDelayMs (E8.6 retries inside the window)", () => {
-  const NOW = Date.parse("2026-08-13T02:00:00.000Z");
+  const NOW = Date.parse("2054-08-13T02:00:00.000Z");
   const at = (offsetMs: number): Date => new Date(NOW + offsetMs);
 
   it("uses the retry interval while another attempt fits before the deadline", () => {
@@ -602,7 +602,7 @@ describe("nextHandoffAttemptDelayMs (E8.6 retries inside the window)", () => {
 });
 
 describe("handoffWakeDelayMs / toUnixSeconds", () => {
-  const NOW = Date.parse("2026-08-13T02:00:00.000Z");
+  const NOW = Date.parse("2054-08-13T02:00:00.000Z");
 
   it("wakes the queue entry at the START of the window", () => {
     expect(handoffWakeDelayMs(new Date(NOW + 60 * 60_000), NOW)).toBe(
@@ -617,7 +617,7 @@ describe("handoffWakeDelayMs / toUnixSeconds", () => {
   });
 
   it("converts to the unix SECONDS Meta expects", () => {
-    const at = new Date("2026-08-13T02:00:00.999Z");
+    const at = new Date("2054-08-13T02:00:00.999Z");
     // Floored, never rounded up: a rounded-up second could push a borderline
     // schedule past a boundary Meta measures itself.
     expect(toUnixSeconds(at)).toBe(Math.floor(at.getTime() / 1000));
@@ -635,7 +635,7 @@ describe("mayHoldUnconfirmedScheduledPost / canOperatorRetryPostJob", () => {
   const unconfirmed = makeJob({
     status: "failed",
     lastErrorCode: HANDOFF_FAILED_ERROR_CODE,
-    scheduledAt: new Date("2026-08-13T03:00:00.000Z"),
+    scheduledAt: new Date("2054-08-13T03:00:00.000Z"),
   });
 
   it("recognises the row failUnconfirmedHandoff leaves behind", () => {
@@ -672,7 +672,7 @@ describe("mayHoldUnconfirmedScheduledPost / canOperatorRetryPostJob", () => {
       status: "failed",
       lastErrorCode: SCHEDULE_UNCONFIRMED_ERROR_CODE,
       scheduledPostId: "1000000000_2000000000",
-      scheduledAt: new Date("2026-08-13T03:00:00.000Z"),
+      scheduledAt: new Date("2054-08-13T03:00:00.000Z"),
     });
     expect(unconfirmedPlatformPostReason(gaveUp)).toBe("PLATFORM_HOLDS_SCHEDULED_POST");
     expect(canOperatorRetryPostJob(gaveUp)).toBe(false);
@@ -698,7 +698,7 @@ describe("mayHoldUnconfirmedScheduledPost / canOperatorRetryPostJob", () => {
     const reaped = makeJob({
       status: "failed",
       lastErrorCode: PUBLISH_UNCONFIRMED_ERROR_CODE,
-      scheduledAt: new Date("2026-08-13T03:00:00.000Z"),
+      scheduledAt: new Date("2054-08-13T03:00:00.000Z"),
     });
     expect(unconfirmedPlatformPostReason(reaped)).toBe("PUBLISH_OUTCOME_UNKNOWN");
     expect(canOperatorRetryPostJob(reaped)).toBe(false);
@@ -714,7 +714,7 @@ describe("mayHoldUnconfirmedScheduledPost / canOperatorRetryPostJob", () => {
       status: "blocked",
       lastErrorCode: "OPERATOR_CANCELLED",
       scheduledPostId: "1000000000_2000000000",
-      scheduledAt: new Date("2026-08-13T03:00:00.000Z"),
+      scheduledAt: new Date("2054-08-13T03:00:00.000Z"),
     });
     expect(unconfirmedPlatformPostReason(cancelled)).toBeNull();
     expect(canOperatorRetryPostJob(cancelled)).toBe(true);
@@ -729,7 +729,7 @@ describe("mayHoldUnconfirmedScheduledPost / canOperatorRetryPostJob", () => {
     const handedOver = makeJob({
       status: "scheduled_on_facebook",
       scheduledPostId: "1000000000_2000000000",
-      scheduledAt: new Date("2026-08-13T03:00:00.000Z"),
+      scheduledAt: new Date("2054-08-13T03:00:00.000Z"),
     });
     const cancelled = transitionPostJob(handedOver, "blocked", {
       reason: "OPERATOR_CANCELLED",
@@ -762,7 +762,7 @@ describe("mayHoldUnconfirmedScheduledPost / canOperatorRetryPostJob", () => {
     const handedOver = makeJob({
       status: "scheduled_on_facebook",
       scheduledPostId: "1000000000_2000000000",
-      scheduledAt: new Date("2026-08-13T03:00:00.000Z"),
+      scheduledAt: new Date("2054-08-13T03:00:00.000Z"),
     });
     const failed = transitionPostJob(handedOver, "failed", {
       reason: "STILL_SCHEDULED",

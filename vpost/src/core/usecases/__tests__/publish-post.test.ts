@@ -97,7 +97,7 @@ function makeCatalogConfig(policy: StockPolicy | Error): CatalogConfigRepo {
   };
 }
 
-function fixedClock(startMs = Date.parse("2026-08-13T02:00:00.000Z")): Clock & { advance(ms: number): void } {
+function fixedClock(startMs = Date.parse("2054-08-13T02:00:00.000Z")): Clock & { advance(ms: number): void } {
   let now = startMs;
   return {
     now: () => new Date(now),
@@ -228,7 +228,7 @@ function makeMemoryRepo(jobs: PostJob[]) {
           failed: 0,
           blocked: 0,
         },
-        startedAt: new Date("2026-08-13T02:00:00.000Z"),
+        startedAt: new Date("2054-08-13T02:00:00.000Z"),
         finishedAt: null,
         jobs: list,
       };
@@ -523,7 +523,7 @@ describe("publishPost — suspended tenant (doc 10 §5.2)", () => {
     // process dies, so the gate must sit BEFORE the handoff window, not after.
     // T+20min: INSIDE the handoff window, i.e. the exact instant at which an
     // active tenant's post is handed to Facebook (see the E8.6 happy path).
-    const inHandoffWindow = new Date(Date.parse("2026-08-13T02:00:00.000Z") + 20 * 60_000);
+    const inHandoffWindow = new Date(Date.parse("2054-08-13T02:00:00.000Z") + 20 * 60_000);
     const h = harness({
       jobs: [makeJob({ scheduledAt: inHandoffWindow })],
       tenant: { id: TENANT, name: "Demo", status: "suspended" },
@@ -834,7 +834,7 @@ describe("publishPost — spacing gate (brief §6, PENDING(E1): per channel)", (
       id: "job-0",
       status: "published",
       publishedPostId: "555000111_0",
-      publishedAt: new Date("2026-08-13T01:59:30.000Z"),
+      publishedAt: new Date("2054-08-13T01:59:30.000Z"),
     });
     const { publish, publisher, queue, repo } = harness({
       jobs: [previous, makeJob()],
@@ -859,7 +859,7 @@ describe("publishPost — spacing gate (brief §6, PENDING(E1): per channel)", (
       id: "job-0",
       status: "published",
       publishedPostId: "555000111_0",
-      publishedAt: new Date("2026-08-13T01:58:00.000Z"),
+      publishedAt: new Date("2054-08-13T01:58:00.000Z"),
     });
     const { publish, publisher, queue } = harness({
       jobs: [previous, makeJob()],
@@ -894,7 +894,7 @@ describe("publishPost — spacing gate reads the run's own gap first", () => {
       id: "job-0",
       status: "published",
       publishedPostId: "555000111_0",
-      publishedAt: new Date("2026-08-13T01:59:30.000Z"),
+      publishedAt: new Date("2054-08-13T01:59:30.000Z"),
     });
   }
 
@@ -994,7 +994,7 @@ describe("publishPost — spacing gate reads the run's own gap first", () => {
       channelId: "chan-other",
       status: "published",
       publishedPostId: "555000111_0",
-      publishedAt: new Date("2026-08-13T01:59:59.000Z"),
+      publishedAt: new Date("2054-08-13T01:59:59.000Z"),
     });
     const { publish, publisher } = harness({
       jobs: [otherChannel, makeJob()],
@@ -1014,7 +1014,7 @@ describe("publishPost — spacing gate reads the run's own gap first", () => {
       status: "published",
       publishedPostId: "555000111_0",
       // Published "an hour from now": a wrong clock somewhere.
-      publishedAt: new Date("2026-08-13T03:00:00.000Z"),
+      publishedAt: new Date("2054-08-13T03:00:00.000Z"),
     });
     const { publish, queue } = harness({
       jobs: [future, makeJob()],
@@ -1087,7 +1087,7 @@ describe("publishPost — spacing gate reads the run's own gap first", () => {
 });
 
 describe("spacingWaitMs", () => {
-  const now = Date.parse("2026-08-13T02:00:00.000Z");
+  const now = Date.parse("2054-08-13T02:00:00.000Z");
   it("returns 0 without a previous post, with spacing 0, or once elapsed", () => {
     expect(spacingWaitMs(null, now, 60_000)).toBe(0);
     expect(spacingWaitMs(new Date(now - 1_000), now, 0)).toBe(0);
@@ -1596,7 +1596,7 @@ describe("publishPost — happy path", () => {
 });
 
 describe("publishPost — scheduled posts (E8.2/E8.3/E8.5)", () => {
-  const SCHEDULED_AT = new Date("2026-08-13T01:00:00.000Z");
+  const SCHEDULED_AT = new Date("2054-08-13T01:00:00.000Z");
 
   it("rechecks stock at the scheduled hour and auto-cancels a sold-out post", async () => {
     // The brief's exact scenario: "hẹn hôm nay mai đăng, trong đêm hàng bán hết".
@@ -1667,7 +1667,7 @@ describe("publishPost — stale queue entry guard (E8.4)", () => {
 
   it("skips a STALE entry: the old hour must not publish after a reschedule", async () => {
     const h = harness({
-      jobs: [makeJob({ queueJobId: NEW_ENTRY, scheduledAt: new Date("2026-08-13T09:00:00.000Z") })],
+      jobs: [makeJob({ queueJobId: NEW_ENTRY, scheduledAt: new Date("2054-08-13T09:00:00.000Z") })],
     });
 
     const result = await h.publish({
@@ -1713,7 +1713,7 @@ describe("publishPost — the deferred entry is not stale (E8.4 regression)", ()
         makeJob({
           id: "job-0",
           status: "published",
-          publishedAt: new Date("2026-08-13T01:59:30.000Z"),
+          publishedAt: new Date("2054-08-13T01:59:30.000Z"),
           publishedPostId: "555000111_0",
         }),
       ],
@@ -1839,7 +1839,7 @@ const VIDEO_ASSET: MediaAsset = {
   variants: { aiGenerated: false, realPhoto: true, backView: false },
   mimeType: "video/mp4",
   sizeBytes: 5_000_000,
-  modifiedTime: "2026-08-01T00:00:00.000Z",
+  modifiedTime: "2054-08-01T00:00:00.000Z",
   warnings: [],
   needsReview: false,
 };
@@ -2118,7 +2118,7 @@ describe("publishPost — platform routing (E6)", () => {
  * T-5 is past the deadline.
  */
 describe("publishPost — handing a scheduled post to Facebook (E8.6)", () => {
-  const NOW = Date.parse("2026-08-13T02:00:00.000Z");
+  const NOW = Date.parse("2054-08-13T02:00:00.000Z");
   const at = (offsetMs: number): Date => new Date(NOW + offsetMs);
 
   // --- Edge cases first ------------------------------------------------------
@@ -2566,7 +2566,7 @@ describe("publishPost — handing a scheduled post to Facebook (E8.6)", () => {
  * describe the run truthfully, and it must never be able to change its outcome.
  */
 describe("publishPost — progress reporting (E7.5)", () => {
-  const NOW = Date.parse("2026-08-13T02:00:00.000Z");
+  const NOW = Date.parse("2054-08-13T02:00:00.000Z");
   const at = (offsetMs: number): Date => new Date(NOW + offsetMs);
 
   /** A publisher that emits the events the real Facebook adapter emits. */
@@ -2938,7 +2938,7 @@ describe("publishPost — stock recheck on a MANUAL product (phase 3, business r
   it("keeps the SCHEDULED variant honest too: a typed row that sold out is auto-cancelled", async () => {
     // E8.3 — same gate, different bookkeeping: an hours-old scheduled post that
     // the recheck kills must show up as a withdrawal, not a silent no-op.
-    const scheduled = makeJob({ scheduledAt: new Date("2026-08-13T01:59:00.000Z") });
+    const scheduled = makeJob({ scheduledAt: new Date("2054-08-13T01:59:00.000Z") });
     const { publish, publisher, repo } = harness({
       jobs: [scheduled],
       products: sequencedProducts([manualProduct("0")]),

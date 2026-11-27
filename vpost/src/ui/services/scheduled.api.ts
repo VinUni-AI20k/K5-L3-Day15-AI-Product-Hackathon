@@ -19,7 +19,7 @@ import { apiRequest } from "./http-client";
  * POST /api/posts/scheduled/:id/cancel.
  *
  * This is also the ONLY place where the pure dates of the filter become
- * instants: the URL carries "13/08" (what the operator picked), the wire
+ * instants: the URL carries "27/11" (what the operator picked), the wire
  * carries the two instants that bound that local day.
  */
 

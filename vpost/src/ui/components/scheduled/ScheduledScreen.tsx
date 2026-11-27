@@ -68,7 +68,7 @@ import {
  * The filter, the mode, the anchored month, the open day AND the two dialogs all
  * live in the URL (core-data-list-query rule 1 + web-calendar-view rule 1 +
  * web-crud-inline-edit rule 1): `/scheduled?channelId=fbpage-a&che-do=lich&
- * thang=2026-08&ngay=2026-08-13` is shareable, survives F5 and makes Back
+ * thang=2026-11&ngay=2026-11-27` is shareable, survives F5 and makes Back
  * behave. `useState` for any of them would lose all three.
  *
  * WHY THE MODE DOES NOT REFETCH: only the filter is in the query key. The
