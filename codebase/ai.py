@@ -14,10 +14,13 @@ Chế độ giả (mặc định khi .env chưa có MODEL_PROVIDER, hoặc MODEL
     trả một câu giả cố định, model "fake", token 0 — để luồng chạy hết từ trước CP2 (guide bước 3.2).
     Lượt `run.py eval` / `run.py simulate` chạy bằng model giả KHÔNG được tính.
 
-Nối model thật: điền .env (chép từ .env.example), rồi viết nhánh gọi API ở dưới theo docs/connect-model.md
-(có ví dụ OpenAI, Claude, model chạy trên máy, và cách nối nhà cung cấp khác). Không dán API key vào file này.
+Nối model thật: điền .env (chép từ .env.example) với MODEL_PROVIDER=openai, MODEL_NAME và API_KEY.
+Không dán API key vào file này.
 """
+import json
 import os
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 from tracing import model_call
 
@@ -43,14 +46,42 @@ MODEL_NAME = (os.environ.get("MODEL_NAME") or "").strip()
 API_KEY = (os.environ.get("API_KEY") or "").strip()
 
 
+def call_openai(system: str, user: str) -> dict:
+    if not MODEL_NAME or not API_KEY:
+        raise RuntimeError("Cần điền MODEL_NAME và API_KEY vào .env để thử OpenAI.")
+    messages = [{"role": "user", "content": user}]
+    if system:
+        messages.insert(0, {"role": "system", "content": system})
+    request = Request(
+        "https://api.openai.com/v1/chat/completions",
+        data=json.dumps({"model": MODEL_NAME, "messages": messages}).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Authorization": "Bearer " + API_KEY},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=60) as response:
+            result = json.load(response)
+    except HTTPError as error:
+        raise RuntimeError(f"OpenAI trả HTTP {error.code}. Kiểm tra cấu hình, quyền model và hạn mức.") from None
+
+    usage = result["usage"]
+    content = result["choices"][0]["message"]["content"]
+    if not isinstance(content, str) or not content.strip():
+        raise RuntimeError("Model không trả văn bản cho lượt thử.")
+    return {
+        "text": content,
+        "model": result.get("model") or MODEL_NAME,
+        "tokens_in": usage["prompt_tokens"],
+        "tokens_out": usage["completion_tokens"],
+    }
+
+
 @model_call
 def call_model(system: str, user: str) -> dict:
     if MODEL_PROVIDER == "fake":
         last = (user.strip().splitlines() or [""])[-1]
         return {"text": "[câu trả lời giả — chưa nối model] " + last[:60], "model": "fake", "tokens_in": 0, "tokens_out": 0}
 
-    # NHÓM VIẾT: gọi model thật ở đây (theo MODEL_PROVIDER, MODEL_NAME, API_KEY) rồi trả đúng 4 khoá.
-    # Ví dụ chép được cho từng nhà cung cấp: docs/connect-model.md mục 2.
-    raise NotImplementedError(
-        "chưa viết phần gọi model thật cho MODEL_PROVIDER=%s trong codebase/ai.py — xem docs/connect-model.md"
-        % MODEL_PROVIDER)
+    if MODEL_PROVIDER == "openai":
+        return call_openai(system, user)
+    raise NotImplementedError("Chưa có adapter cho MODEL_PROVIDER=%s — xem docs/connect-model.md" % MODEL_PROVIDER)

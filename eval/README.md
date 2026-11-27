@@ -32,6 +32,8 @@ Một dòng riêng `Chốt` trong ô input mô phỏng thao tác xác nhận. Ca
 
 `python3 run.py check` kiểm cấu trúc. `MODEL_PROVIDER=fake python3 run.py eval` dùng để kiểm kỹ thuật CP2 và ghi `eval/run-mock.csv`. Chạy thật trước CP3 và chỉ tính tỷ lệ đạt trên lượt hợp lệ đã chấm.
 
+Kiểm kỹ thuật ngày 27/11/2026: chạy đủ 20 câu qua `answer()` với model giả, 0 lỗi thực thi. Lượt kiểm này chưa có điểm chấm độc lập và không tính là lượt đánh giá model thật.
+
 ## 5. Đã chạy gì
 
 | Lượt | Run ID | Model | Cấu hình (prompt / công cụ / thay đổi) | Đạt / tổng | % | Đạt chuẩn? |
