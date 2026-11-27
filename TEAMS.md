@@ -4,16 +4,17 @@
 > Giữ nguyên tên file `TEAMS.md` ở thư mục gốc repo, giữ nguyên các dòng `- Tên nhóm:` … và tiêu đề cột của bảng. Chỉ thay chỗ `____`.
 > Kiểm bằng `python run.py check`: phần "Kiểm TEAMS.md" không báo gì là đúng format.
 
-- Tên nhóm: ____
-- Lớp: ____
-- Track: ____
-- Link repo: ____
+- Tên nhóm: F88
+- Lớp: L3B
+- Track: D
+- Link repo: https://github.com/vindpd203/K5-Day15-L3B-F88
 
 | STT | Họ và tên | Mã học viên | Vai trò | Phần việc chính |
 |---|---|---|---|---|
-| 1 | ____ | ____ | Đội trưởng | ____ |
-| 2 | ____ | ____ | Thành viên | ____ |
-| 3 | ____ | ____ | Thành viên | ____ |
+| 1 | Phạm Đức Vinh | 2A202603849 | Đội trưởng | Sản phẩm: canvas, spec.md, impact, slide và demo |
+| 2 | ____ Minh | ____ | Thành viên | Bằng chứng: gắn nhãn review Chợ Tốt, khảo sát, phỏng vấn (evidence/) |
+| 3 | ____ Hùng | ____ | Thành viên | Bản chạy thử: data Chợ Mẫu, công cụ, luồng, nối model (codebase/, data/) |
+| 4 | ____ Khánh | ____ | Thành viên | Đánh giá và chi phí: bộ câu thử, metric, chạy eval, mô phỏng chi phí (eval/, cost/) |
 
 **Quy tắc điền**
 - **Lớp:** `L3A` hoặc `L3B`. **Track:** một chữ `A` (EdTech), `B` (Y tế), `C` (Du lịch), `D` (Thương mại điện tử), `E` (Tài chính) hoặc `F` (Làn khác). **Link repo:** link GitHub công khai của nhóm.
