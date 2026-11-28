@@ -1,0 +1,48 @@
+# Datastores cho máy dev: Postgres (bảng của Next ở schema public, dữ liệu backend Python
+# ở schema shop) và Redis (hàng đợi đăng bài).
+#
+#   docker compose -f docker-compose.dev.yml up -d
+#   cd vpost && pnpm db:migrate        # tạo bảng của Next
+#   python codebase/server.py          # backend tự tạo schema shop khi khởi động
+#
+# Cổng mặc định 5433 (Postgres) và 6379 (Redis), chỉ mở trên 127.0.0.1.
+# Máy đã bận cổng thì đặt VPOST_PG_PORT / VPOST_REDIS_PORT rồi sửa DATABASE_URL / REDIS_URL theo.
+# Xoá sạch dữ liệu: docker compose -f docker-compose.dev.yml down -v
+
+name: vpost-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vpost
+      POSTGRES_PASSWORD: vpost
+      POSTGRES_DB: vpost
+    ports:
+      - "127.0.0.1:${VPOST_PG_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vpost -d vpost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${VPOST_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
