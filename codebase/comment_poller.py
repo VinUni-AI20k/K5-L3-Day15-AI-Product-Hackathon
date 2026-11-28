@@ -20,6 +20,7 @@ from typing import Optional
 
 import psycopg
 
+import agent_runs
 import auto_reply
 import store
 import vpost_api
@@ -171,6 +172,24 @@ def run_tick(stop_event: Optional[threading.Event] = None) -> dict:
                         thread_id,
                         type(e).__name__,
                     )
+
+        if not (ev is not None and ev.is_set()):
+            try:
+                now_dt = vpost_api.now()
+                agent_runs.recover_stale_runs(tenant_id=vpost_api.TENANT_ID, now_dt=now_dt)
+                pruned_runs = agent_runs.cleanup_old_runs(tenant_id=vpost_api.TENANT_ID, now_dt=now_dt)
+                if pruned_runs:
+                    log.info(
+                        "comment_poller_agent_runs_pruned tenant=%s deleted=%d",
+                        vpost_api.TENANT_ID,
+                        pruned_runs,
+                    )
+            except Exception as e:
+                log.warning(
+                    "comment_poller_agent_runs_cleanup_error tenant=%s err=%s",
+                    vpost_api.TENANT_ID,
+                    type(e).__name__,
+                )
 
         log.info(
             "comment_poller_tick tenant=%s synced_posts=%d new_comments=%d updated_comments=%d "
