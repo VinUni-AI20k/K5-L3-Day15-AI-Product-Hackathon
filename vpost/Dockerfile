@@ -25,12 +25,18 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 
 # --- build: Next.js standalone output ---------------------------------------
 FROM base AS build
+# Next.js evaluates next.config.ts rewrites() at build time and freezes them
+# into .next/standalone/server.js + .next/routes-manifest.json. Defaulting
+# VPOST_API_URL here ensures the containerised `web` image proxies /api/*
+# (except Next-owned routes) to the sibling Python `api` service.
+ARG VPOST_API_URL=http://api:8021
 # NODE_OPTIONS: `next build` type-checks the whole project in one process and
 # blows past Node's default old-space cap (~2 GB), dying with "Ineffective
 # mark-compacts near heap limit" — which reads like a hang, not a limit. 4 GB
 # fits a GitHub-hosted runner and an 8 GB Docker Desktop alike.
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    NODE_OPTIONS=--max-old-space-size=4096
+    NODE_OPTIONS=--max-old-space-size=4096 \
+    VPOST_API_URL=${VPOST_API_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build && test -f .next/standalone/server.js
