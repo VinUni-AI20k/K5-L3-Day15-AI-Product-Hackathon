@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+**/__pycache__
+**/*.pyc
+.venv
+venv
+CSDL/images
+CSDL/receipts.json
+CSDL/drafts.json
+CSDL/ledger.lock
+data-btc
+starter-repo
+slides
+further-reading

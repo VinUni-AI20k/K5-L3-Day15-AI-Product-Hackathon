@@ -1,0 +1,17 @@
+# Dùng:  docker compose up --build            → web tại http://localhost:8080
+#        docker compose run --rm app python run.py eval --try
+# Model thật: tạo .env ở gốc repo (MODEL_PROVIDER, MODEL_NAME, API_KEY…) — không commit .env.
+# Trọng số ONNX (tuỳ chọn): đặt det.onnx + viesvtr_v7.onnx vào data/ocr-weights/; thiếu thì dùng Tesseract.
+services:
+  app:
+    build: .
+    image: skybill:cp3
+    # Chạy bằng UID máy host để file sinh ra (eval/run-N.csv, CSDL/) không thuộc root.
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+    env_file:
+      - path: .env
+        required: false
