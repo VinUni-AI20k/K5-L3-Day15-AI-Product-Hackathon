@@ -863,6 +863,8 @@ _QTY_PREFIX_RES = [
     re.compile(r"^%s%s\s+%s\s+%s%s\s+" % (_QTY_BUYER, _QTY_VERB, _QTY_NUM, _QTY_UNIT, _QTY_LINK)),
     re.compile(r"^%s\s+%s%s\s+" % (_QTY_NUM, _QTY_UNIT, _QTY_LINK)),
 ]
+# "giá 2 cái bao nhiêu" -> "giá bao nhiêu"
+_QTY_MID_PRICE_RE = re.compile(r"^(?P<g>giá|gía|gia)\s+%s\s+%s(?:\s+(?:thì|thi|là|la))?\s+" % (_QTY_NUM, _QTY_UNIT))
 _QTY_SUFFIX_RE = re.compile(r"\s+(?:cho|lấy|lay|mua|đặt|dat)\s+%s\s+%s$" % (_QTY_NUM, _QTY_UNIT))
 # "size M còn 2 cái không" -> "size M còn không"
 _QTY_AVAIL_RE = re.compile(r"\s+(?P<v>còn|con|có|co)\s+%s\s+%s\s+(?P<neg>không|ko|k)$" % (_QTY_NUM, _QTY_UNIT))
@@ -893,6 +895,11 @@ def extract_quantity(core: str) -> tuple[Optional[int], Optional[str], str]:
             q = _qty_value(m.group("q"))
             if q:
                 return q, _unit_label(m.group("u")), core[m.end():].strip()
+    m = _QTY_MID_PRICE_RE.match(core)
+    if m:
+        q = _qty_value(m.group("q"))
+        if q:
+            return q, _unit_label(m.group("u")), ("%s %s" % (m.group("g"), core[m.end():])).strip()
     m = _QTY_SUFFIX_RE.search(core)
     if m:
         q = _qty_value(m.group("q"))
@@ -1543,17 +1550,6 @@ def _evaluate_comment(
                 % (post_rate_limit, post_rate_window),
             )
 
-        # 3. Lớp bảo vệ bổ sung theo khách hàng khi có from_id
-        if from_id and store.has_recent_auto_reply_for_customer(
-            tenant_id,
-            page_id,
-            from_id,
-            ref_dt - timedelta(minutes=cooldown_minutes),
-        ):
-            return _reject(
-                "safety",
-                "Khách hàng này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
-            )
 
     _emit("safety", "ok", "Đạt kiểm tra an toàn, phạm vi hội thoại và chống spam")
 
@@ -1564,6 +1560,24 @@ def _evaluate_comment(
 
     intents = intent_res["intents"]
     sorted_ints = _sorted_intents(intents)
+
+    # Lớp bảo vệ theo khách khi có from_id: chỉ chặn khi khách hỏi lại ĐÚNG loại câu chung chung đã được trả lời
+    # gần đây. Câu cụ thể hơn (có số lượng, size hoặc màu cụ thể) là câu hỏi mới nên vẫn trả lời.
+    specific_question = bool(
+        intent_res.get("asked_qty") or intent_res.get("asked_size") or intent_res.get("asked_color")
+    )
+    if check_cooldown and from_id and not specific_question and store.has_recent_auto_reply_for_customer(
+        tenant_id,
+        page_id,
+        from_id,
+        ref_dt - timedelta(minutes=cooldown_minutes),
+        intents=sorted_ints,
+    ):
+        return _reject(
+            "safety",
+            "Khách hàng này vừa được tự động trả lời đúng câu hỏi này trong vòng %d phút" % cooldown_minutes,
+            sorted_ints,
+        )
     disabled_ints = [i for i in sorted_ints if i not in enabled_intents]
     if disabled_ints:
         labels = ", ".join(_INTENT_LABELS[i] for i in disabled_ints)
@@ -1728,6 +1742,7 @@ def _evaluate_comment(
 
     return {
         "status": "ready",
+        "specific_question": specific_question,
         "intents": sorted_ints,
         "reply_text": reply_text,
         "product_code": product_code,
@@ -2283,13 +2298,14 @@ def process_comment(
                     action_detail=reason,
                 )
 
-            if from_id and store.has_recent_auto_reply_for_customer(
+            if from_id and not ev.get("specific_question") and store.has_recent_auto_reply_for_customer(
                 tenant_id,
                 page_id,
                 from_id,
                 ref_dt - timedelta(minutes=cooldown_minutes),
+                intents=sorted_ints,
             ):
-                reason = "Khách hàng này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes
+                reason = "Khách hàng này vừa được tự động trả lời đúng câu hỏi này trong vòng %d phút" % cooldown_minutes
                 return _finish_can_ban(
                     _record_rejection(
                         tenant_id,
