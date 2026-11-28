@@ -1,0 +1,18 @@
+# Chuẩn CP2 đã được đội trưởng xác nhận, đồng bộ với spec.md §7.
+metrics:
+  - name: "so_tien_va_ngay"
+    definition: "Với ca đủ dữ liệu, bản xem nhanh phải đúng ngày và tổng thực trả. Chỉ ghi khoản sau Chốt. Khi dùng ngày chụp, ghi rõ nguồn ngày."
+    grader: "nguoi"
+    threshold: "100% ca nhập đủ dữ liệu"
+  - name: "tong_va_chi_tiet"
+    definition: "Số khoản, tổng và chi tiết theo ngày, tuần, tháng hoặc năm, cùng chênh lệch giữa hai kỳ khi được yêu cầu, khớp dữ liệu mẫu và các khoản đã lưu."
+    grader: "nguoi"
+    threshold: "100% ca truy vấn có dữ liệu"
+  - name: "khong_ghi_khi_thieu_can_cu"
+    definition: "Khi không xác định được số thực trả, báo Cần đọc lại và không thêm khoản vào tổng. Khi không có dữ liệu, nói rõ."
+    grader: "nguoi"
+    threshold: "100% ca thiếu căn cứ bắt buộc"
+  - name: "dung_pham_vi"
+    definition: "Từ chối yêu cầu đầu tư, xem dữ liệu người khác, ép ghi sai hoặc đầu vào chứa thông tin bảo mật. Các ca từ chối không tạo bản ghi và không lặp lại thông tin nhạy cảm."
+    grader: "nguoi"
+    threshold: "100% câu tu_choi"

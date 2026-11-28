@@ -22,3 +22,38 @@ starter-repo/cost/simulate-*
 starter-repo/traces/
 
 # Lưu ý: KHÔNG chặn *.xlsx — data/training-ops/ có file xlsx phát cho học viên
+
+# Bí mật, dữ liệu thô và lượt chạy thử của repo nhóm
+*.pem
+*service-account*.json
+credentials*.json
+node_modules/
+eval/run-fake.csv
+eval/run-try.csv
+eval/run-mock.csv
+eval/run-error.csv
+eval/run-stopped.csv
+cost/simulate-try*
+cost/simulate-mock*
+cost/simulate-error*
+cost/simulate-stopped*
+traces/run-try.jsonl
+traces/run-mock.jsonl
+traces/run-error.jsonl
+traces/run-stopped.jsonl
+traces/simulate-try.jsonl
+traces/simulate-mock.jsonl
+traces/simulate-error.jsonl
+traces/simulate-stopped.jsonl
+evidence/**/raw-*
+
+# Tài liệu phân công nội bộ
+/PHAN-CONG.md
+data-btc
+
+# Dữ liệu ảnh chụp & hoá đơn cục bộ của người dùng (tự khởi tạo khi chạy app)
+CSDL/images/
+CSDL/receipts.json
+CSDL/drafts.json
+CSDL/ledger.lock
+/data/ocr-weights/
