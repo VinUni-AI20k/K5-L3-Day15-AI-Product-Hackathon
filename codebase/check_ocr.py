@@ -9,12 +9,14 @@ import re
 from pathlib import Path
 
 from document_ocr import GetOcrEnvironmentStatus, ScanReceiptImageBytes
+import tracing
 
 
 def main():
     parser = argparse.ArgumentParser(description="Đọc ảnh hóa đơn và kiểm trạng thái Cần đọc lại")
     parser.add_argument("--capture-date", type=datetime.date.fromisoformat, default=datetime.date.today())
     parser.add_argument("--truth", type=Path, help="CSV nhãn MC-OCR (img_id,total_cost) để đối chiếu tổng tiền")
+    parser.add_argument("--model", action="store_true", help="Cho model đọc ảnh (agent.read_receipt_image) sau OCR cục bộ; cần .env")
     parser.add_argument("images", nargs="+", type=Path)
     args = parser.parse_args()
     truth = {}
@@ -23,6 +25,8 @@ def main():
             for row in csv.DictReader(handle):
                 truth[row["img_id"]] = {int(re.sub(r"\D", "", n)) for n in re.findall(r"\d{1,3}(?:[., ]\d{3}(?!\d))+|\d{4,}", row["total_cost"])}
     summary = collections.Counter()
+    if args.model:
+        from agent import read_receipt_image
     environment = GetOcrEnvironmentStatus()
     print(json.dumps({
         "ocr": environment["engine_version"],
@@ -31,7 +35,14 @@ def main():
     }, ensure_ascii=False))
     for path in args.images:
         try:
-            result = ScanReceiptImageBytes(path.read_bytes(), args.capture_date.isoformat(), SourceMode="upload")
+            raw = path.read_bytes()
+            result = ScanReceiptImageBytes(raw, args.capture_date.isoformat(), SourceMode="upload")
+            if args.model:
+                tracing.begin(path.name)
+                result = read_receipt_image(result, raw, args.capture_date.isoformat())
+                usage, _ = tracing.end()
+                summary["tokens_in"] += usage["tokens_in"]
+                summary["tokens_out"] += usage["tokens_out"]
         except (OSError, ValueError) as error:
             print(json.dumps({"image": path.name, "error": str(error)}, ensure_ascii=False))
             continue
@@ -40,7 +51,7 @@ def main():
             status = "Từ chối thông tin bảo mật"
         elif not result.get("ocr_engine_available"):
             status = "OCR chưa sẵn sàng"
-        elif result.get("is_uncertain"):
+        elif result.get("is_uncertain") or not result.get("printed_total"):
             status = "Cần đọc lại"
         else:
             status = "Xem nhanh"

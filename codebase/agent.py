@@ -1,11 +1,14 @@
 """Luồng văn bản OCR và báo cáo dùng chung công cụ tính số của SkyBill."""
 import datetime as dt
 import hashlib
+import io
 import json
 import re
 from pathlib import Path
 
-from ai import call_model
+from PIL import Image, ImageOps
+
+from ai import call_model, call_model_image
 from document_ocr import DateValuePattern, normalize_receipt_date, parse_vnd_amount, receipt_has_sensitive_text
 import storage
 import tools
@@ -58,6 +61,75 @@ def choose_category(receipt_text: str) -> str:
         f"Nội dung hóa đơn:\n{receipt_text}\nNhóm có căn cứ:\n{menu}",
     )["text"].strip()
     return {str(index): name for index, name in enumerate(candidates, start=1)}.get(choice, candidates[0])
+
+
+RECEIPT_IMAGE_PROMPT = (
+    "Bạn đọc ảnh hóa đơn tiếng Việt. Chỉ trả một đối tượng JSON, không giải thích:\n"
+    '{"merchant": tên cửa hàng hoặc "", "date": "YYYY-MM-DD" in trên hóa đơn hoặc "", '
+    '"paid_total": tổng phải thanh toán (số nguyên VND) hoặc 0, "uncertain": true/false}\n'
+    "paid_total lấy ở dòng Tổng cộng / Tổng tiền phải thanh toán / Thanh toán / Cộng tiền hàng. "
+    "KHÔNG lấy tiền khách đưa, tiền khách trả, tiền thừa, tiền trả lại, mã số, số điện thoại. "
+    "Đặt uncertain=true và paid_total=0 khi số thực trả bị mờ, bị che, hoặc có nhiều mức tổng mâu thuẫn. "
+    "Không đoán số không nhìn thấy trên ảnh."
+)
+
+
+def _digits_seen_in_ocr(ocr_text: str) -> set[int]:
+    """Các số tiền có mặt trong chữ OCR (chấp nhận 35,500 · 35.500 · 35 500 · 35500)."""
+    found = set()
+    for token in re.findall(r"\d{1,3}(?:[., ]\d{3})+|\d{4,9}", ocr_text):
+        found.add(int(re.sub(r"\D", "", token)))
+    return found
+
+
+def _shrink_image(image_bytes: bytes, max_side: int = 1600) -> bytes:
+    """Thu ảnh về cạnh dài ≤1600px, JPEG, để giảm token ảnh gửi model."""
+    with Image.open(io.BytesIO(image_bytes)) as image:
+        image = ImageOps.exif_transpose(image).convert("RGB")
+        image.thumbnail((max_side, max_side))
+        buffer = io.BytesIO()
+        image.save(buffer, "JPEG", quality=85)
+    return buffer.getvalue()
+
+
+def read_receipt_image(scan: dict, image_bytes: bytes, capture_date: str) -> dict:
+    """Model đọc ảnh hóa đơn; code kiểm số tiền có thật trên ảnh trước khi cho xem nhanh.
+
+    - Ảnh không đạt chất lượng (mờ/lóa) hoặc đã bị chặn: giữ nguyên kết quả OCR, không gọi model.
+    - Số model đọc phải trùng tổng OCR cục bộ đọc được; nếu OCR chưa đọc ra tổng thì số đó phải
+      xuất hiện trong chữ OCR của chính ảnh. Không thỏa → Cần đọc lại.
+    - Ngày sau ngày chụp → Cần đọc lại. Không có ngày → dùng ngày chụp.
+    Hàm không ghi sổ; chỉ người dùng bấm Chốt mới ghi.
+    """
+    if scan.get("blocked") or scan.get("quality_report", {}).get("quality_status") == "fail":
+        return scan
+    try:
+        reply = call_model_image("Trích dữ liệu hóa đơn thành JSON.", RECEIPT_IMAGE_PROMPT, _shrink_image(image_bytes))["text"]
+        fields = json.loads(re.search(r"\{.*\}", reply, re.DOTALL)[0])
+    except (NotImplementedError, RuntimeError, TypeError, ValueError, OSError) as error:
+        note(f"Model chưa đọc được ảnh, giữ kết quả OCR cục bộ: {type(error).__name__}")
+        return scan
+
+    ocr_text = "\n".join(row["text"] for row in scan.get("logical_rows", []))
+    total = fields.get("paid_total")
+    total = total if type(total) is int and total > 0 else 0
+    ocr_total = scan.get("printed_total") or 0
+    # OCR cục bộ đã đọc được tổng mà model đọc số khác → mâu thuẫn, không chọn hộ người dùng.
+    grounded = bool(total) and (total == ocr_total if ocr_total else total in _digits_seen_in_ocr(ocr_text))
+    date = normalize_receipt_date(str(fields.get("date") or ""))
+    future = bool(date and date > capture_date)
+    if total and not grounded:
+        note(f"Số model đọc ({total}) không có trong chữ OCR của ảnh → Cần đọc lại")
+    merchant = str(fields.get("merchant") or "").strip()
+    return {
+        **scan,
+        "merchant": merchant or scan.get("merchant") or "không rõ",
+        "date": date or scan.get("date") or capture_date,
+        "date_source": "hóa đơn" if date else "ngày chụp",
+        "printed_total": total if grounded else 0,
+        "is_uncertain": bool(fields.get("uncertain")) or not grounded or future,
+        "ocr_engine": f"{scan.get('ocr_engine')} + model đọc ảnh",
+    }
 
 
 def _confirm_receipt(draft, ledger):

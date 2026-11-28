@@ -17,6 +17,7 @@ Chế độ giả (mặc định khi .env chưa có MODEL_PROVIDER, hoặc MODEL
 Nối model thật qua OpenAI hoặc llama.cpp chạy cục bộ. Xem docs/connect-model.md.
 Không dán API key vào file này.
 """
+import base64
 import json
 import os
 from urllib.error import HTTPError
@@ -46,7 +47,8 @@ MODEL_PROVIDER = (os.environ.get("MODEL_PROVIDER") or "fake").strip().lower()
 MODEL_NAME = (os.environ.get("MODEL_NAME") or "").strip()
 API_KEY = (os.environ.get("API_KEY") or "").strip()
 
-def _call_chat(url: str, system: str, user: str, *, api_key: str = "", max_tokens: int = 0) -> dict:
+def _call_chat(url: str, system: str, user, *, api_key: str = "", max_tokens: int = 0) -> dict:
+    """user là chuỗi, hoặc danh sách phần nội dung (chữ + ảnh) theo định dạng chat completions."""
     messages = [{"role": "user", "content": user}]
     if system:
         messages.insert(0, {"role": "system", "content": system})
@@ -94,3 +96,18 @@ def call_model(system: str, user: str) -> dict:
             raise RuntimeError("Cần MODEL_NAME và SKYBILL_MODEL_URL trỏ đến llama-server trên máy này.")
         return _call_chat(local_url + "/v1/chat/completions", system, user, max_tokens=32)
     raise NotImplementedError("Chưa có adapter cho MODEL_PROVIDER=%s — xem docs/connect-model.md" % MODEL_PROVIDER)
+
+
+@model_call
+def call_model_image(system: str, user: str, image_bytes: bytes, mime: str = "image/jpeg") -> dict:
+    """Như call_model nhưng kèm một ảnh (model đọc ảnh hoá đơn). Token lấy từ usage của API.
+
+    Chỉ hỗ trợ OpenAI; chế độ giả và provider khác báo lỗi để luồng quay về OCR cục bộ.
+    """
+    if MODEL_PROVIDER != "openai":
+        raise NotImplementedError("Đọc ảnh bằng model cần MODEL_PROVIDER=openai.")
+    if not MODEL_NAME or not API_KEY:
+        raise RuntimeError("Cần điền MODEL_NAME và API_KEY vào .env để thử OpenAI.")
+    image_url = "data:%s;base64,%s" % (mime, base64.b64encode(image_bytes).decode("ascii"))
+    content = [{"type": "text", "text": user}, {"type": "image_url", "image_url": {"url": image_url}}]
+    return _call_chat("https://api.openai.com/v1/chat/completions", system, content, api_key=API_KEY)

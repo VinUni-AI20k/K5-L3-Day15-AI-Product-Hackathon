@@ -108,7 +108,7 @@ def _FindFreePort(PreferredPort: int) -> int:
     return PreferredPort
 
 
-def _CreateHttpHandler(TracingModule, AnswerFunction, ChooseCategory):
+def _CreateHttpHandler(TracingModule, AnswerFunction, ChooseCategory, ReadReceiptImage):
     class SkyBillHttpHandler(SimpleHTTPRequestHandler):
         def __init__(SelfInstance, *PositionalArgs, **KeywordArgs):
             super().__init__(*PositionalArgs, directory=FrontendDirectory, **KeywordArgs)
@@ -232,6 +232,10 @@ def _CreateHttpHandler(TracingModule, AnswerFunction, ChooseCategory):
                     SelfInstance._SendJsonResponse(400, {"error": "Mã lượt chụp không hợp lệ."})
                     return
                 ScanResult["capture_id"] = capture_id
+                # Model đọc ảnh (ngày, số thực trả, nơi mua); code kiểm số có thật trên ảnh.
+                TracingModule.begin("web-scan")
+                ScanResult = ReadReceiptImage(ScanResult, ImageRawBytes, TargetDate)
+                TracingModule.end()
                 # Cùng quy tắc chọn nhóm với answer(); chỉ gọi model khi ảnh đã đủ căn cứ.
                 readable = ScanResult.get("printed_total") and not ScanResult.get("is_uncertain")
                 OcrText = "\n".join(row["text"] for row in ScanResult.get("logical_rows", []))
@@ -326,7 +330,7 @@ def run_web(PortNumber: int, OpenBrowser: bool, HostAddress: str = "127.0.0.1") 
 
     try:
         import tracing
-        from agent import answer, choose_category
+        from agent import answer, choose_category, read_receipt_image
     except Exception as LoadError:
         print("Không nạp được codebase/ — lỗi ở %s: %s: %s" % (_WhereFailed(LoadError), type(LoadError).__name__, LoadError))
         return 1
@@ -334,7 +338,7 @@ def run_web(PortNumber: int, OpenBrowser: bool, HostAddress: str = "127.0.0.1") 
     StorageModule.EnsureStorageLayout()
     OcrStatus = DocumentOcrModule.GetOcrEnvironmentStatus()
     ChosenPort = _FindFreePort(PortNumber) if HostAddress == "127.0.0.1" else PortNumber
-    WebServer = ThreadingHTTPServer((HostAddress, ChosenPort), _CreateHttpHandler(tracing, answer, choose_category))
+    WebServer = ThreadingHTTPServer((HostAddress, ChosenPort), _CreateHttpHandler(tracing, answer, choose_category, read_receipt_image))
     ServerUrl = "http://%s:%d" % ("localhost" if HostAddress == "0.0.0.0" else HostAddress, ChosenPort)
 
     print("SkyBill Web UI đang chạy tại: %s" % ServerUrl)
