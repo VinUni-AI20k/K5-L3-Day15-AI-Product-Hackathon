@@ -1644,7 +1644,9 @@ def test_n02_thread_scope_blocks_reply_chains_page_roots_3lvl_and_unpublished_po
     facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_n2_{len(fb_calls)}")[1]
 
     # Repro 1: Follow-up under operator reply (even with plain allowlisted question!) -> can_ban, zero sends
-    seed_comment("c_n2_op1", from_id="u1", message="Em 55kg mặc size nào, ship HN bao nhiêu?", created_time="2026-11-28T10:00:00.000Z")
+    # Thời điểm theo đồng hồ thật: send_thread_reply đóng dấu sent_at = giờ thật, nên bình luận hỏi tiếp
+    # phải đến SAU câu trả lời của nhân viên (giờ cố định sẽ hỏng khi đồng hồ thật vượt qua mốc đó).
+    seed_comment("c_n2_op1", from_id="u1", message="Em 55kg mặc size nào, ship HN bao nhiêu?", created_time=iso_ago(minutes=10))
     vpost_api.send_thread_reply(
         "c_n2_op1",
         "Dạ Đầm Voan Hoa G1 giá 1.950.000đ bạn nhé!",
@@ -1652,8 +1654,8 @@ def test_n02_thread_scope_blocks_reply_chains_page_roots_3lvl_and_unpublished_po
         sent_by="operator",
     )
     fb_calls.clear()
-    c_op_fu1 = seed_comment("c_n2_op2", parent_id="c_n2_op1", from_id="u1", message="Mẫu đó giá bao nhiêu ạ?", created_time="2026-11-28T10:05:00.000Z")
-    c_op_fu2 = seed_comment("c_n2_op3", parent_id="c_n2_op1", from_id="u1", message="Giá bao nhiêu ạ?", created_time="2026-11-28T10:06:00.000Z")
+    c_op_fu1 = seed_comment("c_n2_op2", parent_id="c_n2_op1", from_id="u1", message="Mẫu đó giá bao nhiêu ạ?", created_time=iso_ago(seconds=-2))
+    c_op_fu2 = seed_comment("c_n2_op3", parent_id="c_n2_op1", from_id="u1", message="Giá bao nhiêu ạ?", created_time=iso_ago(seconds=-3))
     for c_fu in (c_op_fu1, c_op_fu2):
         r = auto_reply.process_comment(vpost_api.TENANT_ID, c_fu)
         assert r["action"] == "skipped" and r["tagged"] is True and r["threadId"] == "c_n2_op1", r
