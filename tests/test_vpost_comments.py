@@ -660,9 +660,10 @@ def test_reply_nested_uses_parent_and_sending_sent_transitions_and_duplicate_409
     assert body["draft"]["status"] == "sent"
     assert any(p["id"] == "fb_rep_99" for p in body["pageReplies"])
 
-    # Duplicate send -> 409 CONFLICT (already replied / sent)
-    dup = client.post("/api/comments/c_child/reply", json={"text": "Dạ Đầm Voan Hoa G1 giá 890.000đ bạn nhé!"})
-    assert dup.status_code == 409 and dup.json()["code"] == "CONFLICT"
+    # Follow-up reply after previous send completed is allowed (reply-once rule removed)
+    followup = client.post("/api/comments/c_child/reply", json={"text": "Dạ Đầm Voan Hoa G1 giá 890.000đ bạn nhé!"})
+    assert followup.status_code == 200
+    assert len(seen) == 2 and seen[-1]["target_id"] == "c_parent"
 
     # In-flight 'sending' draft -> 409 CONFLICT on reply, draft, and patch
     seed_comment("c_inflight", message="Còn hàng không shop?")
@@ -970,10 +971,13 @@ def test_f02_concurrent_replies_and_partial_unique_index():
 
     graph_calls = []
     call_lock = threading.Lock()
+    release_send = threading.Event()
 
     def counted_reply(target_id, message, token):
         with call_lock:
             graph_calls.append(target_id)
+        # Keep the winning send in flight until concurrent callers hit the in-flight lock
+        release_send.wait(timeout=2)
         return "fb_rep_conc"
 
     facebook.reply_comment = counted_reply
@@ -991,18 +995,31 @@ def test_f02_concurrent_replies_and_partial_unique_index():
         )
         with status_lock:
             statuses.append(r.status_code)
+            if statuses.count(409) >= n_threads - 1:
+                release_send.set()
 
     threads = [threading.Thread(target=worker) for _ in range(n_threads)]
     for t in threads:
         t.start()
     for t in threads:
         t.join(timeout=5)
+    release_send.set()
 
     assert statuses.count(200) == 1
     assert statuses.count(409) == n_threads - 1
     assert len(graph_calls) == 1
 
-    # DB-level partial unique index enforces at most one sending/sent draft per (tenant_id, comment_id)
+    # DB-level partial unique index enforces at most one in-flight 'sending' draft per (tenant_id, comment_id)
+    store.create_comment_draft(
+        vpost_api.TENANT_ID,
+        {
+            "id": "d-sending-1",
+            "comment_id": "c_conc",
+            "status": "sending",
+            "created_at": iso_ago(),
+            "updated_at": iso_ago(),
+        },
+    )
     with pytest.raises(psycopg.IntegrityError):
         store.create_comment_draft(
             vpost_api.TENANT_ID,
@@ -1186,6 +1203,8 @@ def test_f08_slow_draft_race_returns_409_and_does_not_shadow_sent_draft():
 
     entered_ai = threading.Event()
     release_ai = threading.Event()
+    entered_send = threading.Event()
+    release_send = threading.Event()
 
     def slow_model(system, user, schema=None):
         entered_ai.set()
@@ -1202,35 +1221,59 @@ def test_f08_slow_draft_race_returns_409_and_does_not_shadow_sent_draft():
             "tokens_out": 30,
         }
 
+    def slow_reply(target_id, message, token):
+        entered_send.set()
+        assert release_send.wait(timeout=5)
+        return "fb_rep_fast"
+
     vpost_api.MODEL = slow_model
-    facebook.reply_comment = lambda target_id, message, token: "fb_rep_fast"
+    facebook.reply_comment = slow_reply
     draft_res = {}
+    reply_res = {}
 
     def run_draft():
         draft_res["r"] = client.post("/api/comments/c_slow/draft")
 
-    t = threading.Thread(target=run_draft)
-    t.start()
+    def run_reply():
+        reply_res["r"] = client.post(
+            "/api/comments/c_slow/reply",
+            json={"text": "Dạ Đầm Voan Hoa G1 giá 890.000đ còn màu đen size S, M, L bạn nhé!"},
+        )
+
+    t_draft = threading.Thread(target=run_draft)
+    t_draft.start()
     assert entered_ai.wait(timeout=5)
 
-    # Operator replies while slow AI draft is still running
-    r_rep = client.post(
-        "/api/comments/c_slow/reply",
-        json={"text": "Dạ Đầm Voan Hoa G1 giá 890.000đ còn màu đen size S, M, L bạn nhé!"},
-    )
-    assert r_rep.status_code == 200
+    # Operator starts replying (in-flight 'sending') while slow AI draft is still running
+    t_rep = threading.Thread(target=run_reply)
+    t_rep.start()
+    assert entered_send.wait(timeout=5)
 
     release_ai.set()
-    t.join(timeout=5)
+    t_draft.join(timeout=5)
     assert draft_res["r"].status_code == 409 and draft_res["r"].json()["code"] == "CONFLICT"
+
+    release_send.set()
+    t_rep.join(timeout=5)
+    assert reply_res["r"].status_code == 200
     latest = store.latest_comment_draft(vpost_api.TENANT_ID, "c_slow")
     assert latest is not None and latest["status"] == "sent"
 
-    # Already-replied comment (even without VPOST draft) also rejects POST /draft with 409 before calling model
-    seed_comment("c_ext_replied", message="Giá bao nhiêu?", status="replied")
+    # In-flight 'sending' comment rejects POST /draft with 409 before calling model
+    seed_comment("c_sending_now", message="Giá bao nhiêu?")
+    store.create_comment_draft(
+        vpost_api.TENANT_ID,
+        {
+            "id": "d-sending-now",
+            "comment_id": "c_sending_now",
+            "status": "sending",
+            "created_at": iso_ago(),
+            "updated_at": iso_ago(),
+        },
+    )
     called = []
     vpost_api.MODEL = lambda *a, **kw: (called.append(1), {})[1]
-    r_ext = client.post("/api/comments/c_ext_replied/draft")
+    r_ext = client.post("/api/comments/c_sending_now/draft")
     assert r_ext.status_code == 409 and r_ext.json()["code"] == "CONFLICT"
     assert called == []
 
@@ -1818,3 +1861,139 @@ def test_reply_422_blocked_includes_additive_reasons_list():
     assert all(isinstance(x, str) and x for x in body["reasons"])
     assert body["message"] == "; ".join(body["reasons"])
     assert body["detail"] == body["message"]
+
+
+def test_stale_sending_recovery_unblocks_legacy_comment_endpoints():
+    """Legacy /api/comments/{id} endpoints recover stale (>2m) 'sending' rows to 'failed' with clear userMessage."""
+    seed_post_job()
+    stale_ts = iso_ago(minutes=3)
+    seed_comment("c_legacy_stale", message="Giá bao nhiêu ạ?", created_time=iso_ago(minutes=10))
+    store.create_comment_draft(
+        vpost_api.TENANT_ID,
+        {
+            "id": "d-legacy-stale",
+            "comment_id": "c_legacy_stale",
+            "status": "sending",
+            "edited_text": "Dạ váy G1 giá 890.000đ ạ!",
+            "created_at": stale_ts,
+            "updated_at": stale_ts,
+        },
+    )
+
+    # GET /api/comments surfaces recovered failed state + clear userMessage instead of stuck 'sending'
+    lst = client.get("/api/comments").json()
+    item = next(i for i in lst["items"] if i["id"] == "c_legacy_stale")
+    assert item["draft"]["status"] == "failed"
+    assert item["draft"]["errorCode"] == store.STALE_SENDING_ERROR_CODE
+    assert item["draft"]["userMessage"] == store.STALE_SENDING_USER_MESSAGE
+
+    # Retry via legacy POST /api/comments/{id}/reply succeeds cleanly
+    facebook.reply_comment = lambda target_id, message, token: "fb_legacy_recovered_1"
+    r_ok = client.post(
+        "/api/comments/c_legacy_stale/reply",
+        json={"text": "Dạ Đầm Voan Hoa G1 giá 890.000đ còn màu đen size S, M, L bạn nhé!"},
+    )
+    assert r_ok.status_code == 200, r_ok.text
+    assert r_ok.json()["comment"]["draft"]["status"] == "sent"
+
+
+def test_new_finding01_legacy_reply_fences_stale_failure_and_live_inflight(monkeypatch):
+    """Review-2 #1: legacy /api/comments/{id}/reply also fences live in-flight sends and stale failures."""
+    seed_post_job()
+    base_now = datetime(2026, 11, 28, 12, 0, 0, tzinfo=timezone.utc)
+    clock = [base_now]
+    monkeypatch.setattr(vpost_api, "now", lambda: clock[0])
+
+    # 1. Live in-flight send past 120s is NOT recovered or duplicated
+    seed_comment("c_leg_live", message="Mẫu G1 giá sao?", created_time=iso_ago(minutes=10))
+    entered = threading.Event()
+    release = threading.Event()
+    live_calls = []
+
+    def slow_fb(target_id, message, token):
+        live_calls.append(target_id)
+        entered.set()
+        assert release.wait(timeout=5)
+        return "fb_leg_live_1"
+
+    facebook.reply_comment = slow_fb
+    holder = {}
+    th = threading.Thread(
+        target=lambda: holder.__setitem__(
+            "a",
+            client.post("/api/comments/c_leg_live/reply", json={"text": "Dạ Đầm Voan Hoa G1 giá 890.000đ ạ!"}),
+        )
+    )
+    th.start()
+    assert entered.wait(timeout=5)
+
+    clock[0] = base_now + timedelta(minutes=3)
+    # GET /api/comments must NOT mark live request as failed
+    lst = client.get("/api/comments").json()
+    item = next(i for i in lst["items"] if i["id"] == "c_leg_live")
+    assert item["draft"]["status"] == "sending"
+
+    # Concurrent second reply returns 409 CONFLICT
+    r_dup = client.post("/api/comments/c_leg_live/reply", json={"text": "Dạ Đầm Voan Hoa G1 giá 890.000đ ạ!"})
+    assert r_dup.status_code == 409 and r_dup.json()["code"] == "CONFLICT"
+    assert len(live_calls) == 1
+
+    release.set()
+    th.join(timeout=5)
+    assert holder["a"].status_code == 200
+    assert holder["a"].json()["comment"]["draft"]["status"] == "sent"
+
+    # 2. Stale failed attempt MUST NOT overwrite a newer 'sent' draft back to 'failed'
+    seed_comment("c_leg_race", message="Còn màu đen không?", created_time=iso_ago(minutes=10))
+    clock[0] = base_now
+    a_entered, a_release = threading.Event(), threading.Event()
+    race_calls = []
+
+    def race_fb(target_id, message, token):
+        n = len(race_calls) + 1
+        race_calls.append(n)
+        if n == 1:
+            a_entered.set()
+            assert a_release.wait(timeout=5)
+            raise facebook.FacebookError("UPSTREAM_ERROR", "stale timeout")
+        return "fb_leg_winner"
+
+    facebook.reply_comment = race_fb
+    race_holder = {}
+    th_r = threading.Thread(
+        target=lambda: race_holder.__setitem__(
+            "a",
+            client.post("/api/comments/c_leg_race/reply", json={"text": "Dạ còn màu đen size M giá 890.000đ ạ!"}),
+        )
+    )
+    th_r.start()
+    assert a_entered.wait(timeout=5)
+
+    # Simulate external worker recovering stale row
+    saved_active = None
+    if hasattr(store, "_ACTIVE_ATTEMPTS"):
+        with store._ACTIVE_ATTEMPTS_LOCK:
+            saved_active = set(store._ACTIVE_ATTEMPTS)
+            store._ACTIVE_ATTEMPTS.clear()
+    try:
+        recovered = store.recover_stale_sending_drafts(
+            vpost_api.TENANT_ID,
+            "c_leg_race",
+            now_ts=(clock[0] + timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        )
+        assert len(recovered) == 1
+    finally:
+        if saved_active is not None:
+            with store._ACTIVE_ATTEMPTS_LOCK:
+                store._ACTIVE_ATTEMPTS.update(saved_active)
+
+    r_b = client.post("/api/comments/c_leg_race/reply", json={"text": "Dạ còn màu đen size M giá 890.000đ ạ!"})
+    assert r_b.status_code == 200 and r_b.json()["comment"]["draft"]["status"] == "sent"
+
+    # Stale Request A fails — must NOT overwrite 'sent' back to 'failed'
+    a_release.set()
+    th_r.join(timeout=5)
+    assert race_holder["a"].status_code == 502
+
+    latest = store.latest_comment_draft(vpost_api.TENANT_ID, "c_leg_race")
+    assert latest["status"] == "sent" and latest["fb_reply_id"] == "fb_leg_winner"
