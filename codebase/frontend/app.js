@@ -127,12 +127,10 @@
     return `${Math.round(Number(n) || 0).toLocaleString("vi-VN")} ₫`;
   }
 
+  // Ô lịch: hiện đủ số tiền, không làm tròn (75.500 chứ không phải 76k).
   function formatCompactVnd(n) {
     const v = Math.round(Number(n) || 0);
-    if (v <= 0) return "";
-    if (v >= 1000000) return `${(v / 1000000).toFixed(1).replace(/\.0$/, "")}tr`;
-    if (v >= 1000) return `${Math.round(v / 1000)}k`;
-    return `${v}`;
+    return v > 0 ? v.toLocaleString("vi-VN") : "";
   }
 
   function formatDateVi(iso) {

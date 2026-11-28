@@ -33,7 +33,10 @@ except Exception as ImportException:
     OcrDependenciesAvailable = False
     OcrImportErrorMessage = "%s: %s" % (type(ImportException).__name__, ImportException)
 
-DefaultWeightsDirectory = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "ocr-weights")
+# Trọng số do Vũ đóng gói (nguồn, giấy phép, SHA-256: backend/weights/ocr-1/ppocrv3-viesvtr-v7/manifest.json).
+DefaultWeightsDirectory = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "backend", "weights", "ocr-1", "ppocrv3-viesvtr-v7"
+)
 
 # Bảng chữ cái VietOCR 229 ký tự (index 0 là CTC blank, ký tự thật bắt đầu từ index 1)
 VietOcrVocabulary = (
@@ -650,7 +653,67 @@ def _LooksLikeMerchantName(RowItem: dict) -> bool:
     )
 
 
-def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: str) -> dict:
+# --- Chọn tổng tiền theo mức ưu tiên từ khoá cho dòng ONNX (port từ backend/ocr_engine.py của Vũ, nhánh
+# nguyenquangvu_2A202603407). Bỏ phần "không thấy tổng thì cộng các món" để không đoán số thực trả.
+ImageTotalHighPattern = re.compile(
+    r"(phai\s*thanh\s*toan|tong\s*cong|tong\s*so\s*thanh\s*toan|tong\s*tien\s*phai\s*t\.?\s*toan|"
+    r"tien\s*thanh\s*toan|tong\s*tien\b(?!\s*hang)|grand\s*total|\btotal\b)"
+)
+ImageTotalMediumPattern = re.compile(r"(cong\s*tien\s*hang|cong\s*tien|thanh\s*toan)")
+ImageTotalLowPattern = re.compile(r"(tong\s*tien\s*hang)")
+ImageSkipRowPattern = re.compile(
+    r"(tien\s*khach|tien\s*dua|khach\s*(?:dua|tra)|tien\s*thua|tien\s*mat|tra\s*lai|change|cash|"
+    r"don\s*gia|thanh\s*tien|ten\s*hang|tong\s*so\b(?!\s*(?:tien|thanh))|so\s*luong)"
+)
+ImageDiscountPattern = re.compile(r"(chiet\s*khau|giam\s*gia|khuyen\s*mai)")
+ImagePricePattern = re.compile(r"(?<!\d)(\d{1,3}(?:\.\d{3})+|\d{1,3}(?:,\d{3})+|\d{4,7})(?!\d)")
+ImageSpacePricePattern = re.compile(r"(?<!\d)(\d{1,3}\s\d{3})(?!\d)")
+ImageNoisePattern = re.compile(
+    r"(?:https?://|www\.)\S+|\b\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}\b|\b\d{1,2}:\d{2}(?::\d{2})?\b"
+    r"|\b0\d{8,10}\b|\b[A-Za-z]*\d{8,}[A-Za-z0-9]*\b|\b\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)\b",
+    re.IGNORECASE,
+)
+
+
+def _ImageRowPrices(RowText: str, AllowSpace: bool) -> list:
+    """Các số tiền trong một dòng OCR sau khi bỏ ngày, giờ, SĐT, mã dài, đơn vị đo."""
+    Cleaned = ImageNoisePattern.sub(" ", RowText)
+    Found = ImagePricePattern.findall(Cleaned) or (ImageSpacePricePattern.findall(Cleaned) if AllowSpace else [])
+    return [Amount for Amount in (_ParseVietnameseMoneyToken(Token) for Token in Found) if Amount >= 1000]
+
+
+def read_image_total(LogicalRows: list) -> int:
+    """Số thực trả từ dòng OCR ảnh: dòng tổng có ưu tiên cao nhất (số có thể nằm ở dòng kế tiếp).
+
+    Trả 0 khi không thấy dòng tổng, hoặc khi hai dòng cùng mức ưu tiên cao nhất ghi hai số khác nhau.
+    """
+    Best = {}  # mức ưu tiên → tập số tiền
+    PendingPriority = 0
+    for RowItem in LogicalRows:
+        Normalized = re.sub(r"^[^a-z0-9]+", "", _StripVietnameseAccents(RowItem["text"]))
+        if ImageSkipRowPattern.search(Normalized):
+            PendingPriority = 0
+            continue
+        Priority = (3 if ImageTotalHighPattern.search(Normalized) else 2 if ImageTotalMediumPattern.search(Normalized)
+                    else 1 if ImageTotalLowPattern.search(Normalized) else 0)
+        Prices = _ImageRowPrices(RowItem["text"], AllowSpace=bool(Priority or PendingPriority))
+        if PendingPriority and Prices and not Priority:
+            Best.setdefault(PendingPriority, set()).add(Prices[-1])
+            PendingPriority = 0
+            continue
+        PendingPriority = 0
+        if Priority and not ImageDiscountPattern.search(Normalized):
+            if Prices:
+                Best.setdefault(Priority, set()).add(Prices[-1])
+            else:
+                PendingPriority = Priority
+    if not Best:
+        return 0
+    TopAmounts = Best[max(Best)]
+    return next(iter(TopAmounts)) if len(TopAmounts) == 1 else 0
+
+
+def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: str, UseImageTotal: bool = False) -> dict:
     """Phân tích các dòng OCR thành cấu trúc hoá đơn có kiểm tra G10 khi ảnh mờ/thiếu.
 
     Nhóm chi không chọn ở đây: web và answer() cùng gọi agent.choose_category().
@@ -687,7 +750,8 @@ def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: 
         if ItemPrice > 0 and ItemLabel:
             ParsedItems.append({"name": ItemLabel, "price": ItemPrice})
 
-    PrintedTotalVnd = read_paid_total(row["text"] for row in LogicalRows)
+    # Dòng ONNX dùng bộ chọn tổng theo ưu tiên; Tesseract (dự phòng) giữ bộ đọc cũ.
+    PrintedTotalVnd = read_image_total(LogicalRows) if UseImageTotal else read_paid_total(row["text"] for row in LogicalRows)
     QualityStatus = QualityReport.get("quality_status", "unknown")
     MeanConfidence = (
         sum(LineItem["confidence"] for LineItem in LogicalRows) / float(len(LogicalRows))
@@ -755,7 +819,9 @@ def ScanReceiptImageBytes(
     }
     if receipt_has_sensitive_text(" ".join(row["text"] for row in lines)):
         return {**metadata, "blocked": True}
-    ParsedReceipt = ParseReceiptFromOcrLines(lines, QualityReport, TargetDate)
+    ParsedReceipt = ParseReceiptFromOcrLines(
+        lines, QualityReport, TargetDate, UseImageTotal=OcrOutput.get("engine_version") == "ppocrv3-viesvtr-v7"
+    )
     ParsedReceipt["source"] = SourceMode
     ParsedReceipt["filename"] = FileName
     ParsedReceipt["ocr_line_count"] = len(ParsedReceipt["logical_rows"])

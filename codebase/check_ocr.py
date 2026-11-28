@@ -12,6 +12,14 @@ from document_ocr import GetOcrEnvironmentStatus, ScanReceiptImageBytes
 import tracing
 
 
+def truth_amounts(label: str) -> set[int]:
+    """Các số tiền trong nhãn MC-OCR: 35,500 · 253.000 253.000 · 39 000 · UHD510510.760 (dính chữ/số phía trước)."""
+    formatted = re.findall(r"(?=(\d{1,3}(?:[.,]\d{3})+)(?!\d))", label)
+    spaced = re.findall(r"(?<![\d.,])(\d{1,3} \d{3})(?![\d.,])", label)
+    plain = re.findall(r"(?<![\d.,])(\d{4,9})(?![\d.,])", label)
+    return {int(re.sub(r"\D", "", token)) for token in formatted + spaced + plain}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Đọc ảnh hóa đơn và kiểm trạng thái Cần đọc lại")
     parser.add_argument("--capture-date", type=datetime.date.fromisoformat, default=datetime.date.today())
@@ -23,7 +31,7 @@ def main():
     if args.truth:
         with args.truth.open(encoding="utf-8-sig") as handle:
             for row in csv.DictReader(handle):
-                truth[row["img_id"]] = {int(re.sub(r"\D", "", n)) for n in re.findall(r"\d{1,3}(?:[., ]\d{3}(?!\d))+|\d{4,}", row["total_cost"])}
+                truth[row["img_id"]] = truth_amounts(row["total_cost"])
     summary = collections.Counter()
     if args.model:
         from agent import read_receipt_image
@@ -57,7 +65,7 @@ def main():
             status = "Xem nhanh"
         paid = result.get("printed_total") or None
         match = None
-        if path.name in truth and status == "Xem nhanh":
+        if truth.get(path.name) and status == "Xem nhanh":  # ảnh thiếu nhãn tổng thì không chấm
             match = paid in truth[path.name]
             summary["xem_nhanh_dung" if match else "xem_nhanh_sai"] += 1
         summary[status] += 1

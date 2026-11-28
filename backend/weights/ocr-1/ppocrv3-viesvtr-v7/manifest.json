@@ -1,0 +1,14 @@
+{
+  "sources": {
+    "det.onnx": "https://huggingface.co/monkt/paddleocr-onnx/resolve/7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65/detection/v3/det.onnx",
+    "viesvtr_v7.onnx": "https://huggingface.co/ngocthua830/viesvtr/resolve/61bcfb92a1010a01b8d7ed59961419667abe655f/weights/viesvtr_v7.onnx"
+  },
+  "licences": {
+    "det.onnx": "Apache-2.0 (PaddleOCR PP-OCRv3 via monkt/paddleocr-onnx)",
+    "viesvtr_v7.onnx": "CC-BY-NC-4.0 (VieSVTR v7, MLCV lab UIT; academic/non-commercial use)"
+  },
+  "sha256": {
+    "det.onnx": "ee40e80071ba3a320d4efda75f3e22047a7d049e9bf7bcaaf9daea23fc21b935",
+    "viesvtr_v7.onnx": "da8dc9cac938472d97373e7eb88768e7e4e98300c4c4687c3766fbcb29d36b5e"
+  }
+}
