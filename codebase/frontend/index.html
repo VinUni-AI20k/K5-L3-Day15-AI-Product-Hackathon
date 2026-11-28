@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SkyBill · Lịch Hoá Đơn AI kiểu Locket</title>
+  <title>SkyBill · Lịch chi tiêu</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -19,7 +19,7 @@
         </div>
         <div>
           <h1 class="brand-title">SkyBill</h1>
-          <p class="brand-sub">Locket Hoá Đơn &amp; Xu Hướng Chi Tiêu</p>
+          <p class="brand-sub">Nhật ký chi tiêu từ ảnh hóa đơn</p>
         </div>
       </div>
 
@@ -66,7 +66,7 @@
               <div class="panel-head">
                 <div>
                   <h3>Khung chụp Locket</h3>
-                  <p class="muted-sm">Ảnh chụp trực tiếp sẽ tự động gắn vào <strong>ngày hôm nay (<span id="camera-today-label"></span>)</strong>.</p>
+                  <p class="muted-sm">App tự đọc ngày trên hóa đơn. Nếu thiếu ngày, dùng <span id="camera-today-label"></span>.</p>
                 </div>
                 <span class="date-chip" id="camera-date-chip">Hôm nay</span>
               </div>
@@ -104,29 +104,13 @@
               </div>
             </div>
 
-            <!-- Chế độ 1B: Tải ảnh từ app khác (bắt buộc chọn ngày) -->
+            <!-- Chế độ tải ảnh -->
             <div id="panel-upload" class="capture-panel">
               <div class="panel-head">
                 <div>
                   <h3>Tải ảnh chụp từ ứng dụng khác</h3>
                   <p class="muted-sm">Hỗ trợ ảnh hoá đơn MoMo, ZaloPay, ngân hàng hoặc ảnh chụp sẵn trong máy.</p>
                 </div>
-                <span class="pill-required">Bắt buộc chọn ngày</span>
-              </div>
-
-              <div class="upload-date-box" id="upload-date-box">
-                <label for="upload-date" class="field-label">
-                  Hoá đơn này chi tiêu vào ngày nào? <span class="required-mark">*</span>
-                </label>
-                <div class="date-input-row">
-                  <input id="upload-date" type="date" class="input-control" required />
-                  <div class="quick-date-pills">
-                    <button type="button" class="chip-btn" data-quick-date="0">Hôm nay</button>
-                    <button type="button" class="chip-btn" data-quick-date="-1">Hôm qua</button>
-                    <button type="button" class="chip-btn" data-quick-date="-2">2 ngày trước</button>
-                  </div>
-                </div>
-                <p id="upload-date-hint" class="muted-sm">Phải chỉ rõ ngày chi tiêu để AI xếp đúng vào ô trên Lịch Locket và tính báo cáo tuần/tháng.</p>
               </div>
 
               <label id="dropzone" for="upload-file-input" class="dropzone">
@@ -139,7 +123,7 @@
                     <line x1="12" y1="3" x2="12" y2="15"></line>
                   </svg>
                   <p class="placeholder-title">Chọn hoặc kéo thả ảnh hoá đơn vào đây</p>
-                  <p class="placeholder-sub">JPG, PNG, WEBP · Ảnh chỉ xử lý minh hoạ trên phiên hiện tại</p>
+                  <p class="placeholder-sub">JPG, PNG, WEBP</p>
                 </div>
               </label>
 
@@ -151,11 +135,11 @@
 
             <div class="extract-bar">
               <div class="extract-meta">
-                <span class="muted-sm">Ngày ghi nhận dự kiến:</span>
+                <span class="muted-sm">Ngày dùng nếu ảnh thiếu ngày</span>
                 <strong id="active-target-date">—</strong>
               </div>
-              <button id="btn-extract-ai" type="button" class="btn btn-primary">
-                Trích xuất hoá đơn bằng AI
+              <button id="btn-extract-ai" type="button" class="btn btn-soft hidden">
+                Đọc lại ảnh
               </button>
             </div>
           </div>
@@ -179,7 +163,7 @@
                   <line x1="9" y1="17" x2="13" y2="17"></line>
                 </svg>
               </div>
-              <p>Chụp hoặc tải ảnh ở khung bên cạnh rồi bấm <strong>"Trích xuất hoá đơn bằng AI"</strong> để xem bản nháp chi tiết tại đây.</p>
+              <p id="draft-scan-message" role="status">Chụp hoặc tải ảnh để tự động đọc hóa đơn.</p>
             </div>
 
             <form id="draft-form" class="draft-form hidden">
@@ -188,7 +172,7 @@
               <div class="form-row-2">
                 <div class="form-group">
                   <label for="draft-merchant" class="field-label">Cửa hàng / Nơi chi</label>
-                  <input id="draft-merchant" type="text" class="input-control" placeholder="VD: Quán Cà Phê Mẫu" required />
+                  <input id="draft-merchant" type="text" class="input-control" placeholder="Chưa rõ cửa hàng" />
                 </div>
                 <div class="form-group">
                   <label for="draft-date" class="field-label">Ngày lưu vào lịch</label>
@@ -204,15 +188,14 @@
               <div class="form-group">
                 <div class="items-head">
                   <label class="field-label">Chi tiết các món / khoản chi</label>
-                  <button id="btn-add-item" type="button" class="btn btn-soft btn-xs">+ Thêm dòng</button>
                 </div>
                 <div id="draft-items-list" class="draft-items-list"></div>
               </div>
 
               <div class="total-summary-box">
                 <div>
-                  <span class="muted-sm">Tổng cộng (tính 100% bằng code)</span>
-                  <div id="draft-total-display" class="total-amount">0 ₫</div>
+                  <label for="draft-total" class="field-label">Số tiền thực trả (VND)</label>
+                  <input id="draft-total" type="number" min="1" step="1" class="input-control" required />
                 </div>
                 <div class="form-group note-inline">
                   <label for="draft-note" class="field-label">Ghi chú nhanh</label>
@@ -222,7 +205,7 @@
 
               <div class="draft-actions">
                 <button id="btn-discard-draft" type="button" class="btn btn-ghost">Huỷ bản nháp</button>
-                <button id="btn-confirm-save" type="submit" class="btn btn-primary">Xác nhận lưu vào lịch ngày</button>
+                <button id="btn-confirm-save" type="submit" class="btn btn-primary">Chốt</button>
               </div>
             </form>
           </div>
@@ -232,10 +215,10 @@
       <!-- ================================================================
            VIEW 2: LỊCH CHI TIÊU KIỂU LOCKET (Giao diện chủ đạo 2)
            ================================================================ -->
-      <section id="view-calendar" class="view" aria-label="Lịch chi tiêu Locket">
+      <section id="view-calendar" class="view" aria-label="Lịch chi tiêu">
         <div class="section-intro">
           <div>
-            <span class="pill-tag">Giao diện 2 · Lịch Locket chi tiêu</span>
+            <span class="pill-tag">Lịch chi tiêu</span>
             <h2>Lịch hoá đơn theo từng ngày</h2>
             <p class="muted">Mỗi ô ngày thể hiện số hoá đơn và mức chi qua sắc độ xanh da trời. Bấm vào bất kỳ ngày nào để xem chi tiết.</p>
           </div>
@@ -315,10 +298,10 @@
               <div id="day-category-breakdown" class="breakdown-list"></div>
             </div>
 
-            <div class="day-section">
-              <h4>Chi tiết từng hoá đơn trong ngày</h4>
+            <details class="day-section">
+              <summary>Xem thêm từng khoản chi</summary>
               <div id="day-receipts-list" class="receipt-cards-list"></div>
-            </div>
+            </details>
           </aside>
         </div>
       </section>

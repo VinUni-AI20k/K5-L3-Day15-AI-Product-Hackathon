@@ -8,232 +8,15 @@
   const STORAGE_KEY = "skybill_receipts_v1";
   const TOUR_KEY = "skybill_tour_done_v1";
 
+  // Khớp tools.StandardCategories và data/expenses.json (một danh sách nhóm cho web, eval và CLI).
   const CATEGORIES = [
     "Ăn uống",
-    "Đi lại",
+    "Di chuyển",
     "Mua sắm",
-    "Hoá đơn & Tiện ích",
+    "Hóa đơn & Nhà ở",
+    "Sức khỏe",
     "Giải trí",
-    "Sức khoẻ",
     "Khác",
-  ];
-
-  // Dữ liệu mẫu fallback khi mở tĩnh không qua server Python
-  const SEED_RECEIPTS = [
-    {
-      id: "HD-1001",
-      date: "2026-10-04",
-      time: "08:30",
-      merchant: "Tiệm Bánh Mẫu Sáng",
-      category: "Ăn uống",
-      source: "camera",
-      note: "Bữa sáng và cà phê",
-      items: [
-        { name: "Bánh mì kẹp", price: 35000 },
-        { name: "Cà phê sữa đá", price: 29000 },
-      ],
-      total: 64000,
-    },
-    {
-      id: "HD-1002",
-      date: "2026-10-10",
-      time: "19:15",
-      merchant: "Siêu Thị Xanh Mẫu",
-      category: "Mua sắm",
-      source: "upload",
-      note: "Đồ dùng cá nhân tháng 10",
-      items: [
-        { name: "Nước giặt 2L", price: 145000 },
-        { name: "Khăn giấy & đồ bếp", price: 95000 },
-      ],
-      total: 240000,
-    },
-    {
-      id: "HD-1003",
-      date: "2026-10-15",
-      time: "09:05",
-      merchant: "Điện Lực Mẫu Khu A",
-      category: "Hoá đơn & Tiện ích",
-      source: "upload",
-      note: "Hoá đơn điện tháng 10",
-      items: [{ name: "Tiền điện sinh hoạt", price: 420000 }],
-      total: 420000,
-    },
-    {
-      id: "HD-1004",
-      date: "2026-10-21",
-      time: "18:40",
-      merchant: "Xe Công Nghệ Mẫu",
-      category: "Đi lại",
-      source: "upload",
-      note: "Đi học nhóm",
-      items: [{ name: "Cước xe 2 chiều", price: 88000 }],
-      total: 88000,
-    },
-    {
-      id: "HD-1005",
-      date: "2026-10-27",
-      time: "20:00",
-      merchant: "Rạp Chiếu Phim Mẫu",
-      category: "Giải trí",
-      source: "camera",
-      note: "Xem phim cuối tháng",
-      items: [
-        { name: "Vé xem phim", price: 95000 },
-        { name: "Nước suối", price: 20000 },
-      ],
-      total: 115000,
-    },
-    {
-      id: "HD-1006",
-      date: "2026-10-30",
-      time: "12:20",
-      merchant: "Cơm Trưa Văn Phòng Mẫu",
-      category: "Ăn uống",
-      source: "camera",
-      note: "Ăn trưa",
-      items: [{ name: "Cơm phần + canh", price: 52000 }],
-      total: 52000,
-    },
-    {
-      id: "HD-1101",
-      date: "2026-11-03",
-      time: "12:15",
-      merchant: "Bếp Cơm Mẫu 01",
-      category: "Ăn uống",
-      source: "camera",
-      note: "Cơm trưa",
-      items: [{ name: "Suất cơm trưa", price: 48000 }],
-      total: 48000,
-    },
-    {
-      id: "HD-1102",
-      date: "2026-11-08",
-      time: "17:20",
-      merchant: "Nhà Thuốc Mẫu An Tâm",
-      category: "Sức khoẻ",
-      source: "camera",
-      note: "Mua vitamin & khẩu trang",
-      items: [
-        { name: "Vitamin C", price: 85000 },
-        { name: "Hộp khẩu trang", price: 45000 },
-      ],
-      total: 130000,
-    },
-    {
-      id: "HD-1103",
-      date: "2026-11-15",
-      time: "10:10",
-      merchant: "Internet & Điện Mẫu",
-      category: "Hoá đơn & Tiện ích",
-      source: "upload",
-      note: "Thanh toán từ app ngân hàng",
-      items: [
-        { name: "Tiền điện tháng 11", price: 390000 },
-        { name: "Cước Internet", price: 180000 },
-      ],
-      total: 570000,
-    },
-    {
-      id: "HD-1104",
-      date: "2026-11-20",
-      time: "08:15",
-      merchant: "Quán Cà Phê Bầu Trời",
-      category: "Ăn uống",
-      source: "camera",
-      note: "Cà phê sáng",
-      items: [{ name: "Bạc xỉu đá", price: 39000 }],
-      total: 39000,
-    },
-    {
-      id: "HD-1105",
-      date: "2026-11-20",
-      time: "19:45",
-      merchant: "Siêu Thị Mini Mẫu B",
-      category: "Mua sắm",
-      source: "upload",
-      note: "Mua thêm đồ dùng cuối tuần",
-      items: [
-        { name: "Sữa tươi 1L", price: 38000 },
-        { name: "Bình giữ nhiệt", price: 195000 },
-      ],
-      total: 233000,
-    },
-    {
-      id: "HD-1106",
-      date: "2026-11-23",
-      time: "12:30",
-      merchant: "Quán Bún Mẫu Hà Nội",
-      category: "Ăn uống",
-      source: "camera",
-      note: "Ăn trưa",
-      items: [{ name: "Bún chả đặc biệt", price: 55000 }],
-      total: 55000,
-    },
-    {
-      id: "HD-1107",
-      date: "2026-11-24",
-      time: "08:05",
-      merchant: "Xe Bus & Metro Mẫu",
-      category: "Đi lại",
-      source: "upload",
-      note: "Nạp vé tháng",
-      items: [{ name: "Vé đi lại tuần", price: 110000 }],
-      total: 110000,
-    },
-    {
-      id: "HD-1108",
-      date: "2026-11-25",
-      time: "20:10",
-      merchant: "Lẩu Nướng Mẫu Nhóm",
-      category: "Ăn uống",
-      source: "camera",
-      note: "Liên hoan nhóm học",
-      items: [
-        { name: "Phần ăn chia nhóm", price: 185000 },
-        { name: "Trà chanh", price: 25000 },
-      ],
-      total: 210000,
-    },
-    {
-      id: "HD-1109",
-      date: "2026-11-26",
-      time: "09:15",
-      merchant: "Tiệm Trà Mẫu Sáng",
-      category: "Ăn uống",
-      source: "camera",
-      note: "Đồ uống sáng",
-      items: [{ name: "Trà sữa ít đường", price: 42000 }],
-      total: 42000,
-    },
-    {
-      id: "HD-1110",
-      date: "2026-11-26",
-      time: "18:30",
-      merchant: "Nhà Sách Mẫu Tri Thức",
-      category: "Mua sắm",
-      source: "upload",
-      note: "Mua sổ ghi chép và bút",
-      items: [
-        { name: "Sổ tay bìa cứng", price: 78000 },
-        { name: "Bộ bút xanh", price: 42000 },
-      ],
-      total: 120000,
-    },
-    {
-      id: "HD-1111",
-      date: "2026-11-27",
-      time: "12:05",
-      merchant: "Quán Cơm Gà Mẫu",
-      category: "Ăn uống",
-      source: "camera",
-      note: "Ăn trưa hôm nay",
-      items: [
-        { name: "Cơm gà xé", price: 48000 },
-        { name: "Nước cam ép", price: 22000 },
-      ],
-      total: 70000,
-    },
   ];
 
   const GUIDE_ITEMS = [
@@ -246,19 +29,19 @@
       steps: [
         "Mở tab <strong>Chụp HĐ</strong> và chọn chế độ <strong>Chụp ngay bằng app</strong>.",
         "Bấm <strong>Bật camera</strong> (hoặc bấm <strong>Dùng ảnh hoá đơn mẫu</strong> nếu máy không có webcam), đưa hoá đơn vào khung bo tròn.",
-        "Bấm nút chụp tròn lớn kiểu Locket — hệ thống tự động gắn ngày <strong>hôm nay</strong> và lưu ảnh vào thư mục <code>CSDL/images/</code>.",
+        "Bấm nút chụp. SkyBill tự đọc ảnh và đưa ngày, số thực trả và nhóm chi vào bản xem nhanh.",
       ],
     },
     {
       id: "g-upload",
-      title: "2. Tải ảnh chụp từ app khác & chỉ rõ ngày chi tiêu",
+      title: "2. Tải ảnh hóa đơn từ máy",
       keywords: "tải ảnh upload app khác momo zalopay ngân hàng chọn ngày hôm qua",
       view: "capture",
       mode: "upload",
       steps: [
         "Chuyển sang chế độ <strong>Tải ảnh từ app khác</strong> trong tab <strong>Chụp HĐ</strong>.",
-        "Chọn đúng <strong>ngày hoá đơn phát sinh</strong> ở ô ngày bắt buộc (có thể bấm nhanh <em>Hôm nay</em>, <em>Hôm qua</em>, <em>2 ngày trước</em>).",
-        "Kéo thả hoặc chọn ảnh chụp hoá đơn từ máy rồi bấm <strong>Trích xuất hoá đơn bằng AI</strong>.",
+        "SkyBill dùng ngày ghi trên hóa đơn. Nếu thiếu, app điền ngày chụp và hiển thị nguồn ngày.",
+        "Kéo thả hoặc chọn ảnh để app tự đọc.",
       ],
     },
     {
@@ -268,9 +51,9 @@
       view: "capture",
       mode: "camera",
       steps: [
-        "Backend kiểm tra chất lượng ảnh (độ nét, độ loá) và chạy mô hình ONNX OCR tiếng Việt, sau đó tạo bản nháp trong <code>CSDL/drafts.json</code>.",
-        "Nếu ảnh mờ hoặc lệch tổng, AI sẽ đánh dấu <strong>\"không rõ\"</strong> để bạn kiểm lại và tự nhập phần thiếu.",
-        "Bạn có thể sửa tên cửa hàng, chọn lại danh mục, thêm/xoá món hàng rồi bấm <strong>Xác nhận lưu vào lịch ngày</strong>.",
+        "OCR tiếng Việt đọc nội dung ảnh trên máy. SkyBill dùng kết quả để điền bản xem nhanh.",
+        "Nếu ảnh mờ hoặc thiếu số thực trả, hãy chụp lại phần thanh toán.",
+        "Bạn có thể sửa ngày, số tiền hoặc danh mục rồi bấm <strong>Chốt</strong>.",
       ],
     },
     {
@@ -325,21 +108,21 @@
       mode: "camera",
       target: "#locket-viewfinder",
       title: "1. Chụp nhanh hoá đơn kiểu Locket",
-      desc: "Bật camera để chụp ngay hoá đơn trong ngày hôm nay, hoặc dùng ảnh mẫu có sẵn để thử quy trình Quality Gate + ONNX OCR.",
+      desc: "Bật camera để chụp ngay hoá đơn trong ngày hôm nay, hoặc dùng ảnh mẫu có sẵn để thử quy trình OCR tiếng Việt.",
     },
     {
       view: "capture",
       mode: "upload",
-      target: "#upload-date-box",
-      title: "2. Tải ảnh từ app khác phải chọn ngày",
-      desc: "Khi tải ảnh chụp từ app ngân hàng/ví điện tử, hãy chỉ rõ ngày chi tiêu tại đây để hệ thống xếp đúng vào ô lịch.",
+      target: "#dropzone",
+      title: "2. Tải ảnh hóa đơn",
+      desc: "SkyBill tự đọc ảnh bạn chọn và hiển thị ngày trên bản xem nhanh.",
     },
     {
       view: "capture",
       mode: "camera",
       target: "#draft-card",
       title: "3. Duyệt bản nháp trước khi lưu",
-      desc: "Backend chấm chất lượng ảnh, quét chữ bằng ONNX OCR và lập bản nháp. Bạn luôn kiểm, sửa danh mục hoặc số tiền rồi mới xác nhận lưu vào CSDL.",
+      desc: "Kiểm ngày, số tiền và danh mục, sau đó bấm Chốt để lưu vào lịch.",
     },
     {
       view: "calendar",
@@ -368,6 +151,7 @@
     captureMode: "camera",
     capturedImageDataUrl: "",
     uploadImageDataUrl: "",
+    scanVersion: 0,
     cameraStream: null,
     draft: null,
     calendarYear: 2026,
@@ -420,7 +204,7 @@
         if (Array.isArray(parsed)) return parsed;
       }
     } catch (_err) {}
-    return SEED_RECEIPTS.map((r) => ({ ...r, items: r.items.map((i) => ({ ...i })) }));
+    return [];
   }
 
   function saveReceiptsLocal(list) {
@@ -482,18 +266,18 @@
 
     ctx.fillStyle = "#072540";
     ctx.font = "bold 28px Inter, Arial, sans-serif";
-    ctx.fillText(kind === "upload" ? "BIEN LAI VI DIEN TU MAU" : "QUAN CA PHE MAU SKY", 72, 98);
+    ctx.fillText(kind === "upload" ? "BIEN LAI VI DIEN TU MAU" : "QUÁN CÀ PHÊ MẪU SKY", 72, 98);
 
     ctx.fillStyle = "#0c3b66";
     ctx.font = "20px Inter, Arial, sans-serif";
-    ctx.fillText("Ngay: " + formatDisplayDate(todayIso()), 72, 140);
+    ctx.fillText("Ngày: " + (kind === "upload" ? "26/11/2026" : "27/11/2026"), 72, 140);
 
     if (kind === "blurry") {
       ctx.fillStyle = "#bae6fd";
       ctx.fillRect(72, 180, 470, 320);
       ctx.fillStyle = "#075985";
       ctx.font = "bold 22px Inter, Arial, sans-serif";
-      ctx.fillText("Anh mo - can kiem tra G10", 130, 340);
+      ctx.fillText("Vùng số tiền không đọc được", 130, 340);
     } else if (kind === "upload") {
       ctx.fillStyle = "#072540";
       ctx.font = "22px Inter, Arial, sans-serif";
@@ -503,18 +287,18 @@
       ctx.fillText("32.000", 450, 276);
       ctx.fillStyle = "#0284c7";
       ctx.font = "bold 24px Inter, Arial, sans-serif";
-      ctx.fillText("TONG CONG", 72, 360);
+      ctx.fillText("THỰC TRẢ", 72, 360);
       ctx.fillText("97.000", 440, 360);
     } else {
       ctx.fillStyle = "#072540";
       ctx.font = "22px Inter, Arial, sans-serif";
-      ctx.fillText("Tra sua O Long Lai", 72, 220);
+      ctx.fillText("Trà sữa Ô Long Lài", 72, 220);
       ctx.fillText("45.000", 450, 220);
-      ctx.fillText("Banh sung bo bo", 72, 276);
+      ctx.fillText("Bánh sừng bò bơ", 72, 276);
       ctx.fillText("35.000", 450, 276);
       ctx.fillStyle = "#0284c7";
       ctx.font = "bold 24px Inter, Arial, sans-serif";
-      ctx.fillText("TONG CONG", 72, 360);
+      ctx.fillText("THỰC TRẢ", 72, 360);
       ctx.fillText("80.000", 440, 360);
     }
     return canvas.toDataURL("image/jpeg", 0.92);
@@ -556,12 +340,7 @@
 
   function updateActiveTargetDateLabel() {
     const label = document.getElementById("active-target-date");
-    if (state.captureMode === "camera") {
-      label.textContent = formatDisplayDate(todayIso()) + " (Hôm nay · Tự động)";
-    } else {
-      const val = document.getElementById("upload-date").value;
-      label.textContent = val ? formatDisplayDate(val) : "Chưa chọn ngày (bắt buộc)";
-    }
+    label.textContent = formatDisplayDate(todayIso()) + " (ngày chụp)";
   }
 
   async function startCamera() {
@@ -619,19 +398,18 @@
     canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const dataUrl = canvas.toDataURL("image/jpeg", 0.86);
-    setCameraPreview(dataUrl, "clear");
+    setCameraPreview(dataUrl);
     stopCamera();
-    showToast("Đã chụp ảnh hoá đơn cho ngày hôm nay!");
   }
 
-  function setCameraPreview(dataUrl, sampleKind) {
+  function setCameraPreview(dataUrl) {
     state.capturedImageDataUrl = dataUrl;
-    state.captureSampleKind = sampleKind || "clear";
     const img = document.getElementById("camera-preview");
     img.src = dataUrl;
     img.classList.remove("hidden");
     document.getElementById("camera-placeholder").classList.add("hidden");
     document.getElementById("camera-video").classList.add("hidden");
+    void extractReceiptToDraft();
   }
 
   function handleUploadFile(file) {
@@ -641,156 +419,55 @@
     }
     const reader = new FileReader();
     reader.onload = function (ev) {
-      setUploadPreview(ev.target.result, file.name);
+      setUploadPreview(ev.target.result);
     };
     reader.readAsDataURL(file);
   }
 
-  function setUploadPreview(dataUrl, filename) {
+  function setUploadPreview(dataUrl) {
     state.uploadImageDataUrl = dataUrl;
-    state.uploadFilename = filename || "hoa-don.jpg";
     const img = document.getElementById("upload-preview");
     img.src = dataUrl;
     img.classList.remove("hidden");
     document.getElementById("upload-placeholder").classList.add("hidden");
-  }
-
-  function validateReceiptCode(draft) {
-    const missing = [];
-    if (!draft.merchant || draft.merchant === "không rõ") missing.push("Tên cửa hàng");
-    if (!draft.date) missing.push("Ngày chi tiêu");
-    if (!draft.items || draft.items.length === 0) missing.push("Danh sách món");
-    const calcSum = (draft.items || []).reduce((s, it) => s + (Number(it.price) || 0), 0);
-    const hasZeroOrUnknown = (draft.items || []).some(
-      (it) => !it.name || it.name.toLowerCase().includes("không rõ") || Number(it.price) <= 0
-    );
-    if (hasZeroOrUnknown) missing.push("Số tiền/tên món rõ ràng");
-    return {
-      valid: missing.length === 0 && calcSum > 0,
-      missingFields: missing,
-      calculatedTotal: calcSum,
-    };
+    void extractReceiptToDraft();
   }
 
   async function extractReceiptToDraft() {
-    let targetDate = todayIso();
-    let imageData = state.capturedImageDataUrl;
-    let source = "camera";
-    let filename = "camera-capture.jpg";
-
-    if (state.captureMode === "upload") {
-      source = "upload";
-      imageData = state.uploadImageDataUrl;
-      filename = state.uploadFilename || "upload-receipt.jpg";
-      const dateBox = document.getElementById("upload-date-box");
-      const chosenDate = document.getElementById("upload-date").value;
-      if (!chosenDate) {
-        dateBox.classList.add("needs-attention");
-        document.getElementById("upload-date").focus();
-        showToast("Khi tải ảnh lên, vui lòng chọn rõ ngày chi tiêu!");
-        return;
-      }
-      dateBox.classList.remove("needs-attention");
-      targetDate = chosenDate;
-    }
-
-    if (!imageData) {
-      showToast(
-        state.captureMode === "camera"
-          ? "Hãy chụp ảnh hoặc bấm 'Dùng ảnh hoá đơn mẫu' trước."
-          : "Hãy chọn ảnh hoá đơn cần tải lên trước."
-      );
-      return;
-    }
-
-    const extractBtn = document.getElementById("btn-extract-ai");
-    extractBtn.disabled = true;
-    extractBtn.textContent = "Đang quét Quality + OCR...";
+    const source = state.captureMode;
+    const image = source === "camera" ? state.capturedImageDataUrl : state.uploadImageDataUrl;
+    if (!image) return;
+    const scan = ++state.scanVersion;
+    const retry = document.getElementById("btn-extract-ai");
+    const message = document.getElementById("draft-scan-message");
+    state.draft = null;
+    renderDraftForm();
+    retry.classList.add("hidden");
+    message.textContent = "Đang đọc ảnh hóa đơn…";
 
     try {
       const response = await fetch("/api/receipts/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image_data_url: imageData,
-          receipt_date: targetDate,
-          source_mode: source,
-          filename: filename,
-        }),
+        body: JSON.stringify({ image_data_url: image, receipt_date: todayIso(), source_mode: source }),
       });
-      if (response.ok) {
-        const data = await response.json();
-        const serverDraft = data.draft || {};
+      const data = await response.json();
+      if (scan !== state.scanVersion) return;
+      if (!response.ok || !data.validation.valid) {
+        message.textContent = !response.ok ? data.error : !data.ocr_engine_available
+          ? "OCR chưa sẵn sàng. Hãy kiểm tra cấu hình trên máy chủ. Chưa ghi khoản chi."
+          : "Cần đọc lại hóa đơn. Hãy chụp rõ phần ngày và số tiền thực trả. Chưa ghi khoản chi.";
+        retry.classList.remove("hidden");
+      } else {
         state.backendConnected = true;
-        state.draft = {
-          draft_id: serverDraft.draft_id || "",
-          merchant: serverDraft.merchant || "không rõ",
-          date: serverDraft.date || targetDate,
-          category: serverDraft.category || "Khác",
-          note: serverDraft.note || "",
-          items: Array.isArray(serverDraft.items) && serverDraft.items.length ? serverDraft.items : [{ name: "không rõ", price: 0 }],
-          image_path: serverDraft.image_path || "",
-          image: imageData,
-          source: source,
-          quality_report: data.quality_report || null,
-          ocr_engine: data.ocr_engine || "",
-          ocr_engine_available: Boolean(data.ocr_engine_available),
-          ocr_lines_count: Array.isArray(data.ocr_lines) ? data.ocr_lines.length : 0,
-          backend_warnings: (data.validation && data.validation.warnings) || [],
-        };
+        state.draft = { ...data.draft, ocr_line_count: data.ocr_line_count, warnings: data.validation.warnings };
         renderDraftForm();
-        document.getElementById("draft-card").scrollIntoView({ behavior: "smooth", block: "nearest" });
-        showToast("Đã lưu ảnh vào CSDL và quét xong bản nháp!");
-        return;
       }
     } catch (_err) {
-      // Fallback sang chế độ cục bộ khi không chạy server Python
-    } finally {
-      extractBtn.disabled = false;
-      extractBtn.textContent = "Trích xuất hoá đơn bằng AI";
+      if (scan !== state.scanVersion) return;
+      message.textContent = "Chưa kết nối được máy chủ để đọc ảnh. Hãy thử lại.";
+      retry.classList.remove("hidden");
     }
-
-    let extracted;
-    if (state.captureMode === "camera" && state.captureSampleKind === "blurry") {
-      extracted = {
-        merchant: "không rõ",
-        date: targetDate,
-        category: "Ăn uống",
-        note: "Ảnh mờ vùng số tiền — cần bạn bổ sung (G10)",
-        items: [{ name: "không rõ (món trên ảnh mờ)", price: 0 }],
-        image: imageData,
-        source,
-      };
-    } else if (state.captureMode === "upload") {
-      extracted = {
-        merchant: "Biên Lai Ví Điện Tử Mẫu",
-        date: targetDate,
-        category: "Đi lại",
-        note: filename ? "Tải từ: " + filename : "Ảnh tải từ app khác",
-        items: [
-          { name: "Cước đi lại nội thành", price: 65000 },
-          { name: "Phí giao hàng tài liệu", price: 32000 },
-        ],
-        image: imageData,
-        source,
-      };
-    } else {
-      extracted = {
-        merchant: "Quán Cà Phê Mẫu Sky",
-        date: targetDate,
-        category: "Ăn uống",
-        note: "Chụp trực tiếp bằng SkyBill",
-        items: [
-          { name: "Trà sữa Ô Long Lài", price: 45000 },
-          { name: "Bánh sừng bò bơ", price: 35000 },
-        ],
-        image: imageData,
-        source,
-      };
-    }
-
-    state.draft = extracted;
-    renderDraftForm();
     document.getElementById("draft-card").scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
@@ -808,11 +485,12 @@
 
     emptyEl.classList.add("hidden");
     formEl.classList.remove("hidden");
-    badgeEl.textContent = state.draft.draft_id ? state.draft.draft_id : "DRAFT_PENDING_USER";
+    badgeEl.textContent = "Chưa ghi khoản chi";
 
     document.getElementById("draft-merchant").value = state.draft.merchant || "";
     document.getElementById("draft-date").value = state.draft.date || todayIso();
     document.getElementById("draft-note").value = state.draft.note || "";
+    document.getElementById("draft-total").value = state.draft.printed_total;
 
     const chipsWrap = document.getElementById("draft-category-chips");
     chipsWrap.innerHTML = "";
@@ -829,49 +507,10 @@
     });
 
     const listEl = document.getElementById("draft-items-list");
-    listEl.innerHTML = "";
-    state.draft.items.forEach((item, idx) => {
-      const row = document.createElement("div");
-      row.className = "draft-item-row";
-
-      const nameInput = document.createElement("input");
-      nameInput.type = "text";
-      nameInput.className = "input-control";
-      nameInput.value = item.name;
-      nameInput.placeholder = "Tên món / khoản chi";
-      nameInput.addEventListener("input", (e) => {
-        state.draft.items[idx].name = e.target.value;
-        refreshDraftValidationAndTotal();
-      });
-
-      const priceInput = document.createElement("input");
-      priceInput.type = "number";
-      priceInput.min = "0";
-      priceInput.step = "1000";
-      priceInput.className = "input-control";
-      priceInput.value = item.price;
-      priceInput.placeholder = "Số tiền";
-      priceInput.addEventListener("input", (e) => {
-        state.draft.items[idx].price = Number(e.target.value) || 0;
-        refreshDraftValidationAndTotal();
-      });
-
-      const delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "btn btn-ghost btn-xs";
-      delBtn.textContent = "Xoá";
-      delBtn.disabled = state.draft.items.length <= 1;
-      delBtn.addEventListener("click", () => {
-        state.draft.items.splice(idx, 1);
-        renderDraftForm();
-      });
-
-      row.appendChild(nameInput);
-      row.appendChild(priceInput);
-      row.appendChild(delBtn);
-      listEl.appendChild(row);
-    });
-
+    listEl.innerHTML = state.draft.items.map((item) =>
+      '<div class="draft-item-row"><span>' + escapeHtml(item.name) + "</span><strong>" +
+      formatVnd(item.price) + "</strong></div>"
+    ).join("");
     refreshDraftValidationAndTotal();
   }
 
@@ -880,108 +519,61 @@
     state.draft.merchant = document.getElementById("draft-merchant").value.trim();
     state.draft.date = document.getElementById("draft-date").value;
     state.draft.note = document.getElementById("draft-note").value.trim();
+    state.draft.printed_total = Number(document.getElementById("draft-total").value);
 
-    const check = validateReceiptCode(state.draft);
-    document.getElementById("draft-total-display").textContent = formatVnd(check.calculatedTotal);
-    document.getElementById("btn-confirm-save").textContent =
-      "Xác nhận lưu vào ngày " + formatDisplayDate(state.draft.date);
-
-    const qr = state.draft.quality_report;
-    let metaLine = "";
-    if (qr && qr.available) {
-      metaLine =
-        `<div class="muted-xs" style="margin-top:4px;">` +
-        `Quality Gate: <strong>${escapeHtml(qr.quality_status)}</strong> ` +
-        `(điểm ${qr.overall_score} · độ nét ${qr.blur_score} · độ loá ${qr.glare_score})` +
-        (state.draft.ocr_engine_available
-          ? ` · ONNX OCR (${escapeHtml(state.draft.ocr_engine)}): đọc ${state.draft.ocr_lines_count} vùng chữ.`
-          : " · OCR chưa sẵn sàng ở môi trường Python hiện tại.") +
-        `</div>`;
-    }
-
+    const draft = state.draft;
     const box = document.getElementById("draft-validation-box");
-    if (check.valid) {
-      box.className = "validation-box";
-      box.innerHTML =
-        "<strong>Kiểm tra code đạt:</strong> Đủ thông tin và khớp tổng tiền <strong>" +
-        formatVnd(check.calculatedTotal) +
-        "</strong>. Bấm xác nhận để lưu vào CSDL." +
-        metaLine;
-    } else {
-      box.className = "validation-box uncertain";
-      box.innerHTML =
-        "<strong>Cần bạn kiểm lại (G10 — thu hẹp khi không chắc):</strong> Thiếu hoặc chưa rõ: <strong>" +
-        escapeHtml(check.missingFields.join(", ")) +
-        "</strong>. Hãy sửa trực tiếp bên dưới trước khi lưu." +
-        metaLine;
-    }
+    const details = [
+      "Nguồn ngày: " + (draft.date_source || "hóa đơn") + " · OCR: " +
+        draft.ocr_engine + " · " + draft.ocr_line_count + " dòng đọc được.",
+      ...draft.warnings,
+    ];
+    box.textContent = details.join(" ");
+    document.getElementById("btn-confirm-save").disabled =
+      !draft.date || !Number.isSafeInteger(draft.printed_total) || draft.printed_total <= 0;
   }
 
   async function confirmSaveDraft(ev) {
     ev.preventDefault();
     if (!state.draft) return;
-    refreshDraftValidationAndTotal();
-    const check = validateReceiptCode(state.draft);
-    if (!check.valid) {
-      showToast("Vui lòng điền đủ tên món và số tiền > 0 trước khi lưu!");
-      return;
-    }
-
-    const payload = {
-      draft_id: state.draft.draft_id || "",
-      user_id: "default_user",
-      date: state.draft.date,
-      merchant: state.draft.merchant,
-      category: state.draft.category || "Khác",
-      source: state.draft.source || "camera",
-      note: state.draft.note || "",
-      image_path: state.draft.image_path || "",
-      items: state.draft.items.map((it) => ({ name: it.name.trim(), price: Number(it.price) || 0 })),
-    };
-
-    let savedReceipt = null;
+    const confirmButton = document.getElementById("btn-confirm-save");
+    if (confirmButton.disabled) return;
+    confirmButton.disabled = true;
+    const draft = state.draft;
     try {
       const res = await fetch("/api/receipts/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          draft_id: draft.draft_id,
+          date: draft.date,
+          merchant: draft.merchant,
+          category: draft.category,
+          note: draft.note,
+          total: draft.printed_total,
+        }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        savedReceipt = data.receipt;
-        state.backendConnected = true;
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error);
+        return;
       }
-    } catch (_err) {}
-
-    if (!savedReceipt) {
-      const now = new Date();
-      const timeStr = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
-      savedReceipt = {
-        id: "HD-" + Date.now().toString().slice(-5),
-        date: payload.date,
-        time: timeStr,
-        merchant: payload.merchant,
-        category: payload.category,
-        source: payload.source,
-        note: payload.note,
-        image: state.draft.image || "",
-        items: payload.items,
-        total: check.calculatedTotal,
-      };
+      const savedReceipt = data.receipt;
+      if (!state.receipts.some((row) => row.id === savedReceipt.id)) state.receipts.push(savedReceipt);
+      saveReceiptsLocal(state.receipts);
+      const [year, month] = savedReceipt.date.split("-").map(Number);
+      state.calendarYear = year;
+      state.calendarMonth = month - 1;
+      state.selectedDate = savedReceipt.date;
+      state.draft = null;
+      renderDraftForm();
+      showToast(data.duplicate ? "Khoản này đã có trong lịch." : "Đã ghi khoản chi.");
+      switchView("calendar");
+    } catch (_err) {
+      showToast("Chưa lưu được khoản chi. Hãy thử lại.");
+    } finally {
+      if (state.draft === draft) confirmButton.disabled = false;
     }
-
-    state.receipts.push(savedReceipt);
-    saveReceiptsLocal(state.receipts);
-
-    const [y, m] = savedReceipt.date.split("-").map(Number);
-    state.calendarYear = y;
-    state.calendarMonth = m - 1;
-    state.selectedDate = savedReceipt.date;
-    state.draft = null;
-    renderDraftForm();
-
-    showToast("Đã lưu hoá đơn vào CSDL ngày " + formatDisplayDate(savedReceipt.date) + "!");
-    switchView("calendar");
   }
 
   function getDaySummary(dateIso) {
@@ -1592,25 +1184,10 @@
     document.getElementById("btn-shutter").addEventListener("click", capturePhotoFromCamera);
     document.getElementById("btn-stop-camera").addEventListener("click", stopCamera);
     document.getElementById("btn-sample-clear").addEventListener("click", () => {
-      setCameraPreview(createSampleReceiptImage("clear"), "clear");
-      showToast("Đã nạp ảnh hoá đơn mẫu cho hôm nay.");
+      setCameraPreview(createSampleReceiptImage("clear"));
     });
     document.getElementById("btn-sample-blurry").addEventListener("click", () => {
-      setCameraPreview(createSampleReceiptImage("blurry"), "blurry");
-      showToast("Đã nạp ảnh hoá đơn mờ để thử nguyên tắc G10.");
-    });
-
-    document.getElementById("upload-date").addEventListener("change", () => {
-      document.getElementById("upload-date-box").classList.remove("needs-attention");
-      updateActiveTargetDateLabel();
-    });
-    document.querySelectorAll("[data-quick-date]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const delta = Number(btn.dataset.quickDate);
-        document.getElementById("upload-date").value = shiftIsoDate(todayIso(), delta);
-        document.getElementById("upload-date-box").classList.remove("needs-attention");
-        updateActiveTargetDateLabel();
-      });
+      setCameraPreview(createSampleReceiptImage("blurry"));
     });
 
     const fileInput = document.getElementById("upload-file-input");
@@ -1631,21 +1208,11 @@
     });
 
     document.getElementById("btn-upload-sample").addEventListener("click", () => {
-      setUploadPreview(createSampleReceiptImage("upload"), "bien-lai-vi-mau.jpg");
-      if (!document.getElementById("upload-date").value) {
-        document.getElementById("upload-date").value = shiftIsoDate(todayIso(), -1);
-        updateActiveTargetDateLabel();
-      }
-      showToast("Đã nạp ảnh biên lai mẫu.");
+      setUploadPreview(createSampleReceiptImage("upload"));
     });
 
     document.getElementById("btn-extract-ai").addEventListener("click", extractReceiptToDraft);
-    document.getElementById("btn-add-item").addEventListener("click", () => {
-      if (!state.draft) return;
-      state.draft.items.push({ name: "", price: 0 });
-      renderDraftForm();
-    });
-    ["draft-merchant", "draft-date", "draft-note"].forEach((id) => {
+    ["draft-merchant", "draft-date", "draft-total", "draft-note"].forEach((id) => {
       document.getElementById(id).addEventListener("input", refreshDraftValidationAndTotal);
     });
     document.getElementById("btn-discard-draft").addEventListener("click", () => {
@@ -1682,10 +1249,8 @@
     });
     document.getElementById("btn-add-for-day").addEventListener("click", () => {
       switchView("capture");
-      setCaptureMode("upload");
-      document.getElementById("upload-date").value = state.selectedDate;
-      updateActiveTargetDateLabel();
-      showToast("Đã chọn sẵn ngày " + formatDisplayDate(state.selectedDate) + " để bạn tải hoá đơn.");
+      setCaptureMode("camera");
+      void startCamera();
     });
 
     document.querySelectorAll(".period-tab").forEach((btn) => {
@@ -1747,13 +1312,14 @@
         }
       } catch (_err) {}
       if (!resetOk) {
-        state.receipts = SEED_RECEIPTS.map((r) => ({ ...r, items: r.items.map((i) => ({ ...i })) }));
+        showToast("Chưa kết nối được máy chủ để khôi phục dữ liệu mẫu.");
+        return;
       }
       saveReceiptsLocal(state.receipts);
       renderCalendar();
       renderDayDetail(state.selectedDate);
       renderAnalytics();
-      showToast("Đã khôi phục 17 hoá đơn mẫu trong CSDL.");
+      showToast("Đã khôi phục " + state.receipts.length + " khoản chi mẫu từ data/expenses.json.");
     });
 
     document.getElementById("tour-skip-btn").addEventListener("click", endTour);

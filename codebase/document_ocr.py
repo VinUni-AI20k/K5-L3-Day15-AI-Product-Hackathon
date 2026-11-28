@@ -1,36 +1,39 @@
-"""Kiểm tra chất lượng ảnh hoá đơn (Quality Gate) và OCR tiếng Việt bằng ONNX Runtime.
+"""Kiểm tra chất lượng ảnh và đọc hóa đơn tiếng Việt bằng OCR cục bộ.
 
 Kế thừa trực tiếp thuật toán từ P-163 (quality.py + ocr.py) với trọng số:
 - det.onnx (PaddleOCR PP-OCRv3 DBNet)
 - viesvtr_v7.onnx (VieSVTR v7 CTC trên bảng chữ cái VietOCR 229 ký tự)
 """
 
+import collections
+import csv
+import datetime
+import functools
 import io
 import math
 import os
 import re
+import shutil
+import subprocess
 import threading
 import unicodedata
+
+from PIL import Image, ImageOps
 
 try:
     import cv2 as OpenCvLib
     import numpy as NumpyLib
     import onnxruntime as OnnxRuntime
-    from PIL import Image
     OcrDependenciesAvailable = True
     OcrImportErrorMessage = ""
 except Exception as ImportException:
     OpenCvLib = None
     NumpyLib = None
     OnnxRuntime = None
-    Image = None
     OcrDependenciesAvailable = False
     OcrImportErrorMessage = "%s: %s" % (type(ImportException).__name__, ImportException)
 
-DefaultWeightsDirectory = os.environ.get(
-    "SKYBILL_OCR_WEIGHTS_DIR",
-    r"E:\Personal_BuildPhase\P-163\data\weights\ocr-1\ppocrv3-viesvtr-v7",
-)
+DefaultWeightsDirectory = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "ocr-weights")
 
 # Bảng chữ cái VietOCR 229 ký tự (index 0 là CTC blank, ký tự thật bắt đầu từ index 1)
 VietOcrVocabulary = (
@@ -69,26 +72,36 @@ PriceTokenPattern = re.compile(
     r"(?:(?<!\d)(\d{1,3}(?:[.,]\d{3})+|\d{4,7})\s*(?:đ|vnđ|vnd|d)?\b)",
     re.IGNORECASE,
 )
-DateValuePattern = re.compile(r"(?<!\d)(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})(?!\d)")
+PaymentAmountPattern = re.compile(r"(?<![\w.,])\d+(?:(?:[.,]| (?=\d{3}(?!\d)))\d{3})*(?:\s*(?:k|nghìn|ngàn|đ|d|vnđ|vnd))?(?![\w.,])", re.IGNORECASE)
+DateValuePattern = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2}|\d{1,2}[-/]\d{1,2}[-/]\d{4})(?!\d)")
 TotalKeywordPattern = re.compile(
-    r"(tong\s*cong|tong\s*tien|tong\s*thanh\s*toan|thanh\s*toan|cong\s*tien|total|grand\s*total|\btong\b)",
+    r"^(?:(?:tong\s*(?:so\s*)?(?:cong|tien|bill|thanh\s*toan|phai\s*tra)|(?:so\s*)?(?:tien\s*)?(?:can|phai)\s*tra"
+    r"|(?:so\s*)?(?:tien\s*)?thanh\s*toan|grand\s*total|total)\b|tong\s*:)",
     re.IGNORECASE,
 )
+PaidPattern = re.compile(r"^(?:so tien )?(?:thuc tra|da thanh toan|da tra|paid)\b")
+TenderPattern = re.compile(r"^(?:tien )?khach (?:dua|tra)\b")
+ChangePattern = re.compile(r"^(?:(?:tien )?thua|(?:tien )?tra lai|change)\b")
+SubtotalPattern = re.compile(r"^(?:tam tinh|cong tien(?: hang)?|subtotal|tong tien hang)\b")
+PaymentFields = (("paid", PaidPattern), ("tender", TenderPattern), ("change", ChangePattern), ("total", TotalKeywordPattern))
+CredentialPattern = re.compile(r"\b(?:otp|cvv|cvc|mat khau|ma pin|so the)\b")
+# Số thẻ: 4 nhóm x 4 số (4111 2222 3333 4444) hoặc dãy 15-19 số đầu 2-6 qua kiểm Luhn.
+# Không dùng ngưỡng 13 số vì mã vạch EAN-13 và mã số thuế trên hoá đơn siêu thị bị chặn nhầm.
+CardGroupedPattern = re.compile(r"(?<!\d)\d{4}(?:[ -]\d{4}){3}(?![\d])")
+CardDigitsPattern = re.compile(r"(?<![\d-])[2-6]\d{14,18}(?![\d-])")  # đầu số thẻ (IIN) chỉ 2-6
+
+
+def _passes_luhn(digits: str) -> bool:
+    total = 0
+    for index, char in enumerate(reversed(digits)):
+        value = int(char) * (2 if index % 2 else 1)
+        total += value - 9 if value > 9 else value
+    return total % 10 == 0
 IgnoreLinePattern = re.compile(
     r"(tien\s*khach|tien\s*thua|tien\s*mat|tra\s*lai|change|cash|cam\s*on|xin\s*cam\s*on|"
     r"hen\s*gap|wifi|mat\s*khau|hotline|dia\s*chi|sdt|dien\s*thoai|ngay[:\s]|gio[:\s]|ma\s*hd|^[-=*_.]{3,}$)",
     re.IGNORECASE,
 )
-
-CategoryKeywordMap = {
-    "Ăn uống": ("ca phe", "cafe", "coffee", "tra", "tra sua", "banh", "com", "bun", "pho", "lau", "nuong", "quan", "an", "uong", "nha hang", "bep"),
-    "Đi lại": ("grab", "be ", "xanh sm", "taxi", "xe", "xang", "gui xe", "ve", "bus", "metro", "cuoc"),
-    "Mua sắm": ("sieu thi", "mart", "bach hoa", "sach", "nha sach", "quan", "ao", "giay", "my pham", "dien may", "mua"),
-    "Hoá đơn & Tiện ích": ("dien luc", "tien dien", "tien nuoc", "internet", "wifi", "vien thong", "cuoc", "tien ich", "chung cu"),
-    "Giải trí": ("rap", "phim", "cinema", "cgv", "lotte", "ve xem", "game", "du lich", "karaoke"),
-    "Sức khoẻ": ("thuoc", "nha thuoc", "benh vien", "phong kham", "kham", "y te", "vitamin", "nha khoa"),
-}
-
 
 def _StripVietnameseAccents(SourceText: str) -> str:
     """Chuyển tiếng Việt có dấu sang không dấu viết thường để đối chiếu từ khoá OCR ổn định."""
@@ -98,20 +111,44 @@ def _StripVietnameseAccents(SourceText: str) -> str:
     return "".join(StrippedChars).lower()
 
 
+def receipt_has_sensitive_text(text: str) -> bool:
+    normalized = _StripVietnameseAccents(text)
+    if CredentialPattern.search(normalized) or CardGroupedPattern.search(normalized):
+        return True
+    return any(_passes_luhn(match) for match in CardDigitsPattern.findall(normalized))
+
+
+@functools.lru_cache(maxsize=1)
+def _tesseract_vie_ready() -> bool:
+    executable = shutil.which("tesseract")
+    if executable is None:
+        return False
+    try:
+        listed = subprocess.run([executable, "--list-langs"], capture_output=True, text=True, check=True, timeout=3)
+        return "vie" in listed.stdout.splitlines()
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def GetOcrEnvironmentStatus() -> dict:
     """Kiểm tra trạng thái thư viện và file trọng số ONNX trên thiết bị hiện tại."""
-    DetectionModelPath = os.path.join(DefaultWeightsDirectory, "det.onnx")
-    RecognitionModelPath = os.path.join(DefaultWeightsDirectory, "viesvtr_v7.onnx")
+    weights = os.environ.get("SKYBILL_OCR_WEIGHTS_DIR") or DefaultWeightsDirectory
+    DetectionModelPath = os.path.join(weights, "det.onnx")
+    RecognitionModelPath = os.path.join(weights, "viesvtr_v7.onnx")
     DetectionWeightExists = os.path.isfile(DetectionModelPath)
     RecognitionWeightExists = os.path.isfile(RecognitionModelPath)
+    onnx_ready = bool(OcrDependenciesAvailable and DetectionWeightExists and RecognitionWeightExists)
+    tess_ready = _tesseract_vie_ready()
     return {
         "dependencies_available": OcrDependenciesAvailable,
         "import_error": OcrImportErrorMessage,
-        "weights_directory": DefaultWeightsDirectory,
+        "weights_directory": weights,
         "det_model_exists": DetectionWeightExists,
         "rec_model_exists": RecognitionWeightExists,
-        "engine_ready": bool(OcrDependenciesAvailable and DetectionWeightExists and RecognitionWeightExists),
-        "engine_version": "ppocrv3-viesvtr-v7",
+        "onnx_ready": onnx_ready,
+        "tesseract_available": tess_ready,
+        "engine_ready": onnx_ready or tess_ready,
+        "engine_version": "ppocrv3-viesvtr-v7" if onnx_ready else "tesseract-lstm-vie" if tess_ready else "unavailable",
     }
 
 
@@ -123,11 +160,12 @@ def _GetOnnxSessions() -> tuple:
     with SessionLock:
         if CachedDetectionSession is not None and CachedRecognitionSession is not None:
             return CachedDetectionSession, CachedRecognitionSession
-        DetectionModelPath = os.path.join(DefaultWeightsDirectory, "det.onnx")
-        RecognitionModelPath = os.path.join(DefaultWeightsDirectory, "viesvtr_v7.onnx")
+        weights = os.environ.get("SKYBILL_OCR_WEIGHTS_DIR") or DefaultWeightsDirectory
+        DetectionModelPath = os.path.join(weights, "det.onnx")
+        RecognitionModelPath = os.path.join(weights, "viesvtr_v7.onnx")
         if not os.path.isfile(DetectionModelPath) or not os.path.isfile(RecognitionModelPath):
             raise FileNotFoundError(
-                "Không tìm thấy trọng số det.onnx hoặc viesvtr_v7.onnx tại: %s" % DefaultWeightsDirectory
+                "Không tìm thấy trọng số det.onnx hoặc viesvtr_v7.onnx tại: %s" % weights
             )
         SessionOptions = OnnxRuntime.SessionOptions()
         SessionOptions.graph_optimization_level = OnnxRuntime.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -388,7 +426,7 @@ def DecodeCtcGreedy(LogitsArray) -> tuple:
     return NormalizedText, float(NumpyLib.clip(MeanConfidence, 0.0, 1.0))
 
 
-def ExtractOcrLinesFromBytes(ImageBytes: bytes) -> dict:
+def _extract_onnx_lines(ImageBytes: bytes) -> dict:
     """Chạy thật PP-OCRv3 DBNet + VieSVTR v7 trên ảnh hoá đơn và trả về danh sách dòng."""
     if not OcrDependenciesAvailable:
         return {
@@ -455,6 +493,38 @@ def ExtractOcrLinesFromBytes(ImageBytes: bytes) -> dict:
         }
 
 
+def ExtractOcrLinesFromBytes(image_bytes: bytes) -> dict:
+    """Dùng ONNX nếu có trọng số, hoặc dùng Tesseract LSTM tiếng Việt."""
+    status = GetOcrEnvironmentStatus()
+    if status["onnx_ready"]:
+        result = _extract_onnx_lines(image_bytes)
+        if result["engine_available"] or not status["tesseract_available"]:
+            return result
+    try:
+        if not status["tesseract_available"]:
+            raise FileNotFoundError("Tesseract vie")
+        result = subprocess.run(
+            ["tesseract", "stdin", "stdout", "-l", "vie", "--oem", "1", "--psm", "6", "tsv"],
+            input=image_bytes, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True, timeout=12,
+        )
+        lines = []
+        for row in csv.DictReader(io.StringIO(result.stdout.decode("utf-8")), delimiter="\t", quoting=csv.QUOTE_NONE):
+            if row["level"] != "5" or not row["text"].strip():
+                continue
+            left, top, width, height = map(int, (row["left"], row["top"], row["width"], row["height"]))
+            lines.append({
+                "text": row["text"].strip(),
+                "confidence": max(0, float(row["conf"])) / 100,
+                "box": [left, top, left + width, top + height],
+            })
+        return {"engine_available": True, "engine_version": "tesseract-lstm-vie", "lines": lines, "error_message": ""}
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return {
+            "engine_available": False, "engine_version": "unavailable", "lines": [],
+            "error_message": "Không chạy được OCR. Kiểm tra Tesseract và dữ liệu ngôn ngữ vie, hoặc trọng số ONNX.",
+        }
+
+
 def _GroupOcrLinesIntoVisualRows(OcrLines: list) -> list:
     """Gộp các hộp văn bản nằm trên cùng một dòng ngang (tên món + giá tiền bên phải)."""
     if not OcrLines:
@@ -494,34 +564,102 @@ def _ParseVietnameseMoneyToken(RawDigits: str) -> int:
     return int(DigitsOnly) if DigitsOnly else 0
 
 
-def _InferCategoryFromText(FullText: str) -> str:
-    """Suy luận danh mục chi tiêu từ tên cửa hàng và các món bằng bảng từ khoá."""
-    NormalizedText = _StripVietnameseAccents(FullText)
-    for CategoryLabel, KeywordTuple in CategoryKeywordMap.items():
-        if any(KeywordItem in NormalizedText for KeywordItem in KeywordTuple):
-            return CategoryLabel
-    return "Khác"
+def normalize_receipt_date(raw_date: str) -> str:
+    """Chuẩn hóa ngày in ISO, DD/MM/YYYY hoặc DD-MM-YYYY."""
+    try:
+        first, second, third = re.split(r"[-/]", raw_date)
+        if len(first) == 4:
+            return datetime.date(int(first), int(second), int(third)).isoformat()
+        return datetime.date(int(third), int(second), int(first)).isoformat()
+    except (TypeError, ValueError):
+        return ""
 
 
-def _NormalizeExtractedDate(RawDate: str, FallbackDate: str) -> str:
-    """Chuẩn hoá DD/MM/YYYY hoặc YYYY-MM-DD về YYYY-MM-DD."""
-    if not RawDate:
-        return FallbackDate
-    if "-" in RawDate and len(RawDate) == 10:
-        return RawDate
-    Parts = RawDate.split("/")
-    if len(Parts) == 3:
-        DayPart, MonthPart, YearPart = Parts
-        return "%s-%s-%s" % (YearPart, MonthPart.zfill(2), DayPart.zfill(2))
-    return FallbackDate
+def parse_vnd_amount(token: str) -> int | None:
+    """Chuyển 45.000đ, 38k hoặc 70000 thành VND nguyên."""
+    compact = re.sub(r"\s+", "", _StripVietnameseAccents(token))
+    match = re.fullmatch(r"(\d+(?:[.,]\d{3})*)(k|nghin|ngan)?(?:d|vnd)?", compact)
+    return _ParseVietnameseMoneyToken(match[1]) * (1000 if match[2] else 1) if match else None
+
+
+def _payment_field(normalized_line: str) -> str | None:
+    # OCR hay dính ký tự rác đầu dòng ("“ Tổng:", ".... Tổng tiền"), bỏ trước khi so mẫu.
+    normalized_line = re.sub(r"^[^a-z0-9]+", "", normalized_line)
+    if SubtotalPattern.search(normalized_line):
+        return "subtotal"
+    return next((key for key, pattern in PaymentFields if pattern.search(normalized_line)), None)
+
+
+def read_paid_total(lines) -> int:
+    """Chọn số thực trả từ các dòng thanh toán, hoặc trả 0 khi thiếu hay mâu thuẫn."""
+    amounts = {key: set() for key, _ in PaymentFields}
+    supporting_rows = collections.Counter()
+    noisy = False
+    for line in lines:
+        normalized = _StripVietnameseAccents(line).strip()
+        if "chua ro thuc tra" in normalized or "nhieu muc tong chua ro" in normalized:
+            return 0
+        field = _payment_field(normalized)
+        if field in amounts:
+            row_amounts = set()
+            for token in PaymentAmountPattern.findall(line):
+                amount = parse_vnd_amount(token)
+                if amount is None:
+                    continue
+                # Số lẻ < 500đ là số lượng hoặc mảnh số OCR tách rời ("Tổng: 1 39 000"): bỏ nhưng đánh dấu nhiễu.
+                if amount < 500:
+                    noisy = True
+                    continue
+                row_amounts.add(amount)
+            amounts[field] |= row_amounts
+            supporting_rows.update(row_amounts)
+
+    paid, totals, tender, change = (amounts[key] for key in ("paid", "total", "tender", "change"))
+    if paid:
+        result = next(iter(paid)) if len(paid) == 1 else 0
+    elif len(totals) > 1 or len(tender) > 1 or len(change) > 1:
+        result = 0
+    else:
+        printed = next(iter(totals), 0)
+        if not tender:
+            result = printed
+        elif not printed and not change:
+            result = 0
+        else:
+            cash_paid = next(iter(tender)) - next(iter(change), 0)
+            result = cash_paid if cash_paid > 0 and printed in {0, cash_paid} else 0
+    # Khi đã bỏ mảnh số nhiễu, chỉ tin số tiền có ít nhất 2 dòng thanh toán cùng xác nhận.
+    if noisy and result and supporting_rows[result] < 2:
+        return 0
+    return result
+
+
+MerchantSkipPattern = re.compile(
+    r"h[oa]+ don|phieu|ban hang|nhan vien|thu ngan|khach hang|^\W*d[cq]\b|duong|phuong|quan \d|so hd|ma so thue|mst"
+)
+
+
+def _LooksLikeMerchantName(RowItem: dict) -> bool:
+    """Dòng tên cửa hàng: đủ tin cậy, phần lớn là chữ, không phải dòng địa chỉ/điện thoại."""
+    Letters = sum(CharItem.isalpha() for CharItem in RowItem["text"])
+    NonSpace = sum(not CharItem.isspace() for CharItem in RowItem["text"])
+    return (
+        RowItem["confidence"] >= 0.6
+        and Letters >= 4
+        and Letters >= 0.7 * NonSpace
+        and not IgnoreLinePattern.search(_StripVietnameseAccents(RowItem["text"]))
+        and not MerchantSkipPattern.search(_StripVietnameseAccents(RowItem["text"]))
+    )
 
 
 def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: str) -> dict:
-    """Phân tích các dòng OCR thành cấu trúc hoá đơn có kiểm tra G10 khi ảnh mờ/thiếu."""
+    """Phân tích các dòng OCR thành cấu trúc hoá đơn có kiểm tra G10 khi ảnh mờ/thiếu.
+
+    Nhóm chi không chọn ở đây: web và answer() cùng gọi agent.choose_category().
+    """
     LogicalRows = _GroupOcrLinesIntoVisualRows(OcrLines)
     MerchantName = ""
     ExtractedDate = ""
-    PrintedTotalVnd = 0
     ParsedItems = []
 
     for RowIndex, RowItem in enumerate(LogicalRows):
@@ -530,58 +668,58 @@ def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: 
         if not ExtractedDate:
             DateMatch = DateValuePattern.search(RowText)
             if DateMatch:
-                ExtractedDate = _NormalizeExtractedDate(DateMatch.group(1), FallbackDate)
+                ExtractedDate = normalize_receipt_date(DateMatch.group(1))
+
+        if _payment_field(NormalizedRowText):
+            continue
 
         if IgnoreLinePattern.search(NormalizedRowText):
             continue
 
         PriceMatches = list(PriceTokenPattern.finditer(RowText))
-        if TotalKeywordPattern.search(NormalizedRowText):
-            if PriceMatches:
-                CandidateTotal = _ParseVietnameseMoneyToken(PriceMatches[-1].group(1))
-                if CandidateTotal > 0:
-                    PrintedTotalVnd = CandidateTotal
-            continue
-
         if not PriceMatches:
-            if RowIndex <= 2 and not MerchantName and len(RowText) >= 3:
-                MerchantName = RowText
+            if RowIndex <= 5 and not MerchantName and _LooksLikeMerchantName(RowItem):
+                MerchantName = RowText.strip(" .:-–—_|`'\"“”")
             continue
 
         LastMatch = PriceMatches[-1]
         ItemPrice = _ParseVietnameseMoneyToken(LastMatch.group(1))
         ItemLabel = RowText[: LastMatch.start()].strip(" .:-–0123456789")
         ItemLabel = re.sub(r"^\d+[.)]\s*", "", RowText[: LastMatch.start()]).strip(" .:-–")
-        if ItemPrice >= 1000 and ItemLabel:
+        if ItemPrice > 0 and ItemLabel:
             ParsedItems.append({"name": ItemLabel, "price": ItemPrice})
 
+    PrintedTotalVnd = read_paid_total(row["text"] for row in LogicalRows)
     QualityStatus = QualityReport.get("quality_status", "unknown")
     MeanConfidence = (
         sum(LineItem["confidence"] for LineItem in LogicalRows) / float(len(LogicalRows))
         if LogicalRows
         else 0.0
     )
+    uncertain_payment_row = any(
+        row["confidence"] < 0.55
+        and _payment_field(_StripVietnameseAccents(row["text"])) in {"paid", "total", "tender", "change"}
+        and PaymentAmountPattern.search(row["text"])
+        for row in LogicalRows
+    )
 
     IsUncertain = bool(
         QualityStatus == "fail"
         or len(LogicalRows) == 0
-        or len(ParsedItems) == 0
+        or PrintedTotalVnd <= 0
         or MeanConfidence < 0.45
+        or uncertain_payment_row
+        or (ExtractedDate and FallbackDate and ExtractedDate > FallbackDate)
     )
 
     if not MerchantName:
         MerchantName = "không rõ" if IsUncertain else "Cửa hàng trên hoá đơn"
-    if not ParsedItems:
-        ParsedItems = [{"name": "không rõ (cần bạn nhập hoặc chụp lại rõ nét hơn)", "price": PrintedTotalVnd}]
-
-    CombinedSearchText = " ".join([MerchantName] + [ItemObj["name"] for ItemObj in ParsedItems])
-    SuggestedCategory = _InferCategoryFromText(CombinedSearchText)
 
     return {
         "merchant": MerchantName,
-        "date": FallbackDate or ExtractedDate,
+        "date": ExtractedDate or FallbackDate,
+        "date_source": "hóa đơn" if ExtractedDate else "ngày chụp",
         "extracted_date_in_image": ExtractedDate,
-        "category": SuggestedCategory,
         "items": ParsedItems,
         "printed_total": PrintedTotalVnd,
         "logical_rows": LogicalRows,
@@ -596,15 +734,31 @@ def ScanReceiptImageBytes(
     SourceMode: str = "camera",
     FileName: str = "",
 ) -> dict:
-    """Chạy trọn bộ Quality Gate + ONNX OCR + Parser cho Luồng 1 trong spec.md §4."""
+    """Chạy Quality Gate, OCR cục bộ và trích trường cho luồng chụp hóa đơn."""
+    try:
+        with Image.open(io.BytesIO(ImageBytes)) as uploaded:
+            if uploaded.format not in {"JPEG", "PNG", "WEBP"} or uploaded.width * uploaded.height > 24_000_000:
+                raise ValueError("Định dạng ảnh chưa hỗ trợ hoặc ảnh quá lớn.")
+            image = ImageOps.exif_transpose(uploaded).convert("RGB")
+            image.thumbnail((2000, 2000))
+            buffer = io.BytesIO()
+            image.save(buffer, "PNG")
+            ImageBytes = buffer.getvalue()
+    except (OSError, Image.DecompressionBombError) as error:
+        raise ValueError("Không đọc được ảnh. Hãy chọn ảnh JPG, PNG hoặc WEBP.") from error
     QualityReport = AssessReceiptQuality(ImageBytes)
     OcrOutput = ExtractOcrLinesFromBytes(ImageBytes)
-    ParsedReceipt = ParseReceiptFromOcrLines(OcrOutput.get("lines", []), QualityReport, TargetDate)
+    lines = OcrOutput.get("lines", [])
+    metadata = {
+        "quality_report": QualityReport,
+        "ocr_engine": OcrOutput.get("engine_version", "unavailable"),
+        "ocr_engine_available": OcrOutput.get("engine_available", False),
+        "ocr_error": OcrOutput.get("error_message", ""),
+    }
+    if receipt_has_sensitive_text(" ".join(row["text"] for row in lines)):
+        return {**metadata, "blocked": True}
+    ParsedReceipt = ParseReceiptFromOcrLines(lines, QualityReport, TargetDate)
     ParsedReceipt["source"] = SourceMode
     ParsedReceipt["filename"] = FileName
-    ParsedReceipt["quality_report"] = QualityReport
-    ParsedReceipt["ocr_engine"] = OcrOutput.get("engine_version", "unavailable")
-    ParsedReceipt["ocr_engine_available"] = OcrOutput.get("engine_available", False)
-    ParsedReceipt["ocr_error"] = OcrOutput.get("error_message", "")
-    ParsedReceipt["ocr_lines"] = OcrOutput.get("lines", [])
-    return ParsedReceipt
+    ParsedReceipt["ocr_line_count"] = len(ParsedReceipt["logical_rows"])
+    return {**ParsedReceipt, **metadata}

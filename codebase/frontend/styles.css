@@ -669,10 +669,16 @@ h1, h2, h3, h4, p {
 }
 
 .draft-item-row {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr auto;
+  display: flex;
+  justify-content: space-between;
   gap: 8px;
   align-items: center;
+}
+
+.day-section summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
 .total-summary-box {

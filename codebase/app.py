@@ -1,21 +1,20 @@
-"""Web server và CLI cho SkyBill: phục vụ giao diện web, lưu trữ CSDL/, Quality Gate & ONNX OCR.
+"""Web server và CLI cho SkyBill, đọc ảnh hóa đơn và lưu sổ chi tiêu cục bộ.
 
 Chạy mặc định qua: python run.py
 """
 
 import argparse
+import hashlib
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 import mimetypes
 import os
+import re
 import socket
 from datetime import date
-import os
-from pathlib import Path
 import sys
 import threading
 import urllib.parse
-import uuid
 import webbrowser
 
 for StreamObject in (sys.stdout, sys.stderr, sys.stdin):
@@ -61,6 +60,7 @@ def run_cli() -> int:
     StorageModule.EnsureStorageLayout()
     print("Bản chạy thử CLI — gõ đầu vào rồi Enter. Thoát: Ctrl+C (hoặc Enter 2 lần với dòng trống).")
     BlankCount = 0
+    pending_receipt = None
     while True:
         try:
             InputText = input("> ").strip()
@@ -75,7 +75,8 @@ def run_cli() -> int:
         BlankCount = 0
         tracing.begin("app")
         try:
-            AnswerResult = answer(InputText)
+            AnswerResult = answer(InputText, live=True, pending_receipt=pending_receipt)
+            pending_receipt = AnswerResult.get("pending_receipt", pending_receipt)
         except NotImplementedError as NotImplError:
             tracing.end()
             print("Chưa nối model: %s" % NotImplError)
@@ -107,7 +108,7 @@ def _FindFreePort(PreferredPort: int) -> int:
     return PreferredPort
 
 
-def _CreateHttpHandler(TracingModule, AnswerFunction):
+def _CreateHttpHandler(TracingModule, AnswerFunction, ChooseCategory):
     class SkyBillHttpHandler(SimpleHTTPRequestHandler):
         def __init__(SelfInstance, *PositionalArgs, **KeywordArgs):
             super().__init__(*PositionalArgs, directory=FrontendDirectory, **KeywordArgs)
@@ -125,6 +126,8 @@ def _CreateHttpHandler(TracingModule, AnswerFunction):
 
         def _ReadJsonBody(SelfInstance) -> dict:
             ContentLength = int(SelfInstance.headers.get("Content-Length", "0"))
+            if not 0 <= ContentLength <= 12_100_000:
+                raise ValueError("Dữ liệu gửi lên quá lớn.")
             RawBody = SelfInstance.rfile.read(ContentLength).decode("utf-8") if ContentLength > 0 else "{}"
             ParsedPayload = json.loads(RawBody)
             return ParsedPayload if isinstance(ParsedPayload, dict) else {}
@@ -203,7 +206,7 @@ def _CreateHttpHandler(TracingModule, AnswerFunction):
 
             if RoutePath == "/api/receipts/scan":
                 ImageDataUrl = str(RequestBody.get("image_data_url") or "")
-                TargetDate = str(RequestBody.get("receipt_date") or "").strip()
+                TargetDate = DocumentOcrModule.normalize_receipt_date(str(RequestBody.get("receipt_date") or ""))
                 SourceMode = str(RequestBody.get("source_mode") or "camera").strip()
                 FileName = str(RequestBody.get("filename") or "").strip()
 
@@ -211,24 +214,29 @@ def _CreateHttpHandler(TracingModule, AnswerFunction):
                     SelfInstance._SendJsonResponse(400, {"error": "Thiếu image_data_url hoặc receipt_date"})
                     return
 
-                DraftId = "DRAFT-" + uuid.uuid4().hex[:8].upper()
                 try:
-                    RelativeImagePath, ImageRawBytes = StorageModule.SaveBase64ReceiptImage(
-                        ImageDataUrl, TargetDate, DraftId
+                    ImageRawBytes, extension = StorageModule.DecodeReceiptImage(ImageDataUrl)
+                    ScanResult = DocumentOcrModule.ScanReceiptImageBytes(
+                        ImageRawBytes, TargetDate, SourceMode=SourceMode, FileName=FileName
                     )
-                except Exception as ImageError:
+                except ValueError as ImageError:
                     SelfInstance._SendJsonResponse(400, {"error": "Không đọc được dữ liệu ảnh: %s" % ImageError})
                     return
 
-                ScanResult = DocumentOcrModule.ScanReceiptImageBytes(
-                    ImageRawBytes, TargetDate, SourceMode=SourceMode, FileName=FileName
-                )
-                ScanResult["draft_id"] = DraftId
-                ScanResult["image_path"] = RelativeImagePath
-                ScanResult["user_id"] = "default_user"
+                if ScanResult.get("blocked"):
+                    SelfInstance._SendJsonResponse(422, {"error": "Ảnh có thông tin bảo mật. Hãy che thông tin và chụp lại."})
+                    return
 
-                ValidationResult = ReceiptTools.validate_receipt(ScanResult)
-                SavedDraft = ReceiptTools.draft_save_receipt("default_user", TargetDate, ScanResult)
+                capture_id = str(RequestBody.get("capture_id") or hashlib.sha256(ImageRawBytes).hexdigest())
+                if not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", capture_id):
+                    SelfInstance._SendJsonResponse(400, {"error": "Mã lượt chụp không hợp lệ."})
+                    return
+                ScanResult["capture_id"] = capture_id
+                # Cùng quy tắc chọn nhóm với answer(); chỉ gọi model khi ảnh đã đủ căn cứ.
+                readable = ScanResult.get("printed_total") and not ScanResult.get("is_uncertain")
+                OcrText = "\n".join(row["text"] for row in ScanResult.get("logical_rows", []))
+                ScanResult["category"] = ChooseCategory(OcrText) if readable else "không rõ"
+                ValidationResult, SavedDraft = ReceiptTools.prepare_receipt(ScanResult, image=(ImageRawBytes, extension))
 
                 SelfInstance._SendJsonResponse(
                     200,
@@ -239,14 +247,18 @@ def _CreateHttpHandler(TracingModule, AnswerFunction):
                         "ocr_engine": ScanResult.get("ocr_engine"),
                         "ocr_engine_available": ScanResult.get("ocr_engine_available"),
                         "ocr_error": ScanResult.get("ocr_error"),
-                        "ocr_lines": ScanResult.get("ocr_lines", []),
+                        "ocr_line_count": ScanResult.get("ocr_line_count", 0),
                     },
                 )
                 return
 
             if RoutePath == "/api/receipts/confirm":
-                ConfirmedReceipt = StorageModule.ConfirmDraftToLedger(RequestBody)
-                SelfInstance._SendJsonResponse(200, {"receipt": ConfirmedReceipt})
+                try:
+                    ConfirmedReceipt, duplicate = ReceiptTools.confirm_receipt(RequestBody)
+                except (TypeError, ValueError) as exc:
+                    SelfInstance._SendJsonResponse(422, {"error": str(exc)})
+                    return
+                SelfInstance._SendJsonResponse(200, {"receipt": ConfirmedReceipt, "duplicate": duplicate})
                 return
 
             if RoutePath == "/api/receipts/reset-demo":
@@ -261,7 +273,7 @@ def _CreateHttpHandler(TracingModule, AnswerFunction):
                     return
                 TracingModule.begin("web")
                 try:
-                    AnswerResult = AnswerFunction(InputText)
+                    AnswerResult = AnswerFunction(InputText, live=True, allow_receipt=False)
                     TraceSummary, UnusedEvents = TracingModule.end()
                     OutputText = AnswerResult.get("output", "") if isinstance(AnswerResult, dict) else str(AnswerResult)
                     SelfInstance._SendJsonResponse(200, {"output": OutputText, "summary": TraceSummary})
@@ -306,7 +318,7 @@ def _CreateHttpHandler(TracingModule, AnswerFunction):
     return SkyBillHttpHandler
 
 
-def run_web(PortNumber: int, OpenBrowser: bool) -> int:
+def run_web(PortNumber: int, OpenBrowser: bool, HostAddress: str = "127.0.0.1") -> int:
     """Khởi động web server SkyBill và đồng bộ với thư mục CSDL/."""
     if not os.path.isdir(FrontendDirectory):
         print("Không tìm thấy thư mục giao diện: %s" % FrontendDirectory)
@@ -314,20 +326,20 @@ def run_web(PortNumber: int, OpenBrowser: bool) -> int:
 
     try:
         import tracing
-        from agent import answer
+        from agent import answer, choose_category
     except Exception as LoadError:
         print("Không nạp được codebase/ — lỗi ở %s: %s: %s" % (_WhereFailed(LoadError), type(LoadError).__name__, LoadError))
         return 1
 
     StorageModule.EnsureStorageLayout()
     OcrStatus = DocumentOcrModule.GetOcrEnvironmentStatus()
-    ChosenPort = _FindFreePort(PortNumber)
-    WebServer = ThreadingHTTPServer(("127.0.0.1", ChosenPort), _CreateHttpHandler(tracing, answer))
-    ServerUrl = "http://127.0.0.1:%d" % ChosenPort
+    ChosenPort = _FindFreePort(PortNumber) if HostAddress == "127.0.0.1" else PortNumber
+    WebServer = ThreadingHTTPServer((HostAddress, ChosenPort), _CreateHttpHandler(tracing, answer, choose_category))
+    ServerUrl = "http://%s:%d" % ("localhost" if HostAddress == "0.0.0.0" else HostAddress, ChosenPort)
 
     print("SkyBill Web UI đang chạy tại: %s" % ServerUrl)
     print("Thư mục lưu trữ CSDL: %s" % StorageModule.StorageRootDirectory)
-    print("ONNX OCR (%s): %s" % (OcrStatus["engine_version"], "SẴN SÀNG" if OcrStatus["engine_ready"] else "CHƯA ĐỦ THƯ VIỆN/TRỌNG SỐ"))
+    print("OCR (%s): %s" % (OcrStatus["engine_version"], "SẴN SÀNG" if OcrStatus["engine_ready"] else "CHƯA SẴN SÀNG"))
     print("Nhấn Ctrl+C để dừng máy chủ.")
 
     if OpenBrowser:
@@ -345,13 +357,15 @@ def run_web(PortNumber: int, OpenBrowser: bool) -> int:
 def main() -> int:
     ArgParser = argparse.ArgumentParser(description="Khởi chạy SkyBill")
     ArgParser.add_argument("--cli", action="store_true", help="Chạy ở chế độ dòng lệnh")
-    ArgParser.add_argument("--port", type=int, default=8080, help="Cổng chạy web server (mặc định 8080)")
-    ArgParser.add_argument("--no-browser", action="store_true", help="Không tự mở trình duyệt")
+    # Biến môi trường cho Docker: run.py gọi app.py không kèm tham số.
+    ArgParser.add_argument("--host", default=os.environ.get("SKYBILL_HOST", "127.0.0.1"), help="Địa chỉ lắng nghe")
+    ArgParser.add_argument("--port", type=int, default=int(os.environ.get("SKYBILL_PORT", "8080")), help="Cổng chạy web server (mặc định 8080)")
+    ArgParser.add_argument("--no-browser", action="store_true", default=os.environ.get("SKYBILL_NO_BROWSER") == "1", help="Không tự mở trình duyệt")
     ParsedArgs = ArgParser.parse_args()
 
     if ParsedArgs.cli:
         return run_cli()
-    return run_web(ParsedArgs.port, not ParsedArgs.no_browser)
+    return run_web(ParsedArgs.port, not ParsedArgs.no_browser, ParsedArgs.host)
 
 
 if __name__ == "__main__":
