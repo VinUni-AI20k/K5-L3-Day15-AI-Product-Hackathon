@@ -14,12 +14,13 @@ import {
 } from "@/ui/components/inbox/inbox-filters";
 
 describe("inbox-filters URL parser & builder", () => {
-  it("parses defaults, all 6 filter chips, narrowing params, and active thread", () => {
+  it("parses defaults, all 7 filter chips (with can_ban first), narrowing params, and active thread", () => {
     expect(parseInboxUrlState(new URLSearchParams(""))).toEqual(
       DEFAULT_INBOX_URL_STATE,
     );
 
     for (const chip of [
+      "can_ban",
       "needs_reply",
       "unread",
       "all",
@@ -128,13 +129,22 @@ describe("inbox-filters URL parser & builder", () => {
       }),
     ).toBe("no-result");
 
+    expect(
+      resolveInboxListEmptyKind({
+        counts: { ...EMPTY_INBOX_COUNTS, all: 8, canBan: 0 },
+        filter: { ...DEFAULT_INBOX_LIST_FILTER, filter: "can_ban" },
+      }),
+    ).toBe("can-ban-clear");
+
     const counts = {
+      canBan: 2,
       needsReply: 3,
       unread: 2,
       all: 10,
       hidden: 1,
       ignored: 4,
     };
+    expect(getInboxFilterCount(counts, "can_ban")).toBe(2);
     expect(getInboxFilterCount(counts, "needs_reply")).toBe(3);
     expect(getInboxFilterCount(counts, "unread")).toBe(2);
     expect(getInboxFilterCount(counts, "all")).toBe(10);

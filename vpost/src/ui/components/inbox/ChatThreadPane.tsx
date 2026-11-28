@@ -2,6 +2,7 @@
 
 import {
   Button,
+  Card,
   Center,
   HStack,
   Layout,
@@ -9,9 +10,11 @@ import {
   Spinner,
   Stack,
   Text,
+  useAnnounce,
 } from "@astryxdesign/core";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, FlaskConical } from "lucide-react";
 import {
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -19,6 +22,12 @@ import {
 } from "react";
 
 import { CommentErrorNotice } from "@/ui/components/comments/CommentErrorNotice";
+import {
+  AGENT_RUN_LIVE_ANNOUNCEMENT,
+  claimAgentRunAnnouncement,
+  resolveMessageAgentRun,
+} from "@/ui/components/inbox/agent-run-state";
+import { AgentTypingBubble } from "@/ui/components/inbox/AgentTypingBubble";
 import {
   ChatComposer,
   type ComposerBlockedState,
@@ -33,7 +42,13 @@ import {
 } from "@/ui/components/inbox/inbox-scroll-state";
 import { InboxEmptyState } from "@/ui/components/inbox/InboxEmptyState";
 import { InboxChatSkeleton } from "@/ui/components/inbox/InboxSkeleton";
-import type { InboxMessage, InboxThread } from "@/ui/schemas/inbox.schema";
+import {
+  formatCommentAbsoluteTime,
+  formatCommentRelativeTime,
+  type AgentRun,
+  type InboxMessage,
+  type InboxThread,
+} from "@/ui/schemas/inbox.schema";
 import { ApiError } from "@/ui/services/api-error";
 
 import "./inbox-surface.css";
@@ -58,10 +73,17 @@ export interface ChatThreadPaneProps {
   readonly isGeneratingDraft: boolean;
   readonly draftError: unknown;
   readonly blockedState: ComposerBlockedState | null;
+  readonly isClearingAttention?: boolean;
+  readonly clearAttentionError?: unknown;
   readonly likingMessageId: string | null;
   readonly hidingMessageId: string | null;
   readonly messageErrorById: Readonly<Record<string, unknown>>;
   readonly lastOwnSendSeq: number;
+  readonly threadRuns?: readonly AgentRun[];
+  readonly isLoadingThreadRuns?: boolean;
+  readonly threadRunsError?: unknown;
+  /** Optional override for render tests of expanded message traces. */
+  readonly initialExpandedTraceMessageIds?: readonly string[];
   /** Optional override for render tests of the "Có N tin mới" pill. */
   readonly initialUnseenCount?: number;
   /** Optional override for composer initial text in render tests. */
@@ -76,8 +98,11 @@ export interface ChatThreadPaneProps {
   readonly onRetrySendMessage: (message: InboxMessage) => void;
   readonly onRegenerateDraft: () => void;
   readonly onClearBlocked: () => void;
+  readonly onClearAttention?: () => void;
   readonly onToggleLikeMessage: (message: InboxMessage) => void;
   readonly onToggleHideMessage: (message: InboxMessage) => void;
+  readonly onRequestThreadRuns?: () => void;
+  readonly onRetryThreadRuns?: () => void;
 }
 
 function isThreadNotFoundError(error: unknown): boolean {
@@ -135,10 +160,16 @@ export function ChatThreadPane({
   isGeneratingDraft,
   draftError,
   blockedState,
+  isClearingAttention = false,
+  clearAttentionError,
   likingMessageId,
   hidingMessageId,
   messageErrorById,
   lastOwnSendSeq,
+  threadRuns,
+  isLoadingThreadRuns = false,
+  threadRunsError,
+  initialExpandedTraceMessageIds,
   initialUnseenCount = 0,
   composerInitialTextOverride,
   onBack,
@@ -151,10 +182,15 @@ export function ChatThreadPane({
   onRetrySendMessage,
   onRegenerateDraft,
   onClearBlocked,
+  onClearAttention,
   onToggleLikeMessage,
   onToggleHideMessage,
+  onRequestThreadRuns,
+  onRetryThreadRuns,
 }: ChatThreadPaneProps) {
+  const announce = useAnnounce();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const announcedRunIdsRef = useRef<Set<string>>(new Set());
   const scrollTrackerRef = useRef<ChatScrollTrackerState>({
     initializedThreadId: null,
     isAtBottom: true,
@@ -166,12 +202,53 @@ export function ChatThreadPane({
 
   const [trackedThreadId, setTrackedThreadId] = useState(threadId);
   const [unseenNewCount, setUnseenNewCount] = useState(initialUnseenCount);
+  const [expandedTraceMessageIds, setExpandedTraceMessageIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set(initialExpandedTraceMessageIds ?? []));
 
-  // Reset unseen count synchronously during render whenever switching threads
+  // Reset unseen count and collapsed traces synchronously during render whenever switching threads
   // (including cached thread switches where useLayoutEffect runs before useEffect).
   if (trackedThreadId !== threadId) {
     setTrackedThreadId(threadId);
     setUnseenNewCount(initialUnseenCount);
+    setExpandedTraceMessageIds(new Set(initialExpandedTraceMessageIds ?? []));
+  }
+
+  const runningAgentRun =
+    thread?.agentRun?.status === "running" ? thread.agentRun : null;
+  const runningAgentRunId = runningAgentRun?.id ?? null;
+  const runningStepCount = runningAgentRun?.steps.length ?? 0;
+
+  // Announce "AI đang soạn trả lời" via polite live region strictly once per run ID.
+  useEffect(() => {
+    if (claimAgentRunAnnouncement(announcedRunIdsRef.current, runningAgentRunId)) {
+      announce(AGENT_RUN_LIVE_ANNOUNCEMENT, "polite");
+    }
+  }, [announce, runningAgentRunId]);
+
+  // Keep the live typing bubble in view when already scrolled near the bottom.
+  useLayoutEffect(() => {
+    if (!runningAgentRunId) return;
+    const el = scrollRef.current;
+    if (el && scrollTrackerRef.current.isAtBottom) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [runningAgentRunId, runningStepCount]);
+
+  function handleToggleAgentTrace(messageId: string) {
+    const isExpanding = !expandedTraceMessageIds.has(messageId);
+    setExpandedTraceMessageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+    if (isExpanding) {
+      onRequestThreadRuns?.();
+    }
   }
 
   // Reconcile thread switches, older-history scroll anchors, own sends, and new arrivals.
@@ -407,13 +484,86 @@ export function ChatThreadPane({
                     isLiking={likingMessageId === message.id}
                     isHiding={hidingMessageId === message.id}
                     actionError={messageErrorById[message.id]}
+                    matchedAgentRun={resolveMessageAgentRun({
+                      agentRunId: message.agentRunId,
+                      runs: threadRuns,
+                      latestThreadRun: thread.agentRun,
+                    })}
+                    isAgentTraceExpanded={expandedTraceMessageIds.has(message.id)}
+                    isLoadingAgentRuns={isLoadingThreadRuns}
+                    agentRunsError={threadRunsError}
                     onToggleLike={onToggleLikeMessage}
                     onToggleHide={onToggleHideMessage}
                     onRetrySend={onRetrySendMessage}
+                    onToggleAgentTrace={handleToggleAgentTrace}
+                    onRetryAgentRuns={onRetryThreadRuns}
                   />
                 ))}
               </Stack>
             )}
+
+            {/* Dry-run auto-reply preview card when lastAction === "would_send" */}
+            {thread.autoReply?.lastAction === "would_send" ? (
+              <Card
+                variant="muted"
+                padding={3}
+                className="inbox-dry-run-card"
+                data-inbox="auto-reply-dry-run"
+                role="status"
+              >
+                <Stack direction="vertical" gap={1.5}>
+                  <HStack gap={2} align="center" justify="between" wrap="wrap">
+                    <HStack gap={1.5} align="center">
+                      <FlaskConical
+                        className="size-4 shrink-0 inbox-meta-text"
+                        aria-hidden="true"
+                      />
+                      <Text type="label" color="secondary">
+                        Sẽ tự trả lời (chạy thử):
+                      </Text>
+                    </HStack>
+                    <Text
+                      type="supporting"
+                      size="xsm"
+                      color="inherit"
+                      className="inbox-meta-text"
+                      hasTabularNumbers
+                    >
+                      <time
+                        dateTime={thread.autoReply.at}
+                        title={formatCommentAbsoluteTime(thread.autoReply.at)}
+                      >
+                        {formatCommentRelativeTime(thread.autoReply.at, nowMs) ||
+                          formatCommentAbsoluteTime(thread.autoReply.at)}
+                      </time>
+                    </Text>
+                  </HStack>
+                  <Text
+                    type="body"
+                    color="secondary"
+                    className="whitespace-pre-wrap break-words"
+                  >
+                    {thread.autoReply.text?.trim() || "(Không có nội dung xem trước)"}
+                  </Text>
+                  <Text
+                    type="supporting"
+                    size="xsm"
+                    color="inherit"
+                    className="inbox-meta-text"
+                  >
+                    Chưa đăng lên Facebook vì Fanpage đang ở chế độ Chạy thử.
+                  </Text>
+                </Stack>
+              </Card>
+            ) : null}
+
+            {/* Live typing bubble at the end of the chat while thread.agentRun.status === "running" */}
+            {runningAgentRun ? (
+              <AgentTypingBubble
+                agentRun={runningAgentRun}
+                channelName={thread.channelName}
+              />
+            ) : null}
 
             {/* Floating "Có N tin mới" pill when scrolled up */}
             {unseenNewCount > 0 ? (
@@ -447,10 +597,13 @@ export function ChatThreadPane({
           isGeneratingDraft={isGeneratingDraft}
           draftError={draftError}
           blockedState={blockedState}
+          isClearingAttention={isClearingAttention}
+          clearAttentionError={clearAttentionError}
           initialTextOverride={composerInitialTextOverride}
           onSendReply={onSendReply}
           onRegenerateDraft={onRegenerateDraft}
           onClearBlocked={onClearBlocked}
+          onClearAttention={onClearAttention}
         />
       }
     />

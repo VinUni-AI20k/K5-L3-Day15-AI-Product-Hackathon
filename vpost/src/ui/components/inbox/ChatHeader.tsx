@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Badge,
   Button,
   Card,
   HStack,
@@ -13,9 +14,10 @@ import {
   Text,
   Thumbnail,
   Token,
+  Tooltip,
   VisuallyHidden,
 } from "@astryxdesign/core";
-import { ArrowLeft, Ban, PanelRight, RotateCcw } from "lucide-react";
+import { AlertCircle, ArrowLeft, Ban, PanelRight, RotateCcw } from "lucide-react";
 
 import { InboxCustomerAvatar } from "@/ui/components/inbox/InboxCustomerAvatar";
 import {
@@ -68,6 +70,14 @@ export function ChatHeader({
     safePostUrl !== null ||
     rawPostUrlText.length > 0;
 
+  const attention = thread.attention;
+  const attentionReason = attention?.reason.trim() ?? "";
+  const attentionLabel = attention
+    ? attentionReason.length > 0
+      ? `Cần bạn: ${attentionReason}`
+      : "Cần bạn"
+    : null;
+
   return (
     <LayoutHeader hasDivider padding={0} className="inbox-chat-header">
       <Stack direction="vertical" gap={3} className="min-w-0">
@@ -95,6 +105,18 @@ export function ChatHeader({
             <Stack direction="vertical" gap={0.5} className="min-w-0">
               <HStack gap={2} align="center" wrap="wrap">
                 <Heading level={3}>{customerName}</Heading>
+                {attention && attentionLabel ? (
+                  <Tooltip content={attentionLabel} placement="below">
+                    <span className="inline-flex" title={attentionLabel}>
+                      <Badge
+                        variant="error"
+                        icon={<AlertCircle className="size-4" aria-hidden="true" />}
+                        label="Cần bạn"
+                        data-attention-badge="can_ban"
+                      />
+                    </span>
+                  </Tooltip>
+                ) : null}
                 {thread.needsReply ? (
                   <Token label="Cần trả lời" color="orange" size="sm" />
                 ) : null}

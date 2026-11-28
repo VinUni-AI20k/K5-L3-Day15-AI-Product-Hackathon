@@ -10,10 +10,13 @@ import {
   StatusDot,
   Text,
   Token,
+  Tooltip,
   VisuallyHidden,
 } from "@astryxdesign/core";
-import { MessageSquare, Sparkles } from "lucide-react";
+import { AlertCircle, MessageSquare, Sparkles } from "lucide-react";
+import { useId, useState, type FocusEvent, type KeyboardEvent } from "react";
 
+import { AGENT_RUN_ROW_INDICATOR_LABEL } from "@/ui/components/inbox/agent-run-state";
 import { InboxCustomerAvatar } from "@/ui/components/inbox/InboxCustomerAvatar";
 import {
   displayCommentAuthor,
@@ -44,8 +47,10 @@ export interface ConversationListItemProps {
 /**
  * Single conversation row in the left inbox column.
  * Displays avatar initials, customer name, last message excerpt ("Bạn: " when
- * from Page), relative time, unread dot + count, needs-reply indicator,
- * comment type icon, up to 2 colored tag pills + "+N", and AI-draft-ready marker.
+ * from Page), relative time, unread dot + count, highest-priority "Cần bạn"
+ * attention badge (with reason exposed on hover, keyboard focus, and to screen
+ * readers), needs-reply indicator, comment type icon, up to 2 colored tag pills
+ * + "+N", and AI-draft-ready marker.
  */
 export function ConversationListItem({
   thread,
@@ -59,6 +64,9 @@ export function ConversationListItem({
   onSelect,
   onToggleBulkSelect,
 }: ConversationListItemProps) {
+  const attentionDescId = useId();
+  const [isAttentionTooltipFocused, setIsAttentionTooltipFocused] = useState(false);
+
   const customerName = displayCommentAuthor(thread.customer.name);
   const excerpt = formatThreadLastMessageExcerpt(thread.lastMessage);
   const accessibleContext = formatThreadAccessibleContext(thread);
@@ -75,6 +83,38 @@ export function ConversationListItem({
   const isDraftFlagged = thread.draft?.status === "flagged";
 
   const showUnreadBadge = thread.unread && thread.unreadCount > 0;
+  const isAgentRunning = thread.agentRun?.status === "running";
+
+  const attention = thread.attention;
+  const attentionReason = attention?.reason.trim() ?? "";
+  const attentionLabel = attention
+    ? attentionReason.length > 0
+      ? `Cần bạn: ${attentionReason}`
+      : "Cần bạn"
+    : null;
+
+  function handleRowFocus(event: FocusEvent<HTMLElement>) {
+    if (!attention) return;
+    try {
+      if (event.target.matches(":focus-visible")) {
+        setIsAttentionTooltipFocused(true);
+      }
+    } catch {
+      setIsAttentionTooltipFocused(true);
+    }
+  }
+
+  function handleRowBlur() {
+    if (isAttentionTooltipFocused) {
+      setIsAttentionTooltipFocused(false);
+    }
+  }
+
+  function handleRowKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape" && isAttentionTooltipFocused) {
+      setIsAttentionTooltipFocused(false);
+    }
+  }
 
   return (
     <Stack
@@ -88,6 +128,9 @@ export function ConversationListItem({
       data-thread-id={thread.id}
       data-unread={thread.unread ? "true" : "false"}
       data-needs-reply={thread.needsReply ? "true" : "false"}
+      data-attention={attention ? attention.tag : "none"}
+      data-attention-reason={attentionReason || undefined}
+      data-agent-run-status={thread.agentRun?.status ?? "idle"}
       data-selected={isSelected ? "true" : "false"}
     >
       <Item
@@ -96,7 +139,11 @@ export function ConversationListItem({
         density="balanced"
         isSelected={isSelected}
         className="inbox-thread-item"
+        aria-describedby={attention ? attentionDescId : undefined}
         onClick={() => onSelect(thread.id)}
+        onFocus={handleRowFocus}
+        onBlur={handleRowBlur}
+        onKeyDown={handleRowKeyDown}
         startContent={
           <HStack gap={2} align="center">
             {isBulkMode ? (
@@ -187,6 +234,47 @@ export function ConversationListItem({
             </HStack>
 
             <HStack gap={1.5} align="center" wrap="wrap">
+              {attention && attentionLabel ? (
+                <>
+                  <Tooltip
+                    content={attentionLabel}
+                    placement="above"
+                    focusTrigger="never"
+                    isOpen={isAttentionTooltipFocused ? true : undefined}
+                  >
+                    <span className="inline-flex" title={attentionLabel}>
+                      <Badge
+                        variant="error"
+                        icon={<AlertCircle className="size-4" aria-hidden="true" />}
+                        label="Cần bạn"
+                        data-attention-badge="can_ban"
+                      />
+                    </span>
+                  </Tooltip>
+                  <VisuallyHidden id={attentionDescId}>
+                    {` — ${attentionLabel}`}
+                  </VisuallyHidden>
+                </>
+              ) : null}
+
+              {isAgentRunning ? (
+                <span className="inline-flex" data-agent-run-indicator="running">
+                  <Token
+                    label={AGENT_RUN_ROW_INDICATOR_LABEL}
+                    icon={
+                      <StatusDot
+                        variant="accent"
+                        label={AGENT_RUN_ROW_INDICATOR_LABEL}
+                        isPulsing
+                        aria-hidden="true"
+                      />
+                    }
+                    color="purple"
+                    size="sm"
+                  />
+                </span>
+              ) : null}
+
               {thread.needsReply ? (
                 <Token label="Cần trả lời" color="orange" size="sm" />
               ) : null}

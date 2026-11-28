@@ -2,6 +2,13 @@ import type { z } from "zod";
 
 import { ApiErrorBodySchema } from "@/ui/schemas/tenant-health.schema";
 
+import {
+  createRequestSignal,
+  isAbortError,
+  isCallerSignalAborted,
+  isTimeoutError,
+  normalizeAbortError,
+} from "./abort";
 import { ApiError, CLIENT_ERROR_CODES } from "./api-error";
 
 /**
@@ -52,17 +59,33 @@ function encodeBody(body: unknown, isForm: boolean): BodyInit | undefined {
   return isForm ? (body as FormData) : JSON.stringify(body);
 }
 
-/** Combines the caller's signal with the timeout — cancel must work either way. */
-function withTimeout(timeoutMs: number, signal?: AbortSignal): AbortSignal {
-  const timeout = AbortSignal.timeout(timeoutMs);
-  return signal ? AbortSignal.any([signal, timeout]) : timeout;
-}
-
 /** A 502 from a proxy returns HTML; parsing it must not throw a raw SyntaxError. */
-async function readJson(response: Response): Promise<unknown> {
+async function readJson(
+  response: Response,
+  callerSignal: AbortSignal | undefined,
+  fallbackReason: string,
+): Promise<unknown> {
+  if (isCallerSignalAborted(callerSignal)) {
+    throw normalizeAbortError(callerSignal?.reason, callerSignal, fallbackReason);
+  }
   try {
     return await response.json();
   } catch (cause) {
+    if (isCallerSignalAborted(callerSignal)) {
+      throw normalizeAbortError(cause, callerSignal, fallbackReason);
+    }
+    if (isTimeoutError(cause)) {
+      throw new ApiError({
+        code: CLIENT_ERROR_CODES.TIMEOUT,
+        status: 0,
+        message: cause instanceof Error ? cause.message : String(cause),
+        userMessage: "Máy chủ phản hồi quá lâu. Hãy thử lại.",
+        cause,
+      });
+    }
+    if (isAbortError(cause)) {
+      throw normalizeAbortError(cause, callerSignal, fallbackReason);
+    }
     throw new ApiError({
       code: CLIENT_ERROR_CODES.MALFORMED_RESPONSE,
       status: response.status,
@@ -102,6 +125,8 @@ export function toApiErrorBody(status: number, payload: unknown): ApiError {
 async function sendRequest(
   path: string,
   options: Omit<ApiRequestOptions<unknown>, "schema" | "malformedMessage">,
+  requestSignal: AbortSignal,
+  fallbackReason: string,
 ): Promise<Response> {
   const method = options.method ?? "GET";
 
@@ -117,14 +142,21 @@ async function sendRequest(
       body: encodeBody(options.body, isForm),
       // Session-scoped operator data: never served from an HTTP cache.
       cache: "no-store",
-      signal: withTimeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS, options.signal),
+      signal: requestSignal,
     });
   } catch (cause) {
-    // An abort asked for by the caller (component unmounted, query cancelled) is
-    // not a failure to report — rethrow it so TanStack Query can drop it.
-    if (options.signal?.aborted) throw cause;
+    // An abort asked for by the caller (component unmounted, query cancelled,
+    // navigation) is not a failure to report — normalize its reason and rethrow
+    // so TanStack Query or the calling hook can drop it cleanly.
+    if (isCallerSignalAborted(options.signal)) {
+      throw normalizeAbortError(cause, options.signal, fallbackReason);
+    }
 
-    const isTimeout = cause instanceof DOMException && cause.name === "TimeoutError";
+    const isTimeout = isTimeoutError(cause);
+    if (!isTimeout && isAbortError(cause)) {
+      throw normalizeAbortError(cause, options.signal, fallbackReason);
+    }
+
     throw new ApiError({
       code: isTimeout ? CLIENT_ERROR_CODES.TIMEOUT : CLIENT_ERROR_CODES.NETWORK,
       status: 0,
@@ -141,8 +173,21 @@ async function sendRequest(
 
 export async function apiRequest<T>(path: string, options: ApiRequestOptions<T>): Promise<T> {
   const method = options.method ?? "GET";
-  const response = await sendRequest(path, options);
-  const payload = await readJson(response);
+  const fallbackReason = `${method} ${path} aborted`;
+  const { signal: requestSignal, cleanup } = createRequestSignal(
+    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    options.signal,
+    fallbackReason,
+  );
+
+  let response: Response;
+  let payload: unknown;
+  try {
+    response = await sendRequest(path, options, requestSignal, fallbackReason);
+    payload = await readJson(response, options.signal, fallbackReason);
+  } finally {
+    cleanup();
+  }
 
   if (!response.ok) throw toApiErrorBody(response.status, payload);
 
@@ -173,8 +218,20 @@ export async function apiRequestNoContent(
   path: string,
   options: Omit<ApiRequestOptions<unknown>, "schema" | "malformedMessage">,
 ): Promise<void> {
-  const response = await sendRequest(path, options);
-  if (response.ok) return;
+  const method = options.method ?? "GET";
+  const fallbackReason = `${method} ${path} aborted`;
+  const { signal: requestSignal, cleanup } = createRequestSignal(
+    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    options.signal,
+    fallbackReason,
+  );
 
-  throw toApiErrorBody(response.status, await readJson(response));
+  try {
+    const response = await sendRequest(path, options, requestSignal, fallbackReason);
+    if (response.ok) return;
+
+    throw toApiErrorBody(response.status, await readJson(response, options.signal, fallbackReason));
+  } finally {
+    cleanup();
+  }
 }

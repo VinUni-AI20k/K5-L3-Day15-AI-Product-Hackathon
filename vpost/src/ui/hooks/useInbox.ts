@@ -3,12 +3,17 @@
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { inboxKeys } from "@/ui/hooks/inbox-keys";
+import {
+  readDocumentVisible,
+  useDocumentVisible,
+} from "@/ui/hooks/useCommentUpdates";
 import { useActiveTenant } from "@/ui/hooks/useMe";
 import type {
   CommentMutationResponse,
@@ -16,13 +21,16 @@ import type {
 } from "@/ui/schemas/comment.schema";
 import {
   INBOX_DEFAULT_MESSAGES_LIMIT,
+  INBOX_DEFAULT_RUNS_LIMIT,
   INBOX_DEFAULT_THREADS_LIMIT,
   type InboxLikeResponse,
   type InboxListFilter,
   type InboxReplyResponse,
+  type InboxThread,
   type InboxThreadDetailResponse,
   type InboxThreadListResponse,
   type InboxThreadMutationResponse,
+  type InboxThreadRunsResponse,
 } from "@/ui/schemas/inbox.schema";
 import { ApiError } from "@/ui/services/api-error";
 import {
@@ -31,9 +39,11 @@ import {
   type SyncCommentsParams,
 } from "@/ui/services/comment.api";
 import {
+  clearThreadAttention,
   generateThreadDraft,
   getThreadDetail,
   ignoreThread,
+  listThreadRuns,
   listThreads,
   markThreadRead,
   sendThreadReply,
@@ -43,6 +53,42 @@ import {
 import { moderationKeys } from "@/ui/services/moderation.api";
 
 export { inboxKeys };
+
+/** Fast polling interval while the active thread has an agent run in progress. */
+export const AGENT_RUN_POLL_INTERVAL_MS = 2_000;
+
+/** True when a thread's latest agent run is currently executing. */
+export function isAgentRunRunning(
+  thread: Pick<InboxThread, "agentRun"> | null | undefined,
+): boolean {
+  return thread?.agentRun?.status === "running";
+}
+
+function isTerminalThreadMissingError(error: unknown): boolean {
+  if (!ApiError.is(error)) return false;
+  return (
+    error.status === 404 ||
+    error.code === "NOT_FOUND" ||
+    error.code === "COMMENT_NOT_FOUND" ||
+    error.code === "THREAD_NOT_FOUND"
+  );
+}
+
+/**
+ * Computes the TanStack Query `refetchInterval` for a single thread detail query:
+ * polls every 2 s ONLY while `thread.agentRun.status === "running"` and the tab is
+ * visible; stops immediately once done, errored (404), or hidden.
+ */
+export function nextAgentRunPollIntervalMs(
+  data: InfiniteData<InboxThreadDetailResponse> | undefined,
+  isVisible: boolean,
+  error?: unknown,
+): number | false {
+  if (!isVisible) return false;
+  if (isTerminalThreadMissingError(error)) return false;
+  const latestThread = data?.pages[0]?.thread;
+  return isAgentRunRunning(latestThread) ? AGENT_RUN_POLL_INTERVAL_MS : false;
+}
 
 function shouldRetryInboxQuery(failureCount: number, error: unknown): boolean {
   return ApiError.is(error) && error.isRetryable ? failureCount < 2 : false;
@@ -113,12 +159,17 @@ export function useInboxThreads(filter: InboxListFilter) {
 /**
  * Single conversation thread with reverse-paginated older history
  * (`GET /api/comments/threads/{threadId}?before=&limit=`).
+ * Polls this thread every 2 s ONLY while `thread.agentRun.status === "running"`
+ * and the browser tab is visible; stops when done or hidden, and syncs list/runs
+ * caches once a running run finishes.
  */
 export function useInboxThread(threadId: string | null) {
+  const queryClient = useQueryClient();
   const { tenantKey, isResolved } = useActiveTenant();
+  const isVisible = useDocumentVisible();
   const normalizedId = threadId?.trim() || "";
 
-  return useInfiniteQuery<InboxThreadDetailResponse, ApiError>({
+  const query = useInfiniteQuery<InboxThreadDetailResponse, ApiError>({
     queryKey: inboxKeys.thread(tenantKey, normalizedId),
     queryFn: ({ pageParam, signal }) =>
       getThreadDetail(
@@ -132,6 +183,81 @@ export function useInboxThread(threadId: string | null) {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.olderCursor,
     enabled: isResolved && normalizedId.length > 0,
+    retry: shouldRetryInboxQuery,
+    retryDelay: inboxRetryDelay,
+    staleTime: 10_000,
+    refetchIntervalInBackground: false,
+    refetchInterval: (q) =>
+      nextAgentRunPollIntervalMs(
+        q.state.data,
+        isVisible && readDocumentVisible(),
+        q.state.error,
+      ),
+  });
+
+  const latestThread = query.data?.pages[0]?.thread ?? null;
+  const isRunning = isAgentRunRunning(latestThread);
+  const prevVisibleRef = useRef(isVisible);
+  const refetchRef = useRef(query.refetch);
+
+  useEffect(() => {
+    refetchRef.current = query.refetch;
+  }, [query.refetch]);
+
+  // Catch up immediately when returning to a visible tab while this thread's run is active.
+  useEffect(() => {
+    const wasVisible = prevVisibleRef.current;
+    prevVisibleRef.current = isVisible;
+    if (!wasVisible && isVisible && isRunning && isResolved && normalizedId.length > 0) {
+      void refetchRef.current({ cancelRefetch: false });
+    }
+  }, [isRunning, isResolved, isVisible, normalizedId]);
+
+  // When a running agent run completes on this thread, refresh the list row & runs trace.
+  const prevRunningRef = useRef<{ threadId: string; running: boolean }>({
+    threadId: normalizedId,
+    running: false,
+  });
+
+  useEffect(() => {
+    const prev = prevRunningRef.current;
+    prevRunningRef.current = { threadId: normalizedId, running: isRunning };
+    if (
+      isResolved &&
+      normalizedId.length > 0 &&
+      prev.threadId === normalizedId &&
+      prev.running &&
+      !isRunning
+    ) {
+      void queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) });
+      void queryClient.invalidateQueries({
+        queryKey: inboxKeys.threadRuns(tenantKey, normalizedId),
+      });
+    }
+  }, [isResolved, isRunning, normalizedId, queryClient, tenantKey]);
+
+  return query;
+}
+
+/**
+ * Fetches recent agent runs for a thread (`GET /api/comments/threads/{threadId}/runs?limit=10`).
+ * Lazy-loaded only when the operator expands a message's "Xem quá trình xử lý" panel.
+ */
+export function useInboxThreadRuns(threadId: string | null, enabled: boolean) {
+  const { tenantKey, isResolved } = useActiveTenant();
+  const normalizedId = threadId?.trim() || "";
+
+  return useQuery<InboxThreadRunsResponse, ApiError>({
+    queryKey: inboxKeys.threadRuns(tenantKey, normalizedId),
+    queryFn: ({ signal }) =>
+      listThreadRuns(
+        {
+          threadId: normalizedId,
+          limit: INBOX_DEFAULT_RUNS_LIMIT,
+        },
+        signal,
+      ),
+    enabled: isResolved && enabled && normalizedId.length > 0,
     retry: shouldRetryInboxQuery,
     retryDelay: inboxRetryDelay,
     staleTime: 10_000,
@@ -215,6 +341,40 @@ export function useUnignoreThread() {
     mutationFn: ({ threadId }) => unignoreThread(threadId),
     retry: false,
     onSettled: (_data, _error, { threadId }) => invalidate(threadId),
+  });
+}
+
+/**
+ * Clears the "Cần bạn" attention flag on a thread
+ * (`POST /api/comments/threads/{threadId}/attention/clear`).
+ * Updates the cached thread immediately on success and invalidates only
+ * `inboxKeys.threads` and `inboxKeys.thread(threadId)`.
+ */
+export function useClearThreadAttention() {
+  const queryClient = useQueryClient();
+  const { tenantKey } = useActiveTenant();
+
+  return useMutation<InboxThreadMutationResponse, ApiError, { threadId: string }>({
+    mutationFn: ({ threadId }) => clearThreadAttention(threadId),
+    retry: false,
+    onSuccess: (res, { threadId }) => {
+      queryClient.setQueryData<InfiniteData<InboxThreadDetailResponse>>(
+        inboxKeys.thread(tenantKey, threadId),
+        (prev) => {
+          if (!prev || prev.pages.length === 0) return prev;
+          return {
+            ...prev,
+            pages: prev.pages.map((page, index) =>
+              index === 0 ? { ...page, thread: res.thread } : page,
+            ),
+          };
+        },
+      );
+    },
+    onSettled: (_data, _error, { threadId }) => {
+      void queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) });
+      void queryClient.invalidateQueries({ queryKey: inboxKeys.thread(tenantKey, threadId) });
+    },
   });
 }
 

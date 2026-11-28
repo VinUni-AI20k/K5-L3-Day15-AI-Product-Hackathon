@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { UploadResponse } from "@/ui/schemas/compose.schema";
+import { abortWithReason, isAbortError, normalizeAbortError } from "@/ui/services/abort";
 import { ApiError } from "@/ui/services/api-error";
 import {
   confirmUpload,
@@ -34,7 +35,8 @@ export interface DirectUploadState {
 }
 
 export interface UseDirectUploadResult extends DirectUploadState {
-  upload: (productCode: string, files: readonly File[]) => Promise<UploadResponse>;
+  /** Resolves to `null` when the upload was intentionally cancelled or unmounted. */
+  upload: (productCode: string, files: readonly File[]) => Promise<UploadResponse | null>;
   cancel: () => void;
 }
 
@@ -97,7 +99,7 @@ export async function runDirectUpload(
 
   async function worker(): Promise<void> {
     for (;;) {
-      if (failure) return;
+      if (failure || controller.signal.aborted) return;
       const job = queue.shift();
       if (!job) return;
       try {
@@ -106,8 +108,12 @@ export async function runDirectUpload(
           controller.signal,
         );
       } catch (error) {
-        failure = error;
-        controller.abort();
+        // Keep the first real failure: sibling workers aborting on the shared
+        // signal must never overwrite the file-named network/storage cause.
+        if (failure === null || (isAbortError(failure) && !isAbortError(error))) {
+          failure = error;
+        }
+        abortWithReason(controller, `direct-upload: sibling file "${job.file.name}" failed`);
         throw error;
       }
       done += 1;
@@ -124,6 +130,14 @@ export async function runDirectUpload(
     throw failure ?? settledError;
   }
 
+  if (controller.signal.aborted) {
+    throw normalizeAbortError(
+      controller.signal.reason,
+      controller.signal,
+      "direct-upload: aborted before confirm",
+    );
+  }
+
   const confirmed = await services.confirmUpload(
     { productCode: params.productCode, assets: jobs.map((job) => ({ assetId: job.ticket.assetId })) },
     controller.signal,
@@ -137,6 +151,70 @@ export async function runDirectUpload(
   };
 }
 
+export interface ExecuteDirectUploadParams {
+  readonly productCode: string;
+  readonly files: readonly File[];
+  readonly controller: AbortController;
+  readonly onStateChange: (
+    updater: DirectUploadState | ((prev: DirectUploadState) => DirectUploadState),
+  ) => void;
+  readonly isMounted?: () => boolean;
+  readonly services?: DirectUploadServices;
+}
+
+/**
+ * Stateful upload runner shared between `useDirectUpload` and unit tests:
+ * treats intentional aborts (cancel, unmount, navigation) as a clean `null`
+ * no-op without setting error UI or leaking an unhandled `AbortError`, while
+ * still surfacing real network/server errors.
+ */
+export async function executeDirectUpload({
+  productCode,
+  files,
+  controller,
+  onStateChange,
+  isMounted = () => true,
+  services = defaultServices,
+}: ExecuteDirectUploadParams): Promise<UploadResponse | null> {
+  const safeSetState = (
+    updater: DirectUploadState | ((prev: DirectUploadState) => DirectUploadState),
+  ) => {
+    if (isMounted()) onStateChange(updater);
+  };
+
+  safeSetState({ isUploading: true, progress: 0, error: null });
+
+  try {
+    const result = await runDirectUpload(
+      { productCode, files },
+      (done, total) => safeSetState((prev) => ({ ...prev, progress: nextProgress(done, total) })),
+      controller,
+      services,
+    );
+
+    safeSetState({ isUploading: false, progress: 100, error: null });
+    return result;
+  } catch (error) {
+    // Only treat the failure as an intentional cancel when the error itself is
+    // an abort (a sibling-file network failure also aborts the shared controller,
+    // so checking `isAbortError(error)` alone preserves real upload failures!).
+    if (isAbortError(error)) {
+      safeSetState({ isUploading: false, progress: 0, error: null });
+      return null;
+    }
+
+    // Never swallowed: a Vietnamese message reaches the operator and the
+    // error is rethrown so the caller's own error handling still runs.
+    const message = ApiError.is(error)
+      ? error.userMessage
+      : error instanceof Error
+        ? error.message
+        : "Tải file lên thất bại.";
+    safeSetState({ isUploading: false, progress: 0, error: message });
+    throw error;
+  }
+}
+
 export function useDirectUpload(): UseDirectUploadResult {
   const [state, setState] = useState<DirectUploadState>({
     isUploading: false,
@@ -144,40 +222,39 @@ export function useDirectUpload(): UseDirectUploadResult {
     error: null,
   });
   const abortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      abortWithReason(abortRef.current, "direct-upload: component unmounted");
+      abortRef.current = null;
+    };
+  }, []);
 
   const cancel = useCallback(() => {
-    abortRef.current?.abort();
+    abortWithReason(abortRef.current, "direct-upload: cancelled by operator");
     abortRef.current = null;
     setState({ isUploading: false, progress: 0, error: null });
   }, []);
 
   const upload = useCallback(
-    async (productCode: string, files: readonly File[]): Promise<UploadResponse> => {
+    async (productCode: string, files: readonly File[]): Promise<UploadResponse | null> => {
+      abortWithReason(abortRef.current, "direct-upload: superseded by new upload");
       const controller = new AbortController();
       abortRef.current = controller;
-      setState({ isUploading: true, progress: 0, error: null });
 
       try {
-        const result = await runDirectUpload(
-          { productCode, files },
-          (done, total) => setState((prev) => ({ ...prev, progress: nextProgress(done, total) })),
+        return await executeDirectUpload({
+          productCode,
+          files,
           controller,
-        );
-
-        setState({ isUploading: false, progress: 100, error: null });
-        return result;
-      } catch (error) {
-        // Never swallowed: a Vietnamese message reaches the operator and the
-        // error is rethrown so the caller's own error handling still runs.
-        const message = ApiError.is(error)
-          ? error.userMessage
-          : error instanceof Error
-            ? error.message
-            : "Tải file lên thất bại.";
-        setState({ isUploading: false, progress: 0, error: message });
-        throw error;
+          onStateChange: setState,
+          isMounted: () => mountedRef.current,
+        });
       } finally {
-        abortRef.current = null;
+        if (abortRef.current === controller) abortRef.current = null;
       }
     },
     [],

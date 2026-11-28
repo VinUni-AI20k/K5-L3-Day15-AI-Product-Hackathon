@@ -1,11 +1,13 @@
 import {
   COMMENT_REPLY_MAX_LENGTH,
   CommentBlockedErrorBodySchema,
+  INBOX_DEFAULT_RUNS_LIMIT,
   InboxLikeResponseSchema,
   InboxReplyResponseSchema,
   InboxThreadDetailResponseSchema,
   InboxThreadListResponseSchema,
   InboxThreadMutationResponseSchema,
+  InboxThreadRunsResponseSchema,
   parseBlockedReasons,
   type InboxLikeResponse,
   type InboxReplyResponse,
@@ -13,7 +15,15 @@ import {
   type InboxThreadFilterChip,
   type InboxThreadListResponse,
   type InboxThreadMutationResponse,
+  type InboxThreadRunsResponse,
 } from "@/ui/schemas/inbox.schema";
+import {
+  createRequestSignal,
+  isAbortError,
+  isCallerSignalAborted,
+  isTimeoutError,
+  normalizeAbortError,
+} from "@/ui/services/abort";
 import { ApiError, CLIENT_ERROR_CODES } from "@/ui/services/api-error";
 import {
   AI_DRAFT_TIMEOUT_MS,
@@ -24,14 +34,17 @@ import {
 import { apiRequest, toApiErrorBody } from "@/ui/services/http-client";
 
 /**
- * Data layer for the conversation inbox endpoints in `.swarm/specs/inbox-contract.md`:
+ * Data layer for the conversation inbox endpoints in `.swarm/specs/inbox-contract.md`
+ * and `.swarm/specs/agent-run-trace.md`:
  *  - `GET  /api/comments/threads`
  *  - `GET  /api/comments/threads/{threadId}`
+ *  - `GET  /api/comments/threads/{threadId}/runs`
  *  - `POST /api/comments/threads/{threadId}/read`
  *  - `POST /api/comments/threads/{threadId}/draft`
  *  - `POST /api/comments/threads/{threadId}/reply`
  *  - `POST /api/comments/threads/{threadId}/ignore`
  *  - `POST /api/comments/threads/{threadId}/unignore`
+ *  - `POST /api/comments/threads/{threadId}/attention/clear`
  *  - `POST /api/comments/{commentId}/like`
  */
 
@@ -130,6 +143,32 @@ export async function getThreadDetail(
   });
 }
 
+export interface ListThreadRunsParams {
+  readonly threadId: string;
+  readonly limit?: number;
+}
+
+export async function listThreadRuns(
+  params: ListThreadRunsParams,
+  signal?: AbortSignal,
+): Promise<InboxThreadRunsResponse> {
+  const id = requireNonEmptyId(params.threadId, "listThreadRuns", "Thiếu mã hội thoại.");
+  const limit =
+    typeof params.limit === "number" && Number.isInteger(params.limit) && params.limit > 0
+      ? params.limit
+      : INBOX_DEFAULT_RUNS_LIMIT;
+  const query = new URLSearchParams({ limit: String(limit) });
+  return apiRequest(
+    `/api/comments/threads/${encodeURIComponent(id)}/runs?${query.toString()}`,
+    {
+      schema: InboxThreadRunsResponseSchema,
+      signal,
+      malformedMessage:
+        "Dữ liệu quá trình xử lý của AI không đúng định dạng. Hãy thử tải lại.",
+    },
+  );
+}
+
 export async function markThreadRead(
   threadId: string,
   signal?: AbortSignal,
@@ -178,47 +217,72 @@ export async function sendThreadReply(
   );
   const path = `/api/comments/threads/${encodeURIComponent(id)}/reply`;
 
-  const timeout = AbortSignal.timeout(COMMENT_SEND_TIMEOUT_MS);
-  const combinedSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  const fallbackReason = `POST ${path} aborted`;
+  const { signal: combinedSignal, cleanup } = createRequestSignal(
+    COMMENT_SEND_TIMEOUT_MS,
+    signal,
+    fallbackReason,
+  );
 
   let response: Response;
-  try {
-    response = await fetch(path, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ text, clientId }),
-      cache: "no-store",
-      signal: combinedSignal,
-    });
-  } catch (cause) {
-    if (signal?.aborted) throw cause;
-    const isTimeout = cause instanceof DOMException && cause.name === "TimeoutError";
-    throw new ApiError({
-      code: isTimeout ? CLIENT_ERROR_CODES.TIMEOUT : CLIENT_ERROR_CODES.NETWORK,
-      status: 0,
-      message: cause instanceof Error ? cause.message : String(cause),
-      userMessage: isTimeout
-        ? "Máy chủ phản hồi quá lâu. Hãy bấm Thử lại."
-        : "Không kết nối được máy chủ. Kiểm tra mạng rồi bấm Thử lại.",
-      cause,
-    });
-  }
-
   let payload: unknown;
   try {
-    payload = await response.json();
-  } catch (cause) {
-    throw new ApiError({
-      code: CLIENT_ERROR_CODES.MALFORMED_RESPONSE,
-      status: response.status,
-      message: "Response body is not valid JSON",
-      userMessage:
-        "Máy chủ trả về dữ liệu không đọc được. Hãy thử lại; nếu vẫn lỗi, báo quản trị viên.",
-      cause,
-    });
+    try {
+      response = await fetch(path, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ text, clientId }),
+        cache: "no-store",
+        signal: combinedSignal,
+      });
+    } catch (cause) {
+      if (isCallerSignalAborted(signal)) {
+        throw normalizeAbortError(cause, signal, fallbackReason);
+      }
+      const isTimeout = isTimeoutError(cause);
+      if (!isTimeout && isAbortError(cause)) {
+        throw normalizeAbortError(cause, signal, fallbackReason);
+      }
+      throw new ApiError({
+        code: isTimeout ? CLIENT_ERROR_CODES.TIMEOUT : CLIENT_ERROR_CODES.NETWORK,
+        status: 0,
+        message: cause instanceof Error ? cause.message : String(cause),
+        userMessage: isTimeout
+          ? "Máy chủ phản hồi quá lâu. Hãy bấm Thử lại."
+          : "Không kết nối được máy chủ. Kiểm tra mạng rồi bấm Thử lại.",
+        cause,
+      });
+    }
+
+    try {
+      payload = await response.json();
+    } catch (cause) {
+      if (isCallerSignalAborted(signal) || (!isTimeoutError(cause) && isAbortError(cause))) {
+        throw normalizeAbortError(cause, signal, fallbackReason);
+      }
+      if (isTimeoutError(cause)) {
+        throw new ApiError({
+          code: CLIENT_ERROR_CODES.TIMEOUT,
+          status: 0,
+          message: cause instanceof Error ? cause.message : String(cause),
+          userMessage: "Máy chủ phản hồi quá lâu. Hãy bấm Thử lại.",
+          cause,
+        });
+      }
+      throw new ApiError({
+        code: CLIENT_ERROR_CODES.MALFORMED_RESPONSE,
+        status: response.status,
+        message: "Response body is not valid JSON",
+        userMessage:
+          "Máy chủ trả về dữ liệu không đọc được. Hãy thử lại; nếu vẫn lỗi, báo quản trị viên.",
+        cause,
+      });
+    }
+  } finally {
+    cleanup();
   }
 
   if (!response.ok) {
@@ -276,6 +340,21 @@ export async function unignoreThread(
     schema: InboxThreadMutationResponseSchema,
     signal,
     malformedMessage: "Kết quả khôi phục hội thoại không đúng định dạng. Hãy tải lại danh sách.",
+  });
+}
+
+export async function clearThreadAttention(
+  threadId: string,
+  signal?: AbortSignal,
+): Promise<InboxThreadMutationResponse> {
+  const id = requireNonEmptyId(threadId, "clearThreadAttention", "Thiếu mã hội thoại.");
+  return apiRequest(`/api/comments/threads/${encodeURIComponent(id)}/attention/clear`, {
+    method: "POST",
+    body: {},
+    schema: InboxThreadMutationResponseSchema,
+    signal,
+    malformedMessage:
+      "Kết quả gỡ nhãn “Cần bạn” không đúng định dạng. Hãy tải lại hội thoại để kiểm tra.",
   });
 }
 

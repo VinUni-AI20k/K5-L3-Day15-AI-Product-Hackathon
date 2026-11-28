@@ -82,6 +82,9 @@ function makeResponse(
     cursor: "2026-11-27T10:00:00.000Z",
     items: [],
     draftsReady: [],
+    needYou: [],
+    autoReplied: [],
+    runningThreadIds: [],
     ...overrides,
   };
 }
@@ -241,6 +244,19 @@ describe("comment updates cursor store & invalidation", () => {
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["comments", "t1"] });
     // th-1 appeared twice but should only be invalidated once.
     expect(invalidateSpy).toHaveBeenCalledTimes(4);
+
+    // Also invalidates affected threads for needYou and autoReplied
+    invalidateSpy.mockClear();
+    invalidateInboxOnUpdates(queryClient, "t1", {
+      items: [],
+      draftsReady: [],
+      needYou: [{ threadId: "th-need", customerName: "An", reason: "hỏi ship", since: null }],
+      autoReplied: [{ threadId: "th-auto", messageId: "m-auto" }],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: inboxKeys.threads("t1") });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: inboxKeys.thread("t1", "th-need") });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: inboxKeys.thread("t1", "th-auto") });
+    expect(invalidateSpy).toHaveBeenCalledTimes(3);
   });
 });
 

@@ -21,6 +21,7 @@ import {
 import { InternationalizationProvider, type Catalog } from "@astryxdesign/core/i18n";
 import {
   ArrowUp,
+  Bot,
   CheckSquare,
   History,
   RefreshCw,
@@ -118,6 +119,7 @@ export interface ConversationListPaneProps {
   readonly bulkPageSelection: BulkPageSelectionControl;
   readonly bulkCommentLabelsById: Readonly<Record<string, string | undefined>>;
   readonly activeModerationPanel: "settings" | "log" | null;
+  readonly isAutoReplyDialogOpen?: boolean;
   readonly onSearchDraftChange: (value: string) => void;
   readonly onFilterChange: (next: InboxListFilter) => void;
   readonly onClearFilters: () => void;
@@ -136,6 +138,7 @@ export interface ConversationListPaneProps {
     action: BulkCommentAction,
   ) => void;
   readonly onOpenModerationPanel: (panel: "settings" | "log") => void;
+  readonly onOpenAutoReplyDialog?: () => void;
 }
 
 /**
@@ -171,6 +174,7 @@ export function ConversationListPane({
   bulkPageSelection,
   bulkCommentLabelsById,
   activeModerationPanel,
+  isAutoReplyDialogOpen = false,
   onSearchDraftChange,
   onFilterChange,
   onClearFilters,
@@ -186,6 +190,7 @@ export function ConversationListPane({
   onClearBulkSelection,
   onBulkResult,
   onOpenModerationPanel,
+  onOpenAutoReplyDialog,
 }: ConversationListPaneProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const hasFilters = hasActiveInboxFilters(filter);
@@ -229,11 +234,13 @@ export function ConversationListPane({
     const count = getInboxFilterCount(counts, chip);
     if (count === undefined) return undefined;
     const variant =
-      chip === "needs_reply" && count > 0
-        ? "warning"
-        : chip === "unread" && count > 0
-          ? "info"
-          : "neutral";
+      chip === "can_ban" && count > 0
+        ? "error"
+        : chip === "needs_reply" && count > 0
+          ? "warning"
+          : chip === "unread" && count > 0
+            ? "info"
+            : "neutral";
     return <Badge variant={variant} label={count} className="tabular-nums" />;
   }
 
@@ -272,6 +279,29 @@ export function ConversationListPane({
                   isDisabled={isSyncing || readOnlyReason !== null}
                   tooltip={readOnlyReason ?? undefined}
                   onClick={onSync}
+                />
+              }
+            />
+          </Stack>
+        );
+      }
+
+      if (emptyKind === "can-ban-clear") {
+        return (
+          <Stack direction="vertical" padding={4}>
+            <InboxEmptyState
+              kind="done"
+              isCompact
+              title="Không có hội thoại nào cần bạn"
+              description="Tất cả hội thoại cần nhân viên xử lý đều đã được giải quyết. Bạn có thể xem lại toàn bộ hội thoại ở mục Tất cả."
+              action={
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="inbox-touch-target"
+                  label="Xem tất cả hội thoại"
+                  onClick={() => onFilterChange({ ...filter, filter: "all" })}
                 />
               }
             />
@@ -421,6 +451,19 @@ export function ConversationListPane({
                   tooltip={isBulkMode ? "Thoát chọn nhiều" : "Chọn nhiều để kiểm duyệt"}
                   isPressed={isBulkMode}
                   onPressedChange={onToggleBulkMode}
+                />
+
+                <IconButton
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="inbox-touch-target"
+                  icon={<Bot className="size-4" aria-hidden="true" />}
+                  label="Tự động trả lời"
+                  tooltip="Tự động trả lời"
+                  aria-haspopup="dialog"
+                  aria-expanded={isAutoReplyDialogOpen}
+                  onClick={() => onOpenAutoReplyDialog?.()}
                 />
 
                 <IconButton

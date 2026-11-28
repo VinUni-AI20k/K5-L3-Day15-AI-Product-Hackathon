@@ -1,6 +1,14 @@
 import { z } from "zod";
 
 import {
+  InboxMessageSentBySchema,
+  InboxThreadAttentionSchema,
+  InboxThreadAutoReplySchema,
+  type InboxMessageSentBy,
+  type InboxThreadAttention,
+  type InboxThreadAutoReply,
+} from "@/ui/schemas/auto-reply.schema";
+import {
   COMMENT_REPLY_MAX_LENGTH,
   CommentBlockedErrorBodySchema,
   CommentDraftSchema,
@@ -19,13 +27,17 @@ import { CommentModerationSchema } from "@/ui/schemas/moderation.schema";
 
 /**
  * Contracts for the Pancake/Messenger-style comment inbox (`/comments`).
- * Mirrors `.swarm/specs/inbox-contract.md` (Threads + Like routes) and reuses
+ * Mirrors `.swarm/specs/inbox-contract.md` (Threads + Like routes) and
+ * `.swarm/specs/auto-reply.md` (Attention + Auto-reply metadata), reusing
  * `CommentDraftSchema`, `CommentModerationSchema`, and URL sanitizers unchanged.
  */
 
 export {
   COMMENT_REPLY_MAX_LENGTH,
   CommentBlockedErrorBodySchema,
+  InboxMessageSentBySchema,
+  InboxThreadAttentionSchema,
+  InboxThreadAutoReplySchema,
   displayCommentAuthor,
   filterReplyWarnings,
   formatCommentAbsoluteTime,
@@ -35,6 +47,9 @@ export {
   isReconnectPageCode,
   parseBlockedReasons,
   toSafeFacebookUrl,
+  type InboxMessageSentBy,
+  type InboxThreadAttention,
+  type InboxThreadAutoReply,
 };
 
 // --- Safe URLs --------------------------------------------------------------
@@ -89,6 +104,7 @@ export const INBOX_DELIVERY_LABELS: Record<InboxMessageDelivery, string> = {
 };
 
 export const INBOX_THREAD_FILTERS = [
+  "can_ban",
   "needs_reply",
   "unread",
   "all",
@@ -100,6 +116,7 @@ export const InboxThreadFilterChipSchema = z.enum(INBOX_THREAD_FILTERS);
 export type InboxThreadFilterChip = z.infer<typeof InboxThreadFilterChipSchema>;
 
 export const INBOX_FILTER_LABELS: Record<InboxThreadFilterChip, string> = {
+  can_ban: "Cần bạn",
   needs_reply: "Cần trả lời",
   unread: "Chưa đọc",
   all: "Tất cả",
@@ -110,8 +127,81 @@ export const INBOX_FILTER_LABELS: Record<InboxThreadFilterChip, string> = {
 
 export const INBOX_DEFAULT_THREADS_LIMIT = 30;
 export const INBOX_DEFAULT_MESSAGES_LIMIT = 50;
+export const INBOX_DEFAULT_RUNS_LIMIT = 10;
 export const INBOX_COMPOSER_WARN_THRESHOLD = 1800;
 export const INBOX_HIDDEN_MESSAGE_NOTE = "Đã ẩn — chỉ người viết và bạn bè họ còn thấy";
+
+// --- Agent run trace schemas ------------------------------------------------
+
+export const AGENT_RUN_STEP_STATUSES = [
+  "running",
+  "ok",
+  "blocked",
+  "skipped",
+  "error",
+] as const;
+export const AgentRunStepStatusSchema = z.enum(AGENT_RUN_STEP_STATUSES);
+export type AgentRunStepStatus = z.infer<typeof AgentRunStepStatusSchema>;
+
+export const AGENT_RUN_KINDS = ["auto_reply", "draft"] as const;
+export const AgentRunKindSchema = z.enum(AGENT_RUN_KINDS);
+export type AgentRunKind = z.infer<typeof AgentRunKindSchema>;
+
+export const AGENT_RUN_STATUSES = ["running", "done", "error"] as const;
+export const AgentRunStatusSchema = z.enum(AGENT_RUN_STATUSES);
+export type AgentRunStatus = z.infer<typeof AgentRunStatusSchema>;
+
+export const AGENT_RUN_OUTCOMES = [
+  "sent",
+  "would_send",
+  "can_ban",
+  "draft_saved",
+  "failed",
+] as const;
+export const AgentRunOutcomeSchema = z.enum(AGENT_RUN_OUTCOMES);
+export type AgentRunOutcome = z.infer<typeof AgentRunOutcomeSchema>;
+
+export const AgentRunStepSchema = z.object({
+  key: z.string().min(1),
+  label: z.string(),
+  status: AgentRunStepStatusSchema,
+  detail: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  at: z.iso.datetime({ offset: true }),
+});
+export type AgentRunStep = z.infer<typeof AgentRunStepSchema>;
+
+export const AgentRunSchema = z.object({
+  id: z.string().min(1),
+  threadId: z.string().min(1),
+  commentId: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  kind: AgentRunKindSchema,
+  status: AgentRunStatusSchema,
+  outcome: AgentRunOutcomeSchema.nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  steps: z.array(AgentRunStepSchema).optional().default([]),
+  startedAt: z.iso.datetime({ offset: true }),
+  finishedAt: z.iso
+    .datetime({ offset: true })
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
+});
+export type AgentRun = z.infer<typeof AgentRunSchema>;
+
+export const InboxThreadRunsResponseSchema = z.object({
+  tenantId: z.string().min(1),
+  items: z.array(AgentRunSchema).optional().default([]),
+});
+export type InboxThreadRunsResponse = z.infer<typeof InboxThreadRunsResponseSchema>;
 
 // --- DTO schemas ------------------------------------------------------------
 
@@ -165,6 +255,17 @@ export const InboxThreadSchema = z.object({
   moderation: CommentModerationSchema.nullable()
     .optional()
     .transform((value) => value ?? null),
+  // Optional in zod so UI deploys cleanly ahead of backend rollout; defaults to no attention / no auto-reply.
+  attention: InboxThreadAttentionSchema.nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  autoReply: InboxThreadAutoReplySchema.nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  // Optional in zod so UI deploys cleanly ahead of backend rollout; defaults to null.
+  agentRun: AgentRunSchema.nullable()
+    .optional()
+    .transform((value) => value ?? null),
   updatedAt: z.iso.datetime({ offset: true }),
 });
 export type InboxThread = z.infer<typeof InboxThreadSchema>;
@@ -192,10 +293,25 @@ export const InboxMessageSchema = z.object({
   moderation: CommentModerationSchema.nullable()
     .optional()
     .transform((value) => value ?? null),
+  // Optional in zod so UI deploys cleanly ahead of backend rollout; defaults to null (not auto-sent).
+  sentBy: InboxMessageSentBySchema.nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  // Optional in zod so UI deploys cleanly ahead of backend rollout; defaults to null.
+  agentRunId: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => {
+      const trimmed = value?.trim();
+      return trimmed && trimmed.length > 0 ? trimmed : null;
+    }),
 });
 export type InboxMessage = z.infer<typeof InboxMessageSchema>;
 
 export const InboxThreadCountsSchema = z.object({
+  // Optional in zod (backend may roll out after UI); defaults to 0 ("no attention").
+  canBan: z.number().int().min(0).optional().default(0),
   needsReply: z.number().int().min(0),
   unread: z.number().int().min(0),
   all: z.number().int().min(0),

@@ -213,6 +213,15 @@
     box-shadow: none;
   }
 
+  /* --- Auto-reply dry-run preview card (muted, dashed border) -------------- */
+  .inbox-dry-run-card {
+    border-radius: var(--radius-lg);
+    background-color: var(--bg-subtle);
+    border: 1px dashed var(--border-strong);
+    padding: var(--spacing-3);
+    box-shadow: none;
+  }
+
   .inbox-post-card .astryx-thumbnail,
   .inbox-post-card .astryx-thumbnail > div,
   .inbox-post-card img {
@@ -238,6 +247,120 @@
       var(--radius-chat);
     padding-block: var(--spacing-3);
     padding-inline: var(--spacing-4);
+  }
+
+  /* --- Agent typing bubble ("AI đang soạn trả lời…") ----------------------- */
+  .inbox-bubble-typing {
+    background-color: var(--bg-subtle);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-chat) var(--radius-chat) var(--radius-chat-tail)
+      var(--radius-chat);
+    padding-block: var(--spacing-3);
+    padding-inline: var(--spacing-4);
+    max-width: 100%;
+  }
+
+  .inbox-accent-icon {
+    color: var(--color-icon-accent);
+  }
+
+  .inbox-typing-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    flex-shrink: 0;
+  }
+
+  .inbox-typing-dot {
+    width: var(--spacing-1-5);
+    height: var(--spacing-1-5);
+    border-radius: var(--radius-full);
+    background-color: var(--color-accent);
+    opacity: 0.7;
+  }
+
+  .inbox-typing-steps {
+    border-top: 1px solid var(--border-default);
+    padding-top: var(--spacing-2);
+  }
+
+  /* --- Collapsible agent run trace ("Xem quá trình xử lý") ----------------- */
+  .inbox-trace-root {
+    max-width: 100%;
+  }
+
+  .inbox-trace-toggle {
+    color: var(--text-secondary);
+    transition: var(--transition-interactive);
+  }
+
+  .inbox-trace-panel {
+    border-radius: var(--radius-lg);
+    background-color: var(--bg-subtle);
+    border: 1px solid var(--border-default);
+    padding-block: var(--spacing-2);
+    padding-inline: var(--spacing-3);
+    text-align: start;
+  }
+
+  .inbox-trace-steps {
+    list-style: none;
+    margin: 0;
+  }
+
+  .inbox-trace-step {
+    min-width: 0;
+    border-radius: var(--radius-sm);
+    padding-block: var(--spacing-1);
+    padding-inline: var(--spacing-1-5);
+  }
+
+  .inbox-trace-step[data-step-blocking="true"] {
+    background-color: var(--color-background-red);
+    border: 1px solid var(--color-border-red);
+    padding-block: var(--spacing-1-5);
+    padding-inline: var(--spacing-2);
+  }
+
+  .inbox-trace-icon-slot {
+    display: inline-flex;
+    align-items: center;
+    padding-top: var(--spacing-0-5);
+    flex-shrink: 0;
+  }
+
+  .inbox-trace-icon-ok {
+    color: var(--color-icon-green);
+  }
+
+  .inbox-trace-icon-blocked,
+  .inbox-trace-icon-error {
+    color: var(--color-icon-red);
+  }
+
+  .inbox-trace-icon-skipped {
+    color: var(--color-icon-secondary);
+  }
+
+  .inbox-trace-icon-running {
+    color: var(--color-icon-accent);
+  }
+
+  .inbox-trace-step-label {
+    color: var(--text-primary);
+  }
+
+  .inbox-trace-step-detail {
+    color: var(--text-secondary);
+  }
+
+  .inbox-trace-blocking-label {
+    color: var(--color-text-red);
+  }
+
+  .inbox-trace-blocking-detail {
+    color: var(--color-text-red);
   }
 
   /* --- Typography roles: 12px tertiary meta & calm links ------------------- */
@@ -316,11 +439,34 @@
     }
   }
 
-  /* --- Subtle entrance motion (resting state is opacity: 1) ---------------- */
+  /* --- Subtle entrance & typing motion (honours prefers-reduced-motion) ---- */
   @media (prefers-reduced-motion: no-preference) {
     .inbox-thread-row,
     .inbox-message-item {
       animation: inbox-item-enter var(--motion-panel) var(--ease-out) backwards;
+    }
+
+    .inbox-typing-dot {
+      animation: inbox-typing-bounce 1.2s var(--ease-out) infinite;
+    }
+
+    .inbox-typing-dot:nth-child(2) {
+      animation-delay: 160ms;
+    }
+
+    .inbox-typing-dot:nth-child(3) {
+      animation-delay: 320ms;
+    }
+
+    .inbox-trace-icon-running {
+      animation: inbox-spin 1s linear infinite;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .inbox-typing-dot,
+    .inbox-trace-icon-running {
+      animation: none;
     }
   }
 
@@ -333,6 +479,30 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+
+  @keyframes inbox-typing-bounce {
+    0%,
+    80%,
+    100% {
+      opacity: 0.35;
+      transform: translateY(0);
+    }
+
+    40% {
+      opacity: 1;
+      transform: translateY(calc(var(--spacing-0-5) * -1));
+    }
+  }
+
+  @keyframes inbox-spin {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
     }
   }
 }
