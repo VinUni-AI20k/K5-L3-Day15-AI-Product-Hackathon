@@ -33,11 +33,6 @@ const GATED_SURFACES = [
     writes: "huỷ / đổi giờ (bảng nhận qua prop)",
   },
   { screen: "Nhật ký đăng", file: "jobs/JobLogScreen.tsx", writes: "chạy lại một bài" },
-  {
-    screen: "Mẫu prompt",
-    file: "prompts/PromptTemplatesScreen.tsx",
-    writes: "tạo phiên bản / kích hoạt",
-  },
   { screen: "Đổi nguồn dữ liệu", file: "sync/CatalogSourceCard.tsx", writes: "đổi nguồn Drive/Sheet" },
   // Gated in M3.3 itself; kept here so the set cannot shrink unnoticed.
   // The wave-1 IA split this screen into a hub and its panels: the hub is now
@@ -53,6 +48,14 @@ const GATED_SURFACES = [
     screen: "Kết nối dữ liệu",
     file: "onboarding/DataMappingScreen.tsx",
     writes: "lưu ánh xạ cột + chế độ kiểm tồn (bảng nhận qua prop)",
+  },
+  // Writing style: saving company/Page style overrides, deleting a Page override,
+  // and running an LLM preview all mutate config or bill AI usage; support mode
+  // stays strictly view-only and hands the reason down to the scope/form/preview panels.
+  {
+    screen: "Phong cách viết",
+    file: "writing-style/WritingStyleScreen.tsx",
+    writes: "lưu phong cách viết, xoá thiết lập riêng Page, viết thử AI (các khung nhận qua prop)",
   },
 ] as const;
 
@@ -77,6 +80,21 @@ const PROP_FED_TABLES = [
   {
     component: "FieldMapForm",
     file: "onboarding/FieldMapForm.tsx",
+    token: "readOnlyReason",
+  },
+  {
+    component: "ScopeSelector",
+    file: "writing-style/ScopeSelector.tsx",
+    token: "readOnlyReason",
+  },
+  {
+    component: "WritingStyleForm",
+    file: "writing-style/WritingStyleForm.tsx",
+    token: "readOnlyReason",
+  },
+  {
+    component: "PreviewPanel",
+    file: "writing-style/PreviewPanel.tsx",
     token: "readOnlyReason",
   },
 ] as const;
@@ -107,7 +125,7 @@ describe("support mode: every write surface consults the read-only reason", () =
 });
 
 describe("the sweep's scope is written down", () => {
-  it("covers the six screens of the ticket, the two already done, and onboarding", () => {
+  it("covers the five remaining screens of the ticket, the two already done, onboarding, and writing style", () => {
     expect(GATED_SURFACES).toHaveLength(9);
     // Soạn bài is deliberately absent: another agent is rebuilding
     // `components/compose/**` and this sweep must not touch it.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MYSP_FIELD_MAP, type StockPolicy } from "@/core/domain/catalog-field-map";
+import { VPOST_FIELD_MAP, type StockPolicy } from "@/core/domain/catalog-field-map";
 import { AppError } from "@/core/domain/errors";
 import {
   deriveBatchStatus,
@@ -48,8 +48,8 @@ function recordingLogger(lines: LogLine[]): Logger {
 }
 
 const CLOCK: Clock = {
-  now: () => new Date("2026-08-13T02:00:00.000Z"),
-  nowMs: () => Date.parse("2026-08-13T02:00:00.000Z"),
+  now: () => new Date("2054-08-13T02:00:00.000Z"),
+  nowMs: () => Date.parse("2054-08-13T02:00:00.000Z"),
 };
 
 /** Callers hand over ASSETS; the usecase mints the URL (E3.6). */
@@ -58,7 +58,7 @@ const MEDIA: PostMediaInput[] = [
   { driveFileId: "d2", fileName: "MGKVX6310-Tím (2).jpg", kind: "image" },
 ];
 
-const MEDIA_BASE_URL = "https://mysp.example.com";
+const MEDIA_BASE_URL = "https://vpost.example.com";
 
 /** Deterministic stand-in for the HMAC signer wired in composition. */
 function fakeSigner(nowMs = CLOCK.nowMs()) {
@@ -80,7 +80,7 @@ function makeCatalogConfig(policy: StockPolicy | Error): CatalogConfigRepo {
   return {
     findCatalogConfig: async () => null,
     findCatalogSource: async () => null,
-    findFieldMap: async () => MYSP_FIELD_MAP,
+    findFieldMap: async () => VPOST_FIELD_MAP,
     findStockPolicy: async () => {
       if (policy instanceof Error) throw policy;
       return policy;
@@ -651,7 +651,7 @@ describe("createPostBatch — fan-out (business rule 6)", () => {
       expect(job.media).toHaveLength(2);
       for (const item of job.media) {
         expect(item.url).toMatch(
-          /^https:\/\/mysp\.example\.com\/api\/media\/[^?]+\?tenant=[^&]+&expires=\d+&sig=\w+$/,
+          /^https:\/\/vpost\.example\.com\/api\/media\/[^?]+\?tenant=[^&]+&expires=\d+&sig=\w+$/,
         );
         expect(item.driveFileId).not.toBe("");
       }
@@ -745,7 +745,7 @@ describe("createPostBatch — fan-out (business rule 6)", () => {
     const { createPostBatch, queue } = harness();
     await createPostBatch({
       ...BASE_INPUT,
-      scheduledAt: new Date("2026-08-13T03:00:00.000Z"),
+      scheduledAt: new Date("2054-08-13T03:00:00.000Z"),
     });
     // E8.6: T is one hour away, so the worker wakes at T-30 and hands the post
     // to Facebook there — waiting the full hour would leave nothing to hand.
@@ -797,8 +797,8 @@ describe("createPostBatch — logging", () => {
 });
 
 describe("createPostBatch — scheduling (E8.1)", () => {
-  const IN_ONE_HOUR = new Date(Date.parse("2026-08-13T03:00:00.000Z"));
-  const IN_TWO_HOURS = new Date(Date.parse("2026-08-13T04:00:00.000Z"));
+  const IN_ONE_HOUR = new Date(Date.parse("2054-08-13T03:00:00.000Z"));
+  const IN_TWO_HOURS = new Date(Date.parse("2054-08-13T04:00:00.000Z"));
 
   it("delays every channel by the batch time and stores it on each job", async () => {
     const { createPostBatch, repo, queue } = harness();
@@ -853,7 +853,7 @@ describe("createPostBatch — scheduling (E8.1)", () => {
       scheduledAtByChannel: {
         "fbpage-a": IN_ONE_HOUR,
         // Yesterday: a typo or a stale form must never mean "post now".
-        "fbpage-b": new Date(Date.parse("2026-08-12T03:00:00.000Z")),
+        "fbpage-b": new Date(Date.parse("2054-08-12T03:00:00.000Z")),
       },
     });
 

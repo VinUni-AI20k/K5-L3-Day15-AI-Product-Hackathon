@@ -23,14 +23,16 @@ export function ProductStatusLegend({ items }: { items: readonly CatalogProduct[
   if (entries.length === 0) return null;
 
   return (
-    <HStack gap={4} align="center" wrap="wrap" paddingInline={4} paddingBlock={2}>
-      <Text type="supporting">Chú giải</Text>
+    <div className="border-border bg-sidebar/50 flex items-center gap-4 overflow-x-auto border-b px-4 py-2.5 whitespace-nowrap lg:px-6">
+      <Text type="supporting" color="secondary">
+        Chú giải
+      </Text>
       {entries.map((entry) => (
         <HStack key={entry.variant} gap={1.5} align="center">
           <StatusDot aria-hidden variant={entry.variant} label={entry.label} />
           <Text type="supporting">{entry.label}</Text>
         </HStack>
       ))}
-    </HStack>
+    </div>
   );
 }

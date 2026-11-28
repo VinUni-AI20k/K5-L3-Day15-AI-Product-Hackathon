@@ -30,7 +30,7 @@ import { resolveActorUserId } from "./resolve-actor";
  *   3. POINT the config at them.
  *   4. Only THEN delete the file this one replaces. A crash between 3 and 4
  *      leaves a few unused KB; the other order can leave a tenant whose config
- *      points at bytes that are gone (PM decision, 24/08/2026: no sweep job —
+ *      points at bytes that are gone (PM decision, 27/11/2026: no sweep job —
  *      harmless rubbish beats deleting a file that is in use).
  *
  * It writes NO products: uploading a table is not syncing it. The catalog still

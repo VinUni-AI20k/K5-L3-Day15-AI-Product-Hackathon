@@ -116,7 +116,7 @@ describe("OpenAI adapter — wiring", () => {
   });
 
   /**
-   * Regression, verified live 15/08/2026: a GPT-5 model answers
+   * Regression, verified live 27/11/2026: a GPT-5 model answers
    * 400 "Unsupported parameter: 'temperature' is not supported with this model".
    * The engine decides not to send one (registry capability); this pins that an
    * absent temperature really does leave the wire, rather than being serialised

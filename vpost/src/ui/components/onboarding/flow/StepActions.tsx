@@ -27,9 +27,8 @@ import "./onboarding-motion.css";
  * THE BLOCKED BUTTON KEEPS ITS CONTRAST. The shared `Button` fades a disabled
  * control to 50% opacity, which is fine when the label is "Tiếp tục" and
  * useless when the label is the explanation. So the blocked state changes
- * VARIANT — a sunken surface with muted text, which is what Buffer's measured
- * `#DEDCD9` on `#7C7B79` is — and keeps its opacity, so the sentence stays
- * readable.
+ * VARIANT — a sunken surface with muted text — and keeps its opacity, so the
+ * sentence stays readable.
  *
  * THE BLOCKED BUTTON IS NOT `disabled`, IT IS `aria-disabled` (animation spec
  * section 5.3). A truly disabled button swallows the press, so the operator who
@@ -51,7 +50,7 @@ import "./onboarding-motion.css";
  * rather than as a new variant nobody else in the app would use. `rounded-lg`
  * IS `--radius` (16px) — the prototype's own corner, and the value the shared
  * `Button` already defaults to; the earlier `rounded-md` (12.8px) came from the
- * Buffer screenshots, which the PM set aside on 26/08/2026.
+ * Buffer screenshots, which the PM set aside on 27/11/2026.
  */
 
 /**
@@ -256,11 +255,11 @@ export function StepActions({
           className={cn(
             // 352x48, 0 24px of padding, corners off the token (spec section 2.4).
             "h-12 w-[22rem] max-w-full gap-2 rounded-lg px-6 text-sm font-bold",
-            // THE READY CTA IS INK ON CREAM, not the dye. `#2e2820` in the
-            // prototype IS this app's `--foreground`; using the token rather
-            // than the hex is also what makes it invert correctly in the dark
-            // theme, which the prototype has no answer for. Measured after the
-            // swap: 12.85:1 light, 13.82:1 dark.
+            // THE READY CTA IS INK ON CREAM, not the dye. The prototype's dark
+            // ink IS this app's `--foreground`; using the token rather than a
+            // literal is also what makes it invert correctly in the dark theme,
+            // which the prototype has no answer for. Measured after the swap:
+            // 12.85:1 light, 13.82:1 dark.
             !isBlockedLook &&
             !isSaving &&
             "bg-foreground text-background hover:bg-foreground/90",
@@ -281,7 +280,7 @@ export function StepActions({
               Đang lưu…
             </>
           ) : isBlockedLook ? (
-            "Chọn một để tiếp tục"
+            "Chọn một mục để tiếp tục"
           ) : (
             <>
               {continueLabel}

@@ -1,37 +1,17 @@
 "use client";
 
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Info } from "lucide-react";
+import { useId } from "react";
 
 import { cn } from "@/shared/utils";
 
 /**
  * The action row of the compose screen:
  *
- *   [Chọn kênh]  |  [Đăng luôn]  [Hẹn lịch]              N kênh · 1 bài
+ *   [Đăng ngay]  [Hẹn lịch]   (note / disabled reason right beside)
  *
- * On a narrow container the three buttons stay on ONE row and the note drops
- * to its own line under them (`@sm` is measured on the compose container, so a
- * phone is always below it). The bug that forced this: the row wrapped to two
- * lines and the second line landed on top of the note, so the sentence saying
- * WHY the button was dim was unreadable exactly where it mattered. "Hẹn lịch"
- * gives up its label first — it is the secondary branch, and it keeps the name
- * as `aria-label` plus a tooltip.
- *
- * It renders inside the sticky tray at the foot of the left column, so the one
- * action and the sentence explaining it are on screen at every scroll position
- * of a card that is several viewports tall. The tray — its background, its
- * hairline, and the schedule fields that open above this row — belongs to
- * `ComposeFocus`; this component is the row and nothing else.
- *
- * One black action, because there is one thing this screen does. The wizard's
- * "Tiếp / Quay lại" pair is gone with the wizard: nothing on this screen is a
- * step, so nothing needs a next.
- *
- * `note` is not decoration. Whenever the action is unavailable it says WHY, in
- * the same place the button is dimmed — a dead button with no sentence beside
- * it is the thing this bar exists to avoid (core-feedback-states §công thức
- * viết thông báo). When the action IS available it counts what is about to
- * happen, so nobody publishes to eight pages thinking it was one.
+ * One ink primary action, one muted secondary action, and the sentence
+ * explaining either what will happen or why publishing is currently waiting.
  */
 export function ComposeActionBar({
   onPublishNow,
@@ -52,45 +32,59 @@ export function ComposeActionBar({
    */
   readOnlyReason?: string | null;
 }) {
+  const noteId = useId();
   const blocked = Boolean(readOnlyReason);
+  const isDisabled = primaryDisabled || blocked;
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-2.5">
-        {/* Nút Đăng ngay (Primary) */}
+        {/* Nút Đăng ngay (Primary — single ink CTA of the compose screen) */}
         <button
           type="button"
           onClick={onPublishNow}
           disabled={primaryDisabled || blocked}
           aria-busy={busy}
+          aria-describedby={noteId}
           title={readOnlyReason ?? undefined}
           className={cn(
-            "flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-primary px-6 text-xs font-bold text-primary-foreground shadow-xs transition-all hover:opacity-90 outline-none focus:ring-2 focus:ring-primary/30",
+            "bg-primary text-primary-foreground focus-visible:ring-ring focus-visible:ring-offset-background inline-flex h-11 min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-medium shadow-[var(--shadow-button)] transition-colors duration-150 outline-none hover:bg-[var(--button-primary-hover-bg)] focus-visible:ring-2 focus-visible:ring-offset-2 active:bg-[var(--button-primary-pressed-bg)]",
             "disabled:cursor-not-allowed disabled:opacity-40",
           )}
         >
           <span>Đăng ngay</span>
         </button>
 
-        {/* Nút Hẹn lịch (Secondary Action) */}
+        {/* Nút Hẹn lịch (Secondary — muted surface) */}
         <button
           type="button"
           onClick={onSchedule}
           disabled={primaryDisabled || blocked}
           aria-busy={busy}
+          aria-describedby={noteId}
           title={readOnlyReason ?? "Mở bảng chọn ngày giờ hẹn đăng"}
           className={cn(
-            "flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-input bg-card px-4 text-xs font-semibold text-foreground shadow-xs transition-all hover:bg-muted/50 outline-none focus:ring-2 focus:ring-primary/20",
+            "border-border bg-secondary text-secondary-foreground hover:bg-muted focus-visible:ring-ring focus-visible:ring-offset-background inline-flex h-11 min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:bg-[var(--color-overlay-pressed)]",
             "disabled:cursor-not-allowed disabled:opacity-40",
           )}
         >
-          <CalendarClock className="size-4 text-primary shrink-0" />
+          <CalendarClock className="size-4 shrink-0" aria-hidden="true" />
           <span>Hẹn lịch</span>
         </button>
       </div>
 
-      {/* Note indicator on the right */}
-      <p className="text-muted-foreground text-xs font-medium leading-relaxed">
-        {note}
+      {/* Status / disabled explanation right beside the action pair */}
+      <p
+        id={noteId}
+        className={cn(
+          "inline-flex items-center gap-1.5 text-sm leading-snug",
+          isDisabled ? "text-muted-foreground" : "text-foreground font-medium",
+        )}
+      >
+        {isDisabled ? (
+          <Info className="text-foreground-subtle size-4 shrink-0" aria-hidden="true" />
+        ) : null}
+        <span>{note}</span>
       </p>
     </div>
   );

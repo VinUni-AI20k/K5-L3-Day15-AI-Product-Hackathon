@@ -142,7 +142,7 @@ describe("makeHealthcheckTenantHandler — happy path", () => {
       tenantId: DEMO_TENANT_ID,
       name: "Demo Tenant",
       status: "active" as const,
-      checkedAt: "2026-08-13T00:00:00.000Z",
+      checkedAt: "2054-08-13T00:00:00.000Z",
     }));
     const handler = makeHealthcheckTenantHandler({
       logger: logger as unknown as Logger,
@@ -165,7 +165,7 @@ describe("makeHealthcheckTenantHandler — happy path", () => {
     expect(logger.info).toHaveBeenCalledWith("healthcheck-tenant job done", {
       tenant_name: "Demo Tenant",
       status: "active",
-      checked_at: "2026-08-13T00:00:00.000Z",
+      checked_at: "2054-08-13T00:00:00.000Z",
     });
   });
 });

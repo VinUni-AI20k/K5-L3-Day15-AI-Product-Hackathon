@@ -33,7 +33,7 @@ describe("decideOnboardingEntry", () => {
   });
 
   it("does NOT re-ask a tenant that already finished it", () => {
-    expect(decide({ completedAt: "2026-08-26T02:00:00.000Z" })).toBe("app");
+    expect(decide({ completedAt: "2054-08-26T02:00:00.000Z" })).toBe("app");
   });
 
   it("provisions a company first for an account that belongs nowhere", () => {

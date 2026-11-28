@@ -31,7 +31,7 @@ import type { OnboardingStage } from "./onboarding-steps";
  * Mapped onto this project's duration scale rather
  * than typed from the animation spec (section 6 asks for 380ms in and 320ms
  * out): `--duration-medium-max` is 400ms and `--duration-medium` is 300ms in
- * `src/ui/theme/mysp.css`. `--ease-standard` is the system's ONLY curve, and an
+ * `src/ui/theme/vpost.css`. `--ease-standard` is the system's ONLY curve, and an
  * entrance must not overshoot (spec section 9), so both directions read it.
  *
  * THE RULE THAT SURVIVES THE MAPPING is section 6's own: the old screen has to
@@ -39,7 +39,7 @@ import type { OnboardingStage } from "./onboarding-steps";
  * 300 < 400, and both sit inside the 300-400ms band section 2 gives a screen
  * change. The full mapping table lives in `onboarding-motion.css`.
  *
- * THE VALUES ARE THIS PROJECT'S, NOT THE LIBRARY'S. `mysp.css` is generated and
+ * THE VALUES ARE THIS PROJECT'S, NOT THE LIBRARY'S. `vpost.css` is generated and
  * `pnpm theme:check` guards it; it re-values Astryx's whole duration scale
  * faster than `@astryxdesign/core` ships it. framer-motion takes numbers, not
  * `var()`, so the resolved values are written out here; anything CSS can
@@ -143,7 +143,7 @@ const STILL_VARIANTS: Variants = {
  * rather than a dissolve. Going BACK mirrors it. This replaces the crossfade
  * that used to live here, read off the reference shot
  * `05-step-transition-crossfade.jpg`; the PM chose the spec's travel over the
- * shot's overlap on 26/08/2026, and the two cannot both be true because a
+ * shot's overlap on 27/11/2026, and the two cannot both be true because a
  * crossfade needs the screens on top of each other and a slide needs them one
  * after the other.
  *

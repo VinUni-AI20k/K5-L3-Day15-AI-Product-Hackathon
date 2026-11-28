@@ -18,7 +18,7 @@ export function ChannelsFallback({ tab }: { tab: ChannelsTab }) {
       aria-hidden="true"
       header={
         <LayoutHeader hasDivider>
-          <Stack direction="vertical" gap={3} padding={4}>
+          <div className="w-full space-y-4 px-4 py-4 sm:px-6 sm:py-5">
             <Stack direction="vertical" gap={2}>
               <Skeleton width={120} height={28} />
               <Skeleton width="100%" height={16} />
@@ -28,7 +28,7 @@ export function ChannelsFallback({ tab }: { tab: ChannelsTab }) {
               <Skeleton width={110} height={32} />
               <Skeleton width={130} height={32} />
             </HStack>
-          </Stack>
+          </div>
         </LayoutHeader>
       }
       content={
@@ -43,36 +43,41 @@ export function ChannelsFallback({ tab }: { tab: ChannelsTab }) {
 function ChannelsTabFallback({ tab }: { tab: ChannelsTab }) {
   if (tab === "connect") {
     return (
-      <Stack direction="vertical" gap={3} padding={4} maxWidth={880}>
+      <div className="w-full max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-8">
         <Skeleton width={200} height={24} />
         <Skeleton width="100%" height={56} />
         <HStack gap={2}>
-          <Skeleton width={180} height={32} />
-          <Skeleton width={200} height={32} />
+          <Skeleton width={180} height={40} />
+          <Skeleton width={200} height={40} />
         </HStack>
-      </Stack>
+      </div>
     );
   }
 
   if (tab === "groups") {
     return (
-      <Stack direction="vertical" gap={4} padding={4} maxWidth={1024}>
+      <div className="w-full max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         <Skeleton width={160} height={28} />
         <Skeleton width="100%" height={160} />
         <Skeleton width={120} height={20} />
         <Skeleton width="100%" height={96} />
         <Skeleton width="100%" height={96} />
-      </Stack>
+      </div>
     );
   }
 
   return (
     <Stack direction="vertical">
-      <HStack gap={3} paddingInline={4} paddingBlock={3} align="center">
-        <Skeleton width={160} height={24} />
-        <Skeleton width={60} height={16} />
-        <Skeleton width={96} height={32} />
-      </HStack>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+        <HStack gap={3} align="center">
+          <Skeleton width={160} height={24} />
+          <Skeleton width={60} height={16} />
+        </HStack>
+        <HStack gap={2} align="center">
+          <Skeleton width={96} height={32} />
+          <Skeleton width={124} height={32} />
+        </HStack>
+      </div>
       <ChannelTableSkeleton />
     </Stack>
   );

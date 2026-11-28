@@ -29,7 +29,7 @@ vi.mock("@/app/_auth/session", () => ({
 // The link origin comes from AUTH_URL (canonical, https behind Caddy) — set it
 // to something OTHER than the request host so the assertion below proves the
 // request cannot influence the link.
-vi.stubEnv("AUTH_URL", "https://mysp.example");
+vi.stubEnv("AUTH_URL", "https://vpost.example");
 
 const { GET, POST } = await import("../route");
 
@@ -53,7 +53,7 @@ beforeEach(() => {
     id: "inv-1",
     role: "editor",
     token: TOKEN,
-    expiresAt: new Date("2026-08-27T05:00:00Z"),
+    expiresAt: new Date("2054-08-27T05:00:00Z"),
   });
 });
 
@@ -92,7 +92,7 @@ describe("/api/invites — token discipline", () => {
     // AUTH_URL's origin, NOT the request's (`http://localhost`): behind Caddy
     // the request scheme is the internal hop's, and a handed-out link must
     // carry the real one.
-    expect(body.url).toBe(`https://mysp.example/join/${TOKEN}`);
+    expect(body.url).toBe(`https://vpost.example/join/${TOKEN}`);
     expect(createInvite).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: TENANT,
@@ -108,7 +108,7 @@ describe("/api/invites — token discipline", () => {
       {
         id: "inv-1",
         role: "editor",
-        expiresAt: new Date("2026-08-27T05:00:00Z"),
+        expiresAt: new Date("2054-08-27T05:00:00Z"),
         maxUses: 1,
         usedCount: 0,
         revokedAt: null,

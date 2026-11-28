@@ -269,7 +269,7 @@ export type GetBatchStatus = ReturnType<typeof makeGetBatchStatus>;
 /**
  * LAW 3.1: the statuses whose progress still means something.
  *
- * `scheduled_on_facebook` was added on PM's decision (19/08/2026). It is the ONE
+ * `scheduled_on_facebook` was added on PM's decision (27/11/2026). It is the ONE
  * case where the system knows the remaining time exactly — the hour the operator
  * picked — and hiding it made the most reassuring line on the screen invisible:
  * the post is on Facebook, and it goes out at that hour whether or not this

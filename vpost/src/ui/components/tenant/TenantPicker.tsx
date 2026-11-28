@@ -65,36 +65,34 @@ function TenantRow({
   onPick: () => void;
 }) {
   return (
-    <HStack
+    <div
       role="listitem"
-      gap={3}
-      padding={3}
-      align="center"
-      justify="between"
-      wrap="wrap"
+      className="bg-card border-border hover:bg-sidebar rounded-xl border p-4 transition-colors duration-150 ease-out"
     >
-      <Stack direction="vertical" gap={0.5}>
-        <HStack gap={2} align="center" wrap="wrap">
-          <Text>{tenant.name}</Text>
-          {/* Category tags, not system status — plain colour variants. */}
-          <Badge variant="blue" label={planLabel(tenant.plan)} />
-          {isActive ? <Badge variant="success" label="Đang làm việc" /> : null}
-        </HStack>
-        <Text type="supporting" color="secondary">
-          Vai trò của bạn: {MEMBERSHIP_ROLE_LABELS[tenant.role]}
-        </Text>
-      </Stack>
+      <HStack gap={3} align="center" justify="between" wrap="wrap">
+        <Stack direction="vertical" gap={0.5} className="min-w-0 flex-1">
+          <HStack gap={2} align="center" wrap="wrap">
+            <Text weight="semibold">{tenant.name}</Text>
+            {/* Category tags, not system status — plain colour variants. */}
+            <Badge variant="blue" label={planLabel(tenant.plan)} />
+            {isActive ? <Badge variant="success" label="Đang làm việc" /> : null}
+          </HStack>
+          <Text type="supporting" color="secondary">
+            Vai trò của bạn: {MEMBERSHIP_ROLE_LABELS[tenant.role]}
+          </Text>
+        </Stack>
 
-      <Button
-        variant={isActive ? "secondary" : "primary"}
-        size="sm"
-        label={isActive ? `Tiếp tục ở ${tenant.name}` : `Chuyển sang ${tenant.name}`}
-        isLoading={isBusy}
-        isDisabled={isDisabled}
-        onClick={onPick}
-      >
-        {isActive ? "Tiếp tục" : "Chọn"}
-      </Button>
-    </HStack>
+        <Button
+          variant={isActive ? "primary" : "secondary"}
+          size="md"
+          label={isActive ? `Tiếp tục ở ${tenant.name}` : `Chuyển sang ${tenant.name}`}
+          isLoading={isBusy}
+          isDisabled={isDisabled}
+          onClick={onPick}
+        >
+          {isActive ? "Tiếp tục" : "Chọn"}
+        </Button>
+      </HStack>
+    </div>
   );
 }

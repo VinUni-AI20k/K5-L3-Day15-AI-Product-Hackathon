@@ -8,7 +8,6 @@ import { DrizzleAccessRequestRepo } from "@/adapters/db/access-request-repo.driz
 import { DrizzleAccountRepo } from "@/adapters/db/account-repo.drizzle";
 import { DrizzleInviteRepo } from "@/adapters/db/invite-repo.drizzle";
 import { DrizzleMemberRepo } from "@/adapters/db/member-repo.drizzle";
-import { DrizzleAppearanceSettingRepo } from "@/adapters/db/appearance-setting-repo.drizzle";
 import { DrizzlePlatformTenantRepo } from "@/adapters/db/platform-tenant-repo.drizzle";
 import { DrizzleSupportSessionRepo } from "@/adapters/db/support-session-repo.drizzle";
 import { DrizzleOAuthStateStore } from "@/adapters/db/oauth-state-store.drizzle";
@@ -85,7 +84,6 @@ import {
 } from "@/core/usecases/join-with-invite";
 import { makeManageInvites, type ManageInvites } from "@/core/usecases/manage-invites";
 import { makeManageMembers, type ManageMembers } from "@/core/usecases/manage-members";
-import { makePlatformAppearance } from "@/core/usecases/platform-appearance";
 import { makePlatformTenants, type PlatformTenants } from "@/core/usecases/platform-tenants";
 import {
   makeManageSupportSessions,
@@ -121,7 +119,6 @@ import {
   makeManageChannelGroups,
   type ManageChannelGroups,
 } from "@/core/usecases/manage-channel-groups";
-import type { ManagePromptTemplates } from "@/core/usecases/manage-prompt-templates";
 import { makeReapPostJobs, type ReapPostJobs } from "@/core/usecases/reap-post-jobs";
 import {
   makeReconcileScheduledPosts,
@@ -197,7 +194,6 @@ import { makeSyncCatalog, type SyncCatalog } from "@/core/usecases/sync-catalog"
 import {
   closeAiStores,
   makeLazyGenerateCaptions,
-  makeLazyPromptTemplates,
   type GenerateCaptions,
 } from "./ai-engine";
 import {
@@ -223,7 +219,6 @@ import {
   type AuthRateLimiter,
 } from "./auth-rate-limiter";
 import { makeOperatorAccountGate, type OperatorAccountGate } from "./operator-account-gate";
-import { makeAppearanceGate, type AppearanceGate } from "./appearance-gate";
 import { makeRequirePlatformAdmin, type RequirePlatformAdmin } from "./require-platform-admin";
 import { makeRequireTenant, type RequireTenant } from "./require-tenant";
 
@@ -292,8 +287,6 @@ export interface Usecases {
   /** E3.6 — periodic sweep of the Drive byte cache (TTL-based). */
   cleanupMediaCache: CleanupMediaCache;
   generateCaptions: GenerateCaptions;
-  /** E10.7 — versioned prompt catalog (list/create/activate). */
-  promptTemplates: ManagePromptTemplates;
   /** E7.2 — fan a post out to N channels (called by the web API). */
   createPostBatch: CreatePostBatch;
   /** E7.4 — publish one job on one channel (called by the worker). */
@@ -378,12 +371,6 @@ export interface Usecases {
   requirePlatformAdmin: RequirePlatformAdmin;
   /** M3.2 — platform tenant administration: list / provision / (un)suspend. */
   platformTenants: PlatformTenants;
-  /**
-   * M3.4 — the colour of the product, one value for every company. Exposed as
-   * the GATE, not the bare usecase: the root layout reads it on the way to
-   * every page, so the cache is not optional and must not be bypassable.
-   */
-  platformAppearance: AppearanceGate;
   /** M3.3 — support mode: audited visits into customer tenants, read-only. */
   supportSessions: ManageSupportSessions;
   /**
@@ -439,7 +426,7 @@ export interface SignMediaUrlRequest {
   readonly tenantId: TenantId;
   /** Drive file id, i.e. `MediaAsset.driveFileId` / `PostJobMedia.driveFileId`. */
   readonly assetId: string;
-  /** Public origin Meta will call, e.g. `https://mysp.example.com`. */
+  /** Public origin Meta will call, e.g. `https://vpost.example.com`. */
   readonly baseUrl: string;
   /** Defaults to 6h; clamped to [1min, 24h]. */
   readonly ttlMs?: number;
@@ -495,7 +482,7 @@ export function makeInfra(config: Config, options: InfraOptions = {}): Infra {
   const logger = makePinoLogger({
     level: config.LOG_LEVEL,
     pretty: config.LOG_PRETTY,
-    base: { service: options.serviceName ?? "mysp", env: config.NODE_ENV },
+    base: { service: options.serviceName ?? "vpost", env: config.NODE_ENV },
   });
   const { db } = getDbHandle({ url: config.DATABASE_URL });
   return { config, logger, clock: makeSystemClock(), db };
@@ -989,19 +976,6 @@ export function makeUsecases(deps: Infra, overrides: UsecaseOverrides = {}): Use
     randomSuffix: () => randomBytes(2).toString("hex"),
   });
   /**
-   * M3.4 — the appearance setting, behind its own short cache (see
-   * `appearance-gate.ts`): the root layout asks for it on the way to EVERY
-   * page, so an uncached read would be a query per page view.
-   */
-  const platformAppearance = makeAppearanceGate({
-    appearance: makePlatformAppearance({
-      settings: new DrizzleAppearanceSettingRepo(deps.db, { logger: deps.logger }),
-      logger: deps.logger,
-    }),
-    clock: deps.clock,
-    logger: deps.logger,
-  });
-  /**
    * The cache is dropped the instant a decision is written — wired HERE rather
    * than inside the usecase so core stays free of caching, and so nobody can
    * call `decide` through a path that forgets it. Without this the operator we
@@ -1159,13 +1133,8 @@ export function makeUsecases(deps: Infra, overrides: UsecaseOverrides = {}): Use
       db: deps.db,
       redisUrl: deps.config.REDIS_URL,
       // Claim validation compares a caption against the labels of THIS tenant's
-      // sheet; without it an external tenant is judged by MYSP's column names.
+      // sheet; without it an external tenant is judged by VPOST's column names.
       catalogConfig,
-    }),
-    promptTemplates: makeLazyPromptTemplates({
-      logger: deps.logger,
-      clock: deps.clock,
-      db: deps.db,
     }),
     createPostBatch: makeCreatePostBatch({
       postJobs,
@@ -1305,7 +1274,6 @@ export function makeUsecases(deps: Infra, overrides: UsecaseOverrides = {}): Use
         return result;
       },
     },
-    platformAppearance,
     supportSessions: makeManageSupportSessions({
       sessions: supportSessionRepo,
       clock: deps.clock,

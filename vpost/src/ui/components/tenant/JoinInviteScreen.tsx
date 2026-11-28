@@ -1,6 +1,6 @@
 "use client";
 
-import { Banner, Button, Heading, Skeleton, Stack, Text } from "@astryxdesign/core";
+import { Banner, Button, Card, Heading, Skeleton, Stack, Text } from "@astryxdesign/core";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
@@ -47,16 +47,20 @@ export function JoinInviteScreen({ token }: { token: string }) {
   // --- Pending --------------------------------------------------------------
   if (join.isPending || join.isIdle) {
     return (
-      <Stack direction="vertical" gap={3}>
-        <Heading level={1}>Đang kiểm tra lời mời</Heading>
-        <Text type="supporting" role="status" aria-live="polite">
-          Đang kiểm tra lời mời, vui lòng đợi.
-        </Text>
-        <Stack direction="vertical" gap={2} aria-hidden="true">
-          <Skeleton width="100%" height={16} />
-          <Skeleton width="70%" height={16} />
-        </Stack>
-      </Stack>
+      <div className="mx-auto w-full max-w-lg px-4 py-8 sm:px-6">
+        <Card padding={6}>
+          <Stack direction="vertical" gap={4}>
+            <Heading level={1}>Đang kiểm tra lời mời</Heading>
+            <Text type="supporting" color="secondary" role="status" aria-live="polite">
+              Đang kiểm tra lời mời, vui lòng đợi.
+            </Text>
+            <Stack direction="vertical" gap={2} aria-hidden="true">
+              <Skeleton width="100%" height={16} index={0} />
+              <Skeleton width="70%" height={16} index={1} />
+            </Stack>
+          </Stack>
+        </Card>
+      </div>
     );
   }
 
@@ -64,30 +68,35 @@ export function JoinInviteScreen({ token }: { token: string }) {
   if (join.isSuccess) {
     const roleLabel = MEMBERSHIP_ROLE_LABELS[join.data.role];
     return (
-      <Stack direction="vertical" gap={3}>
-        <Heading level={1}>
-          {join.data.alreadyMember ? "Bạn đã là thành viên" : "Vào công ty thành công"}
-        </Heading>
-        <Banner
-          status="success"
-          role="status"
-          title={joinSuccessMessage(join.data, roleLabel)}
-          description={
-            join.data.alreadyMember
-              ? "Lời mời này trỏ tới công ty bạn vốn đã ở trong, nên không có gì thay đổi. Bạn đang làm việc ở công ty đó."
-              : "Bạn đang làm việc ở công ty này. Dữ liệu của mỗi công ty tách riêng: sản phẩm, kênh và nhật ký đăng bài không dùng chung."
-          }
-        />
-        <Stack direction="horizontal" gap={2}>
-          <Button
-            variant="primary"
-            label={`Vào làm việc ở ${join.data.tenant.name}`}
-            onClick={() => router.replace("/")}
-          >
-            Vào làm việc
-          </Button>
-        </Stack>
-      </Stack>
+      <div className="mx-auto w-full max-w-lg px-4 py-8 sm:px-6">
+        <Card padding={6}>
+          <Stack direction="vertical" gap={4}>
+            <Heading level={1}>
+              {join.data.alreadyMember ? "Bạn đã là thành viên" : "Vào công ty thành công"}
+            </Heading>
+            <Banner
+              status="success"
+              role="status"
+              title={joinSuccessMessage(join.data, roleLabel)}
+              description={
+                join.data.alreadyMember
+                  ? "Lời mời này trỏ tới công ty bạn vốn đã ở trong, nên không có gì thay đổi. Bạn đang làm việc ở công ty đó."
+                  : "Bạn đang làm việc ở công ty này. Dữ liệu của mỗi công ty tách riêng: sản phẩm, kênh và nhật ký đăng bài không dùng chung."
+              }
+            />
+            <Stack direction="horizontal" gap={2}>
+              <Button
+                variant="primary"
+                size="md"
+                label={`Vào làm việc ở ${join.data.tenant.name}`}
+                onClick={() => router.replace("/")}
+              >
+                Vào làm việc
+              </Button>
+            </Stack>
+          </Stack>
+        </Card>
+      </div>
     );
   }
 
@@ -96,16 +105,23 @@ export function JoinInviteScreen({ token }: { token: string }) {
   // đã dùng, không tồn tại), so the copy in `presentApiError` does not
   // speculate. No retry either: the same token would fail the same way.
   return (
-    <Stack direction="vertical" gap={3}>
-      <Heading level={1}>Không dùng được link mời này</Heading>
-      <ApiErrorNotice
-        error={join.error}
-        extraAction={
-          <Button variant="secondary" label="Về trang chủ" onClick={() => router.replace("/")}>
-            Về trang chủ
-          </Button>
-        }
-      />
-    </Stack>
+    <div className="mx-auto w-full max-w-lg px-4 py-8 sm:px-6">
+      <Stack direction="vertical" gap={4}>
+        <Heading level={1}>Không dùng được link mời này</Heading>
+        <ApiErrorNotice
+          error={join.error}
+          extraAction={
+            <Button
+              variant="secondary"
+              size="md"
+              label="Về trang chủ"
+              onClick={() => router.replace("/")}
+            >
+              Về trang chủ
+            </Button>
+          }
+        />
+      </Stack>
+    </div>
   );
 }

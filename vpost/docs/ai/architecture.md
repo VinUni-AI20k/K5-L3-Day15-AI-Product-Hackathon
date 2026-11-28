@@ -1,10 +1,10 @@
-# AI Architecture — ✅ APPROVED 12/08/2026
+# AI Architecture — ✅ APPROVED 27/11/2026
 
-**Trạng thái: ĐÃ DUYỆT — được phép implement.** Tài liệu này là kết quả review kiến trúc hiện tại (doc 02/07) theo 14 nguyên tắc của chỉ đạo AI Architecture Review, 12/08/2026.
+**Trạng thái: ĐÃ DUYỆT — được phép implement.** Tài liệu này là kết quả review kiến trúc hiện tại (doc 27/11) theo 14 nguyên tắc của chỉ đạo AI Architecture Review, 27/11/2026.
 
 ## 1. Đánh giá hiện trạng — chỗ nào đã lệch nguyên tắc
 
-| Nguyên tắc | Hiện trạng (doc 02/07 + agent caption-ai) | Kết luận |
+| Nguyên tắc | Hiện trạng (doc 27/11 + agent caption-ai) | Kết luận |
 |---|---|---|
 | #1 Không couple provider | Doc 07 đã có port `CaptionGenerator` — business KHÔNG gọi SDK trực tiếp ✅. Nhưng chỉ có 1 adapter Anthropic, không có tầng gateway/policy ⚠️ | Nâng cấp: port giữ nguyên, thêm AI Gateway phía sau |
 | #2 Không hardcode model | `claude-opus-5` ghi cứng trong doc 02, agent caption-ai ❌ | Chuyển sang Model Registry theo task |
@@ -114,7 +114,7 @@ Chi tiết routing: `model-routing.md`. Chi tiết validation: `validation.md`. 
 
 ## 7. Điểm chờ quyết định khi duyệt
 
-1. ⚠️ **TẠM HOÃN 15/08/2026 — hiện chạy MỘT provider: OpenAI** (chưa cấp được key Google paid tier). Chi tiết + cách bật lại: `provider-strategy.md` §3.1. Quyết định gốc bên dưới vẫn là đích đến.
-   ✅ **ĐÃ CHỐT (owner, 12/08/2026): Google AI Studio làm provider chính** — Gemini phủ cả 3 tier; OpenAI làm fallback hạ tầng ngày 1; Anthropic đợt 2 nếu benchmark cần. **Điều kiện bắt buộc: paid tier từ môi trường có dữ liệu thật** (free tier cho Google quyền dùng dữ liệu để training — xem provider-strategy.md mục 3).
+1. ⚠️ **TẠM HOÃN 27/11/2026 — hiện chạy MỘT provider: OpenAI** (chưa cấp được key Google paid tier). Chi tiết + cách bật lại: `provider-strategy.md` §3.1. Quyết định gốc bên dưới vẫn là đích đến.
+   ✅ **ĐÃ CHỐT (owner, 27/11/2026): Google AI Studio làm provider chính** — Gemini phủ cả 3 tier; OpenAI làm fallback hạ tầng ngày 1; Anthropic đợt 2 nếu benchmark cần. **Điều kiện bắt buộc: paid tier từ môi trường có dữ liệu thật** (free tier cho Google quyền dùng dữ liệu để training — xem provider-strategy.md mục 3).
 2. ⏳ **Model cụ thể trong từng tier**: đề xuất Gemini 3.5 Flash-Lite (cheap) / 3.6 Flash (mid) / 3.1 Pro (top), nhưng **chốt sau benchmark** trên eval dataset (nguyên tắc #10, #13) — benchmark đợt 1 so Flash-Lite vs Flash vs GPT-5 mini trên tiếng Việt bán hàng.
-3. ✅ **ĐÃ CHỐT (owner, 12/08/2026): Registry = YAML-trong-repo + DB override theo tenant**, cache nóng trong Redis (stack đã có Redis từ quyết định cùng ngày).
+3. ✅ **ĐÃ CHỐT (owner, 27/11/2026): Registry = YAML-trong-repo + DB override theo tenant**, cache nóng trong Redis (stack đã có Redis từ quyết định cùng ngày).

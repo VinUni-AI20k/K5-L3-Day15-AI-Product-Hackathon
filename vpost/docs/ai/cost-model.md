@@ -19,7 +19,7 @@ cost/bài published = tổng chi AI trong kỳ ÷ số bài published trong kỳ
 | Tỉ lệ escalation | 10% lên mid, 2% lên top (giả thuyết — đo lại) |
 | Viết lại theo yêu cầu người dùng | 20% bài có 1 lần "viết lại" |
 
-Ước tính thô/tháng (30 ngày, quyết định 12/08: primary Gemini 3.5 Flash-Lite $0.30/$2.50, escalation Gemini 3.6 Flash/3.1 Pro): 60 gen/ngày × ~1.5K in + ảnh + 400 out ≈ **dưới 10 USD/tháng** ở khối lượng MVP — chi phí AI không phải rủi ro Phase 1, nhưng cấu trúc routing phải đúng từ đầu vì SaaS nhiều tenant nhân số này lên trăm lần. **Bắt buộc paid tier** (free tier dùng data để training — provider-strategy.md mục 3); paid tier cùng giá token này.
+Ước tính thô/tháng (30 ngày, quyết định 27/11: primary Gemini 3.5 Flash-Lite $0.30/$2.50, escalation Gemini 3.6 Flash/3.1 Pro): 60 gen/ngày × ~1.5K in + ảnh + 400 out ≈ **dưới 10 USD/tháng** ở khối lượng MVP — chi phí AI không phải rủi ro Phase 1, nhưng cấu trúc routing phải đúng từ đầu vì SaaS nhiều tenant nhân số này lên trăm lần. **Bắt buộc paid tier** (free tier dùng data để training — provider-strategy.md mục 3); paid tier cùng giá token này.
 
 ⚠️ Con số trên là khung suy nghĩ, không phải cam kết — điền lại toàn bộ bằng số đo từ `ai_generation` sau tuần đầu chạy thật (bảng giá verify lại theo trang chính thức tại thời điểm chạy).
 
@@ -32,7 +32,7 @@ cost/bài published = tổng chi AI trong kỳ ÷ số bài published trong kỳ
 | Cảnh báo bất thường | cost/ngày > 2× trung bình 7 ngày | Thông báo kênh cảnh báo (câu E3) |
 | Prompt caching | phần system + guideline cố định đặt đầu prompt, bật cache của provider | Giảm chi phí input lặp (GPT-5.4 mini cached $0.075/M — rẻ 90%) |
 
-### 3.1 Biên còn lại của trần/generation — tính ngày 15/08/2026
+### 3.1 Biên còn lại của trần/generation — tính ngày 27/11/2026
 
 Trần `maxCostPerGenerationUsd = 0.05`. Với thang tier hiện hành và
 `facebook_content.maxOutputTokens = 3000`, chạy `projectAttemptCostUsd` trên

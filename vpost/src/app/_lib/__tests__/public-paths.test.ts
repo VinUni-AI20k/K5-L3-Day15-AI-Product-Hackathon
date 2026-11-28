@@ -29,7 +29,8 @@ describe("isPublicPath — the media boundary", () => {
 });
 
 describe("isPublicPath — the rest of the allowlist", () => {
-  it("keeps the sign-in door and the auth/health prefixes public", () => {
+  it("keeps the landing page, sign-in door and the auth/health prefixes public", () => {
+    expect(isPublicPath("/")).toBe(true);
     expect(isPublicPath("/signin")).toBe(true);
     expect(isPublicPath("/api/auth/callback/google")).toBe(true);
     expect(isPublicPath("/api/health")).toBe(true);
@@ -41,7 +42,7 @@ describe("isPublicPath — the rest of the allowlist", () => {
   });
 
   it("guards everything else", () => {
-    expect(isPublicPath("/")).toBe(false);
+    expect(isPublicPath("/overview")).toBe(false);
     expect(isPublicPath("/api/posts/batches")).toBe(false);
     expect(isPublicPath("/join/sometoken")).toBe(false);
   });

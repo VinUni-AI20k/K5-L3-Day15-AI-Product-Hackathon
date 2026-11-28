@@ -103,8 +103,8 @@ export function PickerList({
             onFocus={() => setActiveIndex(index)}
             onClick={() => onSelect(row.key)}
             className={cn(
-              "focus-visible:ring-ring/50 hover:bg-muted flex w-full items-baseline justify-between gap-3 px-3.5 py-2.5 text-left text-sm outline-none focus-visible:ring-3",
-              row.isSelected && "bg-muted/60 font-medium",
+              "focus-visible:ring-ring hover:bg-sidebar active:bg-muted flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm transition-colors duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-inset",
+              row.isSelected && "bg-accent text-accent-foreground font-medium",
             )}
           >
             <span className="min-w-0 truncate">{row.label}</span>

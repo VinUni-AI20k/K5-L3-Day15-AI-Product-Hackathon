@@ -2,8 +2,8 @@
 
 import { HStack, Skeleton, Stack } from "@astryxdesign/core";
 
-/** Column widths mirror AccessRequestTable so the real rows land where these sat. */
-const COLUMNS = [140, null, 140, 170, 130, 170, null, 420] as const;
+/** Column widths mirror AccessRequestTable (7 columns) so the real rows land where these sat. */
+const COLUMNS = [140, null, 140, 170, 140, 170, null] as const;
 const ROWS = 5;
 
 /**
@@ -13,14 +13,21 @@ const ROWS = 5;
  */
 export function AccessRequestTableSkeleton() {
   return (
-    <Stack direction="vertical" gap={0} padding={0} aria-hidden="true">
-      {Array.from({ length: ROWS }, (_, row) => (
-        <HStack key={row} gap={3} padding={3} align="center">
-          {COLUMNS.map((width, column) => (
-            <Skeleton key={column} width={width ?? "100%"} height={16} index={row} />
-          ))}
-        </HStack>
-      ))}
-    </Stack>
+    <div
+      className="bg-card border-border overflow-hidden rounded-xl border"
+      aria-hidden="true"
+    >
+      <Stack direction="vertical" gap={0} padding={0}>
+        {Array.from({ length: ROWS }, (_, row) => (
+          <div key={row} className={row > 0 ? "border-border border-t" : undefined}>
+            <HStack gap={3} padding={4} align="center">
+              {COLUMNS.map((width, column) => (
+                <Skeleton key={column} width={width ?? "100%"} height={16} index={row} />
+              ))}
+            </HStack>
+          </div>
+        ))}
+      </Stack>
+    </div>
   );
 }

@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1
+# Python FastAPI backend for VPOST (codebase/server.py + data/).
+# Built from the repository root:
+#   docker build -f Dockerfile.api -t vpost-api:test .
+
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8021
+
+WORKDIR /app
+
+# Create a dedicated non-root user before copying runtime files.
+RUN useradd --system --create-home --uid 10001 appuser
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY --chown=appuser:appuser codebase/ ./codebase/
+COPY --chown=appuser:appuser data/ ./data/
+
+# Strip any local dev artifacts and ensure uploads dir is writable by appuser.
+RUN rm -rf ./data/app.db ./data/app.db-* ./data/inventory.local.csv ./data/uploads \
+    && mkdir -p ./data/uploads \
+    && chown -R appuser:appuser ./data
+
+USER appuser
+
+EXPOSE 8021
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/api/meta' % os.environ.get('PORT', '8021'), timeout=3)" || exit 1
+
+# Run codebase/server.py's FastAPI `app` via uvicorn bound to 0.0.0.0 so the
+# sibling `web` container can reach http://api:8021 over the Docker network
+# (codebase/server.py's __main__ binds 127.0.0.1 for local dev). `exec` keeps
+# uvicorn as PID 1 so SIGTERM stops the background comment poller cleanly.
+CMD ["sh", "-c", "exec python -m uvicorn server:app --app-dir codebase --host 0.0.0.0 --port \"${PORT:-8021}\""]

@@ -10,7 +10,7 @@ import {
 } from "../sliding-window-rate-limiter";
 
 const RULE: RateLimitRule = { limit: 3, windowMs: 60_000 };
-const T0 = Date.UTC(2026, 7, 24, 9, 0, 0);
+const T0 = Date.UTC(2054, 7, 24, 9, 0, 0);
 
 function movableClock(startMs = T0) {
   let nowMs = startMs;

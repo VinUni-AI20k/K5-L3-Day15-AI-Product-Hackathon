@@ -22,7 +22,7 @@ import { CAPTION_TONES } from "@/shared/caption-tone";
  * stripped — a client trying to send them is a bug that must be visible.
  *
  * With no AI key configured — today that means OPENAI_API_KEY, the only required
- * one (single-provider decision 15/08/2026) — the composition root throws
+ * one (single-provider decision 27/11/2026) — the composition root throws
  * INVALID_INPUT naming the missing variable; the wizard turns that into "chưa
  * cấu hình AI" and falls back to typing the caption by hand. That is the
  * expected Phase 1 behaviour.

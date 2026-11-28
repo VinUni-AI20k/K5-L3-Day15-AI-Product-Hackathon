@@ -9,7 +9,7 @@ Dùng cho BA khi làm việc với stakeholder (chủ shop / vận hành / marke
 
 Mỗi câu có **"Vì sao hỏi"** để BA không bị stakeholder gạt đi bằng "cứ làm như brief".
 
-> **Cập nhật v2 (12/08/2026):**
+> **Cập nhật v2 (27/11/2026):**
 > - **Nhóm A:** PM xác nhận app Facebook & TikTok **đã có sẵn**. Các câu A1–A5 đổi tính chất từ "hỏi có chưa" thành **checklist verify trên dashboard** — chụp màn hình làm bằng chứng, không nhận trả lời miệng. TikTok (A4–A6) chỉ phục vụ Phase 2 nhưng vẫn verify ngay để Phase 2 không có khoảng chết.
 > - **Nhóm B:** phần lớn sẽ được đóng bằng khảo sát dữ liệu tự động (`05-data-profile.md`) — BA thẩm định kết quả thay vì tự khảo sát.
 > - **F5 (SaaS): ĐÃ CHỐT** — chuẩn bị SaaS mức data model ngay phase này. Xem decision log.
@@ -37,7 +37,7 @@ Mỗi câu có **"Vì sao hỏi"** để BA không bị stakeholder gạt đi b�
 
 ## B. Nguồn dữ liệu — Google Drive & Google Sheet
 
-> **v2 — ĐÃ KHẢO SÁT XONG (12/08/2026):** các câu **B1, B2, B3, B4, B7, B8, B9, B10, B11 đã ĐÓNG** — đáp án chi tiết ở `05-data-profile.md` mục 6. Còn hỏi stakeholder: **B5, B6, B12, B13** + 9 câu hỏi MỚI phát sinh từ dữ liệu (`05-data-profile.md` mục 7 — trong đó nặng nhất: thư mục "Hàng Thiết Kế" không đọc được, và chỉ ~20 mã đủ điều kiện đăng ngay).
+> **v2 — ĐÃ KHẢO SÁT XONG (27/11/2026):** các câu **B1, B2, B3, B4, B7, B8, B9, B10, B11 đã ĐÓNG** — đáp án chi tiết ở `05-data-profile.md` mục 6. Còn hỏi stakeholder: **B5, B6, B12, B13** + 9 câu hỏi MỚI phát sinh từ dữ liệu (`05-data-profile.md` mục 7 — trong đó nặng nhất: thư mục "Hàng Thiết Kế" không đọc được, và chỉ ~20 mã đủ điều kiện đăng ngay).
 >
 > Đáp án chốt nhanh: tồn theo **MÃ** không theo màu (B10) · cột Tồn luôn là **số hoặc trống** (B8) · Lưu ý chỉ có **3 giá trị**, thêm giá trị mới "Không cần cọc" chưa có rule (B9) · 28,2% file sai chuẩn tên (B2) · màu có dấu/không dấu lẫn lộn, cần bảng chuẩn hoá (B3).
 
@@ -112,7 +112,7 @@ Mỗi câu có **"Vì sao hỏi"** để BA không bị stakeholder gạt đi b�
 | F2 | Đăng nhập bằng gì? Có tài khoản Google Workspace công ty không? | 🟡 | Đã dùng Google Drive/Sheet thì đăng nhập Google là rẻ nhất và an toàn nhất. |
 | F3 | Dùng trên **máy tính hay điện thoại**? Brief mục 8 nhắc "chọn ảnh/video từ máy tính, điện thoại". | 🔴 | Nếu bắt buộc dùng tốt trên điện thoại thì khối lượng UI tăng đáng kể (kéo-thả sắp xếp trên mobile là việc khó). |
 | F4 | Triển khai ở đâu — server công ty, VPS thuê, hay cloud? Có ràng buộc dữ liệu phải ở VN không? | 🟡 | Ảnh hưởng lựa chọn hạ tầng và chi phí. |
-| F5 | ~~Sau này có bán ra ngoài dạng SaaS không?~~ **ĐÃ CHỐT 12/08/2026: có, chuẩn bị mức data model ngay phase này** (tenant_id mọi bảng + config theo tenant; chưa làm UI đăng ký/mời user) | ✅ | Người quyết: PM/owner. Chi tiết trong `02-dinh-huong-cong-nghe.md` mục 4. |
+| F5 | ~~Sau này có bán ra ngoài dạng SaaS không?~~ **ĐÃ CHỐT 27/11/2026: có, chuẩn bị mức data model ngay phase này** (tenant_id mọi bảng + config theo tenant; chưa làm UI đăng ký/mời user) | ✅ | Người quyết: PM/owner. Chi tiết trong `02-dinh-huong-cong-nghe.md` mục 4. |
 | F6 | Yêu cầu về thời gian hoạt động, sao lưu, khôi phục? Ai vận hành sau khi bàn giao? | 🟡 | Ảnh hưởng scope của phần vận hành. |
 | F7 | **Deadline mong muốn** và mức độ cứng của nó? | 🔴 | Deadline cứng + phụ thuộc audit TikTok = phải cắt scope. Phải nói ra sớm. |
 
@@ -131,7 +131,7 @@ Mỗi câu có **"Vì sao hỏi"** để BA không bị stakeholder gạt đi b�
 | Thử lại khi lỗi | Tối đa 2 lần, cách nhau 60s, có khoá chống trùng | E4 xác nhận khác |
 | Caption khác nhau | Không trùng quá 8 từ liên tiếp giữa 2 kênh bất kỳ | D1 chốt ngưỡng khác |
 | Thiết bị | Ưu tiên desktop; mobile chỉ xem và duyệt caption | F3 yêu cầu mobile đầy đủ |
-| ~~Đa khách hàng~~ | ~~giả định~~ → **đã thành quyết định chính thức** (F5 chốt 12/08/2026) | — |
+| ~~Đa khách hàng~~ | ~~giả định~~ → **đã thành quyết định chính thức** (F5 chốt 27/11/2026) | — |
 
 ---
 

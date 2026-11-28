@@ -7,7 +7,6 @@ import { asc, eq } from "drizzle-orm";
 
 import { makeRedisAiCache } from "@/adapters/ai/cache/redis-cache";
 import { makeOpenAIProviderAdapter } from "@/adapters/ai/openai/openai-provider";
-import { makeDbPromptStore } from "@/adapters/ai/prompt-store/db-prompt-store";
 import { makeStaticPromptStore } from "@/adapters/ai/prompt-store/static-prompt-store";
 import {
   makeCachedModelPolicyStore,
@@ -17,7 +16,6 @@ import { makeYamlModelPolicyStore } from "@/adapters/ai/registry-store/yaml-mode
 import { makeSystemClock } from "@/adapters/clock/system-clock";
 import { makeDrizzleGenerationLog } from "@/adapters/db/ai-generation-log.drizzle";
 import { DrizzleAiModelPolicyOverrideRepo } from "@/adapters/db/ai-model-policy-override-repo.drizzle";
-import { DrizzleAiPromptTemplateRepo } from "@/adapters/db/ai-prompt-template-repo.drizzle";
 import { makeDbHandle } from "@/adapters/db/client";
 import { aiGenerations, aiModelPolicyOverrides, products, tenants } from "@/adapters/db/schema";
 import { makePinoLogger } from "@/adapters/logging/pino-logger";
@@ -42,7 +40,7 @@ import { makeGenerateCaptions } from "@/core/usecases/generate-captions";
  *   A5 token counts / cost / latency are what the cost model assumes;
  *   A6 the 4 validation stages behave on REAL model output, not fixtures.
  *
- * SINGLE PROVIDER (owner decision 15/08/2026): the registry lists OpenAI models
+ * SINGLE PROVIDER (owner decision 27/11/2026): the registry lists OpenAI models
  * only, so this script drives OpenAI only. The Gemini steps (A1 — does Gemini
  * accept `responseJsonSchema`) and the cross-provider fallback steps were
  * removed with that decision; restore them from git history together with the
@@ -381,11 +379,7 @@ async function main(): Promise<void> {
       logger,
       ttlMs: 60_000,
     });
-    const prompts = makeDbPromptStore({
-      repo: new DrizzleAiPromptTemplateRepo(db, logger),
-      builtIn: makeStaticPromptStore(),
-      logger,
-    });
+    const prompts = makeStaticPromptStore();
     const generationLog = makeDrizzleGenerationLog({ db, logger, newId: () => randomUUID() });
 
     const openai = metered(

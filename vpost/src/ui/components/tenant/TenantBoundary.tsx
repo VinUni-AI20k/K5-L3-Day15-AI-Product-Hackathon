@@ -50,11 +50,19 @@ export function TenantBoundary({ children }: { children: ReactNode }) {
   // --- Loading --------------------------------------------------------------
   if (isFirstLoad) {
     return showSkeleton ? (
-      <Stack direction="vertical" gap={3} padding={4} aria-hidden="true">
-        <Skeleton width={240} height={28} />
-        <Skeleton width="100%" height={16} />
-        <Skeleton width="100%" height={200} />
-      </Stack>
+      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8" aria-hidden="true">
+        <Stack direction="vertical" gap={4}>
+          <Skeleton width={240} height={28} index={0} />
+          <Skeleton width="70%" height={16} index={1} />
+          <div className="bg-card border-border rounded-xl border p-5">
+            <Stack direction="vertical" gap={3}>
+              <Skeleton width="45%" height={20} index={2} />
+              <Skeleton width="100%" height={48} index={3} />
+              <Skeleton width="100%" height={48} index={4} />
+            </Stack>
+          </div>
+        </Stack>
+      </div>
     ) : null;
   }
 
@@ -63,26 +71,30 @@ export function TenantBoundary({ children }: { children: ReactNode }) {
   // for data on behalf of a company nobody has established.
   if (me.isError && !me.data) {
     return (
-      <Stack direction="vertical" gap={3} padding={4}>
-        <Heading level={1}>Chưa mở được phiên làm việc</Heading>
-        <ApiErrorNotice error={me.error} onRetry={() => void me.refetch()} />
-      </Stack>
+      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+        <Stack direction="vertical" gap={4}>
+          <Heading level={1}>Chưa mở được phiên làm việc</Heading>
+          <ApiErrorNotice error={me.error} onRetry={() => void me.refetch()} />
+        </Stack>
+      </div>
     );
   }
 
   // --- Fork in the road: several companies, none chosen ---------------------
   if (mustPickTenant) {
     return (
-      <Stack direction="vertical" gap={4} padding={4}>
-        <Stack direction="vertical" gap={1}>
-          <Heading level={1}>Chọn công ty để làm việc</Heading>
-          <Text type="supporting">
-            Tài khoản của bạn thuộc {tenants.length} công ty. Mỗi công ty có sản phẩm, kênh và nhật
-            ký riêng — chọn một công ty để bắt đầu; bạn đổi lại lúc nào cũng được.
-          </Text>
+      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+        <Stack direction="vertical" gap={5}>
+          <Stack direction="vertical" gap={1.5}>
+            <Heading level={1}>Chọn công ty để làm việc</Heading>
+            <Text type="supporting" color="secondary" className="max-w-prose">
+              Tài khoản của bạn thuộc {tenants.length} công ty. Mỗi công ty có sản phẩm, kênh và
+              nhật ký riêng — chọn một công ty để bắt đầu; bạn đổi lại lúc nào cũng được.
+            </Text>
+          </Stack>
+          <TenantPicker />
         </Stack>
-        <TenantPicker />
-      </Stack>
+      </div>
     );
   }
 

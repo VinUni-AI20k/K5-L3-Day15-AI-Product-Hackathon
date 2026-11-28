@@ -29,7 +29,7 @@ function silentLogger(): Logger {
   return logger;
 }
 
-const clock: Clock = { now: () => new Date("2026-08-20T05:00:00Z"), nowMs: () => 0 };
+const clock: Clock = { now: () => new Date("2054-08-20T05:00:00Z"), nowMs: () => 0 };
 
 function harness(
   options: {
@@ -247,7 +247,7 @@ describe("createTenant — slugs", () => {
 describe("slugify", () => {
   it.each([
     ["Công ty Đá Mỹ Nghệ", "cong-ty-da-my-nghe"],
-    ["  MYSP -- 2026!  ", "mysp-2026"],
+    ["  VPOST -- 2026!  ", "vpost-2026"],
     ["日本語のみ", ""],
   ])("%s -> %s", (name, expected) => {
     expect(slugify(name)).toBe(expected);

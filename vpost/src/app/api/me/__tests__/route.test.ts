@@ -94,7 +94,7 @@ describe("GET /api/me — answers", () => {
 
   it("hands the SESSION's bootstrap flag to the usecase — N6, the UI's only tell", async () => {
     getOperatorSession.mockResolvedValue({
-      email: "boss@mysp.vn",
+      email: "boss@vpost.vn",
       accountId: null,
       isBootstrapAdmin: true,
     });
@@ -135,7 +135,7 @@ describe("GET /api/me — answers", () => {
       tenantId: VISITED,
       tenantName: "Khách A",
       tenantSlug: "khach-a",
-      expiresAt: new Date("2026-08-22T07:00:00.000Z"),
+      expiresAt: new Date("2054-08-22T07:00:00.000Z"),
     });
 
     const response = await GET(
@@ -146,7 +146,7 @@ describe("GET /api/me — answers", () => {
     expect(body.supportSession).toEqual({
       tenantId: VISITED,
       tenantName: "Khách A",
-      expiresAt: "2026-08-22T07:00:00.000Z",
+      expiresAt: "2054-08-22T07:00:00.000Z",
     });
     // The visited tenant becomes the active one so the R routes read its data.
     expect(body.activeTenantId).toBe(VISITED);

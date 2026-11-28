@@ -14,7 +14,7 @@ import { StepActions } from "./StepActions";
  * the reference shot draws a tick box in the tile's corner, and spec section 6
  * calls the answer a "phiếu bầu nhu cầu" — you cannot vote with one channel
  * when eight are listed. (Spec section 7.5 filed step 4 under single-choice in
- * its first draft; corrected 26/08 with those three reasons written down.)
+ * its first draft; corrected 27/11 with those three reasons written down.)
  *
  * A PURE component, same as the other three steps.
  *
@@ -44,7 +44,7 @@ const CHOICES: readonly ChannelTileChoice[] = FOCUS_CHANNELS.map((value) => ({
   isComingSoon: !AVAILABLE_CHANNELS.includes(value),
 }));
 
-const QUESTION = "Các kênh bạn đang tập trung";
+const QUESTION = "Kênh nào bạn đang tập trung?";
 
 /** Narrowing at the boundary: the group hands back a `string`. */
 function isFocusChannel(value: string): value is FocusChannel {

@@ -30,10 +30,10 @@ export function percentOf(value: number, total: number): string | null {
   return `${rounded}%`;
 }
 
-/** Width of a bar segment, clamped so a bad count cannot overflow the track. */
-export function segmentWidth(value: number, total: number): string {
-  if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0 || value <= 0) return "0%";
-  return `${Math.min(100, (value / total) * 100)}%`;
+/** Percentage width (0–100) of a bar segment, clamped so a bad count cannot overflow the track. */
+export function segmentPercent(value: number, total: number): number {
+  if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0 || value <= 0) return 0;
+  return Math.min(100, (value / total) * 100);
 }
 
 export function formatDateTime(iso: string): string {

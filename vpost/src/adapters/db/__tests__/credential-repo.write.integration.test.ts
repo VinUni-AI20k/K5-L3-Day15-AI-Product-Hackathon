@@ -62,7 +62,7 @@ describe.skipIf(!url)("DrizzleCredentialRepo — the password write path", () =>
    */
   const hasher = makeScryptPasswordHasher({ cost: { N: 1024, r: 8, p: 1 } });
 
-  let now = new Date(Date.UTC(2026, 7, 24, 9, 0, 0));
+  let now = new Date(Date.UTC(2054, 7, 24, 9, 0, 0));
   const clock = { now: () => now, nowMs: () => now.getTime() };
   const usecase = makePasswordAuth({
     credentials: credentialRepo,
@@ -99,7 +99,7 @@ describe.skipIf(!url)("DrizzleCredentialRepo — the password write path", () =>
   beforeAll(() => globalLock.acquire());
 
   beforeEach(async () => {
-    now = new Date(Date.UTC(2026, 7, 24, 9, 0, 0));
+    now = new Date(Date.UTC(2054, 7, 24, 9, 0, 0));
     await clean();
   });
 

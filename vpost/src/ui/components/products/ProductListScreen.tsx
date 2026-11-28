@@ -18,12 +18,13 @@ import {
   useMediaQuery,
 } from "@astryxdesign/core";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search } from "lucide-react";
+import { PackageOpen, Search, SearchX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
 import { StockCheckSkippedBanner } from "@/ui/components/inventory/StockCheckSkippedBanner";
 import { firstSkippedReason, hasSkippedStockCheck } from "@/ui/components/inventory/stock-check";
+import { toProductDetailViewState } from "@/ui/components/products/product-detail-helpers";
 import {
   inspectorRecovery,
   isInspectorDrawerOpen,
@@ -35,7 +36,10 @@ import { ProductInspectorDrawer } from "@/ui/components/products/ProductInspecto
 import { ProductStatusLegend } from "@/ui/components/products/ProductStatusLegend";
 import { ProductTable } from "@/ui/components/products/ProductTable";
 import { ProductTableSkeleton } from "@/ui/components/products/ProductTableSkeleton";
-import { useCatalogProducts } from "@/ui/hooks/useCatalogProducts";
+import {
+  useCatalogProductDetail,
+  useCatalogProducts,
+} from "@/ui/hooks/useCatalogProducts";
 import { useDelayedFlag } from "@/ui/hooks/useDelayedFlag";
 import {
   formatCount,
@@ -97,6 +101,7 @@ export function ProductListScreen() {
   const selectedCode = searchParams.get(SELECTED_PARAM);
 
   const products = useCatalogProducts(filter);
+  const productDetail = useCatalogProductDetail(selectedCode);
   const isFirstLoad = products.isPending && products.fetchStatus === "fetching";
   const showSkeleton = useDelayedFlag(isFirstLoad);
 
@@ -119,6 +124,14 @@ export function ProductListScreen() {
   // moment must not turn the open inspector into "không thấy mã này".
   const inspector = productInspectorState(selectedCode, items, {
     isLoading: products.isFetching,
+  });
+  const detailState = toProductDetailViewState({
+    code: selectedCode,
+    isPending: productDetail.isPending,
+    isFetching: productDetail.isFetching,
+    data: productDetail.data?.product,
+    error: productDetail.error,
+    onRetry: () => void productDetail.refetch(),
   });
   const isDrawerOpen = isInspectorDrawerOpen(isNarrow, inspector);
 
@@ -236,12 +249,14 @@ export function ProductListScreen() {
    * "Đăng đ… 1.2" truncated inside a segment is worse than no number, and the
    * footer already says how many rows the active filter matches.
    */
+  const controlSize = isNarrow ? "md" : "sm";
+
   const statusFilter = (
     <SegmentedControl
       label="Lọc theo trạng thái đăng bài"
       value={filter.status ?? "all"}
       onChange={selectStatus}
-      size="sm"
+      size={controlSize}
       layout={isNarrow ? "fill" : "hug"}
     >
       <SegmentedControlItem
@@ -266,7 +281,7 @@ export function ProductListScreen() {
       onChange={setDraft}
       placeholder="MGKVX6310 hoặc Giannal"
       startIcon={Search}
-      size="sm"
+      size={controlSize}
       // Three lines of help under a full-width field is most of a phone screen
       // (spec §3.4). The placeholder carries the example; the behaviour is
       // discovered by typing.
@@ -279,7 +294,7 @@ export function ProductListScreen() {
   );
 
   const clearButton = hasFilter ? (
-    <Button variant="ghost" size="sm" label="Bỏ bộ lọc" onClick={clearFilters} />
+    <Button variant="ghost" size={controlSize} label="Bỏ bộ lọc" onClick={clearFilters} />
   ) : null;
 
   return (
@@ -288,7 +303,12 @@ export function ProductListScreen() {
         height="fill"
         header={
           <LayoutHeader hasDivider>
-            <Stack direction="vertical" gap={3} padding={4}>
+            <Stack
+              direction="vertical"
+              gap={4}
+              paddingInline={isNarrow ? 4 : 6}
+              paddingBlock={isNarrow ? 4 : 5}
+            >
               {/* Title row owns "Tải lại": it acts on the whole screen, not on
                   the filter, and keeping it here is what frees the filter row
                   from wrapping to a third tier on a phone. */}
@@ -305,17 +325,20 @@ export function ProductListScreen() {
 
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size={controlSize}
                   label={products.isFetching ? "Đang tải…" : "Tải lại"}
                   isDisabled={products.isFetching}
-                  onClick={() => void products.refetch()}
+                  onClick={() => {
+                    void products.refetch();
+                    if (selectedCode?.trim()) void productDetail.refetch();
+                  }}
                 />
               </HStack>
 
               {isNarrow ? (
                 // Two tiers, always: search, then status. What used to happen
                 // here was a single HStack wrapping into three ragged rows.
-                <Stack direction="vertical" gap={2}>
+                <Stack direction="vertical" gap={3}>
                   {searchBox}
                   <HStack gap={2} align="center">
                     <StackItem size="fill">{statusFilter}</StackItem>
@@ -333,12 +356,12 @@ export function ProductListScreen() {
           </LayoutHeader>
         }
         content={
-          <LayoutContent padding={0}>
+          <LayoutContent padding={0} className="min-w-0 max-w-full overflow-x-hidden">
             {/* Above the table, inside the scroll region: it belongs to the data
                 below it, and pinning it to the header would push the filters off
                 a short screen. */}
             {isStockCheckSkipped ? (
-              <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
+              <Stack direction="vertical" paddingInline={isNarrow ? 4 : 6} paddingBlock={3}>
                 <StockCheckSkippedBanner reason={firstSkippedReason(items)} />
               </Stack>
             ) : null}
@@ -346,6 +369,7 @@ export function ProductListScreen() {
             <ProductListBody
               isFirstLoad={isFirstLoad}
               showSkeleton={showSkeleton}
+              isNarrow={isNarrow}
               products={products}
               items={items}
               totals={totals}
@@ -359,10 +383,15 @@ export function ProductListScreen() {
         }
         end={
           isNarrow ? undefined : (
-            <LayoutPanel width={380} hasDivider label="Chi tiết sản phẩm">
+            <LayoutPanel
+              width={440}
+              hasDivider
+              label="Chi tiết sản phẩm"
+              className="min-w-0 overflow-x-hidden"
+            >
               {/* The panel is not modal, so the header controls stay usable —
                   but one press beats two, here as much as in the drawer. */}
-              <ProductInspector state={inspector} recovery={recovery} />
+              <ProductInspector state={inspector} detail={detailState} recovery={recovery} />
             </LayoutPanel>
           )
         }
@@ -373,6 +402,7 @@ export function ProductListScreen() {
           the row that opened it. */}
       <ProductInspectorDrawer
         state={inspector}
+        detail={detailState}
         isOpen={isDrawerOpen}
         onClose={closeDrawer}
         recovery={recovery}
@@ -384,6 +414,7 @@ export function ProductListScreen() {
 function ProductListBody({
   isFirstLoad,
   showSkeleton,
+  isNarrow,
   products,
   items,
   totals,
@@ -395,6 +426,7 @@ function ProductListBody({
 }: {
   isFirstLoad: boolean;
   showSkeleton: boolean;
+  isNarrow: boolean;
   products: ReturnType<typeof useCatalogProducts>;
   items: readonly CatalogProduct[];
   totals: { total: number; ok: number; blocked: number };
@@ -412,7 +444,7 @@ function ProductListBody({
   // --- Error ---------------------------------------------------------------
   if (products.isError && items.length === 0) {
     return (
-      <Stack direction="vertical" padding={4}>
+      <Stack direction="vertical" paddingInline={isNarrow ? 4 : 6} paddingBlock={4}>
         <ApiErrorNotice error={products.error} onRetry={() => void products.refetch()} />
       </Stack>
     );
@@ -421,10 +453,18 @@ function ProductListBody({
   // --- Empty: the two cases are told apart on purpose -----------------------
   if (items.length === 0) {
     return (
-      <Stack direction="vertical" padding={4}>
+      <Stack direction="vertical" paddingInline={isNarrow ? 4 : 6} paddingBlock={6}>
         {hasFilter ? (
           <EmptyState
             headingLevel={2}
+            icon={
+              <span
+                aria-hidden="true"
+                className="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl"
+              >
+                <SearchX className="size-5" aria-hidden="true" />
+              </span>
+            }
             title="Không có sản phẩm nào khớp bộ lọc"
             description="Dữ liệu vẫn còn nguyên — chỉ là không có mã nào khớp từ khoá hoặc trạng thái đang chọn. Bỏ bộ lọc để xem toàn bộ danh sách."
             actions={<Button variant="secondary" label="Bỏ bộ lọc" onClick={onClearFilters} />}
@@ -432,6 +472,14 @@ function ProductListBody({
         ) : (
           <EmptyState
             headingLevel={2}
+            icon={
+              <span
+                aria-hidden="true"
+                className="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl"
+              >
+                <PackageOpen className="size-5" aria-hidden="true" />
+              </span>
+            }
             title="Chưa có sản phẩm nào trong hệ thống"
             description="Đơn vị này chưa đồng bộ lần nào, hoặc lần đồng bộ gần nhất không đọc được mã nào. Mở màn Đồng bộ dữ liệu, kiểm tra nguồn Drive/Sheet rồi chạy đồng bộ."
             actions={
@@ -449,16 +497,23 @@ function ProductListBody({
 
   // --- Data ----------------------------------------------------------------
   return (
-    <Stack direction="vertical" height="100%">
+    <Stack direction="vertical" height="100%" className="min-w-0 max-w-full">
       {/* Above the rows, not below: the key has to be read before the dots are,
           and it must survive the table scrolling. */}
       <ProductStatusLegend items={items} />
 
-      <StackItem size="fill">
+      <StackItem size="fill" className="min-w-0 max-w-full">
         <ProductTable items={items} selectedCode={selectedCode} onSelect={onSelect} />
       </StackItem>
 
-      <Stack direction="horizontal" gap={3} padding={3} align="center" justify="center">
+      <Stack
+        direction="horizontal"
+        gap={3}
+        paddingInline={isNarrow ? 4 : 6}
+        paddingBlock={3}
+        align="center"
+        justify="center"
+      >
         <Text type="supporting" role="status" aria-live="polite">
           Đang hiển thị {formatCount(items.length)} / {formatCount(matchingTotal(totals, filter))}{" "}
           sản phẩm
@@ -467,7 +522,7 @@ function ProductListBody({
         {products.hasNextPage ? (
           <Button
             variant="secondary"
-            size="sm"
+            size={isNarrow ? "md" : "sm"}
             label={products.isFetchingNextPage ? "Đang tải…" : "Tải thêm"}
             isDisabled={products.isFetchingNextPage}
             onClick={() => void products.fetchNextPage()}

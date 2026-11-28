@@ -29,17 +29,14 @@ export function WizardStepCreate({
 }) {
   return (
     <Stack direction="vertical" gap={4}>
-      <Stack direction="vertical" gap={1}>
-        <p className="text-muted-foreground font-mono text-[11px] tracking-[0.2em] uppercase">
+      <Stack direction="vertical" gap={1.5}>
+        <p className="text-foreground-subtle text-sm font-medium tabular-nums">
           Bước 01 / 02
         </p>
-        <Heading
-          level={1}
-          className="text-foreground text-2xl font-bold tracking-tight sm:text-3xl"
-        >
+        <Heading level={1}>
           Công ty của bạn tên gì?
         </Heading>
-        <Text type="supporting" className="text-muted-foreground mt-1 text-sm leading-relaxed">
+        <Text type="supporting" className="text-muted-foreground text-sm leading-relaxed">
           Tên hiện trên thanh trên cùng và trong mọi báo cáo. Sửa được sau; đường dẫn thì không.
         </Text>
       </Stack>

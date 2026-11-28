@@ -30,7 +30,7 @@ Tài liệu này nói **BA làm gì, theo thứ tự nào, ra sản phẩm gì**
 
 ## Ngày 2–4: Thẩm định khảo sát dữ liệu ⭐ (v2: PM + AI agent đã khảo sát, BA thẩm định)
 
-> **v2 (12/08/2026):** phần khảo sát thô không còn là việc của BA. PM + AI agent query trực tiếp Drive "Ảnh AI" và Sheet "Mẫu 2026" (qua Google Drive MCP), kết quả nằm ở **`05-data-profile.md`** và **`sample-data/`**. Việc của BA trong 3 ngày này là **thẩm định và diễn giải nghiệp vụ** — máy đếm được nhưng không biết cái nào là bất thường có chủ đích.
+> **v2 (27/11/2026):** phần khảo sát thô không còn là việc của BA. PM + AI agent query trực tiếp Drive "Ảnh AI" và Sheet "Mẫu 2026" (qua Google Drive MCP), kết quả nằm ở **`05-data-profile.md`** và **`sample-data/`**. Việc của BA trong 3 ngày này là **thẩm định và diễn giải nghiệp vụ** — máy đếm được nhưng không biết cái nào là bất thường có chủ đích.
 
 **Việc làm**
 

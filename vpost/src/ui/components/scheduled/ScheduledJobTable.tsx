@@ -124,27 +124,27 @@ export function ScheduledJobTable({
           hẹn cùng lúc lên nhiều kênh gộp thành một dòng mở được.
         </caption>
         <colgroup>
-          <col className="w-[16%]" />
-          <col className="w-[16%]" />
-          <col className="w-[14%]" />
-          <col className="w-[34%]" />
-          <col className="w-[20%]" />
+          <col className="w-2/12" />
+          <col className="w-2/12" />
+          <col className="w-2/12" />
+          <col className="w-4/12" />
+          <col className="w-2/12" />
         </colgroup>
-        <thead className="bg-muted/50">
+        <thead className="border-border bg-[var(--bg-subtle)] text-muted-foreground border-b text-xs font-medium">
           <tr className="text-left">
-            <th scope="col" className="px-3 py-2 font-medium whitespace-nowrap">
+            <th scope="col" className="px-3 py-3 whitespace-nowrap">
               Giờ đăng ({zone})
             </th>
-            <th scope="col" className="px-3 py-2 font-medium whitespace-nowrap">
+            <th scope="col" className="px-3 py-3 whitespace-nowrap">
               Mã SP / màu
             </th>
-            <th scope="col" className="px-3 py-2 font-medium whitespace-nowrap">
+            <th scope="col" className="px-3 py-3 whitespace-nowrap">
               Kênh
             </th>
-            <th scope="col" className="px-3 py-2 font-medium whitespace-nowrap">
+            <th scope="col" className="px-3 py-3 whitespace-nowrap">
               Caption · ảnh
             </th>
-            <th scope="col" className="px-3 py-2 font-medium whitespace-nowrap">
+            <th scope="col" className="px-3 py-3 whitespace-nowrap">
               Thao tác
             </th>
           </tr>
@@ -213,10 +213,10 @@ function ScheduledRows({
 
   return (
     <>
-      <tr className="border-t align-top">
+      <tr className="border-border hover:bg-[var(--bg-subtle)]/70 border-t align-top transition-colors duration-150">
         <th
           scope="row"
-          className="px-3 py-2 text-left font-medium whitespace-nowrap tabular-nums"
+          className="px-3 py-3 text-left font-medium whitespace-nowrap tabular-nums"
         >
           <ScheduledTime job={job} nowMs={nowMs} />
           {isFolded && !sameHour ? (
@@ -229,8 +229,8 @@ function ScheduledRows({
         </th>
         {/* The Mono Ledger Rule: a code an operator compares down the column
             cannot be allowed to break in half. */}
-        <td className="px-3 py-2">
-          <span className="block whitespace-nowrap">{job.productCode}</span>
+        <td className="px-3 py-3">
+          <span className="block font-mono font-medium whitespace-nowrap">{job.productCode}</span>
           {isFolded ? (
             <span className="text-muted-foreground block text-xs">{foldCountLabel(group)}</span>
           ) : null}
@@ -246,7 +246,7 @@ function ScheduledRows({
             operator recognises "Lady Fashion", not "fb-1121597217877301", and a
             schedule they cannot read is a schedule they cannot check before the
             hour comes. */}
-        <td className="px-3 py-2 text-sm">
+        <td className="px-3 py-3 text-sm">
           {isFolded ? (
             <FoldToggle
               isOpen={isOpen}
@@ -259,15 +259,15 @@ function ScheduledRows({
             <ChannelNameCell channelId={job.channelId} label={channelLabels.get(job.channelId)} />
           )}
         </td>
-        <td className="px-3 py-2">
-          <p className="text-muted-foreground line-clamp-3">
+        <td className="px-3 py-3">
+          <p className="text-foreground line-clamp-3 leading-relaxed">
             {job.captionPreview.trim().length > 0 ? job.captionPreview : "(chưa có caption)"}
           </p>
-          <p className="text-muted-foreground/80 mt-1 text-xs">
+          <p className="text-muted-foreground mt-1 text-xs">
             {job.mediaCount} ảnh ·{" "}
             <Link
               href={`/batches/${encodeURIComponent(job.batchId)}`}
-              className="underline underline-offset-4"
+              className="text-accent-foreground font-medium underline underline-offset-4 hover:opacity-80"
             >
               Xem lô
             </Link>
@@ -277,14 +277,14 @@ function ScheduledRows({
               {job.userMessage}{" "}
               <Link
                 href={`/posts?tab=log&batchId=${encodeURIComponent(job.batchId)}`}
-                className="underline underline-offset-4"
+                className="text-accent-foreground font-medium underline underline-offset-4 hover:opacity-80"
               >
                 Xem nhật ký
               </Link>
             </p>
           ) : null}
         </td>
-        <td className="px-3 py-2">
+        <td className="px-3 py-3">
           {isFolded ? (
             <FoldedActionsNote group={group} readOnlyReason={readOnlyReason} />
           ) : (
@@ -303,8 +303,8 @@ function ScheduledRows({
           at something that exists, and these rows were on screen anyway before
           the fold. */}
       {isFolded ? (
-        <tr className="bg-muted/30 border-t" hidden={!isOpen}>
-          <td id={detailId} colSpan={5} className="px-3 py-2">
+        <tr className="border-border bg-[var(--bg-subtle)] border-t" hidden={!isOpen}>
+          <td id={detailId} colSpan={5} className="px-4 py-3">
             <ul className="space-y-2">
               {group.members.map((member) => (
                 <li key={member.postJobId} className="flex flex-wrap items-start gap-x-3 gap-y-1">
@@ -447,7 +447,7 @@ function RowActions({
     <div className="space-y-1.5">
       <div className="flex flex-wrap gap-2">
         {canReschedule ? (
-          <Button asChild size="sm" variant="outline" disabled={isBusy}>
+          <Button asChild size="sm" variant="secondary" disabled={isBusy} className="min-h-10 px-3 sm:min-h-9">
             <Link href={hrefFor("reschedule", job.postJobId)} scroll={false}>
               Đổi giờ
               <span className="sr-only">
@@ -460,7 +460,14 @@ function RowActions({
           // Shown and disabled WITH the reason, not hidden: the operator asks
           // "vì sao không đổi giờ được?" and the answer must be on the row, not
           // behind a click that 409s (core-auth-session decision tree).
-          <Button type="button" size="sm" variant="outline" disabled aria-describedby={reasonId}>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled
+            aria-describedby={reasonId}
+            className="min-h-10 px-3 sm:min-h-9"
+          >
             Đổi giờ
             <span className="sr-only">
               {" "}
@@ -469,7 +476,13 @@ function RowActions({
           </Button>
         ) : null}
         {canCancel ? (
-          <Button asChild size="sm" variant="destructive" disabled={isBusy}>
+          <Button
+            asChild
+            size="sm"
+            variant="destructive"
+            disabled={isBusy}
+            className="min-h-10 px-3 sm:min-h-9"
+          >
             <Link href={hrefFor("cancel", job.postJobId)} scroll={false}>
               Huỷ
               <span className="sr-only">

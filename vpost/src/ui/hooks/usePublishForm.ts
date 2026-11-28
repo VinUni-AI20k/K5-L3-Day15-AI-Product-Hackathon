@@ -14,6 +14,7 @@ import {
   type CaptionSources,
 } from "@/ui/components/compose/caption-targets";
 import { COMPOSE_CHANNELS, postFormatForVideo } from "@/ui/schemas/compose.schema";
+import { isAbortError } from "@/ui/services/abort";
 
 /**
  * Logic layer of step 3's publish action (docs/07 §4.1).
@@ -248,13 +249,15 @@ export function usePublishForm(wizard: ComposeWizard) {
     ) {
       try {
         const res = await wizard.upload.mutateAsync();
+        if (!res) return;
         if (res.accepted.length > 0) {
           assetsToSend = res.accepted;
         } else {
           setFormError("Không thể tải tệp lên. Vui lòng kiểm tra lại định dạng tệp.");
           return;
         }
-      } catch {
+      } catch (error) {
+        if (isAbortError(error)) return;
         setFormError("Tải tệp lên máy chủ thất bại. Vui lòng thử lại.");
         return;
       }

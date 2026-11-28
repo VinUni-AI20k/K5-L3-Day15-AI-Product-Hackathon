@@ -2,11 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   ATTENTION_LIMIT,
+  OVERVIEW_COMMENTS_LIMIT,
+  buildOverviewCommentHref,
   channelLabel,
   failureReason,
   formatLoadedCount,
+  overviewAttentionCount,
   pickAttentionItems,
+  pickOverviewComments,
   pickRunningBatches,
+  resolveOverviewCommentsState,
   statTotal,
   statValue,
   type FailedJobInput,
@@ -14,6 +19,7 @@ import {
   type UpcomingJobInput,
 } from "@/ui/components/overview/overview-model";
 import type { Channel } from "@/ui/schemas/channel.schema";
+import type { InboxThread, InboxThreadCounts } from "@/ui/schemas/inbox.schema";
 
 function failed(id: string, overrides: Partial<FailedJobInput> = {}): FailedJobInput {
   return {
@@ -30,7 +36,7 @@ function upcoming(id: string, overrides: Partial<UpcomingJobInput> = {}): Upcomi
     id,
     code: `MGK${id}`,
     channelName: "Page A",
-    scheduledAt: "2026-08-21T10:00:00.000Z",
+    scheduledAt: "2054-08-21T10:00:00.000Z",
     ...overrides,
   };
 }
@@ -73,9 +79,9 @@ describe("pickAttentionItems", () => {
     const items = pickAttentionItems({
       failedJobs: [],
       upcoming: [
-        upcoming("late", { scheduledAt: "2026-08-21T18:00:00.000Z" }),
+        upcoming("late", { scheduledAt: "2054-08-21T18:00:00.000Z" }),
         upcoming("broken", { scheduledAt: "khong-phai-gio" }),
-        upcoming("soon", { scheduledAt: "2026-08-21T09:00:00.000Z" }),
+        upcoming("soon", { scheduledAt: "2054-08-21T09:00:00.000Z" }),
       ],
     });
     expect(items.map((item) => item.id)).toEqual(["soon", "late", "broken"]);
@@ -86,11 +92,11 @@ describe("pickAttentionItems", () => {
     const items = pickAttentionItems({
       failedJobs: [failed("f1"), failed("f2")],
       upcoming: [
-        upcoming("u1", { scheduledAt: "2026-08-21T09:00:00.000Z" }),
-        upcoming("u2", { scheduledAt: "2026-08-21T10:00:00.000Z" }),
-        upcoming("u3", { scheduledAt: "2026-08-21T11:00:00.000Z" }),
-        upcoming("u4", { scheduledAt: "2026-08-21T12:00:00.000Z" }),
-        upcoming("u5", { scheduledAt: "2026-08-21T13:00:00.000Z" }),
+        upcoming("u1", { scheduledAt: "2054-08-21T09:00:00.000Z" }),
+        upcoming("u2", { scheduledAt: "2054-08-21T10:00:00.000Z" }),
+        upcoming("u3", { scheduledAt: "2054-08-21T11:00:00.000Z" }),
+        upcoming("u4", { scheduledAt: "2054-08-21T12:00:00.000Z" }),
+        upcoming("u5", { scheduledAt: "2054-08-21T13:00:00.000Z" }),
       ],
     });
 
@@ -206,15 +212,15 @@ describe("pickAttentionItems", () => {
     const items = pickAttentionItems({
       failedJobs: [],
       upcoming: [
-        upcoming("u1", { code: "MGKVX6310", scheduledAt: "2026-08-21T10:00:00.000Z" }),
-        upcoming("u2", { code: "MGKVX6310", scheduledAt: "2026-08-21T11:00:00.000Z" }),
+        upcoming("u1", { code: "MGKVX6310", scheduledAt: "2054-08-21T10:00:00.000Z" }),
+        upcoming("u2", { code: "MGKVX6310", scheduledAt: "2054-08-21T11:00:00.000Z" }),
       ],
     });
     // The head is the SOONEST hour — the upcoming side is sorted before folding.
     expect(items[0]).toMatchObject({
       jobCount: 2,
       isUniform: false,
-      scheduledAt: "2026-08-21T10:00:00.000Z",
+      scheduledAt: "2054-08-21T10:00:00.000Z",
     });
   });
 
@@ -285,9 +291,9 @@ describe("pickRunningBatches", () => {
     // nothing is moving. `publishing` means the worker holds it RIGHT NOW, so
     // an hour on that row changes nothing.
     const lots = pickRunningBatches([
-      running("waiting", { status: "queued", scheduledAt: "2026-08-21T18:00:00.000Z" }),
+      running("waiting", { status: "queued", scheduledAt: "2054-08-21T18:00:00.000Z" }),
       running("now", { status: "queued", scheduledAt: null }),
-      running("held", { status: "publishing", scheduledAt: "2026-08-21T18:00:00.000Z" }),
+      running("held", { status: "publishing", scheduledAt: "2054-08-21T18:00:00.000Z" }),
     ]);
     expect(lots.map((lot) => lot.batchId)).toEqual(["now", "held"]);
   });
@@ -488,6 +494,196 @@ describe("statTotal", () => {
     expect(statTotal({ hasData: true, isError: true, total: 4 })).toEqual({
       kind: "count",
       text: "4",
+    });
+  });
+});
+
+function sampleThread(id: string, overrides: Partial<InboxThread> = {}): InboxThread {
+  return {
+    id,
+    channelId: "fb-1",
+    channelName: "WorkHardToday",
+    pageId: "100",
+    postJobId: "job-1",
+    productCode: "G1",
+    postCaption: "Đầm hoa G1",
+    postUrl: "https://www.facebook.com/100_1",
+    postImageUrl: null,
+    customer: { id: `psid-${id}`, name: `Khách ${id}`, tags: [] },
+    lastMessage: {
+      id: `msg-${id}`,
+      fromPage: false,
+      text: `Còn hàng mã ${id} không shop?`,
+      createdAt: "2026-11-28T05:00:00.000Z",
+    },
+    needsReply: true,
+    unread: true,
+    unreadCount: 1,
+    status: "open",
+    isHidden: false,
+    messageCount: 1,
+    hasPhone: false,
+    draft: null,
+    moderation: null,
+    attention: null,
+    autoReply: null,
+    agentRun: null,
+    updatedAt: "2026-11-28T05:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function sampleCounts(overrides: Partial<InboxThreadCounts> = {}): InboxThreadCounts {
+  return {
+    canBan: 0,
+    needsReply: 0,
+    unread: 0,
+    all: 0,
+    hidden: 0,
+    ignored: 0,
+    ...overrides,
+  };
+}
+
+describe("buildOverviewCommentHref", () => {
+  it("encodes thread ids safely into /comments?thread=<id>", () => {
+    expect(buildOverviewCommentHref("thread-42")).toBe("/comments?thread=thread-42");
+    expect(buildOverviewCommentHref(" th/1?a=b ")).toBe("/comments?thread=th%2F1%3Fa%3Db");
+  });
+});
+
+describe("overviewAttentionCount", () => {
+  it("returns 0 when counts or canBan are absent, zero, or invalid", () => {
+    expect(overviewAttentionCount(undefined)).toBe(0);
+    expect(overviewAttentionCount(null)).toBe(0);
+    expect(overviewAttentionCount({ canBan: 0 })).toBe(0);
+    expect(overviewAttentionCount({ canBan: -2 })).toBe(0);
+    expect(overviewAttentionCount({ canBan: Number.NaN })).toBe(0);
+  });
+
+  it("returns the positive integer Cần bạn count", () => {
+    expect(overviewAttentionCount({ canBan: 3 })).toBe(3);
+  });
+});
+
+describe("pickOverviewComments", () => {
+  it("survives empty or non-array inputs and drops blank/duplicate ids", () => {
+    expect(pickOverviewComments(undefined)).toEqual([]);
+    expect(pickOverviewComments(null)).toEqual([]);
+    expect(pickOverviewComments([])).toEqual([]);
+
+    const items = pickOverviewComments([
+      sampleThread(""),
+      sampleThread("   "),
+      sampleThread("t1", { updatedAt: "2026-11-28T05:00:00.000Z" }),
+      sampleThread("t1", { updatedAt: "2026-11-28T06:00:00.000Z" }),
+    ]);
+    expect(items.map((item) => item.id)).toEqual(["t1"]);
+  });
+
+  it("sorts newest first, caps to OVERVIEW_COMMENTS_LIMIT, and formats fallbacks", () => {
+    const items = pickOverviewComments([
+      sampleThread("oldest", { updatedAt: "2026-11-28T01:00:00.000Z" }),
+      sampleThread("bad-time", {
+        updatedAt: "not-a-date",
+        lastMessage: {
+          id: "m-bad",
+          fromPage: false,
+          text: "   ",
+          createdAt: "not-a-date",
+        },
+      }),
+      sampleThread("newest", {
+        updatedAt: "2026-11-28T05:30:00.000Z",
+        customer: { id: "c-new", name: null, tags: [] },
+        lastMessage: {
+          id: "m-new",
+          fromPage: true,
+          text: "  Dạ còn size M ạ!  ",
+          createdAt: "2026-11-28T05:30:00.000Z",
+        },
+      }),
+      sampleThread("second", {
+        updatedAt: "2026-11-28T05:00:00.000Z",
+        attention: {
+          tag: "can_ban",
+          reason: "Khách hỏi phí ship",
+          since: "2026-11-28T05:00:00.000Z",
+        },
+      }),
+      sampleThread("third", { updatedAt: "2026-11-28T04:00:00.000Z" }),
+      sampleThread("fourth", { updatedAt: "2026-11-28T03:00:00.000Z" }),
+    ]);
+
+    expect(items).toHaveLength(OVERVIEW_COMMENTS_LIMIT);
+    expect(items.map((item) => item.id)).toEqual(["newest", "second", "third", "fourth"]);
+    expect(items[0]).toMatchObject({
+      id: "newest",
+      href: "/comments?thread=newest",
+      customerName: "Khách hàng Facebook",
+      excerpt: "Bạn: Dạ còn size M ạ!",
+      needsAttention: false,
+      attentionReason: null,
+    });
+    expect(items[1]).toMatchObject({
+      id: "second",
+      needsAttention: true,
+      attentionReason: "Khách hỏi phí ship",
+    });
+  });
+});
+
+describe("resolveOverviewCommentsState", () => {
+  it("never reports empty before the first page arrives or after an initial error", () => {
+    expect(
+      resolveOverviewCommentsState({
+        hasData: false,
+        isError: false,
+      }),
+    ).toEqual({ kind: "loading" });
+
+    expect(
+      resolveOverviewCommentsState({
+        hasData: false,
+        isError: true,
+        errorMessage: "Không kết nối được máy chủ.",
+      }),
+    ).toEqual({ kind: "error", message: "Không kết nối được máy chủ." });
+  });
+
+  it("reports empty only when a page actually arrived with zero threads", () => {
+    expect(
+      resolveOverviewCommentsState({
+        hasData: true,
+        isError: false,
+        threads: [],
+        counts: sampleCounts(),
+      }),
+    ).toEqual({ kind: "empty", canBanCount: 0 });
+  });
+
+  it("returns ready items with totalCount and canBanCount when threads exist", () => {
+    const state = resolveOverviewCommentsState({
+      hasData: true,
+      isError: false,
+      threads: [
+        sampleThread("th-1", {
+          customer: { id: "c-1", name: "Minh Thư", tags: [] },
+          updatedAt: "2026-11-28T05:20:00.000Z",
+        }),
+      ],
+      counts: sampleCounts({ all: 12, canBan: 2 }),
+    });
+
+    expect(state.kind).toBe("ready");
+    if (state.kind !== "ready") return;
+    expect(state.totalCount).toBe(12);
+    expect(state.canBanCount).toBe(2);
+    expect(state.items).toHaveLength(1);
+    expect(state.items[0]).toMatchObject({
+      id: "th-1",
+      href: "/comments?thread=th-1",
+      customerName: "Minh Thư",
     });
   });
 });

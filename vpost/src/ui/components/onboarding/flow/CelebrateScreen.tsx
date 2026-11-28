@@ -2,7 +2,6 @@ import { ArrowRight, Check } from "lucide-react";
 
 import type { StepView } from "@/ui/components/onboarding/first-run.types";
 import { Button } from "@/ui/components/ui/button";
-import { Eyebrow } from "@/ui/components/ui/eyebrow";
 
 import {
   ENTER_DELAY_CARDS,
@@ -11,7 +10,7 @@ import {
   ENTER_DELAY_SEAL,
   ENTER_DELAY_SUBHEAD,
   enterDelay,
-  enterIndex,
+  enterStaggered,
 } from "./onboarding-motion";
 import "./onboarding-motion.css";
 
@@ -66,6 +65,8 @@ export function CelebrateScreen({
   onEnter,
   onInteract,
 }: CelebrateScreenProps) {
+  const displayName = name?.trim() ?? "";
+
   return (
     /*
       LỚP BÀN GIAO. `data-leaving` chứ không phải một class Tailwind: cú mờ đi
@@ -117,17 +118,17 @@ export function CelebrateScreen({
         className="onboarding-enter text-foreground font-heading text-center text-[1.75rem] leading-[2.1875rem] font-medium text-balance outline-none"
       >
         <span className="block">
-          {name === null ? "Tuyệt vời 🎉" : `Tuyệt vời, ${name} 🎉`}
+          {displayName.length === 0 ? "Xong rồi 🎉" : `Xong rồi, ${displayName} 🎉`}
         </span>
-        <span className="block">Chào mừng bạn đến với MYSPViệc cần chú ý
-        </span>
+        <span className="block">VPOST đã hiểu xưởng của bạn</span>
       </h1>
 
       <p
         style={enterDelay(ENTER_DELAY_SUBHEAD)}
         className="onboarding-enter-fade text-muted-foreground max-w-[34rem] text-center text-sm"
       >
-        Hãy cùng bắt đầu xây dựng nội dung nhé!
+        Câu trả lời của bạn đã được lưu. Từ giờ VPOST sẽ gợi ý caption và kênh
+        đăng theo đúng mặt hàng bạn bán.
       </p>
 
       {/* Ẩn cả khối khi không có dữ liệu — không skeleton, không câu lỗi. Một
@@ -139,9 +140,9 @@ export function CelebrateScreen({
             style={enterDelay(ENTER_DELAY_CARDS)}
             className="onboarding-enter-fade"
           >
-            <Eyebrow className="text-center">
+            <p className="text-muted-foreground text-center text-sm font-medium">
               Còn {nextSteps.length} bước để đăng bài đầu tiên
-            </Eyebrow>
+            </p>
           </div>
 
           <ul className="flex flex-col gap-2">
@@ -151,10 +152,7 @@ export function CelebrateScreen({
                  opacity/scale — luật của cả thư mục này. */
               <li
                 key={step.id}
-                style={{
-                  ...enterDelay(ENTER_DELAY_CARDS),
-                  ...enterIndex(index),
-                }}
+                style={enterStaggered(ENTER_DELAY_CARDS, index)}
                 className="onboarding-enter"
               >
                 <div className="border-border bg-card flex items-start gap-3 rounded-lg border px-4 py-3">

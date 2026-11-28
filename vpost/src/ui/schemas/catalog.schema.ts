@@ -277,6 +277,11 @@ export const CatalogProductSchema = z.object({
   name: z.string(),
   category: z.string().nullable(),
   season: z.string().nullable(),
+  /** Additive columns from `GET /api/catalog/products` — optional while backends roll out. */
+  price: z.string().nullish(),
+  sizes: z.string().nullish(),
+  colors: z.string().nullish(),
+  material: z.string().nullish(),
   inventory: ProductInventorySchema,
   mediaImageCount: z.number(),
   mediaVideoCount: z.number(),
@@ -375,6 +380,7 @@ export const INVENTORY_STATUS_TONES: Record<InventoryStatus, InventoryTone> = {
 export const BLOCKED_REASON_LABELS: Record<string, string> = {
   OUT_OF_STOCK: "Hết hàng",
   MEDIA_NOT_FOUND: "Thiếu ảnh",
+  ROW_DATA_INVALID: "Dữ liệu dòng chưa hợp lệ",
   /** Two rows of the SAME spreadsheet disagree — genuinely sheet-specific. */
   SHEET_ROW_INVALID: "Xung đột Sheet",
   PRODUCT_NOT_FOUND: "Không có trong dữ liệu sản phẩm",

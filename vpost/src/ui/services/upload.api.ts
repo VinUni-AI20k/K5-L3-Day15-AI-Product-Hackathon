@@ -8,6 +8,14 @@ import {
 } from "@/ui/schemas/compose.schema";
 
 import type { UploadCandidate } from "@/ui/hooks/direct-upload-queue";
+import {
+  cancelResponseBody,
+  forwardAbortSignal,
+  isAbortError,
+  isCallerSignalAborted,
+  isTimeoutError,
+  normalizeAbortError,
+} from "./abort";
 import { ApiError, CLIENT_ERROR_CODES } from "./api-error";
 import { apiRequest } from "./http-client";
 
@@ -117,18 +125,36 @@ export async function postFileToStorage(
   for (const [key, value] of Object.entries(params.formFields)) form.append(key, value);
   form.append("file", params.file);
 
+  const fallbackReason = `POST storage upload "${params.file.name}" aborted`;
+  const { signal: forwardedSignal, cleanup } = forwardAbortSignal(signal, fallbackReason);
+
   let response: Response;
   try {
-    response = await fetch(params.postUrl, { method: "POST", body: form, signal });
+    if (isCallerSignalAborted(signal)) {
+      throw normalizeAbortError(signal?.reason, signal, fallbackReason);
+    }
+    response = await fetch(params.postUrl, { method: "POST", body: form, signal: forwardedSignal });
   } catch (cause) {
-    if (signal?.aborted) throw cause;
+    if (isCallerSignalAborted(signal) || (!isTimeoutError(cause) && isAbortError(cause))) {
+      throw normalizeAbortError(cause, signal, fallbackReason);
+    }
+    const isTimeout = isTimeoutError(cause);
     throw new ApiError({
-      code: CLIENT_ERROR_CODES.NETWORK,
+      code: isTimeout ? CLIENT_ERROR_CODES.TIMEOUT : CLIENT_ERROR_CODES.NETWORK,
       status: 0,
       message: cause instanceof Error ? cause.message : String(cause),
-      userMessage: `Không tải được "${params.file.name}" lên kho lưu trữ. Kiểm tra mạng rồi thử lại.`,
+      userMessage: isTimeout
+        ? `Tải "${params.file.name}" lên kho lưu trữ quá lâu. Hãy thử lại.`
+        : `Không tải được "${params.file.name}" lên kho lưu trữ. Kiểm tra mạng rồi thử lại.`,
       cause,
     });
+  } finally {
+    cleanup();
+  }
+
+  if (isCallerSignalAborted(signal)) {
+    cancelResponseBody(response);
+    throw normalizeAbortError(signal?.reason, signal, fallbackReason);
   }
 
   if (!response.ok) {

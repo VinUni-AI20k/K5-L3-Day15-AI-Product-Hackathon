@@ -76,7 +76,7 @@ describe("makeGoogleAuth", () => {
   it("accepts an inlined key with escaped newlines", () => {
     const key = JSON.stringify({
       type: "service_account",
-      client_email: "mysp@project.iam.gserviceaccount.com",
+      client_email: "vpost@project.iam.gserviceaccount.com",
       private_key: "-----BEGIN PRIVATE KEY-----\\nAAAA\\n-----END PRIVATE KEY-----\\n",
     });
     expect(() => makeGoogleAuth({ serviceAccountJson: key })).not.toThrow();
@@ -130,7 +130,7 @@ describe("makeGoogleDriveSource", () => {
             name: "MGKVX6310-KEM (1).jpeg",
             mimeType: "image/jpeg",
             size: "482913",
-            modifiedTime: "2026-08-01T10:00:00.000Z",
+            modifiedTime: "2054-08-01T10:00:00.000Z",
           },
           { name: "no-id.jpg" },
           { id: "2b" },
@@ -149,7 +149,7 @@ describe("makeGoogleDriveSource", () => {
         name: "MGKVX6310-KEM (1).jpeg",
         mimeType: "image/jpeg",
         sizeBytes: 482913,
-        modifiedTime: "2026-08-01T10:00:00.000Z",
+        modifiedTime: "2054-08-01T10:00:00.000Z",
       },
     ]);
   });

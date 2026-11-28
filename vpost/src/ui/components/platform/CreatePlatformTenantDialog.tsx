@@ -72,7 +72,7 @@ export function CreatePlatformTenantDialog({
         subtitle="Tạo sẵn công ty rồi gửi link mời chủ sở hữu cho khách."
         onOpenChange={create.isPending || create.isSuccess ? undefined : () => close()}
       />
-      <Stack direction="vertical" gap={3} padding={4}>
+      <Stack direction="vertical" gap={4} padding={5}>
         {create.isSuccess ? (
           <OwnerInviteReveal result={create.data} onDone={close} />
         ) : (

@@ -1,3 +1,5 @@
+import { ChevronRight } from "lucide-react";
+
 import { cn } from "@/shared/utils";
 import {
   STEP_STATE_LABELS,
@@ -7,15 +9,6 @@ import {
 
 /**
  * Compact horizontal stepper for one channel row (design §5.9).
- *
- * [L6-New] Search-Before-Create: `compose/WizardStepper` is the only stepper in
- * the repo and does not fit — it is a NAVIGATION rail (buttons, jump back, typed
- * to `ComposeStepSlug`, vertical on desktop). This one is read-only, horizontal,
- * lives inside a table cell, and nothing on it is clickable. Wrapping it would
- * mean disabling every button it exists for.
- *
- * The labels come in from the server, which reads them from the domain: a stage
- * added there must not land on whatever index a screen happened to hardcode.
  *
  * NO `aria-live` here, on purpose: this list re-renders every 1.5s on every row,
  * and a live region per row turns a screen reader into noise. The batch summary
@@ -43,16 +36,20 @@ export function ProgressStepper({
             <span
               // State is spoken, never carried by colour alone (a11y).
               aria-current={state === "current" ? "step" : undefined}
-              className={cn("flex items-center gap-1", toneOf(state))}
+              className={cn("flex items-center gap-1.5", toneOf(state))}
             >
-              <span aria-hidden="true" className={cn("size-1.5 shrink-0 rounded-full", dotOf(state))} />
+              <span
+                aria-hidden="true"
+                className={cn("size-1.5 shrink-0 rounded-full", dotOf(state))}
+              />
               {step}
               <span className="sr-only"> — {STEP_STATE_LABELS[state]}</span>
             </span>
             {position < steps.length - 1 ? (
-              <span aria-hidden="true" className="text-foreground-subtle">
-                ›
-              </span>
+              <ChevronRight
+                aria-hidden="true"
+                className="text-foreground-subtle size-3.5 shrink-0"
+              />
             ) : null}
           </li>
         );
@@ -68,7 +65,7 @@ function toneOf(state: StepState): string {
 }
 
 function dotOf(state: StepState): string {
-  if (state === "current") return "bg-primary";
+  if (state === "current") return "bg-ring";
   if (state === "done") return "bg-success";
   return "bg-border";
 }

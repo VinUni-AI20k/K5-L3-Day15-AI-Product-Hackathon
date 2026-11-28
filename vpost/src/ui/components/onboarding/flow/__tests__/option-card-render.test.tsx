@@ -88,7 +88,7 @@ describe("OptionCardGroup — dạng A và C, một lựa chọn", () => {
       unchosen.match(/<svg/g)?.length ?? 0,
     );
 
-    // SINCE 26/08/2026 the glyph rides a 26px badge on the card's corner
+    // SINCE 27/11/2026 the glyph rides a 26px badge on the card's corner
     // (animation spec section 5.2). The RULE is unchanged and is what the
     // assertions above still check — absent, then present; only the drawing
     // moved. The badge is asserted separately so that losing it is a red test
@@ -577,7 +577,7 @@ describe("StepActions", () => {
     // `toContain("disabled")` would pass on an enabled button too.
     //
     // AND IT IS `aria-disabled`, NOT `disabled` (animation spec section 5.3,
-    // PM 26/08/2026). Both say "this cannot go anywhere"; only one of them
+    // PM 27/11/2026). Both say "this cannot go anywhere"; only one of them
     // still lets the press arrive, and the press is what the explanation hangs
     // off. A `disabled` button here would be a control that refuses to say why.
     expect(html).toContain('aria-disabled="true"');
@@ -671,7 +671,7 @@ describe("StepActions", () => {
   it("paints the ready CTA in ink, not in the dye", () => {
     /**
      * The prototype's `#2e2820` is this app's `--foreground`, so the ready
-     * button is ink on cream rather than `--primary` indigo (PM 26/08/2026).
+     * button is ink on cream rather than `--primary` indigo (PM 27/11/2026).
      * Tokens, not the prototype's hex — which is also the only reason the dark
      * theme inverts correctly, something a light-only prototype cannot say.
      * Contrast after the swap: 12.85:1 light, 13.82:1 dark.

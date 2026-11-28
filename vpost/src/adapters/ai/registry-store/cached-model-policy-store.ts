@@ -41,7 +41,7 @@ export interface CachedModelPolicyStoreOptions {
    * It belongs in the cache key because Redis is shared by web and worker: two
    * processes started with different tier models would otherwise serve each
    * other stale routing, and a cache hit would skip the load-time validation
-   * that rejects an unknown model key. Measured on 15/08/2026, before this
+   * that rejects an unknown model key. Measured on 27/11/2026, before this
    * existed: a process started with a deliberately invalid AI_MODEL_MID
    * happily generated captions from another process's cached policy.
    */

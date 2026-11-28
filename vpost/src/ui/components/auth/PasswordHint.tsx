@@ -1,6 +1,7 @@
 "use client";
 
-import { Icon, Stack, Text, VisuallyHidden } from "@astryxdesign/core";
+import { Stack, Text, VisuallyHidden } from "@astryxdesign/core";
+import { CheckCircle2, Info } from "lucide-react";
 
 import { passwordHint } from "@/ui/schemas/password-auth.schema";
 
@@ -31,11 +32,14 @@ export function PasswordHint({ value }: { value: string }) {
   return (
     <Stack direction="vertical" gap={1}>
       <Stack direction="horizontal" gap={2} align="start">
-        <Icon
-          icon={isReady ? "check" : "info"}
-          size="sm"
-          color={isReady ? "success" : "secondary"}
-        />
+        {isReady ? (
+          <CheckCircle2
+            className="text-success-foreground mt-0.5 size-4 shrink-0"
+            aria-hidden="true"
+          />
+        ) : (
+          <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        )}
         <Text type="supporting" color={isReady ? "primary" : "secondary"}>
           {message}
         </Text>

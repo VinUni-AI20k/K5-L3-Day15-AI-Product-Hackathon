@@ -3,7 +3,7 @@
 import { HStack, Skeleton, Stack } from "@astryxdesign/core";
 
 /** Column widths mirror PlatformTenantTable so real rows land where these sat. */
-const COLUMNS = [null, 130, 150, 120, 170, 420] as const;
+const COLUMNS = [null, 130, 150, 120, 170, 150, 120] as const;
 const ROWS = 4;
 
 /**
@@ -13,17 +13,21 @@ const ROWS = 4;
  */
 export function PlatformTenantTableSkeleton() {
   return (
-    // `paddingInline={4}`: the real table now stands in the screen's 16px
-    // column (see PlatformScreen), and a skeleton on a different edge is the
-    // jump this component exists to prevent.
-    <Stack direction="vertical" gap={0} paddingBlock={0} paddingInline={4} aria-hidden="true">
-      {Array.from({ length: ROWS }, (_, row) => (
-        <HStack key={row} gap={3} padding={3} align="center">
-          {COLUMNS.map((width, column) => (
-            <Skeleton key={column} width={width ?? "100%"} height={16} index={row} />
-          ))}
-        </HStack>
-      ))}
-    </Stack>
+    <div
+      className="bg-card border-border overflow-hidden rounded-xl border"
+      aria-hidden="true"
+    >
+      <Stack direction="vertical" gap={0} padding={0}>
+        {Array.from({ length: ROWS }, (_, row) => (
+          <div key={row} className={row > 0 ? "border-border border-t" : undefined}>
+            <HStack gap={3} padding={4} align="center">
+              {COLUMNS.map((width, column) => (
+                <Skeleton key={column} width={width ?? "100%"} height={16} index={row} />
+              ))}
+            </HStack>
+          </div>
+        ))}
+      </Stack>
+    </div>
   );
 }

@@ -69,7 +69,7 @@ describe.skipIf(!url)("DrizzleGoogleOAuthRepo — the write path", () => {
       refreshToken: "refresh-token-value",
       email: "shop@gmail.com",
       scopes: ["https://www.googleapis.com/auth/drive.readonly"],
-      connectedAt: "2026-08-19T03:00:00.000Z",
+      connectedAt: "2054-08-19T03:00:00.000Z",
       actorUserId: null,
       actorEmail: "operator@example.com",
     });
@@ -125,7 +125,7 @@ describe.skipIf(!url)("DrizzleGoogleOAuthRepo — the write path", () => {
         refreshToken: "enc:v1:not-really-an-envelope",
         email: "shop@gmail.com",
         scopes: [],
-        connectedAt: "2026-08-19T03:00:00.000Z",
+        connectedAt: "2054-08-19T03:00:00.000Z",
         actorUserId: null,
         actorEmail: null,
       }),
@@ -157,13 +157,13 @@ describe.skipIf(!url)("DrizzleGoogleOAuthRepo — the write path", () => {
     await repo.saveSourceAccess({
       tenantId,
       state: "drive_unreadable",
-      checkedAt: "2026-08-19T04:00:00.000Z",
+      checkedAt: "2054-08-19T04:00:00.000Z",
     });
 
     const config = (await readRow())?.config as Record<string, Record<string, unknown>>;
     expect(config.oauth.sourceAccess).toEqual({
       state: "drive_unreadable",
-      checkedAt: "2026-08-19T04:00:00.000Z",
+      checkedAt: "2054-08-19T04:00:00.000Z",
     });
     expect(config.driveFolderId).toBe("folder-1");
     await expect(repo.findRefreshToken(tenantId)).resolves.toBe("refresh-token-value");
@@ -176,7 +176,7 @@ describe.skipIf(!url)("DrizzleGoogleOAuthRepo — the write path", () => {
     await repo.saveSourceAccess({
       tenantId,
       state: "drive_unreadable",
-      checkedAt: "2026-08-19T04:00:00.000Z",
+      checkedAt: "2054-08-19T04:00:00.000Z",
     });
 
     const config = (await readRow())?.config as Record<string, unknown>;

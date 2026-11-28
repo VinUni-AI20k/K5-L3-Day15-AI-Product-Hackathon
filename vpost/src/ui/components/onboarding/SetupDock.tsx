@@ -74,8 +74,8 @@ function DockAnchor({ children, isInline }: { children: React.ReactNode; isInlin
   }
 
   return (
-    <div className="pointer-events-none fixed right-4 bottom-4 z-40 flex justify-end pb-[env(safe-area-inset-bottom)] print:hidden">
-      <div className="pointer-events-auto motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300">
+    <div className="pointer-events-none fixed right-4 bottom-4 left-4 z-40 flex justify-end pb-[env(safe-area-inset-bottom)] sm:left-auto print:hidden">
+      <div className="pointer-events-auto motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300 max-w-full">
         {children}
       </div>
     </div>
@@ -121,6 +121,10 @@ const MINUTES_BY_STEP = new Map(
  * Exported for the dev preview page: a pure function of `progress`, so the
  * gallery can show every shape without a session, a company or a live query.
  */
+/** Radius and circumference for the 28px collapsed-pill progress ring. */
+const RING_RADIUS = 11;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
 export function DockPill({
   progress,
   onExpand,
@@ -131,6 +135,7 @@ export function DockPill({
   isInline?: boolean;
 }) {
   const { done, remaining, percent } = tallyOf(progress);
+  const strokeDashoffset = RING_CIRCUMFERENCE * (1 - percent / 100);
 
   return (
     <DockAnchor isInline={isInline}>
@@ -138,24 +143,45 @@ export function DockPill({
         type="button"
         onClick={onExpand}
         className={cn(
-          "group bg-inverse-surface text-inverse-foreground flex items-center gap-2.5 rounded-full py-2 pr-4 pl-2 shadow-lg",
-          "focus-visible:ring-warning/60 outline-none focus-visible:ring-3",
-          "motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:-translate-y-0.5",
+          "group bg-inverse-surface text-inverse-foreground flex min-h-11 items-center gap-2.5 rounded-full py-2 pr-4 pl-2.5 shadow-lg",
+          "hover:bg-inverse-surface/90 active:bg-inverse-surface/80 focus-visible:ring-ring outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+          "motion-safe:transition-all motion-safe:duration-150 motion-safe:ease-out motion-safe:hover:-translate-y-0.5",
         )}
       >
         {/* A ring is the whole progress bar at this size — the number inside is
             what it means, so the shape never has to be decoded on its own. */}
-        <span
-          className="relative grid size-7 shrink-0 place-items-center rounded-full"
-          style={{
-            background: `conic-gradient(var(--warning) ${percent}%, color-mix(in oklch, var(--inverse-foreground) 25%, transparent) 0)`,
-          }}
-        >
-          <span className="bg-inverse-surface text-inverse-foreground grid size-5 place-items-center rounded-full font-mono text-[10px] font-semibold">
+        <span className="relative grid size-7 shrink-0 place-items-center">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 28 28"
+            className="size-7 -rotate-90"
+          >
+            <circle
+              cx={14}
+              cy={14}
+              r={RING_RADIUS}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              className="opacity-25"
+            />
+            <circle
+              cx={14}
+              cy={14}
+              r={RING_RADIUS}
+              fill="none"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeDasharray={RING_CIRCUMFERENCE}
+              strokeDashoffset={strokeDashoffset}
+              className="stroke-warning motion-safe:transition-[stroke-dashoffset] motion-safe:duration-300 motion-safe:ease-out"
+            />
+          </svg>
+          <span className="text-inverse-foreground absolute font-mono text-xs font-semibold tabular-nums">
             {done}
           </span>
         </span>
-        <span className="text-xs font-medium whitespace-nowrap">
+        <span className="text-sm font-medium whitespace-nowrap">
           {remaining > 0 ? `Còn ${remaining} bước thiết lập` : "Đăng bài đầu tiên"}
         </span>
       </button>
@@ -217,12 +243,12 @@ export function DockPanel({
            text is", and once the dark scheme exists that is a NEAR-WHITE slab
            floating on a dark app. The role token means the plane, not the
            text colour, and it is defined for both schemes (globals.css). */
-        className="bg-inverse-surface text-inverse-foreground w-[min(21rem,calc(100vw-2rem))] overflow-hidden rounded-xl shadow-xl"
+        className="bg-inverse-surface text-inverse-foreground w-84 max-w-full overflow-hidden rounded-xl shadow-xl"
       >
         {/* Head: what this is, where it has got to, and the way out */}
-        <header className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-2">
+        <header className="flex items-start justify-between gap-3 px-5 pt-4 pb-2.5">
           <div className="min-w-0">
-            <p className="text-inverse-foreground/55 font-mono text-[10px] tracking-[0.18em] uppercase">
+            <p className="text-inverse-foreground/75 text-xs font-medium">
               Thiết lập
             </p>
             {/*
@@ -233,12 +259,12 @@ export function DockPanel({
               while looking fine on the dev preview page, which renders outside
               that scope. Nothing on a dark surface here may inherit its colour.
             */}
-            <h2 className="text-inverse-foreground mt-1 truncate text-sm font-semibold">
+            <h2 className="text-inverse-foreground mt-0.5 truncate text-base font-semibold">
               {remaining > 0 ? `Còn ${remaining} bước nữa` : "Đăng bài đầu tiên"}
             </h2>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="text-inverse-foreground/55 font-mono text-[11px] tabular-nums">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="text-inverse-foreground/75 font-mono text-xs tabular-nums">
               {String(done).padStart(2, "0")} / {String(total).padStart(2, "0")}
             </span>
             <button
@@ -247,32 +273,42 @@ export function DockPanel({
               // Collapse, not dismiss: the list is the only place the remaining
               // steps are gathered, so it must always be one click away again.
               aria-label="Thu gọn bảng thiết lập"
-              className="text-inverse-foreground/60 hover:bg-inverse-foreground/10 hover:text-inverse-foreground focus-visible:ring-warning/60 grid size-6 place-items-center rounded outline-none focus-visible:ring-2"
+              className="text-inverse-foreground/75 hover:bg-inverse-foreground/10 active:bg-inverse-foreground/15 hover:text-inverse-foreground focus-visible:ring-ring focus-visible:ring-offset-inverse-surface grid size-10 place-items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:size-8 motion-safe:transition-colors motion-safe:duration-150 motion-safe:ease-out"
             >
-              <X className="size-3.5" aria-hidden="true" />
+              <X className="size-4" aria-hidden="true" />
             </button>
           </div>
         </header>
 
         {/* The bar: glides, never jumps — a count that changed settling in */}
-        <div className="px-4 pb-3">
+        <div className="px-5 pb-3">
           <div
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={total}
             aria-valuenow={done}
             aria-valuetext={`${done} trên ${total} bước đã xong`}
-            className="bg-inverse-foreground/15 h-1 w-full overflow-hidden rounded-full"
           >
-            <div
-              className="bg-warning h-full rounded-full motion-safe:transition-[width] motion-safe:duration-500 motion-safe:ease-out"
-              style={{ width: `${percent}%` }}
-            />
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 100 4"
+              preserveAspectRatio="none"
+              className="bg-inverse-foreground/15 block h-1.5 w-full overflow-hidden rounded-full"
+            >
+              <rect
+                x={0}
+                y={0}
+                width={percent}
+                height={4}
+                rx={2}
+                className="fill-warning motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out"
+              />
+            </svg>
           </div>
         </div>
 
         {/* The six rows */}
-        <ul className="px-1.5 pb-1">
+        <ul className="px-2 pb-1.5">
           {steps.map((step) => {
             const isDone = step.state === "done";
             const isCurrent = step.id === currentId;
@@ -285,21 +321,22 @@ export function DockPanel({
                   href={step.href}
                   aria-describedby={isLocked ? `${step.id}-reason` : undefined}
                   className={cn(
-                    "group flex items-center gap-3 rounded-lg px-2.5 py-2 outline-none",
-                    "focus-visible:ring-warning/60 focus-visible:ring-2",
-                    "motion-safe:transition-colors motion-safe:duration-150",
-                    "hover:bg-inverse-foreground/10",
+                    "group flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 outline-none",
+                    "focus-visible:ring-ring focus-visible:ring-offset-inverse-surface focus-visible:ring-2 focus-visible:ring-offset-1",
+                    "motion-safe:transition-colors motion-safe:duration-150 motion-safe:ease-out",
+                    "hover:bg-inverse-foreground/10 active:bg-inverse-foreground/15",
                     isFlashing && "motion-safe:animate-pulse bg-success/25",
                   )}
                 >
-                  {/* Marker: filled + tick when done, ringed when it is your turn */}
+                  {/* Marker: filled + dark-ink tick when done (never white on orange),
+                      ringed when it is your turn */}
                   <span
                     aria-hidden="true"
                     className={cn(
                       "grid size-5 shrink-0 place-items-center rounded-full border",
-                      isDone && "bg-warning border-warning text-foreground",
+                      isDone && "bg-warning border-warning text-inverse-surface",
                       isCurrent && "border-warning text-warning",
-                      !isDone && !isCurrent && "border-inverse-foreground/30 text-inverse-foreground/30",
+                      !isDone && !isCurrent && "border-inverse-foreground/35 text-inverse-foreground/35",
                     )}
                   >
                     {isDone ? (
@@ -311,10 +348,10 @@ export function DockPanel({
 
                   <span
                     className={cn(
-                      "min-w-0 flex-1 truncate text-[13px]",
-                      isDone && "text-inverse-foreground/55",
+                      "min-w-0 flex-1 truncate text-sm",
+                      isDone && "text-inverse-foreground/75",
                       isCurrent && "text-inverse-foreground font-medium",
-                      !isDone && !isCurrent && "text-inverse-foreground/70",
+                      !isDone && !isCurrent && "text-inverse-foreground/85",
                     )}
                   >
                     {step.title}
@@ -338,14 +375,14 @@ export function DockPanel({
 
                   <span
                     className={cn(
-                      "shrink-0 font-mono text-[11px] tabular-nums",
-                      isDone ? "text-warning" : "text-inverse-foreground/40",
+                      "shrink-0 font-mono text-xs tabular-nums",
+                      isDone ? "text-warning" : "text-inverse-foreground/70",
                     )}
                   >
                     {isDone ? (
-                      "✓"
+                      <Check className="size-3.5" aria-hidden="true" />
                     ) : isLocked ? (
-                      <Lock className="size-3" aria-hidden="true" />
+                      <Lock className="size-3.5" aria-hidden="true" />
                     ) : (
                       `${MINUTES_BY_STEP.get(step.id) ?? 1} ph`
                     )}
@@ -356,17 +393,17 @@ export function DockPanel({
           })}
         </ul>
 
-        <footer className="border-inverse-foreground/10 flex items-center justify-between gap-3 border-t px-4 py-2.5">
-          <p className="text-inverse-foreground/45 text-[11px]">Bấm một dòng để mở bước đó.</p>
+        <footer className="border-inverse-foreground/15 flex items-center justify-between gap-3 border-t px-5 py-2.5">
+          <p className="text-inverse-foreground/75 text-xs">Bấm một dòng để mở bước đó.</p>
           {/* This panel IS the full list now, so the link no longer promises a
               fuller one — it is just the way back to the overview from
               whichever screen a step sent the operator to. */}
           <Link
             href="/#thiet-lap"
-            className="text-warning hover:text-warning/80 focus-visible:ring-warning/60 flex shrink-0 items-center gap-0.5 rounded text-[11px] font-medium outline-none focus-visible:ring-2"
+            className="text-warning hover:text-warning/85 focus-visible:ring-ring focus-visible:ring-offset-inverse-surface inline-flex min-h-10 shrink-0 items-center gap-0.5 rounded-sm px-1 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-offset-1 sm:min-h-8 motion-safe:transition-colors motion-safe:duration-150"
           >
             Về trang Tổng quan
-            <ChevronRight className="size-3" aria-hidden="true" />
+            <ChevronRight className="size-3.5" aria-hidden="true" />
           </Link>
         </footer>
       </section>

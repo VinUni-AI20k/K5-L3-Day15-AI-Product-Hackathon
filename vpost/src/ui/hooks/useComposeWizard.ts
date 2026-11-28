@@ -31,6 +31,7 @@ import { applyAlbumOrder, shouldClearCaptions } from "@/ui/components/compose/co
 import type { QueuedFile } from "@/ui/components/compose/upload-queue";
 import { useDirectUpload } from "@/ui/hooks/useDirectUpload";
 import type { ComposeDraftPayload } from "@/ui/schemas/post-draft.schema";
+import { isAbortError } from "@/ui/services/abort";
 import { ApiError } from "@/ui/services/api-error";
 import { composePost, generateCaptions, type GenerateCaptionsResult } from "@/ui/services/post.api";
 import { detectUploadCode } from "@/ui/services/upload.api";
@@ -68,6 +69,7 @@ export type ComposeRestorePhase = "idle" | "restoring" | "done";
 export type ProductStepOutcome =
   | { ok: true; composed: ComposeResponse }
   | { ok: false; reason: "invalid" }
+  | { ok: false; reason: "aborted" }
   | { ok: false; reason: "failed"; error: ApiError | null };
 
 export interface ComposeRestoreOutcome {
@@ -263,7 +265,10 @@ export function useComposeWizard() {
     // Detection failing must NOT block the compose screen — the operator can
     // still type the code by hand. It still has to be visible (rule 5), and
     // that is what `detect.error` is for; a stale verdict must not linger.
-    onError: () => setDetection(null),
+    onError: (error) => {
+      if (isAbortError(error)) return;
+      setDetection(null);
+    },
   });
 
   const compose = useMutation<ComposeResponse, ApiError, void>({
@@ -307,7 +312,8 @@ export function useComposeWizard() {
       // A restored draft re-applies its own order AFTER this, by asset id.
       setAlbum(result.media);
     },
-    onError: () => {
+    onError: (error) => {
+      if (isAbortError(error)) return;
       // Blocked/failed compose invalidates the current post: the caption block,
       // the album and the publish bar must not stay on screen showing the
       // previous product's data.
@@ -336,6 +342,9 @@ export function useComposeWizard() {
       // become an unhandled rejection.
       return { ok: true, composed: await compose.mutateAsync() };
     } catch (error) {
+      if (isAbortError(error)) {
+        return { ok: false, reason: "aborted" };
+      }
       // The error is HANDED BACK, not just swallowed into a boolean: the caller
       // pins the server's own sentence on the colour chip that caused it, and
       // reading it from `compose.error` instead would be a stale closure — the
@@ -348,7 +357,7 @@ export function useComposeWizard() {
     }
   }, [compose, form]);
 
-  const upload = useMutation<UploadResponse, ApiError, void>({
+  const upload = useMutation<UploadResponse | null, ApiError, void>({
     mutationFn: () => {
       const values = form.getValues();
       // The queue order IS the album order (index 0 is the cover); tickets
@@ -359,6 +368,8 @@ export function useComposeWizard() {
     },
     retry: false,
     onSuccess: (result) => {
+      // Intentional cancel/unmount resolves to `null`: leave UI quiet.
+      if (!result) return;
       setUploadedCount(result.accepted.length);
       setUploadedAssets(result.accepted);
       setUploadRejections(result.rejected);
@@ -376,7 +387,8 @@ export function useComposeWizard() {
       // uploaded yet; this is the one place after that where it is safe.
       if (result.accepted.length > 0) void submitProductStep();
     },
-    onError: () => {
+    onError: (error) => {
+      if (isAbortError(error)) return;
       setUploadRejections([]);
       setUploadWarnings([]);
     },
@@ -480,7 +492,10 @@ export function useComposeWizard() {
         form.setValue(`captions.${item.channelId}`, item.text, { shouldDirty: true });
       }
     },
-    onError: () => setToneDropped(false),
+    onError: (error) => {
+      if (isAbortError(error)) return;
+      setToneDropped(false);
+    },
   });
 
   /**
@@ -587,6 +602,7 @@ export function useComposeWizard() {
       // this build refuses, and that has to be visible, not swallowed.
       const outcome = await submitProductStep();
       if (!outcome.ok) {
+        if (outcome.reason === "aborted") return finish(false);
         // Compose refused (hết hàng, thiếu ảnh…): nothing below the field is
         // drawn, and `compose.error` under it carries the real sentence.
         notices.push(

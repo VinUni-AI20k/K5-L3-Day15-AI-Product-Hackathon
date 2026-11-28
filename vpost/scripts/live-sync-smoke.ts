@@ -54,9 +54,9 @@ const LIVE_SOURCE = {
 };
 
 /**
- * Fixture baseline: what the frozen 2026-08-12 snapshot in `sample-data/`
+ * Fixture baseline: what the frozen 2026-11-27 snapshot in `sample-data/`
  * produces (docs/05 sections 1 and 2, re-measured with catalog-smoke on
- * 2026-08-13). Live numbers WILL drift as the shop edits Drive/Sheet — the
+ * 2026-11-27). Live numbers WILL drift as the shop edits Drive/Sheet — the
  * delta is information, not a failure, so it is reported and never asserted.
  */
 const FIXTURE_BASELINE = {
@@ -365,7 +365,7 @@ function reportRun(label: string, status: string, counts: SyncRunCounts, ms: num
 
 /** Live vs the frozen snapshot: expected to drift, loud when it drifts a lot. */
 function reportDrift(counts: SyncRunCounts): void {
-  console.log("\n--- live vs sample-data (2026-08-12 snapshot) ---");
+  console.log("\n--- live vs sample-data (2054-08-12 snapshot) ---");
   const rows: Array<[string, number, number]> = [
     ["driveFilesSeen", counts.driveFilesSeen, FIXTURE_BASELINE.driveFilesSeen],
     ["mediaParsed", counts.mediaParsed, FIXTURE_BASELINE.mediaParsed],

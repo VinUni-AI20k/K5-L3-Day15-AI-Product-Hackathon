@@ -53,8 +53,8 @@ export function CreateTenantDialog({
         // backdrop, in the one place a keyboard user would reach for it.
         onOpenChange={create.isPending ? undefined : () => close()}
       />
-      <Stack direction="vertical" gap={3} padding={4}>
-        <Text type="supporting">
+      <Stack direction="vertical" gap={4} padding={5}>
+        <Text type="supporting" color="secondary">
           Dữ liệu của mỗi công ty tách riêng: sản phẩm, kênh và nhật ký đăng bài không dùng chung.
         </Text>
 

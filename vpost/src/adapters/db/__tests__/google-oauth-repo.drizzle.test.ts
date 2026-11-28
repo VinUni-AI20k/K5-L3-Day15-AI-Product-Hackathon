@@ -82,7 +82,7 @@ function connectionConfig(
       refreshToken,
       email: "shop@gmail.com",
       scopes: ["https://www.googleapis.com/auth/drive.readonly"],
-      connectedAt: "2026-08-19T03:00:00.000Z",
+      connectedAt: "2054-08-19T03:00:00.000Z",
       connectedByUserId: null,
       ...(sourceAccess === undefined ? {} : { sourceAccess }),
     },
@@ -135,7 +135,7 @@ describe("findConnection", () => {
     expect(connection).toEqual({
       email: "shop@gmail.com",
       scopes: ["https://www.googleapis.com/auth/drive.readonly"],
-      connectedAt: "2026-08-19T03:00:00.000Z",
+      connectedAt: "2054-08-19T03:00:00.000Z",
       connectedByUserId: null,
       status: "active",
       // Never checked on this row: null, which reads as "unknown" upstream.
@@ -196,12 +196,12 @@ describe("findConnection — the source-access verdict", () => {
     const { box } = build([]);
     const config = connectionConfig(box.sealSecret("refresh-1"), {
       state: "drive_unreadable",
-      checkedAt: "2026-08-19T04:00:00.000Z",
+      checkedAt: "2054-08-19T04:00:00.000Z",
     });
     const { repo } = build([{ config, status: "active" }]);
 
     await expect(repo.findConnection(TENANT)).resolves.toMatchObject({
-      sourceAccess: { state: "drive_unreadable", checkedAt: "2026-08-19T04:00:00.000Z" },
+      sourceAccess: { state: "drive_unreadable", checkedAt: "2054-08-19T04:00:00.000Z" },
     });
   });
 
@@ -270,7 +270,7 @@ describe("saveSourceAccess — validation at the boundary", () => {
       repo.saveSourceAccess({
         tenantId: TENANT,
         state: "probably_fine" as never,
-        checkedAt: "2026-08-19T04:00:00.000Z",
+        checkedAt: "2054-08-19T04:00:00.000Z",
       }),
     ).rejects.toMatchObject({ code: "INVALID_INPUT" });
   });

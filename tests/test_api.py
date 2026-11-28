@@ -6,14 +6,24 @@ from datetime import datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "codebase"))
-os.environ["APP_DB"] = os.path.join(tempfile.mkdtemp(), "test.db")
+
+import pytest  # noqa: E402
+import store  # noqa: E402
+
+_pg_skip = os.environ.get("_VPOST_PG_UNAVAILABLE")
+if _pg_skip is None:
+    _ok, _pg_err = store.check_connection()
+    _pg_skip = "" if _ok else _pg_err
+if _pg_skip:
+    pytest.skip("PostgreSQL unreachable (%s)" % _pg_skip, allow_module_level=True)
 
 from fastapi.testclient import TestClient  # noqa: E402
 
 import schedule  # noqa: E402
 import tools  # noqa: E402
 
-tools.UPLOADS = tempfile.mkdtemp()   # ảnh test không ghi vào data/uploads của repo
+if "server" not in sys.modules:   # server mount thư mục ảnh lúc nạp — chỉ đổi khi chưa nạp
+    tools.UPLOADS = tempfile.mkdtemp()   # ảnh test không ghi vào data/uploads của repo
 import server  # noqa: E402
 
 INV = {"T1": [{"mau": "Đen", "size": s, "ton": 3, "trang_thai": "Còn hàng"} for s in "SML"]}

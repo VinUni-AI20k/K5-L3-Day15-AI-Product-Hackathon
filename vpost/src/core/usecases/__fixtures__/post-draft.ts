@@ -33,7 +33,7 @@ export function validComposeDraftPayload(
     selectedChannelIds: ["1234567890"],
     shareCaption: true,
     schedule: { mode: "now", value: "" },
-    savedAt: "2026-08-17T03:04:05.000Z",
+    savedAt: "2054-08-17T03:04:05.000Z",
     ...overrides,
   };
 }
@@ -49,7 +49,7 @@ export function makeInMemoryPostDraftRepo(options: { now?: Date } = {}): InMemor
   const store = new Map<string, StoredPostDraft>();
   const failures = new Map<string, unknown>();
   let tick = 0;
-  const base = options.now ?? new Date("2026-08-17T03:00:00.000Z");
+  const base = options.now ?? new Date("2054-08-17T03:00:00.000Z");
 
   const key = (tenantId: string, ownerUserId: string, kind: string): string =>
     `${tenantId}::${ownerUserId}::${kind}`;

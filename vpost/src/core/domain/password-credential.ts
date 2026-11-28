@@ -58,7 +58,7 @@ export function isLocked(lockedUntil: Date | null | undefined, now: Date): boole
 }
 
 /**
- * "14:35 ngày 24/08/2026" — for the Vietnamese message that tells someone when
+ * "14:35 ngày 27/11/2026" — for the Vietnamese message that tells someone when
  * they may try again. Pinned to Asia/Ho_Chi_Minh, not to the server's zone: the
  * operators are all in one country and a UTC timestamp in an error message is
  * an invitation to try again at the wrong hour.

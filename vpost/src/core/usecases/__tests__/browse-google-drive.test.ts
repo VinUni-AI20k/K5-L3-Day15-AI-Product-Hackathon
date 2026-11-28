@@ -20,7 +20,7 @@ const TENANT = testTenantId("00000000-0000-0000-0000-000000000001");
 const ACTIVE: GoogleOAuthConnection = {
   email: "shop@gmail.com",
   scopes: [],
-  connectedAt: "2026-08-19T03:00:00.000Z",
+  connectedAt: "2054-08-19T03:00:00.000Z",
   connectedByUserId: null,
   status: "active",
   sourceAccess: null,

@@ -20,7 +20,7 @@ function health(overrides: Partial<WorkerHealth> = {}): WorkerHealth {
     queueReachable: true,
     untouchedQueuedJobs: 0,
     oldestUntouchedWaitMs: null,
-    checkedAt: "2026-08-17T09:00:00.000Z",
+    checkedAt: "2054-08-17T09:00:00.000Z",
     ...overrides,
   };
 }

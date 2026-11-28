@@ -10,7 +10,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 
 const TENANT_A = testTenantId("00000000-0000-0000-0000-000000000001");
 const TENANT_B = testTenantId("00000000-0000-0000-0000-000000000002");
-const NOW = Date.parse("2026-08-15T10:00:00.000Z");
+const NOW = Date.parse("2054-08-15T10:00:00.000Z");
 
 function makeLogger(): Logger {
   const logger: Logger = {
@@ -166,7 +166,7 @@ describe("cleanupUploads — nothing to do", () => {
     const [input] = listOrphanedUploads.mock.calls[0] as unknown as [
       { olderThan: Date; limit: number },
     ];
-    expect(input.olderThan.toISOString()).toBe("2026-08-14T10:00:00.000Z");
+    expect(input.olderThan.toISOString()).toBe("2054-08-14T10:00:00.000Z");
   });
 
   it("I4: uses the constructor-configured ttlHours when no per-tick override is given", async () => {
@@ -181,7 +181,7 @@ describe("cleanupUploads — nothing to do", () => {
     const [input] = listOrphanedUploads.mock.calls[0] as unknown as [
       { olderThan: Date; limit: number },
     ];
-    expect(input.olderThan.toISOString()).toBe("2026-08-15T05:00:00.000Z");
+    expect(input.olderThan.toISOString()).toBe("2054-08-15T05:00:00.000Z");
   });
 });
 

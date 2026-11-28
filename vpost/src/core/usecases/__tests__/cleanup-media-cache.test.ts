@@ -10,7 +10,7 @@ import type {
 
 import { makeCleanupMediaCache } from "../cleanup-media-cache";
 
-const NOW = Date.UTC(2026, 7, 15, 9, 0, 0);
+const NOW = Date.UTC(2054, 7, 15, 9, 0, 0);
 const HOUR = 60 * 60 * 1000;
 /** Deliberately not 72: a sweep falling back to the old constant must show up. */
 const CONFIGURED_TTL_HOURS = 168;

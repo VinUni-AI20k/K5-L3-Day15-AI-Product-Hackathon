@@ -31,7 +31,7 @@ import { buildSheetSnapshot } from "./sheet-values";
 
 const SAMPLE_DIR = "sample-data";
 const LISTING_FILE = "drive-file-listing.txt";
-const SHEET_FILE = "sheet-mau2026-snapshot-2026-08-12.csv";
+const SHEET_FILE = "sheet-mau2026-snapshot.csv";
 
 /** The first lines of the listing are sub-folders, not files (docs/05 1.1). */
 const SUBFOLDER_NAMES = new Set(["Hàng Thiết Kế", "Nghệ sĩ", "Ảnh hiển thị tiktok và shopee"]);
@@ -68,7 +68,7 @@ export interface FixtureSourceOptions {
 export function readFixtureDriveFiles(options: FixtureSourceOptions = {}): DriveFile[] {
   const text = readSample(LISTING_FILE, options.rootDir ?? process.cwd());
   const files: DriveFile[] = [];
-  const base = Date.UTC(2026, 0, 1);
+  const base = Date.UTC(2054, 0, 1);
 
   text.split("\n").forEach((line, index) => {
     // Trailing whitespace is data here (97 real names start with tabs/spaces),

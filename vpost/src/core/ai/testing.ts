@@ -51,7 +51,7 @@ export function makeFakeLogger(bindings: LogBindings = {}, sink: CapturedLog[] =
   };
 }
 
-export function makeFixedClock(iso = "2026-08-13T02:00:00.000Z"): Clock {
+export function makeFixedClock(iso = "2054-08-13T02:00:00.000Z"): Clock {
   const date = new Date(iso);
   return { now: () => date, nowMs: () => date.getTime() };
 }

@@ -51,30 +51,27 @@ export function ChannelChoice({
 
   return (
     <section aria-labelledby={`${blockId}-heading`} className="flex flex-col gap-2">
-      <h3 id={`${blockId}-heading`} className="text-[13px] text-[var(--muted-foreground)]">
+      <h3 id={`${blockId}-heading`} className="text-foreground text-sm font-medium">
         Kênh đăng
       </h3>
 
       <button
         type="button"
         onClick={onOpenPicker}
-        className="focus-visible:ring-ring flex cursor-pointer items-center gap-3 rounded-lg bg-[var(--card)] px-3.5 py-3 text-left shadow-[inset_0_0_0_1px_var(--border)] outline-none focus-visible:ring-3"
+        className="border-border bg-card hover:bg-[var(--bg-subtle)] focus-visible:ring-ring focus-visible:ring-offset-background flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
       >
-        <span className="shrink-0 font-mono text-[10px] tracking-[0.1em] text-[var(--foreground-subtle)]">
-          FACEBOOK
+        <span className="bg-muted text-muted-foreground shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium">
+          Facebook
         </span>
 
         {selectedIds.length === 0 ? (
-          <span className="text-[13px] text-[var(--muted-foreground)]">
+          <span className="text-muted-foreground text-sm">
             Chưa chọn kênh nào — bấm để chọn
           </span>
         ) : (
           <span className="flex min-w-0 flex-wrap items-center gap-2">
             {shown.map((channelId) => {
               const resolved = labels.get(channelId);
-              // The avatar's initials and tone come from the NAME, never from
-              // the "(đã gỡ)" sentence: a decorative circle reading "F(" helps
-              // nobody, and the tone must stay stable for the same Page.
               const label = resolved?.name ?? channelId;
               const gone = resolved?.note === "removed";
               const off = resolved?.note === "disabled";
@@ -82,21 +79,20 @@ export function ChannelChoice({
               return (
                 <span
                   key={channelId}
-                  className="flex h-9 items-center gap-2 rounded-full bg-[var(--muted)] py-0 pr-3.5 pl-1 shadow-[inset_0_0_0_1px_var(--border)]"
+                  className="border-border bg-muted flex h-9 items-center gap-2 rounded-full border py-0 pr-3.5 pl-1"
                 >
                   <span
                     aria-hidden="true"
                     style={avatarToneStyle(label)}
-                    className="flex size-7 items-center justify-center rounded-full text-[10px] font-semibold"
+                    className="text-foreground flex size-7 items-center justify-center rounded-full text-xs font-semibold"
                   >
                     {channelInitials(label)}
                   </span>
-                  <span className="max-w-45 truncate text-[13px] font-medium">{label}</span>
-                  {/* Said on the chip, not left to the modal: this row is the
-                      operator's answer to "bài này lên đâu?", and a Page that
-                      cannot receive it must not look like one that can. */}
+                  <span className="text-foreground max-w-44 truncate text-sm font-medium">
+                    {label}
+                  </span>
                   {gone || off ? (
-                    <span className="text-[11px] text-[var(--warning-foreground)]">
+                    <span className="text-warning-foreground text-xs">
                       {gone ? "(đã gỡ)" : "(đang tắt)"}
                     </span>
                   ) : null}
@@ -104,7 +100,7 @@ export function ChannelChoice({
               );
             })}
             {selectedIds.length > shown.length ? (
-              <span className="text-[13px] text-[var(--muted-foreground)]">
+              <span className="text-muted-foreground text-sm">
                 +{selectedIds.length - shown.length}
               </span>
             ) : null}
@@ -112,17 +108,17 @@ export function ChannelChoice({
         )}
 
         <span className="flex-1" />
-        <span className="text-primary shrink-0 text-[13px] font-medium">Sửa</span>
+        <span className="text-accent-foreground shrink-0 text-sm font-medium">Sửa</span>
         <ChevronRight aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
       </button>
 
-      <p className="text-xs text-[var(--muted-foreground)]">
+      <p className="text-muted-foreground text-xs">
         {selectedIds.length === 0
           ? "Mỗi kênh là một bài riêng; một kênh lỗi không dừng các kênh còn lại."
           : `Sẽ tạo ${selectedIds.length} bài, mỗi kênh một bài.`}
       </p>
 
-      <p className="bg-warning/15 text-warning-foreground rounded-lg px-3 py-2.5 text-xs leading-relaxed">
+      <p className="border-warning/40 bg-warning/10 text-warning-foreground rounded-xl border px-3.5 py-2.5 text-xs leading-relaxed">
         Trước khi đăng, hệ thống kiểm tra tồn kho lần thứ hai ngay trước lời gọi đăng. Nếu lúc đó
         mã đã hết hàng, bài sẽ bị chặn và không lên — dù lúc soạn vẫn báo còn hàng.
       </p>

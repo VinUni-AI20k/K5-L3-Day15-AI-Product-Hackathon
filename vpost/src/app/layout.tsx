@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import { Be_Vietnam_Pro, JetBrains_Mono } from "next/font/google";
+import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 
-import { readAppearancePreset } from "@/app/_lib/appearance";
-import { APPEARANCE_PRESET_ATTRIBUTE } from "@/shared/appearance-presets";
 import {
   COLOR_SCHEME_ATTRIBUTE,
   COLOR_SCHEME_BOOTSTRAP_SCRIPT,
@@ -17,12 +15,12 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 /**
- * The approved design draws in Outfit, which ships latin + latin-ext only —
- * every Vietnamese tone mark would fall back to a different face mid-word. Be
- * Vietnam Pro is the same geometric sans register and was drawn for this
- * script, so the diacritics come from the same family as the letters.
+ * design system primary sans face: Hanken Grotesk ships full `vietnamese` + `latin`
+ * subsets in `next/font/google`, so Vietnamese diacritics render natively in
+ * the same family across both Tailwind (`--font-sans`) and Astryx
+ * (`--font-family-body` / `--font-family-heading`).
  */
-const appSans = Be_Vietnam_Pro({
+const appSans = Hanken_Grotesk({
   variable: "--font-app-sans",
   weight: ["400", "500", "600", "700"],
   subsets: ["latin", "vietnamese"],
@@ -41,18 +39,18 @@ export const metadata: Metadata = {
   description: "Công cụ đăng bài tự động cho Facebook và TikTok",
   // VPOST: ảnh sản phẩm là link Google (lh3.googleusercontent.com) — Google chặn khi có Referer lạ.
   referrer: "no-referrer",
+  // Meta Business domain verification for vpost.vannt.asia (must be in server-rendered <head>).
+  other: { "facebook-domain-verification": "o40psj52tndat2egji49b1yc4t8ldx" },
 };
 
 /**
- * Session-independent, but NOT static: the appearance preset (M3.4) is read
- * here so the first paint already carries the right dye. The gate behind
- * `readAppearancePreset` caches it, so this costs one query a minute per
- * process rather than one per page view.
+ * Session-independent, but NOT static: reads the per-viewer colour-scheme
+ * cookie here so an explicit light/dark preference arrives on first paint.
  */
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const [themePreset, cookieStore] = await Promise.all([readAppearancePreset(), cookies()]);
+  const cookieStore = await cookies();
 
   const schemeChoice = parseColorSchemeCookie(cookieStore.get(COLOR_SCHEME_COOKIE)?.value);
   const resolvedScheme = resolveColorSchemeOnServer(schemeChoice);
@@ -60,10 +58,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="vi"
-      /* The preset's stylesheet is already in the <head> (globals.css imports
-         it), and it is scoped to this attribute — so the colour arrives with
-         the markup and never flips after hydration. */
-      {...{ [APPEARANCE_PRESET_ATTRIBUTE]: themePreset }}
+      /* The bootstrap script below adds `.dark` synchronously before hydration
+         whenever the viewer's preference is "system" on a dark OS. Suppress the
+         expected root attribute mismatch so React keeps the pre-paint class
+         without surfacing a hydration error in the Next dev overlay.
+         `suppressHydrationWarning` applies only one level deep (to `<html>`). */
+      suppressHydrationWarning
       /* The CHOICE travels too, so the toggle can render "Theo máy" as chosen
          rather than inferring it back from whichever class ended up applied. */
       {...{ [COLOR_SCHEME_ATTRIBUTE]: schemeChoice }}

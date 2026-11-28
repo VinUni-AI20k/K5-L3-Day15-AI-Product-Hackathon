@@ -4,7 +4,7 @@ import {
   formatCount,
   formatDuration,
   percentOf,
-  segmentWidth,
+  segmentPercent,
 } from "@/ui/components/sync/sync-format";
 
 /**
@@ -49,20 +49,23 @@ describe("percentOf", () => {
   });
 });
 
-describe("segmentWidth", () => {
-  it("collapses to zero instead of dividing by zero", () => {
-    expect(segmentWidth(0, 0)).toBe("0%");
-    expect(segmentWidth(5, 0)).toBe("0%");
-    expect(segmentWidth(-5, 10)).toBe("0%");
-    expect(segmentWidth(Number.NaN, 10)).toBe("0%");
+describe("segmentPercent", () => {
+  it("collapses to zero instead of dividing by zero or propagating non-finite inputs", () => {
+    expect(segmentPercent(0, 0)).toBe(0);
+    expect(segmentPercent(5, 0)).toBe(0);
+    expect(segmentPercent(-5, 10)).toBe(0);
+    expect(segmentPercent(Number.NaN, 10)).toBe(0);
+    expect(segmentPercent(5, Number.NaN)).toBe(0);
+    expect(segmentPercent(Number.POSITIVE_INFINITY, 10)).toBe(0);
+    expect(segmentPercent(5, Number.POSITIVE_INFINITY)).toBe(0);
   });
 
   it("clamps a segment that would overflow its track", () => {
-    expect(segmentWidth(150, 100)).toBe("100%");
+    expect(segmentPercent(150, 100)).toBe(100);
   });
 
   it("keeps full precision so segments still add up", () => {
-    expect(segmentWidth(1, 3)).toBe(`${(1 / 3) * 100}%`);
+    expect(segmentPercent(1, 3)).toBe((1 / 3) * 100);
   });
 });
 
@@ -78,20 +81,20 @@ describe("formatCount", () => {
 
 describe("formatDuration", () => {
   it("has no duration while the run has not finished", () => {
-    expect(formatDuration("2026-08-17T10:24:32.000Z", null)).toBeNull();
+    expect(formatDuration("2054-08-17T10:24:32.000Z", null)).toBeNull();
   });
 
   it("refuses a finish time before the start (clock skew)", () => {
-    expect(formatDuration("2026-08-17T10:24:32.000Z", "2026-08-17T10:24:31.000Z")).toBeNull();
+    expect(formatDuration("2054-08-17T10:24:32.000Z", "2054-08-17T10:24:31.000Z")).toBeNull();
   });
 
   it("refuses an unparsable timestamp instead of printing NaN", () => {
-    expect(formatDuration("not-a-date", "2026-08-17T10:25:03.000Z")).toBeNull();
+    expect(formatDuration("not-a-date", "2054-08-17T10:25:03.000Z")).toBeNull();
   });
 
   it("reads in seconds, then in minutes", () => {
-    expect(formatDuration("2026-08-17T10:24:32.000Z", "2026-08-17T10:25:03.000Z")).toBe("31 giây");
-    expect(formatDuration("2026-08-17T10:24:32.000Z", "2026-08-17T10:26:35.000Z")).toBe(
+    expect(formatDuration("2054-08-17T10:24:32.000Z", "2054-08-17T10:25:03.000Z")).toBe("31 giây");
+    expect(formatDuration("2054-08-17T10:24:32.000Z", "2054-08-17T10:26:35.000Z")).toBe(
       "2 phút 3 giây",
     );
   });

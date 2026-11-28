@@ -120,7 +120,7 @@ describe.skipIf(!url)("DrizzleAccessRequestRepo — the write path", () => {
     const created = await repo.createPending({
       tenantId,
       identity: facebookIdentity,
-      requestedAt: new Date("2026-08-19T03:00:00.000Z"),
+      requestedAt: new Date("2054-08-19T03:00:00.000Z"),
     });
 
     expect(created.status).toBe("pending");
@@ -161,7 +161,7 @@ describe.skipIf(!url)("DrizzleAccessRequestRepo — the write path", () => {
       role: null,
       decidedAt: new Date(),
       decidedByUserId: null,
-      decidedByEmail: "boss@mysp.vn",
+      decidedByEmail: "boss@vpost.vn",
     });
 
     const again = await repo.createPending({
@@ -202,9 +202,9 @@ describe.skipIf(!url)("DrizzleAccessRequestRepo — the write path", () => {
       id: created.id,
       status: "approved",
       role: "editor",
-      decidedAt: new Date("2026-08-19T06:00:00.000Z"),
+      decidedAt: new Date("2054-08-19T06:00:00.000Z"),
       decidedByUserId: null,
-      decidedByEmail: "boss@mysp.vn",
+      decidedByEmail: "boss@vpost.vn",
     });
 
     expect(decided).toMatchObject({ status: "approved", role: "editor" });
@@ -227,7 +227,7 @@ describe.skipIf(!url)("DrizzleAccessRequestRepo — the write path", () => {
       previous_status: "pending",
       new_status: "approved",
       role: "editor",
-      actor_email: "boss@mysp.vn",
+      actor_email: "boss@vpost.vn",
     });
   });
 
@@ -244,7 +244,7 @@ describe.skipIf(!url)("DrizzleAccessRequestRepo — the write path", () => {
       role: "editor",
       decidedAt: new Date(),
       decidedByUserId: null,
-      decidedByEmail: "boss@mysp.vn",
+      decidedByEmail: "boss@vpost.vn",
     });
 
     const blocked = await repo.decide({
@@ -254,7 +254,7 @@ describe.skipIf(!url)("DrizzleAccessRequestRepo — the write path", () => {
       role: null,
       decidedAt: new Date(),
       decidedByUserId: null,
-      decidedByEmail: "boss@mysp.vn",
+      decidedByEmail: "boss@vpost.vn",
     });
 
     expect(blocked?.status).toBe("blocked");
@@ -333,7 +333,7 @@ describe.skipIf(!url)("DrizzleAccessRequestRepo — the write path", () => {
     const first = await repo.createPending({
       tenantId,
       identity: facebookIdentity,
-      requestedAt: new Date("2026-08-18T00:00:00.000Z"),
+      requestedAt: new Date("2054-08-18T00:00:00.000Z"),
     });
     await repo.createPending({
       tenantId,
@@ -344,7 +344,7 @@ describe.skipIf(!url)("DrizzleAccessRequestRepo — the write path", () => {
         email: "later@gmail.com",
         displayName: null,
       },
-      requestedAt: new Date("2026-08-19T00:00:00.000Z"),
+      requestedAt: new Date("2054-08-19T00:00:00.000Z"),
     });
     await repo.decide({
       tenantId,

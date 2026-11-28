@@ -5,22 +5,16 @@ import { and, eq } from "drizzle-orm";
 import type { TenantId } from "@/core/domain/tenant-context";
 
 import { makeRedisAiCache } from "@/adapters/ai/cache/redis-cache";
-import { makeDbPromptStore } from "@/adapters/ai/prompt-store/db-prompt-store";
-import {
-  BUILT_IN_TEMPLATES,
-  makeStaticPromptStore,
-} from "@/adapters/ai/prompt-store/static-prompt-store";
+import { makeStaticPromptStore } from "@/adapters/ai/prompt-store/static-prompt-store";
 import { makeCachedModelPolicyStore } from "@/adapters/ai/registry-store/cached-model-policy-store";
 import { makeYamlModelPolicyStore } from "@/adapters/ai/registry-store/yaml-model-policy-store";
 import { makeSystemClock } from "@/adapters/clock/system-clock";
 import { DrizzleAiModelPolicyOverrideRepo } from "@/adapters/db/ai-model-policy-override-repo.drizzle";
 import { makeDrizzleGenerationLog } from "@/adapters/db/ai-generation-log.drizzle";
-import { DrizzleAiPromptTemplateRepo } from "@/adapters/db/ai-prompt-template-repo.drizzle";
 import { makeDbHandle } from "@/adapters/db/client";
 import {
   aiGenerations,
   aiModelPolicyOverrides,
-  aiPromptTemplates,
   tenants,
 } from "@/adapters/db/schema";
 import { makePinoLogger } from "@/adapters/logging/pino-logger";
@@ -30,7 +24,6 @@ import { makeScriptedProvider } from "@/core/ai/testing";
 import { AppError } from "@/core/domain/errors";
 import type { AIProviderAdapter, ModelPolicyStore, NormalizedAIRequest } from "@/core/ports/ai";
 import { makeGenerateCaptions } from "@/core/usecases/generate-captions";
-import { makeManagePromptTemplates } from "@/core/usecases/manage-prompt-templates";
 
 /**
  * Sprint-5 smoke test for the AI persistence layer, on a REAL Postgres + REAL
@@ -39,18 +32,14 @@ import { makeManagePromptTemplates } from "@/core/usecases/manage-prompt-templat
  * What it proves:
  *   a) every attempt lands in `ai_generation` — including the one that failed
  *      validation and the one that failed at the provider;
- *   b) prompt CRUD: create v2 -> activate -> the NEXT generation renders v2;
- *   c) a body missing a required variable is refused (INVALID_INPUT);
- *   d) a body reading a non-whitelisted field is refused;
- *   e) a per-tenant `ai_model_policy_override` changes the model actually used;
- *   f) the Redis hot cache serves the second lookup without touching YAML or DB.
+ *   b) a per-tenant `ai_model_policy_override` changes the model actually used;
+ *   c) the Redis hot cache serves the second lookup without touching YAML or DB.
  *
  *   DATABASE_URL=... REDIS_URL=... NODE_ENV=development \
  *     pnpm exec tsx scripts/ai-persistence-smoke.ts
  */
 
 const TENANT_NAME = "AI persistence smoke";
-const PLATFORM = "facebook";
 const TASK = "facebook_content" as const;
 
 const PRODUCT = {
@@ -110,7 +99,6 @@ async function main(): Promise<void> {
 
   try {
     // --- wiring -----------------------------------------------------------
-    const promptRepo = new DrizzleAiPromptTemplateRepo(db, logger);
     const overrideRepo = new DrizzleAiModelPolicyOverrideRepo(db, logger);
 
     // Counting proxies: the only honest way to prove "the 2nd call touched
@@ -144,18 +132,8 @@ async function main(): Promise<void> {
       ttlMs: 60_000,
     });
 
-    const prompts = makeDbPromptStore({
-      repo: promptRepo,
-      builtIn: makeStaticPromptStore(),
-      logger,
-    });
+    const prompts = makeStaticPromptStore();
     const generationLog = makeDrizzleGenerationLog({ db, logger, newId: () => randomUUID() });
-    const promptTemplates = makeManagePromptTemplates({
-      templates: promptRepo,
-      builtIn: BUILT_IN_TEMPLATES,
-      logger,
-      newId: () => randomUUID(),
-    });
 
     const sentRequests: NormalizedAIRequest[] = [];
     function engineWith(provider: AIProviderAdapter) {
@@ -236,104 +214,8 @@ async function main(): Promise<void> {
       })),
     });
 
-    // --- (c/d) template validation ----------------------------------------
-    step("c) a body missing {{product.name}} is refused");
-    await expectAppError(
-      () =>
-        promptTemplates.createVersion({
-          tenantId,
-          task: TASK,
-          platform: PLATFORM,
-          name: "thiếu biến",
-          systemPrompt: "SYSTEM",
-          body: "Chỉ có {{constraints}}",
-          changelog: "thử",
-        }),
-      "INVALID_INPUT",
-      "missing_variables",
-    );
-
-    step("d) a body reading a non-whitelisted field is refused");
-    await expectAppError(
-      () =>
-        promptTemplates.createVersion({
-          tenantId,
-          task: TASK,
-          platform: PLATFORM,
-          name: "biến lạ",
-          systemPrompt: "SYSTEM",
-          body: "{{product.name}} {{constraints}} giá {{product.price}}",
-          changelog: "thử",
-        }),
-      "INVALID_INPUT",
-      "unknown_variables",
-    );
-
-    // --- (b) create v2 -> activate -> generation renders v2 ----------------
-    step("b) create v2, activate it, and generate with it");
-    const marker = "DẤU HIỆU BẢN V2";
-    const created = await promptTemplates.createVersion({
-      tenantId,
-      task: TASK,
-      platform: PLATFORM,
-      name: "Giọng riêng của shop",
-      systemPrompt: `SYSTEM V2 ${marker}`,
-      body: `${marker}\nTên: {{product.name}}\nMô tả: {{product.description}}\n{{constraints}}\n{{otherCaptions}}\n{{previousFailures}}`,
-      changelog: "thêm giọng riêng cho shop",
-    });
-    assert(created.template.version === 2, `expected v2, got v${created.template.version}`);
-    assert(created.template.status === "draft", "a new version starts as draft");
-    logger.info("prompt version created", {
-      version: created.template.version,
-      warnings: created.warnings,
-    });
-
-    const beforeActivation = await prompts.getActive({ tenantId, task: TASK, platform: PLATFORM });
-    assert(beforeActivation?.version === 1, "an inactive v2 must not be served yet");
-
-    await promptTemplates.activateVersion({
-      tenantId,
-      task: TASK,
-      platform: PLATFORM,
-      version: 2,
-    });
-
-    sentRequests.length = 0;
-    const cleanProvider = makeScriptedProvider("google", [{ kind: "ok", output: GOOD_OUTPUT }]);
-    await makeGenerateCaptions({ contentEngine: engineWith(cleanProvider), logger })(captionInput);
-
-    const rendered = sentRequests.at(-1);
-    assert(rendered, "the provider must have been called");
-    assert(rendered.system.includes(marker), "system prompt must come from v2");
-    assert(rendered.messages[0].parts[0].type === "text", "first part is the user prompt");
-    const userPrompt = rendered.messages[0].parts[0].text;
-    assert(userPrompt.includes(marker), "user prompt must come from v2");
-    assert(userPrompt.includes(PRODUCT.name), "the product name must be rendered");
-    assert(!userPrompt.includes("{{"), "no placeholder may survive rendering");
-
-    const v2Rows = await db
-      .select()
-      .from(aiGenerations)
-      .where(and(eq(aiGenerations.tenantId, tenantId), eq(aiGenerations.promptVersion, 2)));
-    assert(v2Rows.length === 1, "the generation must be logged against prompt version 2");
-    logger.info("generation used prompt v2", {
-      prompt_template_id: v2Rows[0].promptTemplateId,
-      prompt_version: v2Rows[0].promptVersion,
-    });
-
-    const listing = await promptTemplates.listVersions({
-      tenantId,
-      task: TASK,
-      platform: PLATFORM,
-    });
-    assert(
-      listing.versions.filter((item) => item.status === "active").length === 1,
-      "exactly one active version",
-    );
-    assert(listing.nextVersion === 3, `next version must be 3, got ${listing.nextVersion}`);
-
-    // --- (f) Redis cache hit ----------------------------------------------
-    step("f) the registry hot cache serves the second lookup from Redis");
+    // --- (c) Redis cache hit ----------------------------------------------
+    step("c) the registry hot cache serves the second lookup from Redis");
     await policies.invalidate({ tenantId });
     yamlReads = 0;
     overrideReads = 0;
@@ -349,8 +231,8 @@ async function main(): Promise<void> {
     assert(ttl > 0 && ttl <= 60_000, `TTL must be short, got ${ttl}ms`);
     logger.info("cache stats", { ...policies.stats(), ttl_ms: ttl, cache_key: cacheKey });
 
-    // --- (e) per-tenant override ------------------------------------------
-    step("e) a tenant override changes the model actually used");
+    // --- (b) per-tenant override ------------------------------------------
+    step("b) a tenant override changes the model actually used");
     await db.insert(aiModelPolicyOverrides).values({
       id: randomUUID(),
       tenantId,
@@ -375,7 +257,7 @@ async function main(): Promise<void> {
     });
 
     // A broken override must fail loudly rather than silently reverting to YAML.
-    step("e2) a malformed override fails loudly instead of falling back to YAML");
+    step("b2) a malformed override fails loudly instead of falling back to YAML");
     await db
       .update(aiModelPolicyOverrides)
       .set({ override: { primary: "not-a-tier" } })
@@ -396,7 +278,6 @@ async function main(): Promise<void> {
   } finally {
     // Clean up this tenant's rows; cascades take the AI tables with it.
     await db.delete(aiGenerations).where(eq(aiGenerations.tenantId, tenantId));
-    await db.delete(aiPromptTemplates).where(eq(aiPromptTemplates.tenantId, tenantId));
     await db
       .delete(aiModelPolicyOverrides)
       .where(eq(aiModelPolicyOverrides.tenantId, tenantId));

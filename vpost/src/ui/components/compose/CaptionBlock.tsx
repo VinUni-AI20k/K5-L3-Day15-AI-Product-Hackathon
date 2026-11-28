@@ -1,5 +1,6 @@
 "use client";
 
+import { Share2 } from "lucide-react";
 import { useId, useMemo, useRef, useState } from "react";
 
 import { CAPTION_TONES, CAPTION_TONE_LABELS, type CaptionTone } from "@/shared/caption-tone";
@@ -228,7 +229,7 @@ export function CaptionBlock({
   return (
     <div className="flex flex-col gap-3">
       {readOnlyReason ? (
-        <p className="rounded-xl bg-[var(--muted)] px-3.5 py-2.5 text-xs leading-relaxed">
+        <p className="bg-muted text-muted-foreground rounded-xl px-4 py-2.5 text-sm leading-relaxed">
           {readOnlyReason}
         </p>
       ) : null}
@@ -236,13 +237,13 @@ export function CaptionBlock({
       {wizard.toneDropped ? (
         <p
           role="status"
-          className="rounded-xl bg-[var(--muted)] px-3.5 py-2.5 text-xs leading-relaxed"
+          className="bg-muted text-muted-foreground rounded-xl px-4 py-2.5 text-sm leading-relaxed"
         >
           Tông giọng chưa sẵn sàng trên máy chủ — caption vừa rồi được viết theo tông mặc định.
         </p>
       ) : null}
 
-      {/* --- Dòng đầu: công tắc caption riêng (PM, 21/08/2026) ---------- */}
+      {/* --- Dòng đầu: công tắc caption riêng (PM, 21/08/2054) ---------- */}
       <PerChannelSwitch
         id={`${fieldId}-per-channel`}
         /** The model still stores "dùng chung"; the switch shows its opposite,
@@ -271,7 +272,7 @@ export function CaptionBlock({
         <div
           role="alertdialog"
           aria-label="Xác nhận dùng chung caption"
-          className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--warning)]/15 px-3.5 py-2.5 text-xs leading-relaxed text-[var(--warning-foreground)]"
+          className="border-warning/40 bg-warning/10 text-warning-foreground flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 text-sm leading-relaxed"
         >
           <span>
             {confirmShare.length} kênh đang có caption riêng ({confirmShare.map(nameOf).join(", ")}
@@ -281,7 +282,7 @@ export function CaptionBlock({
           <button
             type="button"
             onClick={() => setConfirmShare(null)}
-            className="focus-visible:ring-ring cursor-pointer rounded-md px-2 py-1 font-semibold outline-none focus-visible:ring-3"
+            className="text-foreground hover:bg-muted focus-visible:ring-ring inline-flex min-h-10 cursor-pointer items-center rounded-lg px-3 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2"
           >
             Giữ bản riêng
           </button>
@@ -292,7 +293,7 @@ export function CaptionBlock({
               onActiveChannelChange(null);
               setConfirmShare(null);
             }}
-            className="focus-visible:ring-ring cursor-pointer rounded-md bg-primary text-primary-foreground px-3 py-1 font-semibold outline-none focus-visible:ring-3"
+            className="bg-destructive/15 text-destructive hover:bg-destructive/25 focus-visible:ring-ring inline-flex min-h-10 cursor-pointer items-center rounded-lg px-3.5 text-sm font-semibold transition-colors duration-150 outline-none focus-visible:ring-2"
           >
             Bỏ và dùng chung
           </button>
@@ -304,7 +305,7 @@ export function CaptionBlock({
       ) : (
       <section
         aria-labelledby={`${fieldId}-heading`}
-        className="flex flex-col rounded-lg bg-[var(--muted)] shadow-[inset_0_0_0_1px_var(--border)]"
+        className="border-border bg-[var(--bg-subtle)] flex flex-col rounded-xl border"
       >
         {/* --- Channel tabs: one caption per Page ------------------------- */}
         {showTabs ? (
@@ -332,11 +333,11 @@ export function CaptionBlock({
           className="flex flex-col"
         >
         {/* --- Tier 1: header (template 83–95) --------------------------- */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-3.5 pb-3">
-          <h3 id={`${fieldId}-heading`} className="text-sm font-semibold">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-4 pb-3">
+          <h3 id={`${fieldId}-heading`} className="text-foreground text-base font-semibold">
             Caption
             {activeId ? (
-              <span className="text-[var(--muted-foreground)]"> · {nameOf(activeId)}</span>
+              <span className="text-muted-foreground font-normal"> · {nameOf(activeId)}</span>
             ) : null}
           </h3>
 
@@ -361,13 +362,13 @@ export function CaptionBlock({
           </label>
           {/* Native <select>: a short fixed list, and the browser control is
               keyboard- and screen-reader-correct on every device with no bundle
-              cost. `optgroup` carries the design's "MẪU PROMPT" heading. */}
+              cost. `optgroup` carries the design's "Mẫu prompt" heading. */}
           <Select
             id={`${fieldId}-tone`}
             value={wizard.tone}
             disabled={captions.isPending || Boolean(readOnlyReason)}
             onChange={(event) => wizard.setTone(event.target.value as CaptionTone)}
-            className="h-8.5 w-auto rounded-lg border-0 bg-[var(--card)] px-3 text-[13px] shadow-[inset_0_0_0_1px_var(--border)]"
+            className="border-input bg-card h-10 w-auto rounded-lg border px-3 text-sm shadow-none"
           >
             <optgroup label="Mẫu prompt">
               {CAPTION_TONES.map((tone) => (
@@ -379,15 +380,15 @@ export function CaptionBlock({
           </Select>
 
           {/* Per-Page mode: ONE press writes every ticked Page, each call
-              landing on its own tab. The single-tab "Viết lại" stays beside it
-              for fixing one Page without spending N calls. */}
+              landing on its own tab. Secondary surface so Đăng ngay stays the
+              single primary CTA on the compose view. */}
           {canFanOut && selectedIds.length > 1 ? (
             <button
               type="button"
               onClick={() => fanOut.run(selectedIds)}
               disabled={busy || Boolean(readOnlyReason)}
               title={readOnlyReason ?? undefined}
-              className="focus-visible:ring-ring h-8.5 cursor-pointer rounded-lg bg-primary text-primary-foreground px-3.5 text-[13px] font-semibold outline-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-50"
+              className="border-border bg-secondary text-secondary-foreground hover:bg-muted focus-visible:ring-ring focus-visible:ring-offset-background inline-flex h-10 cursor-pointer items-center rounded-lg border px-3.5 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {fanOut.isRunning
                 ? `Đang viết ${fanOut.done}/${fanOut.total}…`
@@ -400,7 +401,7 @@ export function CaptionBlock({
             onClick={generate}
             disabled={busy || Boolean(readOnlyReason)}
             title={readOnlyReason ?? undefined}
-            className="focus-visible:ring-ring h-8.5 cursor-pointer rounded-md px-1.5 text-sm font-semibold text-[var(--primary)] outline-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-60"
+            className="text-accent-foreground focus-visible:ring-ring inline-flex h-10 cursor-pointer items-center rounded-lg px-2.5 text-sm font-medium transition-colors duration-150 outline-none hover:underline focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {captions.isPending && isThisTarget
               ? "Đang viết…"
@@ -417,7 +418,7 @@ export function CaptionBlock({
           <p
             role="status"
             aria-live="polite"
-            className="mx-4 mb-3 rounded-xl bg-[var(--muted)] px-3.5 py-2 text-xs leading-relaxed"
+            className="bg-muted text-muted-foreground mx-4 mb-3 rounded-lg px-3.5 py-2 text-xs leading-relaxed"
           >
             {progress}
           </p>
@@ -428,7 +429,7 @@ export function CaptionBlock({
         {activeId && fanOut.statuses[activeId] === "error" ? (
           <p
             role="alert"
-            className="mx-4 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--destructive)]/30 bg-[var(--destructive)]/5 px-3.5 py-2.5 text-[13px] text-[var(--destructive)]"
+            className="border-destructive/30 bg-destructive/10 text-destructive mx-4 mb-3 flex flex-wrap items-center gap-2 rounded-lg border px-3.5 py-2.5 text-sm"
           >
             <span>
               {nameOf(activeId)}: {fanOut.errors[activeId]}
@@ -437,7 +438,7 @@ export function CaptionBlock({
               type="button"
               onClick={generate}
               disabled={busy}
-              className="focus-visible:ring-ring cursor-pointer rounded-md px-2 py-0.5 font-semibold underline underline-offset-2 outline-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-60"
+              className="focus-visible:ring-ring cursor-pointer rounded-md px-2 py-1 font-semibold underline underline-offset-2 outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Viết lại kênh này
             </button>
@@ -448,7 +449,7 @@ export function CaptionBlock({
             consecutive words. Saying it here means the fix is one press away
             instead of arriving as a blocked post job. */}
         {activeId && duplicates[activeId] ? (
-          <p className="mx-4 mb-3 rounded-xl bg-[var(--warning)]/15 px-3.5 py-2.5 text-xs leading-relaxed text-[var(--warning-foreground)]">
+          <p className="border-warning/40 bg-warning/10 text-warning-foreground mx-4 mb-3 rounded-lg border px-3.5 py-2.5 text-sm leading-relaxed">
             Caption này trùng {MAX_SHARED_WORD_RUN + 1} từ liên tiếp với{" "}
             {nameOf(duplicates[activeId].otherChannelId)}: “{duplicates[activeId].run}”. Bấm “Viết
             lại kênh này” để có bản khác — máy chủ sẽ chặn bài trùng khi đăng.
@@ -467,7 +468,7 @@ export function CaptionBlock({
         {isThisTarget && failed ? (
           <p
             role="alert"
-            className="mx-4 mb-3 rounded-xl border border-[var(--destructive)]/30 bg-[var(--destructive)]/5 px-3.5 py-2.5 text-[13px] text-[var(--destructive)]"
+            className="border-destructive/30 bg-destructive/10 text-destructive mx-4 mb-3 rounded-lg border px-3.5 py-2.5 text-sm"
           >
             AI chưa viết được caption cho{" "}
             {activeId ? nameOf(activeId) : "kênh này"}: {failed.reason}{" "}
@@ -477,7 +478,7 @@ export function CaptionBlock({
         ) : null}
 
         {activeId && channelCaptionState(captionSources, activeId) === "inherited" ? (
-          <p className="mx-4 mb-3 rounded-xl bg-[var(--warning)]/15 px-3.5 py-2.5 text-xs leading-relaxed text-[var(--warning-foreground)]">
+          <p className="border-warning/40 bg-warning/10 text-warning-foreground mx-4 mb-3 rounded-lg border px-3.5 py-2.5 text-sm leading-relaxed">
             Kênh này đang dùng chung caption với các kênh khác. Sửa hoặc bấm “Viết lại” để có bản
             riêng — nhiều Page đăng y hệt nhau dễ bị coi là spam.
           </p>
@@ -497,7 +498,7 @@ export function CaptionBlock({
 
       )}
 
-      <p className="text-xs leading-relaxed text-[var(--muted-foreground)]">
+      <p className="text-muted-foreground text-xs leading-relaxed">
         {publish.shareCaption
           ? "Mọi kênh đã chọn sẽ nhận đúng caption này. Bật “caption riêng” khi đăng nhiều Page — nội dung trùng hệt nhau dễ bị nền tảng coi là spam."
           : selectedIds.length > 1
@@ -515,7 +516,7 @@ const HASHTAG_BUDGET = 10;
 
 /**
  * "Caption riêng từng kênh" — the FIRST thing in the caption block (PM,
- * 21/08/2026), because it decides what everything under it means.
+ * 27/11/2026), because it decides what everything under it means.
  *
  * The switch is the inverse of the stored `shareCaption`: an operator turns ON
  * "riêng", and the model records "not shared". Presenting it the other way
@@ -540,8 +541,8 @@ function PerChannelSwitch({
     <label
       htmlFor={id}
       className={cn(
-        "flex items-center gap-2.5 rounded-md bg-[var(--card)] px-3.5 py-3 text-sm shadow-[inset_0_0_0_1px_var(--border)]",
-        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+        "border-border bg-card flex min-h-11 flex-wrap items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm transition-colors duration-150",
+        disabled ? "cursor-not-allowed opacity-40" : "hover:bg-[var(--bg-subtle)] cursor-pointer",
       )}
     >
       <input
@@ -554,13 +555,13 @@ function PerChannelSwitch({
       />
       <span
         aria-hidden="true"
-        className="bg-input peer-checked:bg-primary peer-focus-visible:ring-ring/50 peer-checked:[&>span]:translate-x-4 flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors peer-focus-visible:ring-3"
+        className="bg-input peer-checked:bg-ring peer-focus-visible:ring-ring peer-checked:[&>span]:translate-x-4 flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2"
       >
-        <span className="bg-card size-4 rounded-full shadow-sm transition-transform" />
+        <span className="bg-card size-4 rounded-full shadow-xs transition-transform duration-150" />
       </span>
-      <span className="font-medium">Caption riêng từng kênh</span>
+      <span className="text-foreground font-medium">Caption riêng từng kênh</span>
       <span className="flex-1" />
-      <span className="text-xs text-[var(--muted-foreground)]">
+      <span className="text-muted-foreground text-xs">
         {perChannel
           ? channelCount > 1
             ? `${channelCount} kênh, mỗi kênh một bản`
@@ -572,20 +573,29 @@ function PerChannelSwitch({
 }
 
 /**
- * Nothing to write for yet. NOT a disabled box: it says what to do next and
- * carries the way to do it (core-feedback-states — empty states have a CTA).
+ * Nothing to write for yet. NOT a disabled box: icon tile + one sentence + one action.
  */
 function NoChannelYet({ onOpenPicker }: { onOpenPicker: () => void }) {
   return (
-    <div className="flex flex-col items-start gap-2 rounded-lg bg-[var(--muted)] px-4 py-8 shadow-[inset_0_0_0_1px_var(--border)]">
-      <p className="text-sm font-medium">Chọn kênh đăng trước để viết caption</p>
-      <p className="max-w-110 text-xs leading-relaxed text-[var(--muted-foreground)]">
-        Mỗi kênh cần một caption riêng, nên hệ thống hỏi bạn đăng lên đâu trước rồi mới viết.
-      </p>
+    <div className="border-border bg-[var(--bg-subtle)] flex flex-col items-start gap-3 rounded-xl border p-6">
+      <div
+        aria-hidden="true"
+        className="bg-accent text-accent-foreground flex size-10 items-center justify-center rounded-lg"
+      >
+        <Share2 className="size-5" aria-hidden="true" />
+      </div>
+      <div className="space-y-1">
+        <p className="text-foreground text-base font-semibold">
+          Chọn kênh đăng trước để viết caption
+        </p>
+        <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">
+          Mỗi kênh cần một caption riêng, nên hệ thống hỏi bạn đăng lên đâu trước rồi mới viết.
+        </p>
+      </div>
       <button
         type="button"
         onClick={onOpenPicker}
-        className="focus-visible:ring-ring mt-1 h-9.5 cursor-pointer rounded-lg bg-[var(--card)] px-4 text-[13px] font-semibold shadow-[inset_0_0_0_1px_var(--input)] outline-none focus-visible:ring-3"
+        className="border-border bg-secondary text-secondary-foreground hover:bg-muted focus-visible:ring-ring focus-visible:ring-offset-background inline-flex h-10 cursor-pointer items-center rounded-lg border px-4 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
       >
         Chọn kênh đăng
       </button>
@@ -670,7 +680,7 @@ function ChannelTabStrip({
     <div
       role="tablist"
       aria-label="Caption theo từng kênh"
-      className="flex flex-wrap items-center gap-2 px-4 pt-3.5"
+      className="flex items-center gap-2 overflow-x-auto px-4 pt-4 pb-1"
     >
       {channelIds.map((channelId, index) => {
         const name = nameOf(channelId);
@@ -692,20 +702,20 @@ function ChannelTabStrip({
             onClick={() => onSelect(channelId)}
             onKeyDown={(event) => handleKeyDown(event, index)}
             className={cn(
-              "focus-visible:ring-ring flex h-9 cursor-pointer items-center gap-2 rounded-full py-0 pr-3 pl-1 text-[13px] transition-colors outline-none focus-visible:ring-3",
+              "focus-visible:ring-ring flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-full border py-0 pr-3.5 pl-1.5 text-sm whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2",
               isActive
-                ? "bg-[var(--accent)] font-semibold shadow-[inset_0_0_0_1.5px_var(--primary)]"
-                : "bg-[var(--card)] shadow-[inset_0_0_0_1px_var(--border)]",
+                ? "border-ring bg-accent text-accent-foreground font-semibold"
+                : "border-border bg-card text-foreground hover:bg-muted/60",
             )}
           >
             <span
               aria-hidden="true"
               style={avatarToneStyle(name)}
-              className="flex size-7 items-center justify-center rounded-full text-[10px] font-semibold"
+              className="text-foreground flex size-7 items-center justify-center rounded-full text-xs font-semibold"
             >
               {channelInitials(name)}
             </span>
-            <span className="max-w-35 truncate">{name}</span>
+            <span className="max-w-36 truncate">{name}</span>
             <TabState
               state={stateOf(channelId)}
               running={runningOf(channelId)}
@@ -849,7 +859,7 @@ function CaptionFields({
     <>
       {/* --- Tier 2: the post itself (template 96–99) ------------------- */}
       <div className="px-4 pb-3.5">
-        <div className="flex flex-col gap-2.5 rounded-md bg-[var(--card)] p-4 shadow-[inset_0_0_0_1px_var(--border)]">
+        <div className="border-border bg-card focus-within:border-ring flex flex-col gap-2.5 rounded-lg border p-4 transition-colors duration-150">
           <label htmlFor={idPrefix} className="sr-only">
             Nội dung caption cho {label}
           </label>
@@ -860,7 +870,7 @@ function CaptionFields({
             onChange={(event) => write(event.target.value, tags)}
             aria-describedby={`${idPrefix}-meta`}
             placeholder={`Nhập caption sẽ đăng lên ${label}… hoặc bấm “Nhờ AI viết”.`}
-            className="focus-visible:ring-ring resize-none border-0 bg-transparent text-sm leading-6 outline-none placeholder:text-[var(--muted-foreground)] focus-visible:ring-3 focus-visible:ring-offset-2"
+            className="text-foreground placeholder:text-foreground-subtle focus-visible:ring-ring resize-none border-0 bg-transparent text-base leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
           />
 
           <label htmlFor={`${idPrefix}-tags`} className="sr-only">
@@ -872,7 +882,7 @@ function CaptionFields({
             onChange={(event) => write(body, event.target.value)}
             placeholder="#hashtag của bài"
             spellCheck={false}
-            className="focus-visible:ring-ring border-0 bg-transparent text-sm leading-6 text-[var(--primary)] outline-none placeholder:text-[var(--muted-foreground)] focus-visible:ring-3 focus-visible:ring-offset-2"
+            className="text-accent-foreground placeholder:text-foreground-subtle focus-visible:ring-ring border-0 bg-transparent text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
           />
         </div>
       </div>
@@ -880,52 +890,51 @@ function CaptionFields({
       {/* --- Tier 3: tag suggestions (template 100–109) ----------------- */}
       <div
         id={`${idPrefix}-meta`}
-        className="flex flex-col gap-2.5 px-4 pt-3 pb-4 shadow-[inset_0_1px_0_var(--border)]"
+        className="border-border flex flex-col gap-2.5 border-t px-4 pt-3.5 pb-4"
       >
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="font-mono text-[10px] tracking-[0.1em] text-[var(--foreground-subtle)] uppercase">
-            Gợi ý thẻ
-          </span>
-          <span className="text-xs text-[var(--muted-foreground)]">
+          <span className="text-foreground text-sm font-medium">Gợi ý thẻ</span>
+          <span className="text-muted-foreground text-xs tabular-nums">
             đã dùng {used} / {HASHTAG_BUDGET}
           </span>
           <span className="flex-1" />
-          <span className="font-mono text-xs text-[var(--foreground-subtle)]">
+          <span className="text-foreground-subtle font-mono text-xs tabular-nums">
             {value.trim().length} ký tự
           </span>
         </div>
 
         {suggestions.length > 0 ? (
-          <div role="group" aria-label={`Thêm hashtag cho ${label}`} className="flex flex-wrap gap-2">
+          <div
+            role="group"
+            aria-label={`Thêm hashtag cho ${label}`}
+            className="flex items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap"
+          >
             {suggestions.map((tag) => (
               <button
                 key={tag}
                 type="button"
                 onClick={() => write(body, addHashtag(tags, tag))}
-                className={cn(
-                  "focus-visible:ring-ring h-8 cursor-pointer rounded-md px-3 text-[13px] text-[var(--muted-foreground)] outline-none focus-visible:ring-3",
-                  "shadow-[inset_0_0_0_1px_var(--input)] hover:bg-[var(--card)]",
-                )}
+                className="border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring inline-flex h-9 shrink-0 cursor-pointer items-center rounded-full border px-3 text-xs font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2"
               >
                 + {tag}
               </button>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-[var(--muted-foreground)]">
+          <p className="text-muted-foreground text-xs">
             Không còn gợi ý nào chưa dùng — bạn vẫn gõ thêm thẻ trực tiếp vào dòng hashtag được.
           </p>
         )}
 
         {used > HASHTAG_BUDGET ? (
-          <p role="status" className="text-xs leading-relaxed text-[var(--warning-foreground)]">
+          <p role="status" className="text-warning-foreground text-xs leading-relaxed">
             Caption đang có {used} thẻ. Quá nhiều thẻ dễ bị coi là spam — vẫn đăng được nếu bạn
             muốn.
           </p>
         ) : null}
 
         {provider ? (
-          <p className="text-xs text-[var(--muted-foreground)]">
+          <p className="text-muted-foreground text-xs">
             Bản nháp gần nhất do {provider.provider}/{provider.model} viết. Nội dung trong ô là bản
             bạn duyệt.
           </p>
@@ -950,10 +959,10 @@ function AiStatePill({
   return (
     <span
       className={cn(
-        "rounded-full px-2.5 py-1 text-xs",
+        "rounded-full px-2.5 py-0.5 text-xs font-medium",
         tone === "ok"
-          ? "bg-success/20 text-success-foreground"
-          : "bg-[var(--muted)] text-[var(--muted-foreground)]",
+          ? "bg-success/15 text-success-foreground"
+          : "bg-muted text-muted-foreground",
       )}
     >
       {text}

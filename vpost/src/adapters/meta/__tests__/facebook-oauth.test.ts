@@ -70,7 +70,7 @@ function harness(answers: FakeAnswer[], options: { appSecret?: string | null } =
     logger: recordingLogger(lines),
     appId: "1640548543911378",
     appSecret: options.appSecret === undefined ? "APP-SECRET" : options.appSecret,
-    redirectUri: "https://mysp.example.com/api/channels/callback",
+    redirectUri: "https://vpost.example.com/api/channels/callback",
     version: "v23.0",
     fetchImpl: impl,
   });
@@ -159,6 +159,8 @@ describe("facebook oauth — Graph failures speak to the operator", () => {
     expect(error.userMessage).toContain("pages_show_list");
     expect(error.userMessage).toContain("pages_manage_posts");
     expect(error.userMessage).toContain("pages_read_engagement");
+    expect(error.userMessage).toContain("pages_read_user_content");
+    expect(error.userMessage).toContain("pages_manage_engagement");
   });
 
   it("does not reuse the publishing wording for a used authorization code", async () => {
@@ -262,19 +264,19 @@ describe("facebook oauth — Graph failures speak to the operator", () => {
 // --- Happy paths ------------------------------------------------------------
 
 describe("facebook oauth — the login URL", () => {
-  it("asks for exactly the three scopes this product needs", () => {
+  it("asks for exactly the five scopes this product needs", () => {
     const { client } = harness([]);
     const url = new URL(client.buildAuthorizeUrl({ state: "nonce-123" }));
 
     expect(url.origin + url.pathname).toBe("https://www.facebook.com/v23.0/dialog/oauth");
     expect(url.searchParams.get("client_id")).toBe("1640548543911378");
     expect(url.searchParams.get("redirect_uri")).toBe(
-      "https://mysp.example.com/api/channels/callback",
+      "https://vpost.example.com/api/channels/callback",
     );
     expect(url.searchParams.get("state")).toBe("nonce-123");
     expect(url.searchParams.get("response_type")).toBe("code");
     expect(url.searchParams.get("scope")).toBe(
-      "pages_show_list,pages_manage_posts,pages_read_engagement",
+      "pages_show_list,pages_manage_posts,pages_read_engagement,pages_read_user_content,pages_manage_engagement",
     );
   });
 });

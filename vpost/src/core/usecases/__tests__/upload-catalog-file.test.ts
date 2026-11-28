@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_STOCK_POLICY, MYSP_FIELD_MAP } from "@/core/domain/catalog-field-map";
+import { DEFAULT_STOCK_POLICY, VPOST_FIELD_MAP } from "@/core/domain/catalog-field-map";
 import { AppError } from "@/core/domain/errors";
 import { testTenantId } from "@/core/domain/tenant-context.testing";
 import type { CatalogFileStore } from "@/core/ports/catalog-file-store";
@@ -74,7 +74,7 @@ function harness(options: HarnessOptions = {}) {
     findCatalogConfig: async () => options.current ?? null,
     findCatalogSource: async () => options.current ?? null,
     findStockPolicy: async () => DEFAULT_STOCK_POLICY,
-    findFieldMap: async () => MYSP_FIELD_MAP,
+    findFieldMap: async () => VPOST_FIELD_MAP,
     saveCatalogSource: async (input) => {
       if (options.saveError) throw options.saveError;
       saved.push(input);
@@ -82,7 +82,7 @@ function harness(options: HarnessOptions = {}) {
     },
   };
 
-  const clock: Clock = { now: () => new Date("2026-08-24T10:00:00.000Z"), nowMs: () => 0 };
+  const clock: Clock = { now: () => new Date("2054-08-24T10:00:00.000Z"), nowMs: () => 0 };
 
   return {
     saved,
@@ -210,7 +210,7 @@ describe("uploadCatalogFile — order of operations", () => {
       fileName: "bang-gia.csv",
       contentType: "text/csv",
       sizeBytes: GOOD_CSV.length,
-      uploadedAt: "2026-08-24T10:00:00.000Z",
+      uploadedAt: "2054-08-24T10:00:00.000Z",
     });
     expect(result.source.textSource).toMatchObject({ fileName: "bang-gia.csv" });
   });
@@ -383,7 +383,7 @@ describe("uploadCatalogFile — what the operator sees", () => {
         findCatalogConfig: async () => null,
         findCatalogSource: async () => null,
         findStockPolicy: async () => DEFAULT_STOCK_POLICY,
-        findFieldMap: async () => MYSP_FIELD_MAP,
+        findFieldMap: async () => VPOST_FIELD_MAP,
         saveCatalogSource: async () => ({ previous: null }),
       },
       clock: { now: () => new Date(), nowMs: () => 0 },

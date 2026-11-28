@@ -106,20 +106,20 @@ export function MembersHub({
       height="fill"
       header={
         <LayoutHeader hasDivider>
-          <Stack direction="vertical" gap={3} padding={4}>
+          <div className="w-full space-y-4 px-4 py-4 sm:px-6 sm:py-5">
             {/* `max-w-prose` on the intro, like every other screen's: this hub
                 is full-bleed, so at 1440 the three sentences ran the whole
                 1152px of the content area as one line of small type — measured
                 in the T11 inspect round. DESIGN.md §Layout: văn bản dài
                 `max-w-prose`. The heading keeps the full width. */}
-            <Stack direction="vertical" gap={1}>
+            <div className="space-y-1">
               <Heading level={1}>Thành viên</Heading>
-              <Text type="supporting" className="max-w-prose">
+              <Text type="supporting" color="secondary" className="max-w-prose">
                 Ai đang làm việc trong {tenant?.name ?? "công ty này"} và với quyền gì, những link
                 mời đang phát hành, và lịch sử của luồng chờ duyệt cũ. Mỗi công ty có danh sách
                 riêng — đổi công ty ở thanh trên cùng để xem công ty khác.
               </Text>
-            </Stack>
+            </div>
 
             {/* The shell's side nav is the other <nav> on the page, so this one
                 says what it navigates (core-accessibility §2). */}
@@ -132,7 +132,7 @@ export function MembersHub({
                 <Tab key={value} value={value} label={MEMBERS_TAB_LABELS[value]} />
               ))}
             </TabList>
-          </Stack>
+          </div>
         </LayoutHeader>
       }
       content={
@@ -144,9 +144,9 @@ export function MembersHub({
                 // the url of a fresh invite is shown exactly ONCE and two
                 // panels reading the same mutation would be two places for it
                 // to appear — and to be lost.
-                <Stack direction="vertical" padding={4}>
+                <div className="w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
                   <InvitePanel actorRole={actorRole} />
-                </Stack>
+                </div>
               ) : active === "history" ? (
                 canViewHistory ? (
                   <AccessRequestsScreen onGoToInvites={() => goToTab("invites")} />
