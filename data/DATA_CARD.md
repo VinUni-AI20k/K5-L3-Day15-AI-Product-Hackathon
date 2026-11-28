@@ -39,3 +39,11 @@ Nguồn gốc chung: 2 file Google Sheets vận hành của shop thời trang (c
 ## Dataset 5 · `evidence/data-mining-numbers.md` — số bằng chứng
 
 Chỉ chứa số tổng hợp (4.671 bài đã đăng, sổ soi lệch khuyến mãi). Cách đếm nằm trong `scripts/build_data.py` (`mine_posts`, `mine_promo`). **Đây là data thật, dùng cho bằng chứng pain**, không phải data chạy thử.
+
+## File dữ liệu cũ của bản CP2 đầu — `products_sample.csv`, `pages.csv`, `post_rules.md`, `make_data.py`
+
+Bản đầu (Tài, 27/11) dựng 40 sản phẩm synthetic, 8 Page, luật bài đăng bằng `python data/make_data.py`. Code hiện tại (`codebase/agent.py`, `tools.py`, `rules.py`) **không đọc** các file này; giữ lại để đối chiếu câu thử. **Không chạy `data/make_data.py`**: script ghi đè `data/inventory.csv` của bản hiện tại.
+
+## Bộ câu thử — `eval/benchmark.csv`
+
+Mô tả ở `eval/README.md`. Hiện 24 câu đều `tu_viet` → cần thay / thêm câu từ lời nhân viên mysp (`nguoi_dung: …`) để đạt ≥ 1/3.
