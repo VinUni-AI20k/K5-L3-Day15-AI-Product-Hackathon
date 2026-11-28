@@ -43,6 +43,8 @@ function makeMessage(overrides: Partial<InboxMessage> = {}): InboxMessage {
     userMessage: null,
     clientId: null,
     moderation: null,
+    sentBy: null,
+    agentRunId: null,
     ...overrides,
   };
 }
@@ -69,6 +71,9 @@ function makeThread(id: string, updatedAt: string): InboxThread {
     hasPhone: false,
     draft: null,
     moderation: null,
+    attention: null,
+    autoReply: null,
+    agentRun: null,
     updatedAt,
   };
 }

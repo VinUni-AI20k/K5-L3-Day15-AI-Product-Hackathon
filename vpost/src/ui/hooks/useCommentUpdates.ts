@@ -1,11 +1,17 @@
 "use client";
 
-import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import {
+  isCancelledError,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import { inboxKeys } from "@/ui/hooks/inbox-keys";
 import { useActiveTenant } from "@/ui/hooks/useMe";
 import type { CommentUpdatesResponse } from "@/ui/schemas/inbox-updates.schema";
+import { isAbortError } from "@/ui/services/abort";
 import { ApiError } from "@/ui/services/api-error";
 import {
   fetchCommentUpdates,
@@ -160,20 +166,62 @@ export function nextCommentUpdatesIntervalMs(
     : COMMENT_UPDATES_POLL_INTERVAL_MS;
 }
 
+/** True when the set of currently running thread IDs changed between ticks. */
+export function haveRunningThreadIdsChanged(
+  previous: readonly string[],
+  next: readonly string[],
+): boolean {
+  if (previous.length === 0 && next.length === 0) return false;
+  const prevSet = new Set(previous);
+  const nextSet = new Set(next);
+  if (prevSet.size !== nextSet.size) return true;
+  for (const id of nextSet) {
+    if (!prevSet.has(id)) return true;
+  }
+  return false;
+}
+
 /**
  * Invalidates conversation list and each affected thread whenever an updates tick
- * reports new items or ready AI drafts.
+ * reports new items, ready AI drafts, "Cần bạn" escalations, silent auto-replies,
+ * or a change in active `runningThreadIds`.
  */
 export function invalidateInboxOnUpdates(
   queryClient: QueryClient,
   tenantKey: string,
-  response: Pick<CommentUpdatesResponse, "items" | "draftsReady">,
+  response: Pick<CommentUpdatesResponse, "items" | "draftsReady"> &
+    Partial<
+      Pick<CommentUpdatesResponse, "needYou" | "autoReplied" | "runningThreadIds">
+    >,
+  previousRunningThreadIds: readonly string[] = [],
 ): void {
-  if (response.items.length === 0 && response.draftsReady.length === 0) return;
+  const needYou = response.needYou ?? [];
+  const autoReplied = response.autoReplied ?? [];
+  const runningThreadIds = response.runningThreadIds ?? [];
+  const runningChanged = haveRunningThreadIdsChanged(
+    previousRunningThreadIds,
+    runningThreadIds,
+  );
+
+  if (
+    response.items.length === 0 &&
+    response.draftsReady.length === 0 &&
+    needYou.length === 0 &&
+    autoReplied.length === 0 &&
+    !runningChanged
+  ) {
+    return;
+  }
 
   const affectedThreadIds = new Set<string>();
   for (const item of response.items) affectedThreadIds.add(item.threadId);
   for (const threadId of response.draftsReady) affectedThreadIds.add(threadId);
+  for (const item of needYou) affectedThreadIds.add(item.threadId);
+  for (const item of autoReplied) affectedThreadIds.add(item.threadId);
+  if (runningChanged) {
+    for (const threadId of runningThreadIds) affectedThreadIds.add(threadId);
+    for (const threadId of previousRunningThreadIds) affectedThreadIds.add(threadId);
+  }
 
   void queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) });
   for (const threadId of affectedThreadIds) {
@@ -196,6 +244,7 @@ export interface CommentUpdatesPollerState {
   consecutiveErrors: number;
   activeTenantKey: string;
   isActive: boolean;
+  runningThreadIds?: readonly string[];
 }
 
 export interface CreateCommentUpdatesQueryFnParams {
@@ -211,6 +260,30 @@ export interface CreateCommentUpdatesQueryFnParams {
 
 function isInvalidUpdatesCursorError(error: unknown): boolean {
   return ApiError.is(error) && error.status === 400 && error.code === "INVALID_INPUT";
+}
+
+function isCommentUpdatesCancellation(error: unknown, signal?: AbortSignal): boolean {
+  return isAbortError(error, signal) || isCancelledError(error);
+}
+
+function makeCancelledUpdatesTick(
+  tenantKey: string,
+  tenantId: string | null,
+  cursorStore: CommentUpdatesCursorStore,
+): CommentUpdatesTick {
+  return {
+    tenantKey,
+    isInitialCursor: true,
+    response: {
+      tenantId: tenantId ?? "",
+      cursor: cursorStore.get(tenantKey) ?? "",
+      items: [],
+      draftsReady: [],
+      needYou: [],
+      autoReplied: [],
+      runningThreadIds: [],
+    },
+  };
 }
 
 /**
@@ -232,8 +305,13 @@ export function createCommentUpdatesQueryFn({
   signal: AbortSignal;
 }) => Promise<CommentUpdatesTick> {
   return async ({ signal }) => {
+    if (signal.aborted) {
+      return makeCancelledUpdatesTick(tenantKey, tenantId, cursorStore);
+    }
+
     if (cursorStore.handleTenantTransition(tenantKey)) {
       state.consecutiveErrors = 0;
+      state.runningThreadIds = [];
       onTenantSwitch?.();
     }
 
@@ -244,9 +322,14 @@ export function createCommentUpdatesQueryFn({
     try {
       response = await fetcher({ since }, signal);
     } catch (error) {
+      // Aborts caused by unmount, navigation, tab hide, or tenant change are
+      // intentional cancellations — treat as a quiet no-op, never backoff or reject.
+      if (isCommentUpdatesCancellation(error, signal)) {
+        return makeCancelledUpdatesTick(tenantKey, tenantId, cursorStore);
+      }
+
       if (
         since !== null &&
-        !signal.aborted &&
         state.isActive &&
         state.activeTenantKey === tenantKey &&
         isInvalidUpdatesCursorError(error)
@@ -257,18 +340,21 @@ export function createCommentUpdatesQueryFn({
         try {
           response = await fetcher({ since: null }, signal);
         } catch (retryError) {
-          if (!signal.aborted) {
-            state.consecutiveErrors += 1;
+          if (isCommentUpdatesCancellation(retryError, signal)) {
+            return makeCancelledUpdatesTick(tenantKey, tenantId, cursorStore);
           }
+          state.consecutiveErrors += 1;
           throw retryError;
         }
       } else {
-        // Aborts caused by unmount or tenant change are cancellations, not server errors.
-        if (!signal.aborted) {
-          state.consecutiveErrors += 1;
-        }
+        state.consecutiveErrors += 1;
         throw error;
       }
+    }
+
+    // Do not mutate backoff counters, cursor, or cache if cancelled while awaiting.
+    if (signal.aborted) {
+      return makeCancelledUpdatesTick(tenantKey, tenantId, cursorStore);
     }
 
     state.consecutiveErrors = 0;
@@ -283,6 +369,9 @@ export function createCommentUpdatesQueryFn({
 
     cursorStore.set(tenantKey, response.cursor);
 
+    const prevRunningThreadIds = state.runningThreadIds ?? [];
+    state.runningThreadIds = response.runningThreadIds ?? [];
+
     const tick: CommentUpdatesTick = {
       tenantKey,
       response,
@@ -290,7 +379,7 @@ export function createCommentUpdatesQueryFn({
     };
 
     if (!isInitialCursor) {
-      invalidateInboxOnUpdates(queryClient, tenantKey, response);
+      invalidateInboxOnUpdates(queryClient, tenantKey, response, prevRunningThreadIds);
       onUpdates?.(tick);
     }
 
@@ -298,7 +387,7 @@ export function createCommentUpdatesQueryFn({
   };
 }
 
-function readDocumentVisible(): boolean {
+export function readDocumentVisible(): boolean {
   if (typeof document === "undefined") return true;
   return document.visibilityState !== "hidden";
 }
@@ -311,7 +400,7 @@ function subscribeDocumentVisibility(onChange: () => void): () => void {
   };
 }
 
-function useDocumentVisible(): boolean {
+export function useDocumentVisible(): boolean {
   return useSyncExternalStore(
     subscribeDocumentVisibility,
     readDocumentVisible,
@@ -379,6 +468,7 @@ export function useCommentUpdates(options: UseCommentUpdatesOptions = {}) {
     if (!isResolved) return;
     if (cursorStore.handleTenantTransition(tenantKey)) {
       pollerStateRef.current.consecutiveErrors = 0;
+      pollerStateRef.current.runningThreadIds = [];
       onTenantSwitchRef.current?.();
     }
   }, [cursorStore, isResolved, tenantKey]);
@@ -421,6 +511,13 @@ export function useCommentUpdates(options: UseCommentUpdatesOptions = {}) {
     refetchRef.current = query.refetch;
   }, [query.refetch]);
 
+  // Cancel any in-flight poll when the tab hides so it settles cleanly instead
+  // of sitting open in the background.
+  useEffect(() => {
+    if (isVisible) return;
+    void queryClient.cancelQueries({ queryKey: inboxKeys.updates(tenantKey) });
+  }, [isVisible, queryClient, tenantKey]);
+
   // Catch up immediately on visibility regain or window focus regain without duplicating
   // when browsers emit both events back-to-back.
   useEffect(() => {
@@ -438,7 +535,9 @@ export function useCommentUpdates(options: UseCommentUpdatesOptions = {}) {
       if (Date.now() - lastVisibilityRegainAtRef.current < FOCUS_COALESCE_WINDOW_MS) {
         return;
       }
-      void refetchRef.current({ cancelRefetch: false });
+      void refetchRef.current({ cancelRefetch: false }).catch((error: unknown) => {
+        if (!isCommentUpdatesCancellation(error)) throw error;
+      });
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);

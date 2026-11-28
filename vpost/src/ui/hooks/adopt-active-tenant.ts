@@ -1,5 +1,6 @@
-import { hashKey, type QueryClient } from "@tanstack/react-query";
+import { hashKey, isCancelledError, type QueryClient } from "@tanstack/react-query";
 
+import { isAbortError } from "@/ui/services/abort";
 import { fetchMe, meKeys } from "@/ui/services/me.api";
 
 /**
@@ -50,19 +51,30 @@ import { fetchMe, meKeys } from "@/ui/services/me.api";
 const ME_QUERY_HASH = hashKey(meKeys.me());
 
 export async function adoptActiveTenantCache(queryClient: QueryClient): Promise<void> {
+  // Cancel in-flight company-scoped queries cleanly before removing them from
+  // the cache so their aborts settle without surfacing as unhandled rejections.
+  await queryClient.cancelQueries({ predicate: (query) => query.queryHash !== ME_QUERY_HASH });
   queryClient.removeQueries({ predicate: (query) => query.queryHash !== ME_QUERY_HASH });
 
-  await queryClient.resetQueries({ queryKey: meKeys.me(), exact: true });
+  try {
+    await queryClient.resetQueries({ queryKey: meKeys.me(), exact: true });
 
-  /**
-   * A reset only refetches for observers that are MOUNTED. `/join/<token>`
-   * renders outside the app shell and has none, so without this the cache would
-   * be left empty and the screen it navigates into would start from a skeleton.
-   * `ensureQueryData` returns what the reset already fetched when there was an
-   * observer — it does not fetch twice.
-   */
-  await queryClient.ensureQueryData({
-    queryKey: meKeys.me(),
-    queryFn: ({ signal }) => fetchMe(signal),
-  });
+    /**
+     * A reset only refetches for observers that are MOUNTED. `/join/<token>`
+     * renders outside the app shell and has none, so without this the cache would
+     * be left empty and the screen it navigates into would start from a skeleton.
+     * `ensureQueryData` returns what the reset already fetched when there was an
+     * observer — it does not fetch twice.
+     */
+    await queryClient.ensureQueryData({
+      queryKey: meKeys.me(),
+      queryFn: ({ signal }) => fetchMe(signal),
+    });
+  } catch (error) {
+    // A superseded switch, unmount, or navigation cancelling the `/api/me`
+    // re-read is intentional — treat as a no-op so `onSuccess`/`onSettled`
+    // callers never leak an unhandled rejection. Real failures still reject.
+    if (isAbortError(error) || isCancelledError(error)) return;
+    throw error;
+  }
 }

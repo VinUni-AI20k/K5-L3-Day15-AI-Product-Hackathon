@@ -16,6 +16,9 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
 
 import agent  # noqa: E402
+import auto_reply  # noqa: E402
+import auto_reply_api  # noqa: E402
+import catalog_detail_api  # noqa: E402
 import comment_poller  # noqa: E402
 import inbox_api  # noqa: E402
 import inbox_store  # noqa: E402
@@ -57,9 +60,12 @@ except Exception as e:
 moderation_store.init_moderation()
 inbox_store.init_inbox()
 writing_style.init_writing_style()
+auto_reply.init_auto_reply()
 app.include_router(moderation_api.router)
 app.include_router(inbox_api.router)
 app.include_router(writing_style_api.router)
+app.include_router(auto_reply_api.router)
+app.include_router(catalog_detail_api.router)
 app.include_router(vpost_api.router)
 if not store.catalog_rows():  # máy mới: nạp sẵn file demo để giao diện có dữ liệu
     vpost_api.load_catalog(rules.read_table(open(os.path.join(rules.DATA, "demo_products.xlsx"), "rb").read(), "demo.xlsx"))

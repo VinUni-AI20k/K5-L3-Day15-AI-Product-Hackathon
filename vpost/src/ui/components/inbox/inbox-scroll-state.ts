@@ -301,8 +301,13 @@ export function reconcileVisibleThreads(params: {
   }
 
   const latestById = new Map<string, InboxThread>();
-  for (const thread of params.latestFromServer) {
+  const serverIndexById = new Map<string, number>();
+  for (let i = 0; i < params.latestFromServer.length; i += 1) {
+    const thread = params.latestFromServer[i];
     latestById.set(thread.id, thread);
+    if (!serverIndexById.has(thread.id)) {
+      serverIndexById.set(thread.id, i);
+    }
   }
 
   // Anchor tail to the oldest item in the pinned snapshot so paginated older pages
@@ -332,12 +337,15 @@ export function reconcileVisibleThreads(params: {
   }
 
   const headAnchor = pinned[0];
+  const headServerIndex = serverIndexById.get(headAnchor.id) ?? 0;
   const appendedOlder: InboxThread[] = [];
   let pendingNewCount = 0;
 
-  for (const thread of params.latestFromServer) {
+  for (let i = 0; i < params.latestFromServer.length; i += 1) {
+    const thread = params.latestFromServer[i];
+    const promotedAheadOfHead = i < headServerIndex;
     if (!visibleIds.has(thread.id)) {
-      if (compareThreadOrder(thread, tailAnchor) < 0) {
+      if (!promotedAheadOfHead && compareThreadOrder(thread, tailAnchor) < 0) {
         appendedOlder.push(thread);
         visibleIds.add(thread.id);
       } else {
@@ -345,7 +353,7 @@ export function reconcileVisibleThreads(params: {
       }
     } else if (
       thread.id !== headAnchor.id &&
-      compareThreadOrder(thread, headAnchor) > 0
+      (promotedAheadOfHead || compareThreadOrder(thread, headAnchor) > 0)
     ) {
       pendingNewCount += 1;
     }

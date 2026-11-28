@@ -20,6 +20,7 @@ from typing import Optional
 
 import psycopg
 
+import auto_reply
 import store
 import vpost_api
 
@@ -97,7 +98,7 @@ def _advisory_lock():
 
 
 def run_tick(stop_event: Optional[threading.Event] = None) -> dict:
-    """Chạy một lượt đồng bộ + tự kiểm duyệt + soạn nháp AI (không bao giờ gửi trả lời)."""
+    """Chạy một lượt đồng bộ + tự kiểm duyệt + soạn nháp AI + pipeline tự động trả lời (chỉ gửi trên Page đã bật live)."""
     ev = stop_event if stop_event is not None else getattr(_tls, "stop_event", None)
     summary = {
         "locked": False,
@@ -107,6 +108,10 @@ def run_tick(stop_event: Optional[threading.Event] = None) -> dict:
         "draftsCreated": 0,
         "draftsFlagged": 0,
         "draftErrors": 0,
+        "autoReplied": 0,
+        "autoWouldSend": 0,
+        "autoTagged": 0,
+        "autoFailed": 0,
         "rateLimited": False,
     }
     with _advisory_lock() as acquired:
@@ -115,11 +120,35 @@ def run_tick(stop_event: Optional[threading.Event] = None) -> dict:
             return summary
         summary["locked"] = True
 
-        sync_res, rate_limited = vpost_api.run_comment_sync(include_meta=True)
+        new_customer_ids: list[str] = []
+        sync_res, rate_limited = vpost_api.run_comment_sync(include_meta=True, out_new_ids=new_customer_ids)
         summary["syncedPosts"] = int(sync_res.get("syncedPosts", 0))
         summary["newComments"] = int(sync_res.get("newComments", 0))
         summary["updatedComments"] = int(sync_res.get("updatedComments", 0))
         summary["rateLimited"] = bool(rate_limited)
+
+        # Chạy auto-reply TRƯỚC bước soạn nháp AI để thu hẹp cửa sổ đua với nhân viên
+        # và không gọi LLM lãng phí cho hội thoại vừa được tự động trả lời.
+        if new_customer_ids and not (ev is not None and ev.is_set()):
+            try:
+                ar_res = auto_reply.run_auto_reply(
+                    vpost_api.TENANT_ID,
+                    new_customer_ids,
+                    stop_event=ev,
+                )
+                summary["autoReplied"] = int(ar_res.get("sent", 0))
+                summary["autoWouldSend"] = int(ar_res.get("wouldSend", 0))
+                summary["autoTagged"] = int(ar_res.get("tagged", 0))
+                summary["autoFailed"] = int(ar_res.get("failed", 0))
+                if ar_res.get("rateLimited"):
+                    summary["rateLimited"] = True
+            except Exception as e:
+                summary["autoFailed"] += 1
+                log.warning(
+                    "comment_poller_auto_reply_error tenant=%s err=%s",
+                    vpost_api.TENANT_ID,
+                    type(e).__name__,
+                )
 
         max_drafts = auto_draft_max_per_tick()
         if max_drafts > 0 and not (ev is not None and ev.is_set()):
@@ -145,7 +174,8 @@ def run_tick(stop_event: Optional[threading.Event] = None) -> dict:
 
         log.info(
             "comment_poller_tick tenant=%s synced_posts=%d new_comments=%d updated_comments=%d "
-            "drafts_created=%d drafts_flagged=%d draft_errors=%d rate_limited=%s",
+            "drafts_created=%d drafts_flagged=%d draft_errors=%d auto_replied=%d auto_would_send=%d "
+            "auto_tagged=%d auto_failed=%d rate_limited=%s",
             vpost_api.TENANT_ID,
             summary["syncedPosts"],
             summary["newComments"],
@@ -153,6 +183,10 @@ def run_tick(stop_event: Optional[threading.Event] = None) -> dict:
             summary["draftsCreated"],
             summary["draftsFlagged"],
             summary["draftErrors"],
+            summary["autoReplied"],
+            summary["autoWouldSend"],
+            summary["autoTagged"],
+            summary["autoFailed"],
             summary["rateLimited"],
         )
     return summary

@@ -52,7 +52,7 @@ describe("isNavItemActive", () => {
 });
 
 describe("NAV_SECTIONS", () => {
-  it("has the wave-1 IA plus onboarding and writing-style: 5 visible groups, 13 destinations, platform gated", () => {
+  it("has the wave-1 IA plus onboarding and writing-style: 5 visible groups, 12 destinations, platform gated", () => {
     const sections = visibleNavSections({ hasPlatformRole: true });
     expect(sections.map((s) => s.title)).toEqual([
       "Bàn làm việc",
@@ -76,13 +76,12 @@ describe("NAV_SECTIONS", () => {
       "/data-mapping",
       "/channels",
       "/writing-style",
-      "/prompts",
       "/members",
       "/platform",
     ]);
   });
 
-  it("places Phong cách viết in the Cài đặt group alongside Kênh and Mẫu prompt", () => {
+  it("places Phong cách viết in the Cài đặt group alongside Kênh and Thành viên", () => {
     const flat = flattenNavItems();
     expect(flat).toContainEqual({
       href: "/writing-style",
@@ -99,6 +98,7 @@ describe("NAV_SECTIONS", () => {
       "/channels/groups",
       "/access",
       "/platform/appearance",
+      "/prompts",
     ]) {
       expect(hrefs).not.toContain(legacy);
     }
@@ -129,7 +129,7 @@ describe("toSearchKey", () => {
   });
 
   it("handles text with no diacritics and the empty string", () => {
-    expect(toSearchKey("Mẫu prompt")).toBe("mau prompt");
+    expect(toSearchKey("plain text")).toBe("plain text");
     expect(toSearchKey("")).toBe("");
   });
 

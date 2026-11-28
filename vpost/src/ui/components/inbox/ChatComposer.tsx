@@ -9,7 +9,7 @@ import {
   Text,
   TextArea,
 } from "@astryxdesign/core";
-import { Send, Sparkles } from "lucide-react";
+import { AlertCircle, CheckCircle2, Send, Sparkles } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -66,11 +66,14 @@ export interface ChatComposerProps {
   readonly isGeneratingDraft: boolean;
   readonly draftError: unknown;
   readonly blockedState: ComposerBlockedState | null;
+  readonly isClearingAttention?: boolean;
+  readonly clearAttentionError?: unknown;
   /** Optional initial text override (primarily for deterministic render tests). */
   readonly initialTextOverride?: string;
   readonly onSendReply: (text: string) => void;
   readonly onRegenerateDraft: () => void;
   readonly onClearBlocked: () => void;
+  readonly onClearAttention?: () => void;
 }
 
 /**
@@ -92,10 +95,13 @@ export function ChatComposer({
   isGeneratingDraft,
   draftError,
   blockedState,
+  isClearingAttention = false,
+  clearAttentionError,
   initialTextOverride,
   onSendReply,
   onRegenerateDraft,
   onClearBlocked,
+  onClearAttention,
 }: ChatComposerProps) {
   const fallbackComposerId = useId();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -357,6 +363,47 @@ export function ChatComposer({
   return (
     <LayoutFooter hasDivider padding={0} className="inbox-composer-footer">
       <Stack direction="vertical" gap={3} className="relative" data-inbox="composer">
+        {/* "Cần bạn" attention banner above composer with "Đã xử lý" clear action */}
+        {thread.attention ? (
+          <Banner
+            role="status"
+            aria-live="polite"
+            status="warning"
+            icon={<AlertCircle className="size-4" aria-hidden="true" />}
+            title={
+              thread.attention.reason.trim().length > 0
+                ? `Cần bạn: ${thread.attention.reason.trim()}`
+                : "Cần bạn"
+            }
+            data-inbox="attention-banner"
+            endContent={
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="inbox-touch-target"
+                icon={<CheckCircle2 className="size-4" aria-hidden="true" />}
+                label={isClearingAttention ? "Đang xử lý…" : "Đã xử lý"}
+                isLoading={isClearingAttention}
+                isDisabled={isClearingAttention || readOnlyReason !== null}
+                tooltip={readOnlyReason ?? undefined}
+                onClick={() => onClearAttention?.()}
+              />
+            }
+          />
+        ) : null}
+
+        {clearAttentionError ? (
+          <CommentErrorNotice
+            error={clearAttentionError}
+            shouldFocus={false}
+            titleOverride="Không thể gỡ nhãn Cần bạn"
+            onRetry={
+              readOnlyReason === null && !isClearingAttention ? onClearAttention : undefined
+            }
+          />
+        ) : null}
+
         {/* Flagged AI draft callout above composer (polite status, never alert) */}
         {thread.draft?.status === "flagged" && thread.draft.reasons.length > 0 ? (
           <Banner

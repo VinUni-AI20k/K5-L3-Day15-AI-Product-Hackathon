@@ -33,11 +33,6 @@ const GATED_SURFACES = [
     writes: "huỷ / đổi giờ (bảng nhận qua prop)",
   },
   { screen: "Nhật ký đăng", file: "jobs/JobLogScreen.tsx", writes: "chạy lại một bài" },
-  {
-    screen: "Mẫu prompt",
-    file: "prompts/PromptTemplatesScreen.tsx",
-    writes: "tạo phiên bản / kích hoạt",
-  },
   { screen: "Đổi nguồn dữ liệu", file: "sync/CatalogSourceCard.tsx", writes: "đổi nguồn Drive/Sheet" },
   // Gated in M3.3 itself; kept here so the set cannot shrink unnoticed.
   // The wave-1 IA split this screen into a hub and its panels: the hub is now
@@ -130,8 +125,8 @@ describe("support mode: every write surface consults the read-only reason", () =
 });
 
 describe("the sweep's scope is written down", () => {
-  it("covers the six screens of the ticket, the two already done, onboarding, and writing style", () => {
-    expect(GATED_SURFACES).toHaveLength(10);
+  it("covers the five remaining screens of the ticket, the two already done, onboarding, and writing style", () => {
+    expect(GATED_SURFACES).toHaveLength(9);
     // Soạn bài is deliberately absent: another agent is rebuilding
     // `components/compose/**` and this sweep must not touch it.
     expect(GATED_SURFACES.map((surface) => surface.file).join(" ")).not.toContain("compose/");

@@ -12,11 +12,12 @@ import {
   Token,
   VisuallyHidden,
 } from "@astryxdesign/core";
-import { Eye, EyeOff, RotateCw, ThumbsUp } from "lucide-react";
+import { Bot, Eye, EyeOff, RotateCw, ThumbsUp } from "lucide-react";
 
 import { cn } from "@/shared/utils";
 import { CommentErrorNotice } from "@/ui/components/comments/CommentErrorNotice";
 import { ModerationBadge } from "@/ui/components/comments/moderation/ModerationBadge";
+import { AgentRunTrace } from "@/ui/components/inbox/AgentRunTrace";
 import {
   INBOX_DELIVERY_LABELS,
   INBOX_HIDDEN_MESSAGE_NOTE,
@@ -24,6 +25,7 @@ import {
   formatCommentAbsoluteTime,
   formatCommentRelativeTime,
   toSafeFacebookUrl,
+  type AgentRun,
   type InboxMessage,
 } from "@/ui/schemas/inbox.schema";
 
@@ -38,9 +40,15 @@ export interface ChatMessageItemProps {
   readonly isLiking: boolean;
   readonly isHiding: boolean;
   readonly actionError?: unknown;
+  readonly matchedAgentRun?: AgentRun | null;
+  readonly isAgentTraceExpanded?: boolean;
+  readonly isLoadingAgentRuns?: boolean;
+  readonly agentRunsError?: unknown;
   readonly onToggleLike: (message: InboxMessage) => void;
   readonly onToggleHide: (message: InboxMessage) => void;
   readonly onRetrySend: (message: InboxMessage) => void;
+  readonly onToggleAgentTrace?: (messageId: string) => void;
+  readonly onRetryAgentRuns?: () => void;
 }
 
 /**
@@ -60,16 +68,26 @@ export function ChatMessageItem({
   isLiking,
   isHiding,
   actionError,
+  matchedAgentRun = null,
+  isAgentTraceExpanded = false,
+  isLoadingAgentRuns = false,
+  agentRunsError,
   onToggleLike,
   onToggleHide,
   onRetrySend,
+  onToggleAgentTrace,
+  onRetryAgentRuns,
 }: ChatMessageItemProps) {
   const senderDisplayName = message.fromPage
     ? channelName.trim() || "Fanpage"
     : displayCommentAuthor(message.fromName);
 
+  const isAutoReplied = message.fromPage && message.sentBy === "auto";
+
   const screenReaderSenderPrefix = message.fromPage
-    ? `Trang ${senderDisplayName} (Bạn): `
+    ? isAutoReplied
+      ? `Trang ${senderDisplayName} (Tự động trả lời): `
+      : `Trang ${senderDisplayName} (Bạn): `
     : `Khách hàng ${senderDisplayName}: `;
 
   const relativeTime = formatCommentRelativeTime(message.createdAt, nowMs);
@@ -102,9 +120,11 @@ export function ChatMessageItem({
       className="group inbox-message-item"
       data-message-id={message.id}
       data-message-sender={message.fromPage ? "page" : "customer"}
+      data-message-sent-by={message.sentBy ?? undefined}
       data-message-delivery={message.delivery}
       data-message-hidden={message.isHidden ? "true" : "false"}
       data-client-id={message.clientId ?? undefined}
+      data-agent-run-id={message.agentRunId ?? undefined}
     >
       <ChatMessage
         sender={message.fromPage ? "user" : "assistant"}
@@ -127,6 +147,15 @@ export function ChatMessageItem({
                 <VisuallyHidden>{screenReaderSenderPrefix}</VisuallyHidden>
                 {message.fromPage ? `${senderDisplayName} (Bạn)` : senderDisplayName}
               </Text>
+              {isAutoReplied ? (
+                <Token
+                  label="Tự động trả lời"
+                  icon={<Bot className="size-4" aria-hidden="true" />}
+                  color="purple"
+                  size="sm"
+                  data-message-auto-reply="true"
+                />
+              ) : null}
               {message.likedByPage ? (
                 <Token
                   label="Đã thích"
@@ -299,6 +328,20 @@ export function ChatMessageItem({
                   error={actionError}
                   shouldFocus={false}
                   titleOverride="Không thực hiện được thao tác trên bình luận"
+                />
+              ) : null}
+
+              {message.agentRunId ? (
+                <AgentRunTrace
+                  agentRunId={message.agentRunId}
+                  run={matchedAgentRun}
+                  isExpanded={isAgentTraceExpanded}
+                  isLoading={isLoadingAgentRuns}
+                  error={agentRunsError}
+                  align={metaJustify}
+                  contextExcerpt={excerptForAria}
+                  onToggle={() => onToggleAgentTrace?.(message.id)}
+                  onRetry={onRetryAgentRuns}
                 />
               ) : null}
             </Stack>

@@ -57,6 +57,7 @@ import {
   type OptimisticMessagesByThread,
 } from "@/ui/components/inbox/inbox-optimistic";
 import { reconcileVisibleThreads } from "@/ui/components/inbox/inbox-scroll-state";
+import { InboxAutoReplyDialog } from "@/ui/components/inbox/InboxAutoReplyDialog";
 import { InboxCustomerSheet } from "@/ui/components/inbox/InboxCustomerSheet";
 import {
   InboxModerationDialog,
@@ -65,10 +66,12 @@ import {
 import { useChannels } from "@/ui/hooks/useChannels";
 import { useDelayedFlag } from "@/ui/hooks/useDelayedFlag";
 import {
+  useClearThreadAttention,
   useGenerateThreadDraft,
   useIgnoreThread,
   useInboxSyncComments,
   useInboxThread,
+  useInboxThreadRuns,
   useInboxThreads,
   useInvalidateInbox,
   useMarkThreadRead,
@@ -106,6 +109,7 @@ export interface InboxWorkspaceViewProps {
   readonly isDesktopCustomerPanelOpen: boolean;
   readonly isCustomerSheetOpen: boolean;
   readonly activeModerationPanel: InboxModerationPanel;
+  readonly isAutoReplyDialogOpen?: boolean;
   readonly readOnlyReason: string | null;
   readonly pageNameById?: Readonly<Record<string, string | undefined>>;
   readonly listProps: ConversationListPaneProps;
@@ -113,6 +117,7 @@ export interface InboxWorkspaceViewProps {
   readonly onCollapseDesktopCustomerPanel: () => void;
   readonly onCloseCustomerSheet: () => void;
   readonly onCloseModerationPanel: () => void;
+  readonly onCloseAutoReplyDialog?: () => void;
 }
 
 /**
@@ -127,6 +132,7 @@ export function InboxWorkspaceView({
   isDesktopCustomerPanelOpen,
   isCustomerSheetOpen,
   activeModerationPanel,
+  isAutoReplyDialogOpen = false,
   readOnlyReason,
   pageNameById,
   listProps,
@@ -134,6 +140,7 @@ export function InboxWorkspaceView({
   onCollapseDesktopCustomerPanel,
   onCloseCustomerSheet,
   onCloseModerationPanel,
+  onCloseAutoReplyDialog,
 }: InboxWorkspaceViewProps) {
   const isMobile = layoutMode === "mobile";
   const isDesktop = layoutMode === "desktop";
@@ -173,6 +180,13 @@ export function InboxWorkspaceView({
           readOnlyReason={readOnlyReason}
           pageNameById={pageNameById}
           onClose={onCloseModerationPanel}
+        />
+
+        <InboxAutoReplyDialog
+          isOpen={isAutoReplyDialogOpen}
+          readOnlyReason={readOnlyReason}
+          pageNameById={pageNameById}
+          onClose={() => onCloseAutoReplyDialog?.()}
         />
       </>
     );
@@ -272,6 +286,13 @@ export function InboxWorkspaceView({
         pageNameById={pageNameById}
         onClose={onCloseModerationPanel}
       />
+
+      <InboxAutoReplyDialog
+        isOpen={isAutoReplyDialogOpen}
+        readOnlyReason={readOnlyReason}
+        pageNameById={pageNameById}
+        onClose={() => onCloseAutoReplyDialog?.()}
+      />
     </>
   );
 }
@@ -306,8 +327,13 @@ export function InboxScreen() {
   const listFilter = useMemo(() => toInboxListFilter(urlState), [urlState]);
   const selectedThreadId = urlState.thread;
 
+  const [runsRequestedThreadId, setRunsRequestedThreadId] = useState<string | null>(null);
+  const shouldFetchThreadRuns =
+    Boolean(selectedThreadId) && runsRequestedThreadId === selectedThreadId;
+
   const threadsQuery = useInboxThreads(listFilter);
   const threadQuery = useInboxThread(selectedThreadId);
+  const threadRunsQuery = useInboxThreadRuns(selectedThreadId, shouldFetchThreadRuns);
   const channelsQuery = useChannels();
 
   const markReadMutation = useMarkThreadRead();
@@ -315,6 +341,7 @@ export function InboxScreen() {
   const sendReplyMutation = useSendThreadReply();
   const ignoreMutation = useIgnoreThread();
   const unignoreMutation = useUnignoreThread();
+  const clearAttentionMutation = useClearThreadAttention();
   const likeMutation = useSetMessageLiked();
   const hideMutation = useSetMessageHidden();
   const syncMutation = useInboxSyncComments();
@@ -326,6 +353,7 @@ export function InboxScreen() {
   const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
   const [activeModerationPanel, setActiveModerationPanel] =
     useState<InboxModerationPanel>(null);
+  const [isAutoReplyDialogOpen, setIsAutoReplyDialogOpen] = useState(false);
   const [isBulkMode, setIsBulkMode] = useState(false);
 
   // Sync feedback state
@@ -339,6 +367,9 @@ export function InboxScreen() {
     Record<string, ComposerBlockedState | undefined>
   >({});
   const [draftErrorByThread, setDraftErrorByThread] = useState<
+    Record<string, unknown>
+  >({});
+  const [clearAttentionErrorByThread, setClearAttentionErrorByThread] = useState<
     Record<string, unknown>
   >({});
   const [messageErrorById, setMessageErrorById] = useState<Record<string, unknown>>(
@@ -472,6 +503,20 @@ export function InboxScreen() {
     [rawServerThreads, selectedThreadId],
   );
   const activeThread = detailThread ?? listThreadFallback;
+
+  // Keep the open thread's live 2 s agentRun state reflected on its row in the list.
+  const syncedVisibleThreads = useMemo(() => {
+    if (!detailThread) return visibleThreads;
+    let changed = false;
+    const next = visibleThreads.map((item) => {
+      if (item.id !== detailThread.id || item.agentRun === detailThread.agentRun) {
+        return item;
+      }
+      changed = true;
+      return { ...item, agentRun: detailThread.agentRun };
+    });
+    return changed ? next : visibleThreads;
+  }, [detailThread, visibleThreads]);
 
   const serverMessages = useMemo(
     () => flattenThreadPages(threadQuery.data?.pages ?? []),
@@ -731,6 +776,21 @@ export function InboxScreen() {
     );
   }
 
+  function handleClearAttention() {
+    if (!activeThread || readOnlyReason !== null) return;
+    const targetId = activeThread.id;
+    setClearAttentionErrorByThread((prev) => ({ ...prev, [targetId]: undefined }));
+    clearAttentionMutation.mutate(
+      { threadId: targetId },
+      {
+        onSuccess: () => announce("Đã đánh dấu xử lý hội thoại Cần bạn.", "polite"),
+        onError: (err) => {
+          setClearAttentionErrorByThread((prev) => ({ ...prev, [targetId]: err }));
+        },
+      },
+    );
+  }
+
   function handleToggleLikeMessage(message: InboxMessage) {
     if (readOnlyReason !== null || message.fromPage) return;
     setMessageErrorById((prev) => ({ ...prev, [message.id]: undefined }));
@@ -797,6 +857,10 @@ export function InboxScreen() {
     generateDraftMutation.isPending &&
     generateDraftMutation.variables?.threadId === activeThread?.id;
 
+  const isClearingAttention =
+    clearAttentionMutation.isPending &&
+    clearAttentionMutation.variables?.threadId === activeThread?.id;
+
   return (
     <InboxWorkspaceView
       layoutMode={layoutMode}
@@ -805,13 +869,14 @@ export function InboxScreen() {
       isDesktopCustomerPanelOpen={isDesktopCustomerPanelOpen}
       isCustomerSheetOpen={isCustomerSheetOpen}
       activeModerationPanel={activeModerationPanel}
+      isAutoReplyDialogOpen={isAutoReplyDialogOpen}
       readOnlyReason={readOnlyReason}
       pageNameById={pageNameById}
       listProps={{
         filter: listFilter,
         counts,
         hasCounts,
-        items: visibleThreads,
+        items: syncedVisibleThreads,
         selectedThreadId,
         nowMs,
         readOnlyReason,
@@ -835,6 +900,7 @@ export function InboxScreen() {
         bulkPageSelection,
         bulkCommentLabelsById,
         activeModerationPanel,
+        isAutoReplyDialogOpen,
         onSearchDraftChange: setSearchDraft,
         onFilterChange: replaceListFilter,
         onClearFilters: handleClearFilters,
@@ -855,6 +921,7 @@ export function InboxScreen() {
         onClearBulkSelection: selection.clear,
         onBulkResult: handleBulkResult,
         onOpenModerationPanel: setActiveModerationPanel,
+        onOpenAutoReplyDialog: () => setIsAutoReplyDialogOpen(true),
       }}
       chatProps={{
         threadId: selectedThreadId,
@@ -878,6 +945,10 @@ export function InboxScreen() {
         blockedState: activeThread
           ? (blockedByThread[activeThread.id] ?? null)
           : null,
+        isClearingAttention,
+        clearAttentionError: activeThread
+          ? clearAttentionErrorByThread[activeThread.id]
+          : undefined,
         likingMessageId: likeMutation.isPending
           ? (likeMutation.variables?.commentId ?? null)
           : null,
@@ -886,6 +957,12 @@ export function InboxScreen() {
           : null,
         messageErrorById,
         lastOwnSendSeq,
+        threadRuns: threadRunsQuery.data?.items,
+        isLoadingThreadRuns:
+          shouldFetchThreadRuns &&
+          threadRunsQuery.isPending &&
+          threadRunsQuery.fetchStatus === "fetching",
+        threadRunsError: shouldFetchThreadRuns ? threadRunsQuery.error : null,
         onBack: handleBackToList,
         onRetryThread: () => void threadQuery.refetch(),
         onLoadOlder: () => void threadQuery.fetchNextPage(),
@@ -900,12 +977,20 @@ export function InboxScreen() {
           clearBlockedDraftFromStorage(activeThread.id);
           setBlockedByThread((prev) => ({ ...prev, [activeThread.id]: undefined }));
         },
+        onClearAttention: handleClearAttention,
         onToggleLikeMessage: handleToggleLikeMessage,
         onToggleHideMessage: handleToggleHideMessage,
+        onRequestThreadRuns: () => {
+          if (selectedThreadId) {
+            setRunsRequestedThreadId(selectedThreadId);
+          }
+        },
+        onRetryThreadRuns: () => void threadRunsQuery.refetch(),
       }}
       onCollapseDesktopCustomerPanel={() => setIsDesktopCustomerPanelOpen(false)}
       onCloseCustomerSheet={() => setIsCustomerSheetOpen(false)}
       onCloseModerationPanel={handleCloseModerationPanel}
+      onCloseAutoReplyDialog={() => setIsAutoReplyDialogOpen(false)}
     />
   );
 }

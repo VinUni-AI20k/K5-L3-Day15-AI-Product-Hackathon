@@ -30,6 +30,7 @@ export const DEFAULT_INBOX_URL_STATE: InboxUrlState = {
 };
 
 export const EMPTY_INBOX_COUNTS: InboxThreadCounts = {
+  canBan: 0,
   needsReply: 0,
   unread: 0,
   all: 0,
@@ -144,6 +145,8 @@ export function getInboxFilterCount(
   chip: InboxThreadFilterChip,
 ): number | undefined {
   switch (chip) {
+    case "can_ban":
+      return counts.canBan;
     case "needs_reply":
       return counts.needsReply;
     case "unread":
@@ -159,12 +162,13 @@ export function getInboxFilterCount(
   }
 }
 
-export type InboxListEmptyKind = "first-run" | "done" | "no-result";
+export type InboxListEmptyKind = "first-run" | "done" | "can-ban-clear" | "no-result";
 
 /**
  * Classifies an empty thread list into:
  * - `"first-run"`: tenant has zero threads overall and no narrowing filter
  * - `"done"`: default `needs_reply` tab has 0 waiting threads while other threads exist
+ * - `"can-ban-clear"`: `can_ban` tab has 0 escalated threads while other threads exist
  * - `"no-result"`: current filter/search returned nothing (show clear-filters CTA)
  */
 export function resolveInboxListEmptyKind(input: {
@@ -173,6 +177,13 @@ export function resolveInboxListEmptyKind(input: {
 }): InboxListEmptyKind {
   if (input.counts.all === 0) {
     return hasNarrowingInboxFilters(input.filter) ? "no-result" : "first-run";
+  }
+  if (
+    input.filter.filter === "can_ban" &&
+    input.counts.canBan === 0 &&
+    !hasNarrowingInboxFilters(input.filter)
+  ) {
+    return "can-ban-clear";
   }
   if (
     input.filter.filter === "needs_reply" &&

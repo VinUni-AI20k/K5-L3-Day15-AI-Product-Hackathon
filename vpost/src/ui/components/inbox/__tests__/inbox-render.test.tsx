@@ -109,6 +109,9 @@ function sampleThread(overrides: Partial<InboxThread> = {}): InboxThread {
       updatedAt: "2026-11-27T11:31:00.000Z",
     },
     moderation: null,
+    attention: null,
+    autoReply: null,
+    agentRun: null,
     updatedAt: "2026-11-27T11:30:00.000Z",
     ...overrides,
   };
@@ -132,6 +135,8 @@ function sampleMessage(overrides: Partial<InboxMessage> = {}): InboxMessage {
     userMessage: null,
     clientId: null,
     moderation: null,
+    sentBy: null,
+    agentRunId: null,
     ...overrides,
   };
 }

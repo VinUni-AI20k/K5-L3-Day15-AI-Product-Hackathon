@@ -66,6 +66,8 @@ export function createOptimisticReplyMessage(
     userMessage: null,
     clientId: input.clientId,
     moderation: null,
+    sentBy: "operator",
+    agentRunId: null,
   };
 }
 

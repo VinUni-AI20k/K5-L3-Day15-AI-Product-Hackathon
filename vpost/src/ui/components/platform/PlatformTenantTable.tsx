@@ -140,9 +140,8 @@ export function PlatformTenantTable({
 
   /**
    * A passive effect in the PARENT of the dialog, so it runs after the dialog's
-   * own restore and gets the last word (the same call `PromptTemplatesScreen`
-   * makes for its reuse dialog). Focusing inside the click handler would be
-   * overwritten by that restore.
+   * own restore and gets the last word. Focusing inside the click handler would
+   * be overwritten by that restore.
    */
   useEffect(() => {
     if (confirmingId !== null) return;

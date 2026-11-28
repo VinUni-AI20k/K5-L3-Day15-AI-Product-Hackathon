@@ -46,6 +46,9 @@ function makeResponse(
     cursor: "2026-11-27T10:01:00.000Z",
     items: [],
     draftsReady: [],
+    needYou: [],
+    autoReplied: [],
+    runningThreadIds: [],
     ...overrides,
   };
 }
@@ -400,6 +403,163 @@ describe("inbox notification planner", () => {
       },
     ]);
     queryClient.clear();
+  });
+
+  it("emits 'Cần bạn: {Tên} — {reason}' toasts with 'Xem', dedupes by threadId+since (and reason fallback), and updates autoReplied silently via polite live region only", () => {
+    const tracker = createInboxNotificationTracker();
+
+    // First tick: needYou with explicit since + autoReplied
+    const tick1 = tracker.plan({
+      response: makeResponse({
+        cursor: "c-1",
+        needYou: [
+          {
+            threadId: "th-1",
+            customerName: "Minh Thư",
+            reason: "khách hỏi phí ship",
+            since: "2026-11-27T10:05:00+07:00",
+          },
+          // Duplicate within same tick (same threadId + since) -> deduped
+          {
+            threadId: "th-1",
+            customerName: "Minh Thư",
+            reason: "khách hỏi phí ship",
+            since: "2026-11-27T10:05:00+07:00",
+          },
+          // Backend omitting `since` -> fallback dedupe by threadId + reason
+          {
+            threadId: "th-2",
+            customerName: null,
+            reason: "hết hàng size M",
+            since: null,
+          },
+        ],
+        autoReplied: [{ threadId: "th-auto-1", messageId: "m-auto-1" }],
+      }),
+      isInitialCursor: false,
+      activeThreadId: null,
+      lookupCachedCustomerName: (threadId) =>
+        threadId === "th-auto-1" ? "Lan Anh" : null,
+    });
+
+    expect(tick1.toasts).toEqual([
+      {
+        uniqueID: "inbox-need-you-th-1:2026-11-27T10:05:00+07:00",
+        type: "info",
+        body: "Cần bạn: Minh Thư — khách hỏi phí ship",
+        actionLabel: "Xem",
+        actionHref: "/comments?thread=th-1",
+        collisionBehavior: "ignore",
+      },
+      {
+        uniqueID: "inbox-need-you-th-2:reason:hết hàng size M",
+        type: "info",
+        body: "Cần bạn: Khách hàng — hết hàng size M",
+        actionLabel: "Xem",
+        actionHref: "/comments?thread=th-2",
+        collisionBehavior: "ignore",
+      },
+    ]);
+    // autoReplied NEVER creates a toast; announces politely in live region only
+    expect(tick1.liveAnnouncement).toBe("Đã tự động trả lời cho Lan Anh");
+
+    // Second tick: replay same threadId+since and same threadId+reason + same autoReplied -> 0 toasts, null live
+    const tick2 = tracker.plan({
+      response: makeResponse({
+        cursor: "c-2",
+        needYou: [
+          {
+            threadId: "th-1",
+            customerName: "Minh Thư",
+            reason: "khách hỏi phí ship",
+            since: "2026-11-27T10:05:00+07:00",
+          },
+          {
+            threadId: "th-2",
+            customerName: null,
+            reason: "hết hàng size M",
+            since: null,
+          },
+        ],
+        autoReplied: [{ threadId: "th-auto-1", messageId: "m-auto-1" }],
+      }),
+      isInitialCursor: false,
+      activeThreadId: null,
+    });
+    expect(tick2.toasts).toEqual([]);
+    expect(tick2.liveAnnouncement).toBeNull();
+
+    // Third tick: same threadId re-tagged with a NEW since -> emits a fresh toast!
+    const tick3 = tracker.plan({
+      response: makeResponse({
+        cursor: "c-3",
+        needYou: [
+          {
+            threadId: "th-1",
+            customerName: "Minh Thư",
+            reason: "khách hỏi đổi size",
+            since: "2026-11-27T10:15:00+07:00",
+          },
+        ],
+        autoReplied: [
+          { threadId: "th-auto-2", messageId: "m-auto-2" },
+          { threadId: "th-auto-3", messageId: "m-auto-3" },
+        ],
+      }),
+      isInitialCursor: false,
+      activeThreadId: null,
+    });
+    expect(tick3.toasts).toEqual([
+      {
+        uniqueID: "inbox-need-you-th-1:2026-11-27T10:15:00+07:00",
+        type: "info",
+        body: "Cần bạn: Minh Thư — khách hỏi đổi size",
+        actionLabel: "Xem",
+        actionHref: "/comments?thread=th-1",
+        collisionBehavior: "ignore",
+      },
+    ]);
+    expect(tick3.liveAnnouncement).toBe("Đã tự động trả lời 2 bình luận");
+
+    // Open thread needYou suppresses toast and announces politely in live region
+    const tickOpen = tracker.plan({
+      response: makeResponse({
+        cursor: "c-4",
+        needYou: [
+          {
+            threadId: "th-open",
+            customerName: "Hải Yến",
+            reason: "thiếu mã sản phẩm",
+            since: "2026-11-27T10:20:00+07:00",
+          },
+        ],
+      }),
+      isInitialCursor: false,
+      activeThreadId: "th-open",
+    });
+    expect(tickOpen.toasts).toEqual([]);
+    expect(tickOpen.liveAnnouncement).toBe("Cần bạn: Hải Yến — thiếu mã sản phẩm");
+
+    // Reset on tenant switch clears needYou & autoReplied dedupe sets
+    tracker.reset();
+    const afterReset = tracker.plan({
+      response: makeResponse({
+        cursor: "c-5",
+        needYou: [
+          {
+            threadId: "th-1",
+            customerName: "Minh Thư",
+            reason: "khách hỏi phí ship",
+            since: "2026-11-27T10:05:00+07:00",
+          },
+        ],
+        autoReplied: [{ threadId: "th-auto-1", messageId: "m-auto-1" }],
+      }),
+      isInitialCursor: false,
+      activeThreadId: null,
+    });
+    expect(afterReset.toasts).toHaveLength(1);
+    expect(afterReset.liveAnnouncement).toBe("Đã tự động trả lời 1 bình luận");
   });
 });
 

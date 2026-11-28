@@ -264,14 +264,15 @@ def test_threads_list_shapes_filters_counts_and_has_phone():
     assert b["tenantId"] == vpost_api.TENANT_ID
     assert b["limit"] == 30 and b["nextCursor"] is None
     assert [t["id"] for t in b["items"]] == ["t_followup", "t_phone", "t_need"]
-    assert b["counts"] == {"needsReply": 3, "unread": 4, "all": 6, "hidden": 1, "ignored": 1}
+    assert b["counts"] == {"canBan": 0, "needsReply": 3, "unread": 4, "all": 6, "hidden": 1, "ignored": 1}
 
     by_id = {t["id"]: t for t in b["items"]}
     tf = by_id["t_followup"]
     expected_thread_keys = {
         "id", "channelId", "channelName", "pageId", "postJobId", "productCode", "postCaption",
         "postUrl", "postImageUrl", "customer", "lastMessage", "needsReply", "unread", "unreadCount",
-        "status", "isHidden", "messageCount", "hasPhone", "draft", "moderation", "updatedAt",
+        "status", "isHidden", "messageCount", "hasPhone", "draft", "moderation", "attention",
+        "autoReply", "updatedAt",
     }
     assert set(tf.keys()) == expected_thread_keys
     assert tf["customer"] == {"id": "u3", "name": "Quỳnh", "tags": []}
@@ -382,7 +383,7 @@ def test_thread_detail_before_pagination_and_batch_inbox_store_calls():
     expected_msg_keys = {
         "id", "threadId", "fromPage", "fromId", "fromName", "text", "createdAt",
         "permalinkUrl", "isHidden", "canComment", "likedByPage", "delivery",
-        "errorCode", "userMessage", "clientId", "moderation",
+        "errorCode", "userMessage", "clientId", "sentBy", "moderation",
     }
     assert set(b1["messages"][0].keys()) == expected_msg_keys
 

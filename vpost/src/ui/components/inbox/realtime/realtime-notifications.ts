@@ -1,5 +1,7 @@
 import type {
+  CommentUpdateAutoRepliedItem,
   CommentUpdateItem,
+  CommentUpdateNeedYouItem,
   CommentUpdatesResponse,
 } from "@/ui/schemas/inbox-updates.schema";
 
@@ -37,7 +39,11 @@ export function getActiveThreadId(
   pathname: string | null | undefined,
   searchParams: Pick<URLSearchParams, "get"> | null | undefined,
 ): string | null {
-  if (typeof pathname === "string" && pathname !== "/comments" && !pathname.startsWith("/comments/")) {
+  if (
+    typeof pathname === "string" &&
+    pathname !== "/comments" &&
+    !pathname.startsWith("/comments/")
+  ) {
     return null;
   }
   const raw = searchParams?.get("thread")?.trim() ?? "";
@@ -68,16 +74,47 @@ export function buildThreadHref(threadId: string): string {
   return `/comments?thread=${encodeURIComponent(threadId)}`;
 }
 
-function formatSingleCommentToastBody(item: Pick<CommentUpdateItem, "customerName" | "text">): string {
+/**
+ * Builds the deduplication key for a `needYou` ("Cần bạn") escalation item.
+ * Uses `threadId + since` when the server provides `since`, and falls back
+ * cleanly to `threadId + normalized reason` if `since` is omitted.
+ */
+export function buildNeedYouDedupeKey(
+  item: Pick<CommentUpdateNeedYouItem, "threadId" | "since" | "reason">,
+): string {
+  const since = typeof item.since === "string" ? item.since.trim() : "";
+  if (since.length > 0) {
+    return `${item.threadId}:${since}`;
+  }
+  const normalizedReason = item.reason.replace(/\s+/g, " ").trim();
+  return `${item.threadId}:reason:${normalizedReason}`;
+}
+
+function formatSingleCommentToastBody(
+  item: Pick<CommentUpdateItem, "customerName" | "text">,
+): string {
   const sender = formatCommentSender(item.customerName);
   const excerpt = truncateToastExcerpt(item.text);
   return excerpt.length > 0 ? `${sender} vừa bình luận: ${excerpt}` : `${sender} vừa bình luận`;
 }
 
-function formatOpenThreadAnnouncement(item: Pick<CommentUpdateItem, "customerName" | "text">): string {
+function formatOpenThreadAnnouncement(
+  item: Pick<CommentUpdateItem, "customerName" | "text">,
+): string {
   const sender = formatCommentSender(item.customerName);
   const excerpt = truncateToastExcerpt(item.text);
   return excerpt.length > 0 ? `${sender}: ${excerpt}` : `${sender} vừa bình luận`;
+}
+
+function formatNeedYouCopy(
+  senderName: string | null | undefined,
+  reason: string,
+): string {
+  const sender = formatCommentSender(senderName);
+  const reasonExcerpt = truncateToastExcerpt(reason);
+  return reasonExcerpt.length > 0
+    ? `Cần bạn: ${sender} — ${reasonExcerpt}`
+    : `Cần bạn: ${sender}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -168,16 +205,24 @@ export interface InboxNotificationTracker {
  *   a polite live-region announcement (`sender + short text`) instead.
  * - Shows up to 3 individual comment toasts, or 1 grouped "Có N bình luận mới" toast (>3).
  * - Shows an info toast "Đã có nháp AI cho <Tên hoặc 'khách'>" for non-open `draftsReady`.
+ * - Shows "Cần bạn: {Tên} — {reason}" toasts with "Xem" for `needYou`, deduped by
+ *   `threadId + since` (fallback `threadId + reason`), or polite live announcement when
+ *   that thread is already open.
+ * - Updates `autoReplied` silently (never shows a toast; emits polite live-region copy only).
  */
 export function createInboxNotificationTracker(
   maxTracked = MAX_TRACKED_ENTRIES,
 ): InboxNotificationTracker {
   const seenMessageIds = new Set<string>();
+  const seenNeedYouKeys = new Set<string>();
+  const seenAutoRepliedKeys = new Set<string>();
   const customerNamesByThread = new Map<string, string>();
 
   return {
     reset(): void {
       seenMessageIds.clear();
+      seenNeedYouKeys.clear();
+      seenAutoRepliedKeys.clear();
       customerNamesByThread.clear();
     },
 
@@ -260,12 +305,74 @@ export function createInboxNotificationTracker(
         }
       }
 
+      // "Cần bạn" escalations: deduped by threadId + since (fallback threadId + reason).
+      const openNeedYouAnnouncements: string[] = [];
+      for (const item of response.needYou ?? []) {
+        const trimmedName = item.customerName?.trim() ?? "";
+        if (trimmedName.length > 0) {
+          customerNamesByThread.set(item.threadId, trimmedName);
+          trimBoundedMap(customerNamesByThread, maxTracked);
+        }
+
+        const dedupeKey = buildNeedYouDedupeKey(item);
+        if (seenNeedYouKeys.has(dedupeKey)) continue;
+        seenNeedYouKeys.add(dedupeKey);
+        trimBoundedSet(seenNeedYouKeys, maxTracked);
+
+        const resolvedName =
+          trimmedName ||
+          customerNamesByThread.get(item.threadId) ||
+          lookupCachedCustomerName?.(item.threadId) ||
+          null;
+        const copy = formatNeedYouCopy(resolvedName, item.reason);
+
+        if (activeThreadId !== null && item.threadId === activeThreadId) {
+          openNeedYouAnnouncements.push(copy);
+        } else {
+          toasts.push({
+            uniqueID: `inbox-need-you-${dedupeKey}`,
+            type: "info",
+            body: copy,
+            actionLabel: "Xem",
+            actionHref: buildThreadHref(item.threadId),
+            collisionBehavior: "ignore",
+          });
+        }
+      }
+
+      // Auto-replied updates: silent (never show a toast; polite live region only).
+      const freshAutoReplied: CommentUpdateAutoRepliedItem[] = [];
+      for (const item of response.autoReplied ?? []) {
+        const dedupeKey = `${item.threadId}:${item.messageId}`;
+        if (seenAutoRepliedKeys.has(dedupeKey)) continue;
+        seenAutoRepliedKeys.add(dedupeKey);
+        trimBoundedSet(seenAutoRepliedKeys, maxTracked);
+        freshAutoReplied.push(item);
+      }
+
       const liveParts: string[] = [];
       for (const item of openThreadItems) {
         liveParts.push(formatOpenThreadAnnouncement(item));
       }
       for (const label of openThreadDraftLabels) {
         liveParts.push(`Đã có nháp AI cho ${label}`);
+      }
+      for (const msg of openNeedYouAnnouncements) {
+        liveParts.push(msg);
+      }
+      if (freshAutoReplied.length === 1) {
+        const single = freshAutoReplied[0];
+        const resolvedName =
+          customerNamesByThread.get(single.threadId) ??
+          lookupCachedCustomerName?.(single.threadId) ??
+          null;
+        liveParts.push(
+          resolvedName
+            ? `Đã tự động trả lời cho ${resolvedName}`
+            : "Đã tự động trả lời 1 bình luận",
+        );
+      } else if (freshAutoReplied.length > 1) {
+        liveParts.push(`Đã tự động trả lời ${freshAutoReplied.length} bình luận`);
       }
 
       return {

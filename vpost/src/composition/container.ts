@@ -119,7 +119,6 @@ import {
   makeManageChannelGroups,
   type ManageChannelGroups,
 } from "@/core/usecases/manage-channel-groups";
-import type { ManagePromptTemplates } from "@/core/usecases/manage-prompt-templates";
 import { makeReapPostJobs, type ReapPostJobs } from "@/core/usecases/reap-post-jobs";
 import {
   makeReconcileScheduledPosts,
@@ -195,7 +194,6 @@ import { makeSyncCatalog, type SyncCatalog } from "@/core/usecases/sync-catalog"
 import {
   closeAiStores,
   makeLazyGenerateCaptions,
-  makeLazyPromptTemplates,
   type GenerateCaptions,
 } from "./ai-engine";
 import {
@@ -289,8 +287,6 @@ export interface Usecases {
   /** E3.6 — periodic sweep of the Drive byte cache (TTL-based). */
   cleanupMediaCache: CleanupMediaCache;
   generateCaptions: GenerateCaptions;
-  /** E10.7 — versioned prompt catalog (list/create/activate). */
-  promptTemplates: ManagePromptTemplates;
   /** E7.2 — fan a post out to N channels (called by the web API). */
   createPostBatch: CreatePostBatch;
   /** E7.4 — publish one job on one channel (called by the worker). */
@@ -1139,11 +1135,6 @@ export function makeUsecases(deps: Infra, overrides: UsecaseOverrides = {}): Use
       // Claim validation compares a caption against the labels of THIS tenant's
       // sheet; without it an external tenant is judged by VPOST's column names.
       catalogConfig,
-    }),
-    promptTemplates: makeLazyPromptTemplates({
-      logger: deps.logger,
-      clock: deps.clock,
-      db: deps.db,
     }),
     createPostBatch: makeCreatePostBatch({
       postJobs,

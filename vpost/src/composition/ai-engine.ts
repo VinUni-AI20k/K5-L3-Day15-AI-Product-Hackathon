@@ -4,11 +4,7 @@ import { makeRedisAiCache, type AiCache } from "@/adapters/ai/cache/redis-cache"
 import { makeLoggerGenerationLog } from "@/adapters/ai/generation-log/logger-generation-log";
 import { makeGoogleProviderAdapter } from "@/adapters/ai/google/google-provider";
 import { makeOpenAIProviderAdapter } from "@/adapters/ai/openai/openai-provider";
-import { makeDbPromptStore } from "@/adapters/ai/prompt-store/db-prompt-store";
-import {
-  BUILT_IN_TEMPLATES,
-  makeStaticPromptStore,
-} from "@/adapters/ai/prompt-store/static-prompt-store";
+import { makeStaticPromptStore } from "@/adapters/ai/prompt-store/static-prompt-store";
 import {
   makeCachedModelPolicyStore,
   type CachedModelPolicyStore,
@@ -16,7 +12,6 @@ import {
 import { makeYamlModelPolicyStore } from "@/adapters/ai/registry-store/yaml-model-policy-store";
 import { DrizzleAiModelPolicyOverrideRepo } from "@/adapters/db/ai-model-policy-override-repo.drizzle";
 import { makeDrizzleGenerationLog } from "@/adapters/db/ai-generation-log.drizzle";
-import { DrizzleAiPromptTemplateRepo } from "@/adapters/db/ai-prompt-template-repo.drizzle";
 import type { Database } from "@/adapters/db/client";
 import { createRedisConnection } from "@/adapters/queue/redis-connection";
 import { makeContentEngine } from "@/core/ai/content-engine";
@@ -36,10 +31,6 @@ import {
   type GenerateCaptionsInput,
   type GenerateCaptionsResult,
 } from "@/core/usecases/generate-captions";
-import {
-  makeManagePromptTemplates,
-  type ManagePromptTemplates,
-} from "@/core/usecases/manage-prompt-templates";
 
 import { loadAiConfig, type AiConfig, type EnvRecord } from "./config";
 
@@ -147,19 +138,16 @@ export interface AiStores {
   policies: ModelPolicyStore;
   prompts: PromptStore;
   generationLog: GenerationLog;
-  promptTemplates: ManagePromptTemplates;
   close: () => Promise<void>;
 }
 
 /**
  * All AI persistence in one place: registry (YAML + tenant override + Redis),
- * prompt catalog (DB + built-in fallback) and the `ai_generation` writer.
+ * built-in static prompt store and the `ai_generation` writer.
  */
 export function makeAiStores(deps: AiWiringDeps): AiStores {
   const config = loadAiConfig(deps.env);
   const { cache, close } = makeAiCache(deps);
-
-  const promptRepo = new DrizzleAiPromptTemplateRepo(deps.db, deps.logger);
 
   return {
     policies: makeAiPolicyStore({
@@ -169,48 +157,13 @@ export function makeAiStores(deps: AiWiringDeps): AiStores {
       cache,
       overrides: new DrizzleAiModelPolicyOverrideRepo(deps.db, deps.logger),
     }),
-    prompts: makeDbPromptStore({
-      repo: promptRepo,
-      builtIn: makeStaticPromptStore(),
-      logger: deps.logger,
-    }),
+    prompts: makeStaticPromptStore(),
     generationLog: makeDrizzleGenerationLog({
       db: deps.db,
       logger: deps.logger,
       newId: () => randomUUID(),
     }),
-    promptTemplates: makeManagePromptTemplates({
-      templates: promptRepo,
-      builtIn: BUILT_IN_TEMPLATES,
-      logger: deps.logger,
-      newId: () => randomUUID(),
-    }),
     close,
-  };
-}
-
-/**
- * Prompt-template administration (E10.7). Built lazily like the generation
- * path: only the DB is needed, no provider key, so an admin screen works on a
- * process that never generated anything.
- */
-export function makeLazyPromptTemplates(deps: AiWiringDeps): ManagePromptTemplates {
-  let cached: ManagePromptTemplates | null = null;
-  const build = (): ManagePromptTemplates => {
-    cached ??= makeManagePromptTemplates({
-      templates: new DrizzleAiPromptTemplateRepo(deps.db, deps.logger),
-      builtIn: BUILT_IN_TEMPLATES,
-      logger: deps.logger,
-      newId: () => randomUUID(),
-    });
-    return cached;
-  };
-
-  return {
-    listVersions: (input) => build().listVersions(input),
-    getActive: (input) => build().getActive(input),
-    createVersion: (input) => build().createVersion(input),
-    activateVersion: (input) => build().activateVersion(input),
   };
 }
 

@@ -67,7 +67,6 @@ describe("nobody asks for a full line and then caps it", () => {
   const CALLERS = [
     "../../bulk/BulkRunScreen.tsx",
     "../../channels/ChannelGroupsScreen.tsx",
-    "../../prompts/PromptTemplatesScreen.tsx",
     "../../sync/CatalogSourceCard.tsx",
   ] as const;
 

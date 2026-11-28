@@ -5,6 +5,7 @@ import {
   type ComposeDraftPayload,
 } from "@/ui/schemas/post-draft.schema";
 
+import { isAbortError } from "./abort";
 import { apiRequest, apiRequestNoContent } from "./http-client";
 
 /**
@@ -126,6 +127,8 @@ export function beaconComposeDraft(params: { payload: ComposeDraftPayload }): bo
       keepalive: true,
       cache: "no-store",
     }).catch((cause: unknown) => {
+      // Browser aborts keepalive fetches on rapid reload/unload — treat as a no-op.
+      if (isAbortError(cause)) return;
       // Nothing to show: the page is unloading. Logged so a systematic failure
       // is visible in a devtools session that survives the navigation.
       console.warn("[draft.api] keepalive draft flush failed", {

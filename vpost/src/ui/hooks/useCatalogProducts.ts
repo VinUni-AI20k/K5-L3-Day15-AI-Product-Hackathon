@@ -9,10 +9,12 @@ import {
   type ProductFilter,
   type UploadCatalogFileResponse,
 } from "@/ui/schemas/catalog.schema";
+import type { ProductDetailResponse } from "@/ui/schemas/product-detail.schema";
 import { useActiveTenant } from "@/ui/hooks/useMe";
 import { ApiError } from "@/ui/services/api-error";
 import {
   catalogKeys,
+  fetchCatalogProductDetail,
   fetchCatalogSource,
   listCatalogProducts,
   updateCatalogSource,
@@ -151,6 +153,28 @@ export function useCatalogProducts(filter: ProductFilter) {
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
     // The catalog only moves when a sync runs; 30s keeps typing responsive
     // without re-querying on every keystroke that lands on the same filter.
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Full product detail for fact-checking AI output (`GET /api/catalog/products/{code}`).
+ *
+ * Gated on `isResolved` AND a non-empty code so selecting nothing never fires a
+ * request and switching tenants starts from an isolated cache partition.
+ * 404 (`PRODUCT_NOT_FOUND`) is non-retryable and settles immediately.
+ */
+export function useCatalogProductDetail(code: string | null) {
+  const { tenantKey, isResolved } = useActiveTenant();
+  const normalizedCode = code?.trim() ?? "";
+
+  return useQuery<ProductDetailResponse, ApiError>({
+    queryKey: catalogKeys.productDetail(tenantKey, normalizedCode),
+    queryFn: ({ signal }) => fetchCatalogProductDetail(normalizedCode, signal),
+    enabled: isResolved && normalizedCode.length > 0,
+    retry: (failureCount, error) =>
+      ApiError.is(error) && error.isRetryable ? failureCount < 2 : false,
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
     staleTime: 30_000,
   });
 }

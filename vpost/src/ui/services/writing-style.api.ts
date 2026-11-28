@@ -12,6 +12,13 @@ import {
   type WritingStylePreviewResponse,
 } from "@/ui/schemas/writing-style.schema";
 
+import {
+  createRequestSignal,
+  isAbortError,
+  isCallerSignalAborted,
+  isTimeoutError,
+  normalizeAbortError,
+} from "./abort";
 import { ApiError, CLIENT_ERROR_CODES } from "./api-error";
 import { apiRequest, apiRequestNoContent, toApiErrorBody } from "./http-client";
 
@@ -111,47 +118,72 @@ async function writingStyleJsonRequest<T>(
     signal?: AbortSignal;
   },
 ): Promise<T> {
-  const timeout = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  const combinedSignal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  const fallbackReason = `${options.method} ${path} aborted`;
+  const { signal: combinedSignal, cleanup } = createRequestSignal(
+    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    options.signal,
+    fallbackReason,
+  );
 
   let response: Response;
-  try {
-    response = await fetch(path, {
-      method: options.method,
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(options.body),
-      cache: "no-store",
-      signal: combinedSignal,
-    });
-  } catch (cause) {
-    if (options.signal?.aborted) throw cause;
-    const isTimeout = cause instanceof DOMException && cause.name === "TimeoutError";
-    throw new ApiError({
-      code: isTimeout ? CLIENT_ERROR_CODES.TIMEOUT : CLIENT_ERROR_CODES.NETWORK,
-      status: 0,
-      message: cause instanceof Error ? cause.message : String(cause),
-      userMessage: isTimeout
-        ? "Máy chủ phản hồi quá lâu. Hãy thử lại."
-        : "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.",
-      cause,
-    });
-  }
-
   let payload: unknown;
   try {
-    payload = await response.json();
-  } catch (cause) {
-    throw new ApiError({
-      code: CLIENT_ERROR_CODES.MALFORMED_RESPONSE,
-      status: response.status,
-      message: "Response body is not valid JSON",
-      userMessage:
-        "Máy chủ trả về dữ liệu không đọc được. Hãy thử lại; nếu vẫn lỗi, báo quản trị viên.",
-      cause,
-    });
+    try {
+      response = await fetch(path, {
+        method: options.method,
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(options.body),
+        cache: "no-store",
+        signal: combinedSignal,
+      });
+    } catch (cause) {
+      if (isCallerSignalAborted(options.signal)) {
+        throw normalizeAbortError(cause, options.signal, fallbackReason);
+      }
+      const isTimeout = isTimeoutError(cause);
+      if (!isTimeout && isAbortError(cause)) {
+        throw normalizeAbortError(cause, options.signal, fallbackReason);
+      }
+      throw new ApiError({
+        code: isTimeout ? CLIENT_ERROR_CODES.TIMEOUT : CLIENT_ERROR_CODES.NETWORK,
+        status: 0,
+        message: cause instanceof Error ? cause.message : String(cause),
+        userMessage: isTimeout
+          ? "Máy chủ phản hồi quá lâu. Hãy thử lại."
+          : "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.",
+        cause,
+      });
+    }
+
+    try {
+      payload = await response.json();
+    } catch (cause) {
+      if (isCallerSignalAborted(options.signal) || (!isTimeoutError(cause) && isAbortError(cause))) {
+        throw normalizeAbortError(cause, options.signal, fallbackReason);
+      }
+      if (isTimeoutError(cause)) {
+        throw new ApiError({
+          code: CLIENT_ERROR_CODES.TIMEOUT,
+          status: 0,
+          message: cause instanceof Error ? cause.message : String(cause),
+          userMessage: "Máy chủ phản hồi quá lâu. Hãy thử lại.",
+          cause,
+        });
+      }
+      throw new ApiError({
+        code: CLIENT_ERROR_CODES.MALFORMED_RESPONSE,
+        status: response.status,
+        message: "Response body is not valid JSON",
+        userMessage:
+          "Máy chủ trả về dữ liệu không đọc được. Hãy thử lại; nếu vẫn lỗi, báo quản trị viên.",
+        cause,
+      });
+    }
+  } finally {
+    cleanup();
   }
 
   if (!response.ok) {

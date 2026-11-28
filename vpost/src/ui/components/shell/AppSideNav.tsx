@@ -24,7 +24,6 @@ import {
   PenLine,
   Radio,
   ScrollText,
-  Sparkles,
   TableProperties,
   Users,
 } from "lucide-react";
@@ -65,7 +64,6 @@ export const NAV_ICONS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> =
   "/data-mapping": TableProperties,
   "/channels": Radio,
   "/writing-style": Feather,
-  "/prompts": Sparkles,
   "/members": Users,
   "/platform": Building2,
 };
