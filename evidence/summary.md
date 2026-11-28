@@ -30,9 +30,9 @@ Phỏng vấn nhiều vai thì đếm theo từng vai, không cộng chung.
 
 | | Vai | Gặp pain? | Số lần / 1 tháng qua | Lần gần nhất mất | Đang xoay xở bằng |
 |---|---|---|---|---|---|
-| P1 | Người bán hàng online | Có (mất thời gian) | *(chưa ghi nhận)* | *(chưa ghi nhận)* | Đăng bài thủ công |
-| P2 | Người bán hàng online | Có (bất tiện khi đăng nhiều bài) | *(chưa ghi nhận)* | *(chưa ghi nhận)* | Đăng bài thủ công |
-| P3 | Người bán hàng online | Có (thao tác lặp lại, tốn công sức) | *(chưa ghi nhận)* | *(chưa ghi nhận)* | Đăng bài thủ công |
+| P1 | Người bán hàng online | Có (mất thời gian) | Thi thoảng bán | ~15 phút / bài | Đăng bài thủ công |
+| P2 | Người bán hàng online | Có (bất tiện khi đăng nhiều bài) | Rất nhiều bài / tháng | Rất nhiều thời gian | Đăng bài thủ công |
+| P3 | Người bán hàng online | Có (tốn công suy nghĩ content & lặp thao tác) | ~10 bài | Rất nhiều thời gian suy nghĩ content | Tự nghĩ content & đăng thủ công |
 
 ## 3. ≥5 trích dẫn hoặc ví dụ nguyên văn (có nguồn, bỏ tên)
 
