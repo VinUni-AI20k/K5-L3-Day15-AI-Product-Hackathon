@@ -140,6 +140,7 @@ flowchart TD
 | Thời điểm | Đổi gì | Vì sao (trỏ về câu thử / lỗi / bằng chứng nào) |
 |---|---|---|
 | 28/11/2026 | Khôi phục nhãn Canvas theo mẫu, ghi rõ lát cắt Track E của CP1 và bước Chốt được thêm ở CP2. | Đối chiếu bản CP1 đã sửa tại commit `9cef839` và luồng Chốt tại commit `0cea24c`. |
+| 28/11/2026 (CP4, cải tiến trước lượt 2) | Đọc ảnh: OCR cục bộ ONNX (PP-OCRv3 + VieSVTR v7, trọng số Vũ đóng gói) thay Tesseract; model chỉ được gọi khi OCR chưa ra tổng; đọc được dòng tổng bị OCR gộp với "Tổng số lượng"; thước đo `check_ocr.py` chỉ chấm số đầy đủ trong nhãn. Commit `f1b47fd`, `99c0d91`, `c797c7c`. | Nhóm lỗi 1 "Cần đọc lại oan" (`eval/report.md` §2). 40 ảnh MC-OCR: trước `eval/image-check-before.jsonl` 25 đúng · 2 sai · 13 Cần đọc lại → sau `eval/image-check-after.jsonl` 35 đúng · 1 sai · 3 Cần đọc lại; token đọc ảnh 44.816 → 5.415. |
 
 **Sau CP4 (đến 23:59 Thứ Bảy 28/11)** (sửa theo góp ý — không sửa chuẩn "đạt", câu thử, số bằng chứng, kết quả các lượt đã chạy)
 
