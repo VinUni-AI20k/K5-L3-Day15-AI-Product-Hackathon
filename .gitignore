@@ -51,5 +51,7 @@ evidence/**/raw-*
 /PHAN-CONG.md
 data-btc
 
-# Sổ chi tiêu cục bộ của bản demo
-/data/runtime/
+# Dữ liệu ảnh chụp & hoá đơn cục bộ của người dùng (tự khởi tạo khi chạy app)
+CSDL/images/
+CSDL/receipts.json
+CSDL/drafts.json

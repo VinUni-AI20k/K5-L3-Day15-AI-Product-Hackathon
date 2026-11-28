@@ -1,296 +1,300 @@
-"""Công cụ cho ứng dụng AI nhận diện hóa đơn, lưu note ngày theo ngày và phân tích chi tiêu.
+"""Các công cụ nghiệp vụ của SkyBill khớp spec.md §4 (bản chạy thử Track E).
 
-Mỗi công cụ có @tool và docstring 4 ý: tên · input · output · tác động ra ngoài.
-Mọi phép cộng trừ tổng tiền theo ngày/tháng chạy bằng code Python, không để model tự nhẩm.
+Mỗi công cụ đều dùng @tool từ tracing.py và có docstring đủ 4 ý:
+    tên · input · output · có tác động ra ngoài không.
+Toàn bộ phép cộng, lọc, tổng hợp, so sánh kỳ chạy 100% bằng code trên CSDL/receipts.json.
 """
-from contextlib import closing
-from datetime import date, timedelta
-import calendar
-import hashlib
-import json
-import os
-import re
-import sqlite3
-from pathlib import Path
-from collections import defaultdict
 
+import calendar
+import datetime
+import uuid
+
+import storage as StorageModule
 from tracing import tool, TOOLS  # noqa: F401
 
-DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "expenses.json")
-
-CATEGORY_KEYWORDS = {
-    "Ăn uống": ("highlands", "cà phê", "ca phe", "phin", "trà sữa", "tra sua", "cơm", "com", "phở", "pho", "bún", "bun", "bánh", "banh", "ăn", "an", "bach hoa xanh", "nước", "nuoc"),
-    "Di chuyển": ("grab", "xanh sm", "be ", "xăng", "xang", "xe ", "taxi", "gửi xe", "gui xe", "cuốc", "cuoc"),
-    "Mua sắm": ("circle k", "siêu thị", "sieu thi", "áo", "ao", "quần", "quan", "giày", "giay", "shopee", "lazada", "nồi", "noi"),
-    "Hóa đơn & Nhà ở": ("tiền trọ", "tien tro", "tiền phòng", "tien phong", "điện", "dien", "nước sinh hoạt", "internet", "wifi"),
-    "Sức khỏe": ("thuốc", "thuoc", "khám", "kham", "vitamin", "bệnh viện", "benh vien", "nhà thuốc", "nha thuoc"),
-    "Giải trí": ("phim", "rạp", "rap", "sách", "sach", "vé", "ve ", "game", "nhạc", "nhac"),
-}
-
-
-def _load_base_records() -> list:
-    if not os.path.exists(DATA_PATH):
-        return []
-    with open(DATA_PATH, encoding="utf-8") as f:
-        data = json.load(f)
-    return list(data.get("records") or [])
+StandardCategories = [
+    "Ăn uống",
+    "Đi lại",
+    "Mua sắm",
+    "Hoá đơn & Tiện ích",
+    "Giải trí",
+    "Sức khoẻ",
+    "Khác",
+]
 
 
-def _connect_journal(path):
-    if path is not None:
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(str(path) if path is not None else ":memory:")
-    connection.execute("CREATE TABLE IF NOT EXISTS receipts (id TEXT PRIMARY KEY, payload TEXT NOT NULL)")
-    return connection
+def _CalculateWeekBounds(AnchorDateIso: str) -> tuple:
+    """Tính ngày đầu tuần (Thứ Hai) và cuối tuần (Chủ Nhật) cho mốc ngày YYYY-MM-DD."""
+    AnchorDateObj = datetime.date.fromisoformat(AnchorDateIso)
+    WeekdayOffset = AnchorDateObj.weekday()
+    StartDateObj = AnchorDateObj - datetime.timedelta(days=WeekdayOffset)
+    EndDateObj = StartDateObj + datetime.timedelta(days=6)
+    return StartDateObj.isoformat(), EndDateObj.isoformat()
 
 
-def _all_records(journal_path=None) -> list:
-    base = _load_base_records()
-    if journal_path is None or not Path(journal_path).is_file():
-        return base
-    with closing(_connect_journal(journal_path)) as connection:
-        return base + [json.loads(row[0]) for row in connection.execute("SELECT payload FROM receipts ORDER BY rowid")]
+def _ResolvePeriodBounds(PeriodType: str, PeriodKey: str) -> tuple:
+    """Quy đổi (PeriodType, PeriodKey) thành (StartIso, EndIso, PeriodLabel)."""
+    NormalizedType = str(PeriodType or "month").strip().lower()
+    CleanKey = str(PeriodKey or "").strip()
 
+    if NormalizedType == "week":
+        AnchorDate = CleanKey if len(CleanKey) == 10 else datetime.date.today().isoformat()
+        StartIso, EndIso = _CalculateWeekBounds(AnchorDate)
+        return StartIso, EndIso, "Tuần %s → %s" % (StartIso, EndIso)
 
-def parse_vnd_amount(token: str) -> int | None:
-    """Chuyển chuỗi tiền Việt ('45.000đ', '38k', '70000') thành số nguyên VND."""
-    s = (token or "").strip().lower().replace(" ", "")
-    m = re.match(r"^(\d+(?:[.,]\d{3})*)(k|nghin|ngan)?(?:d|đ|vnd)?$", s)
-    if not m:
-        return None
-    raw_num = m.group(1).replace(".", "").replace(",", "")
-    if not raw_num.isdigit():
-        return None
-    val = int(raw_num)
-    if m.group(2):
-        val *= 1000
-    return val
+    if NormalizedType == "year":
+        TargetYear = int(CleanKey[:4]) if len(CleanKey) >= 4 and CleanKey[:4].isdigit() else datetime.date.today().year
+        return "%04d-01-01" % TargetYear, "%04d-12-31" % TargetYear, "Năm %04d" % TargetYear
 
-
-def _infer_category(text: str) -> str:
-    low = (text or "").lower()
-    for cat, kws in CATEGORY_KEYWORDS.items():
-        if any(re.search(r'(?<!\w)' + re.escape(k.strip()) + r'(?!\w)', low) for k in kws):
-            return cat
-    return "không rõ"
-
-
-@tool
-def parse_receipt_text(raw_input: str, capture_date: str | None = None) -> dict:
-    """Kiểm văn bản hóa đơn mô phỏng OCR; nhận chuỗi và ngày chụp, trả ngày, tiền, nhóm và lỗi. Chỉ đọc."""
-    text = raw_input.strip()
-    low = text.lower()
-    receipt_date = None
-    capture_id = re.search(r"(?:mã lượt chụp|capture_id)\s*:\s*([\w-]+)", text, flags=re.IGNORECASE)
-    capture_marker = re.search(r"ngày chụp\s*:\s*(20\d{2}-\d{2}-\d{2})", low)
-    receipt_text = re.sub(r"ngày chụp\s*:\s*20\d{2}-\d{2}-\d{2}", "", text, flags=re.IGNORECASE)
-    iso = re.search(r"20\d{2}-\d{2}-\d{2}", receipt_text)
-    dmy = re.search(r"\b(\d{1,2})/(\d{1,2})/(20\d{2})\b", receipt_text)
-    if iso:
-        receipt_date = iso.group()
-    elif dmy:
-        d, m, y = dmy.groups()
-        receipt_date = f"{y}-{int(m):02d}-{int(d):02d}"
-
-    chosen_date = receipt_date or (capture_marker.group(1) if capture_marker else capture_date)
-    if chosen_date:
-        try:
-            chosen_date = date.fromisoformat(chosen_date).isoformat()
-        except ValueError:
-            chosen_date = None
-
-    merchant = re.sub(
-        r"^(?:chụp|gửi ảnh)?\s*hóa đơn(?: bị [^:]+)?\s*:\s*",
-        "", text.split("|", 1)[0].splitlines()[0] if text else "", flags=re.IGNORECASE,
-    ).strip()
-    if not merchant or merchant.lower().startswith(("tổng", "ngày", "gửi ảnh hóa đơn", "hóa đơn")):
-        merchant = "Không rõ"
-
-    amounts = {
-        parse_vnd_amount(match.group(1))
-        for match in re.finditer(
-            r"(?:tổng cộng|tổng thanh toán|tổng phải trả|thực trả|phải trả)\s*:?\s*"
-            r"(\d+(?:[.,]\d{3})*\s*(?:k|nghin|ngan|vnd|đ|d)?)(?![\d.,])",
-            low,
-        )
-    }
-    total = next(iter(amounts)) if len(amounts) == 1 else None
-    if "chưa rõ thực trả" in low or "nhiều mức tổng chưa rõ" in low:
-        total = None
-    return {
-        "merchant": merchant,
-        "capture_id": capture_id.group(1).upper() if capture_id else None,
-        "date": chosen_date,
-        "date_source": "hóa đơn" if receipt_date else "ngày chụp",
-        "total": total,
-        "category": _infer_category(receipt_text),
-    }
-
-
-@tool
-def validate_receipt(receipt: dict):
-    """Kiểm ngày và số tiền thực trả trước khi cho xem bản nháp có thể chốt. Chỉ đọc."""
-    missing = []
-    if not receipt["date"]:
-        missing.append("ngày hợp lệ")
-    total = receipt["total"]
-    if total is None or total <= 0:
-        missing.append("số tiền thực trả")
-    return missing
-
-
-@tool
-def draft_save_receipt(receipt: dict, raw_input: str):
-    """Tạo dữ liệu xem nhanh trong phiên; chỉ thao tác Chốt mới ghi sổ."""
-    return {"receipt": receipt, "capture_text": raw_input}
-
-
-@tool
-def save_daily_note(receipt: dict, raw_input: str, journal_path=None) -> dict:
-    """Ghi một khoản VND vào sổ cục bộ của CLI, hoặc sổ tạm khi đánh giá. Trả khoản và trạng thái trùng."""
-    capture_id = receipt["capture_id"]
-    identity = "capture:" + capture_id if capture_id else (
-        "receipt:" + hashlib.sha256(" ".join(raw_input.split()).casefold().encode("utf-8")).hexdigest()
-    )
-    base = _load_base_records()
-    previous = next((row for row in base if capture_id and row.get("capture_id") == capture_id), None)
-    if previous:
-        same_day = [row for row in _all_records(journal_path) if row["date"] == previous["date"]]
-        return {"record": previous, "duplicate": True, "new_day_total": sum(row["total"] for row in same_day), "new_day_count": len(same_day)}
-    record = {
-        "id": identity, "date": receipt["date"], "time": "",
-        "merchant": receipt["merchant"], "total": receipt["total"],
-        "category": receipt["category"], "date_source": receipt["date_source"], "capture_id": capture_id,
-    }
-    with closing(_connect_journal(journal_path)) as connection, connection:
-        cursor = connection.execute(
-            "INSERT OR IGNORE INTO receipts (id, payload) VALUES (?, ?)",
-            (identity, json.dumps(record, ensure_ascii=False)),
-        )
-        duplicate = cursor.rowcount == 0
-        if duplicate:
-            record = json.loads(connection.execute("SELECT payload FROM receipts WHERE id = ?", (identity,)).fetchone()[0])
-    if journal_path is None:
-        records = _load_base_records() + [record]
+    # Mặc định: month (chấp nhận YYYY-MM hoặc YYYY-MM-DD)
+    if len(CleanKey) >= 7 and CleanKey[:4].isdigit() and CleanKey[5:7].isdigit():
+        TargetYear = int(CleanKey[:4])
+        TargetMonth = int(CleanKey[5:7])
     else:
-        records = _all_records(journal_path)
-    same_day = [row for row in records if row["date"] == record["date"]]
-    return {"record": record, "duplicate": duplicate, "new_day_total": sum(row["total"] for row in same_day), "new_day_count": len(same_day)}
+        TodayDate = datetime.date.today()
+        TargetYear = TodayDate.year
+        TargetMonth = TodayDate.month
+    LastDayOfMonth = calendar.monthrange(TargetYear, TargetMonth)[1]
+    StartIso = "%04d-%02d-01" % (TargetYear, TargetMonth)
+    EndIso = "%04d-%02d-%02d" % (TargetYear, TargetMonth, LastDayOfMonth)
+    return StartIso, EndIso, "Tháng %02d/%04d" % (TargetMonth, TargetYear)
 
 
 @tool
-def get_day_summary(date: str, journal_path=None) -> dict:
-    """Xem chi tiết chi tiêu của một ngày trong tháng khi người dùng ấn vào ngày trên lịch ngày.
-    Input: date ('YYYY-MM-DD'). Output: dict gồm date, total, count, by_category, unknown_items, items. Không tác động ra ngoài."""
-    items = [r for r in _all_records(journal_path) if r.get("date") == date]
-    by_cat = defaultdict(int)
-    unknown = []
-    for r in items:
-        by_cat[r["category"]] += int(r["total"])
-        if r["category"] == "không rõ":
-            unknown.append({"id": r["id"], "merchant": r["merchant"], "total": r["total"], "note": r.get("note", "")})
+def validate_receipt(ReceiptPayload: dict) -> dict:
+    """validate_receipt: Kiểm tra số học, trường thiếu và trùng lặp của hoá đơn trích xuất.
+    Input: ReceiptPayload (dict). Output: dict {valid, missing_fields, total_mismatch, duplicate_flag, warnings, calculated_total}. Không tác động ra ngoài."""
+    MissingFields = []
+    WarningsList = []
+
+    MerchantName = str(ReceiptPayload.get("merchant") or "").strip()
+    ReceiptDate = str(ReceiptPayload.get("date") or "").strip()
+    LineItems = ReceiptPayload.get("items") or []
+    PrintedTotal = int(round(float(ReceiptPayload.get("printed_total") or 0)))
+
+    if not MerchantName or MerchantName == "không rõ":
+        MissingFields.append("merchant")
+    if not ReceiptDate:
+        MissingFields.append("date")
+    if not isinstance(LineItems, list) or len(LineItems) == 0:
+        MissingFields.append("items")
+
+    CalculatedTotal = 0
+    HasUnclearItem = False
+    for LineItem in LineItems:
+        ItemName = str(LineItem.get("name") or "").strip()
+        ItemPrice = int(round(float(LineItem.get("price") or 0)))
+        CalculatedTotal += ItemPrice
+        if not ItemName or "không rõ" in ItemName.lower() or ItemPrice <= 0:
+            HasUnclearItem = True
+
+    if HasUnclearItem:
+        MissingFields.append("item_details")
+        WarningsList.append("Có dòng món hoặc số tiền bị mờ/chưa rõ (G10 — cần người dùng kiểm tra).")
+
+    TotalMismatch = False
+    if PrintedTotal > 0 and CalculatedTotal > 0 and abs(PrintedTotal - CalculatedTotal) > 1000:
+        TotalMismatch = True
+        WarningsList.append(
+            "Tổng các món (%s đ) lệch với tổng in trên hoá đơn (%s đ)."
+            % (format(CalculatedTotal, ","), format(PrintedTotal, ","))
+        )
+
+    QualityReport = ReceiptPayload.get("quality_report") or {}
+    if QualityReport.get("quality_status") == "fail":
+        WarningsList.append(
+            "Ảnh hoá đơn chưa đạt chất lượng (%s) — khuyến nghị kiểm tra hoặc chụp lại."
+            % ", ".join(QualityReport.get("reasons") or ["LOW_QUALITY"])
+        )
+
+    ExistingReceipts = StorageModule.LoadReceiptRecords(str(ReceiptPayload.get("user_id") or "default_user"))
+    DuplicateFlag = False
+    for ExistingItem in ExistingReceipts:
+        SameDate = ExistingItem.get("date") == ReceiptDate
+        SameMerchant = str(ExistingItem.get("merchant") or "").strip().lower() == MerchantName.lower()
+        SameTotal = int(ExistingItem.get("total") or 0) == CalculatedTotal and CalculatedTotal > 0
+        if SameDate and SameMerchant and SameTotal:
+            DuplicateFlag = True
+            WarningsList.append("Đã có hoá đơn trùng cửa hàng, ngày và số tiền trong CSDL.")
+            break
+
+    IsValid = bool(len(MissingFields) == 0 and CalculatedTotal > 0 and not TotalMismatch)
     return {
-        "date": date,
-        "total": sum(int(r["total"]) for r in items),
-        "count": len(items),
-        "by_category": dict(sorted(by_cat.items(), key=lambda x: -x[1])),
-        "unknown_items": unknown,
+        "valid": IsValid,
+        "missing_fields": MissingFields,
+        "total_mismatch": TotalMismatch,
+        "duplicate_flag": DuplicateFlag,
+        "warnings": WarningsList,
+        "calculated_total": CalculatedTotal,
+        "printed_total": PrintedTotal,
+    }
+
+
+@tool
+def draft_save_receipt(UserId: str, ReceiptDate: str, ReceiptPayload: dict) -> dict:
+    """draft_save_receipt: Tạo bản nháp hoá đơn chờ người dùng xác nhận lưu vào sổ ngày.
+    Input: UserId (str), ReceiptDate (str YYYY-MM-DD), ReceiptPayload (dict). Output: dict bản nháp DRAFT_PENDING_USER. Chỉ tạo bản nháp chờ người duyệt."""
+    DraftId = str(ReceiptPayload.get("draft_id") or ("DRAFT-" + uuid.uuid4().hex[:8].upper()))
+    LineItems = ReceiptPayload.get("items") or []
+    CalculatedTotal = sum(int(round(float(LineItem.get("price") or 0))) for LineItem in LineItems)
+    QualityReport = ReceiptPayload.get("quality_report") or {}
+
+    DraftRecord = {
+        "draft_id": DraftId,
+        "status": "DRAFT_PENDING_USER",
+        "requires_user_approval": True,
+        "user_id": UserId or "default_user",
+        "date": ReceiptDate,
+        "merchant": str(ReceiptPayload.get("merchant") or "không rõ").strip(),
+        "category": str(ReceiptPayload.get("category") or "Khác").strip(),
+        "source": str(ReceiptPayload.get("source") or "camera"),
+        "note": str(ReceiptPayload.get("note") or "").strip(),
+        "image_path": str(ReceiptPayload.get("image_path") or ""),
         "items": [
-            {"id": r["id"], "time": r["time"], "merchant": r["merchant"], "category": r["category"], "total": r["total"]}
-            for r in items
+            {
+                "name": str(LineItem.get("name") or "").strip(),
+                "price": int(round(float(LineItem.get("price") or 0))),
+            }
+            for LineItem in LineItems
         ],
+        "calculated_total": CalculatedTotal,
+        "printed_total": int(round(float(ReceiptPayload.get("printed_total") or 0))),
+        "ocr_engine": str(ReceiptPayload.get("ocr_engine") or ""),
+        "quality_score": QualityReport.get("overall_score"),
+        "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
     }
+    StorageModule.UpsertDraftRecord(DraftRecord)
+    return DraftRecord
 
 
 @tool
-def get_month_calendar(year_month: str, journal_path=None) -> dict:
-    """Lấy lưới tổng chi từng ngày trong tháng (dữ liệu cho màn hình lịch tháng).
-    Input: year_month ('YYYY-MM'). Output: dict gồm year_month, total, active_days, top_day, days. Không tác động ra ngoài."""
-    items = [r for r in _all_records(journal_path) if (r.get("date") or "").startswith(year_month)]
-    daily = defaultdict(int)
-    counts = defaultdict(int)
-    for r in items:
-        daily[r["date"]] += int(r["total"])
-        counts[r["date"]] += 1
-    top_day = max(daily.items(), key=lambda x: x[1]) if daily else None
+def get_day_summary(UserId: str, TargetDate: str) -> dict:
+    """get_day_summary: Đọc và tổng kết hoá đơn của một ngày cụ thể từ CSDL bằng code.
+    Input: UserId (str), TargetDate (str YYYY-MM-DD). Output: dict số hoá đơn, danh sách chi tiết, tổng tiền và bảng theo danh mục. Không tác động ra ngoài."""
+    AllReceipts = StorageModule.LoadReceiptRecords(UserId)
+    DayReceipts = [ReceiptItem for ReceiptItem in AllReceipts if ReceiptItem.get("date") == TargetDate]
+    DayTotal = sum(int(ReceiptItem.get("total") or 0) for ReceiptItem in DayReceipts)
+
+    CategoryTotals = {}
+    for ReceiptItem in DayReceipts:
+        CategoryName = str(ReceiptItem.get("category") or "Khác")
+        CategoryTotals[CategoryName] = CategoryTotals.get(CategoryName, 0) + int(ReceiptItem.get("total") or 0)
+
+    CategoryBreakdown = [
+        {
+            "category": CategoryName,
+            "amount": AmountValue,
+            "share_pct": round((AmountValue / float(DayTotal)) * 100.0, 1) if DayTotal > 0 else 0.0,
+        }
+        for CategoryName, AmountValue in sorted(CategoryTotals.items(), key=lambda PairItem: PairItem[1], reverse=True)
+    ]
+
     return {
-        "year_month": year_month,
-        "total": sum(daily.values()),
-        "active_days": len(daily),
-        "top_day": {"date": top_day[0], "total": top_day[1]} if top_day else None,
-        "days": [{"date": d, "total": daily[d], "count": counts[d]} for d in sorted(daily)],
+        "date": TargetDate,
+        "receipt_count": len(DayReceipts),
+        "total_spend": DayTotal,
+        "category_breakdown": CategoryBreakdown,
+        "receipts": DayReceipts,
     }
 
 
-def period_bounds(kind, key):
-    if kind == "week":
-        year, week = key.split("-W")
-        start = date.fromisocalendar(int(year), int(week), 1)
-        return start, start + timedelta(days=6)
-    if kind == "month":
-        year, month = map(int, key.split("-"))
-        return date(year, month, 1), date(year, month, calendar.monthrange(year, month)[1])
-    if kind == "year":
-        year = int(key)
-        return date(year, 1, 1), date(year, 12, 31)
-    raise ValueError("Kỳ không hợp lệ")
-
-
-def previous_period(kind, key):
-    start, _ = period_bounds(kind, key)
-    day_before = start - timedelta(days=1)
-    if kind == "week":
-        year, week, _ = day_before.isocalendar()
-        return f"{year}-W{week:02}"
-    return day_before.isoformat()[:7 if kind == "month" else 4]
-
-
 @tool
-def aggregate_period(kind, key, journal_path=None):
-    """Tính tổng, nhóm và ngày cao nhất của một tuần ISO, tháng hoặc năm. Chỉ đọc."""
-    start, end = (bound.isoformat() for bound in period_bounds(kind, key))
-    items = [row for row in _all_records(journal_path) if start <= row["date"] <= end]
-    if not items:
-        return {"period": key, "has_data": False, "total": 0, "count": 0}
+def aggregate_period(UserId: str, PeriodType: str, PeriodKey: str) -> dict:
+    """aggregate_period: Tổng hợp chi tiêu theo tuần, tháng hoặc năm bằng code từ CSDL.
+    Input: UserId (str), PeriodType ('week'|'month'|'year'), PeriodKey (str). Output: dict tổng chi, số hoá đơn, tỷ trọng danh mục và top khoản chi. Không tác động ra ngoài."""
+    StartIso, EndIso, PeriodLabel = _ResolvePeriodBounds(PeriodType, PeriodKey)
+    AllReceipts = StorageModule.LoadReceiptRecords(UserId)
+    PeriodReceipts = [
+        ReceiptItem
+        for ReceiptItem in AllReceipts
+        if StartIso <= str(ReceiptItem.get("date") or "") <= EndIso
+    ]
 
-    by_cat = defaultdict(int)
-    daily = defaultdict(int)
-    unknown_count = 0
-    for r in items:
-        by_cat[r["category"]] += int(r["total"])
-        daily[r["date"]] += int(r["total"])
-        if r["category"] == "không rõ":
-            unknown_count += 1
+    TotalSpend = sum(int(ReceiptItem.get("total") or 0) for ReceiptItem in PeriodReceipts)
+    ActiveDates = sorted({str(ReceiptItem.get("date") or "") for ReceiptItem in PeriodReceipts if ReceiptItem.get("date")})
 
-    total = sum(by_cat.values())
-    top_day = max(daily.items(), key=lambda x: x[1])
-    sorted_cats = [{"category": k, "total": v, "pct": round(100.0 * v / total, 2)} for k, v in sorted(by_cat.items(), key=lambda x: -x[1])]
+    CategoryTotals = {CategoryName: 0 for CategoryName in StandardCategories}
+    for ReceiptItem in PeriodReceipts:
+        CategoryName = str(ReceiptItem.get("category") or "Khác")
+        if CategoryName not in CategoryTotals:
+            CategoryTotals[CategoryName] = 0
+        CategoryTotals[CategoryName] += int(ReceiptItem.get("total") or 0)
 
-    res = {
-        "period": key,
-        "has_data": True,
-        "total": total,
-        "count": len(items),
-        "active_days": len(daily),
-        "avg_per_active_day": round(total / len(daily)),
-        "top_day": {"date": top_day[0], "total": top_day[1]},
-        "by_category": sorted_cats,
-        "unknown_count": unknown_count,
+    CategorySummary = [
+        {
+            "category": CategoryName,
+            "amount": AmountValue,
+            "share_pct": round((AmountValue / float(TotalSpend)) * 100.0, 1) if TotalSpend > 0 else 0.0,
+        }
+        for CategoryName, AmountValue in sorted(CategoryTotals.items(), key=lambda PairItem: PairItem[1], reverse=True)
+        if AmountValue > 0
+    ]
+
+    TopExpenses = sorted(PeriodReceipts, key=lambda ReceiptItem: int(ReceiptItem.get("total") or 0), reverse=True)[:3]
+    TopExpensesCompact = [
+        {
+            "id": ExpenseItem.get("id"),
+            "date": ExpenseItem.get("date"),
+            "merchant": ExpenseItem.get("merchant"),
+            "category": ExpenseItem.get("category"),
+            "total": ExpenseItem.get("total"),
+        }
+        for ExpenseItem in TopExpenses
+    ]
+
+    DailyAverage = int(round(TotalSpend / float(len(ActiveDates)))) if ActiveDates else 0
+    return {
+        "period_type": PeriodType,
+        "period_key": PeriodKey,
+        "period_label": PeriodLabel,
+        "start_date": StartIso,
+        "end_date": EndIso,
+        "receipt_count": len(PeriodReceipts),
+        "active_days": len(ActiveDates),
+        "total_spend": TotalSpend,
+        "daily_average": DailyAverage,
+        "categories": CategorySummary,
+        "top_expenses": TopExpensesCompact,
     }
 
-    return res
-
 
 @tool
-def compare_periods(kind, current, previous, journal_path=None):
-    """Tính chênh lệch và phần trăm giữa hai kỳ cùng loại; trả căn cứ theo nhóm. Chỉ đọc."""
-    current_summary = aggregate_period(kind, current, journal_path)
-    previous_summary = aggregate_period(kind, previous, journal_path)
-    result = {"current": current_summary, "previous": previous_summary}
-    if not (current_summary["has_data"] and previous_summary["has_data"]):
-        return result
-    diff = current_summary["total"] - previous_summary["total"]
-    previous_total = previous_summary["total"]
-    result.update(diff=diff, pct_diff=round(100 * diff / previous_total, 2) if previous_total else None)
-    return result
+def compare_periods(UserId: str, PeriodType: str, CurrentKey: str, PreviousKey: str) -> dict:
+    """compare_periods: So sánh chi tiêu giữa kỳ hiện tại và kỳ trước đó bằng code.
+    Input: UserId (str), PeriodType ('week'|'month'|'year'), CurrentKey (str), PreviousKey (str). Output: dict chênh lệch tổng tiền, % tăng/giảm và biến động theo từng danh mục. Không tác động ra ngoài."""
+    CurrentSummary = aggregate_period(UserId, PeriodType, CurrentKey)
+    PreviousSummary = aggregate_period(UserId, PeriodType, PreviousKey)
+
+    CurrentTotal = int(CurrentSummary["total_spend"])
+    PreviousTotal = int(PreviousSummary["total_spend"])
+    DeltaAmount = CurrentTotal - PreviousTotal
+    DeltaPct = round((DeltaAmount / float(PreviousTotal)) * 100.0, 1) if PreviousTotal > 0 else None
+
+    CurrentCategoryMap = {Row["category"]: Row["amount"] for Row in CurrentSummary["categories"]}
+    PreviousCategoryMap = {Row["category"]: Row["amount"] for Row in PreviousSummary["categories"]}
+    AllCategoryNames = sorted(set(CurrentCategoryMap.keys()) | set(PreviousCategoryMap.keys()))
+
+    CategoryDeltas = []
+    for CategoryName in AllCategoryNames:
+        CurrentAmount = int(CurrentCategoryMap.get(CategoryName, 0))
+        PreviousAmount = int(PreviousCategoryMap.get(CategoryName, 0))
+        CategoryDeltas.append(
+            {
+                "category": CategoryName,
+                "current_amount": CurrentAmount,
+                "previous_amount": PreviousAmount,
+                "delta_amount": CurrentAmount - PreviousAmount,
+            }
+        )
+    CategoryDeltas.sort(key=lambda DeltaRow: abs(DeltaRow["delta_amount"]), reverse=True)
+
+    StrongestShift = CategoryDeltas[0] if CategoryDeltas else None
+    return {
+        "period_type": PeriodType,
+        "current": CurrentSummary,
+        "previous": PreviousSummary,
+        "delta_amount": DeltaAmount,
+        "delta_pct": DeltaPct,
+        "category_deltas": CategoryDeltas,
+        "strongest_shift": StrongestShift,
+    }
