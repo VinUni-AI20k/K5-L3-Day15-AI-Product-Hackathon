@@ -1,0 +1,20 @@
+# Scoped ignore rules for Dockerfile.api (repo-root build context).
+# Only requirements.txt, codebase/, and data/ are sent to the build daemon.
+*
+!requirements.txt
+!codebase
+!codebase/**
+!data
+!data/**
+
+# Exclude caches, local dev state, and secrets.
+**/__pycache__
+**/*.pyc
+**/*.pyo
+data/app.db
+data/app.db-*
+data/inventory.local.csv
+data/uploads
+data/uploads/**
+.env
+.env.*

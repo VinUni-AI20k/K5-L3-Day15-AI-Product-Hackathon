@@ -1,0 +1,224 @@
+# VPOST production stack (single VPS behind an external Caddy edge on `vpost-edge`).
+#
+# Expected VPS layout under $VPS_APP_DIR (default /srv/vpost):
+#   /srv/vpost/.env                          operator-managed secrets & settings
+#   /srv/vpost/.image-tag.env                written by deploy/remote-deploy.sh
+#   /srv/vpost/deploy/docker-compose.prod.yml
+#   /srv/vpost/deploy/remote-deploy.sh
+#
+# Usage:
+#   docker compose --env-file .env --env-file .image-tag.env -f deploy/docker-compose.prod.yml ps
+
+name: vpost
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vpost}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-vpost}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vpost} -d ${POSTGRES_DB:-vpost}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - default
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - default
+
+  # One-shot Next.js Drizzle migrations. Invoked explicitly by deploy/remote-deploy.sh
+  # via `docker compose ... run --rm --no-deps migrate < /dev/null` after postgres is
+  # healthy and before `api`, `web`, and `worker` are updated.
+  migrate:
+    image: ${IMAGE_PREFIX:?IMAGE_PREFIX is required}/migrate:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    restart: "no"
+    profiles: ["migrate"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vpost}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-vpost}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+
+  # Python FastAPI backend (codebase/server.py). Owns /api/* routes proxied by
+  # Next.js (catalog, posts, channels, comments, auto-reply, inbox, writing style)
+  # and stores shop data in PostgreSQL schema `shop`.
+  api:
+    image: ${IMAGE_PREFIX:?IMAGE_PREFIX is required}/api:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      PORT: "8021"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vpost}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-vpost}
+      VPOST_UI_URL: ${VPOST_UI_URL:-https://vpost.vannt.asia}
+    volumes:
+      - api_uploads:/app/data/uploads
+    expose:
+      - "8021"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8021/api/meta', timeout=3)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+
+  # Next.js standalone UI + auth/tenant API. The external Caddy edge reaches it
+  # on the shared `vpost-edge` network as `vpost-web:3000`; loopback 127.0.0.1:3110
+  # is published strictly for local health probes on the VPS.
+  web:
+    image: ${IMAGE_PREFIX:?IMAGE_PREFIX is required}/web:${IMAGE_TAG:?IMAGE_TAG is required}
+    container_name: vpost-web
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_PRETTY: "false"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vpost}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-vpost}
+      REDIS_URL: redis://redis:6379
+      VPOST_API_URL: http://api:8021
+      AUTH_URL: ${AUTH_URL:?AUTH_URL is required}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      META_GRAPH_VERSION: ${META_GRAPH_VERSION:-v23.0}
+      UPLOAD_STORAGE_ROOT: /var/lib/vpost/uploads
+      CATALOG_STORAGE_ROOT: /var/lib/vpost/catalog
+      UPLOAD_ORPHAN_TTL_HOURS: ${UPLOAD_ORPHAN_TTL_HOURS:-24}
+      MEDIA_CACHE_ROOT: /var/lib/vpost/media-cache
+      MEDIA_CACHE_TTL_HOURS: ${MEDIA_CACHE_TTL_HOURS:-72}
+      # Composition root validates MinIO config eagerly on first getContainer()
+      # call (e.g. /api/me). Provide safe non-empty defaults when MinIO is not
+      # deployed in this stack; set real values in .env if external MinIO is used.
+      MINIO_INTERNAL_ENDPOINT: ${MINIO_INTERNAL_ENDPOINT:-minio:9000}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-https://media.vannt.asia}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-unused-when-minio-disabled}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-unused-when-minio-disabled}
+      MINIO_BUCKET: ${MINIO_BUCKET:-vpost-media}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+    volumes:
+      - uploaddata:/var/lib/vpost/uploads
+      - catalogdata:/var/lib/vpost/catalog
+      - mediacachedata:/var/lib/vpost/media-cache
+    expose:
+      - "3000"
+    ports:
+      - "127.0.0.1:3110:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - default
+      - vpost-edge
+
+  worker:
+    image: ${IMAGE_PREFIX:?IMAGE_PREFIX is required}/worker:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_PRETTY: "false"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vpost}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-vpost}
+      REDIS_URL: redis://redis:6379
+      META_GRAPH_VERSION: ${META_GRAPH_VERSION:-v23.0}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
+      WORKER_HEARTBEAT_FILE: /tmp/vpost-worker-heartbeat
+      WORKER_HEARTBEAT_INTERVAL_MS: ${WORKER_HEARTBEAT_INTERVAL_MS:-15000}
+      WORKER_SHUTDOWN_DEADLINE_MS: ${WORKER_SHUTDOWN_DEADLINE_MS:-30000}
+      WORKER_REAPER_INTERVAL_MS: ${WORKER_REAPER_INTERVAL_MS:-300000}
+      WORKER_PUBLISHING_STALE_MS: ${WORKER_PUBLISHING_STALE_MS:-900000}
+      WORKER_OVERDUE_QUEUED_MS: ${WORKER_OVERDUE_QUEUED_MS:-600000}
+      WORKER_REAPER_LIMIT: ${WORKER_REAPER_LIMIT:-50}
+      UPLOAD_STORAGE_ROOT: /var/lib/vpost/uploads
+      CATALOG_STORAGE_ROOT: /var/lib/vpost/catalog
+      UPLOAD_ORPHAN_TTL_HOURS: ${UPLOAD_ORPHAN_TTL_HOURS:-24}
+      MEDIA_CACHE_ROOT: /var/lib/vpost/media-cache
+      MEDIA_CACHE_TTL_HOURS: ${MEDIA_CACHE_TTL_HOURS:-72}
+      MINIO_INTERNAL_ENDPOINT: ${MINIO_INTERNAL_ENDPOINT:-minio:9000}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-https://media.vannt.asia}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-unused-when-minio-disabled}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-unused-when-minio-disabled}
+      MINIO_BUCKET: ${MINIO_BUCKET:-vpost-media}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+    volumes:
+      - uploaddata:/var/lib/vpost/uploads
+      - catalogdata:/var/lib/vpost/catalog
+      - mediacachedata:/var/lib/vpost/media-cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - default
+
+networks:
+  default:
+    name: vpost_default
+  vpost-edge:
+    external: true
+    name: vpost-edge
+
+volumes:
+  pgdata:
+  redisdata:
+  uploaddata:
+  catalogdata:
+  mediacachedata:
+  api_uploads:

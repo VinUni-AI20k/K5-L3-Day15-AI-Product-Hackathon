@@ -52,7 +52,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const api = process.env.VPOST_API_URL;
     if (!api) return [];
-    const nextOwned = ["auth", "me", "tenants", "members", "invites", "join", "access-requests", "platform"];
+    const nextOwned = ["auth", "me", "tenants", "members", "invites", "join", "access-requests", "platform", "health"];
     const source = `/api/:path((?!(?:${nextOwned.join("|")})(?:/|$)).*)`;
     return { beforeFiles: [{ source, destination: `${api}/api/:path` }] };
   },
