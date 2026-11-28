@@ -189,9 +189,9 @@ def teardown_function(_):
     client.cookies.clear()
 
 
-# ---------------- 1. Settings CRUD & CONFIRM_REQUIRED ----------------
+# ---------------- 1. Settings CRUD (always-on live defaults, no confirmLive, reject off/dry_run) ----------------
 
-def test_auto_reply_settings_defaults_validation_and_confirm_required():
+def test_auto_reply_settings_defaults_always_live_and_validation():
     seed_page(page_id=PAGE2_ID, name="Page Two", token=PAGE2_TOKEN)
 
     r_get = client.get("/api/comments/auto-reply-settings")
@@ -204,72 +204,82 @@ def test_auto_reply_settings_defaults_validation_and_confirm_required():
         "pageId": PAGE_ID,
         "channelId": CHANNEL_ID,
         "pageName": "WorkHardToday",
-        "enabled": False,
-        "mode": "dry_run",
-        "intents": ["price", "size", "color"],
-        "hourlyCap": 30,
-        "dailyCap": 200,
+        "enabled": True,
+        "mode": "live",
+        "intents": ["price", "size", "color", "size_advice"],
+        "hourlyCap": 200,
+        "dailyCap": 2000,
         "updatedAt": None,
     }
 
-    # Enable in dry_run -> 200 without confirmLive
-    r_dry = client.put(
+    # Update intents & caps without enabled/mode/confirmLive -> 200 and always enabled=True, mode="live"
+    r_upd1 = client.put(
         f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={"enabled": True, "mode": "dry_run", "intents": ["price", "size"], "hourlyCap": 20, "dailyCap": 150},
+        json={"intents": ["price", "size"], "hourlyCap": 20, "dailyCap": 150},
     )
-    assert r_dry.status_code == 200, r_dry.text
-    s_dry = r_dry.json()["setting"]
-    assert s_dry["enabled"] is True and s_dry["mode"] == "dry_run"
-    assert s_dry["intents"] == ["price", "size"]
-    assert s_dry["hourlyCap"] == 20 and s_dry["dailyCap"] == 150
-    assert Z.match(s_dry["updatedAt"])
+    assert r_upd1.status_code == 200, r_upd1.text
+    s1 = r_upd1.json()["setting"]
+    assert s1["enabled"] is True and s1["mode"] == "live"
+    assert s1["intents"] == ["price", "size"]
+    assert s1["hourlyCap"] == 20 and s1["dailyCap"] == 150
+    assert Z.match(s1["updatedAt"])
 
-    # Switching dry_run -> live without confirmLive -> 400 CONFIRM_REQUIRED
-    r_no_conf = client.put(
-        f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={"enabled": True, "mode": "live", "intents": ["price"]},
-    )
-    assert r_no_conf.status_code == 400 and r_no_conf.json()["code"] == "CONFIRM_REQUIRED"
-
-    # confirmLive: false -> also 400 CONFIRM_REQUIRED
-    r_false_conf = client.put(
-        f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={"enabled": True, "mode": "live", "intents": ["price"], "confirmLive": False},
-    )
-    assert r_false_conf.status_code == 400 and r_false_conf.json()["code"] == "CONFIRM_REQUIRED"
-
-    # confirmLive: true -> 200, preserves existing caps if omitted
+    # Updating with enabled=True, mode="live" requires NO confirmLive (even confirmLive=False is accepted)
     r_live = client.put(
         f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={"enabled": True, "mode": "live", "intents": ["price", "color"], "confirmLive": True},
+        json={"enabled": True, "mode": "live", "intents": ["price", "color"], "confirmLive": False},
     )
     assert r_live.status_code == 200, r_live.text
     s_live = r_live.json()["setting"]
-    assert s_live["mode"] == "live" and s_live["hourlyCap"] == 20 and s_live["dailyCap"] == 150
+    assert s_live["enabled"] is True and s_live["mode"] == "live"
+    assert s_live["hourlyCap"] == 20 and s_live["dailyCap"] == 150
 
-    # Updating while already live does not require confirmLive again
-    r_upd = client.put(
+    # Updating hourlyCap while omitting dailyCap preserves dailyCap
+    r_upd2 = client.put(
         f"/api/comments/auto-reply-settings/{PAGE_ID}",
         json={"enabled": True, "mode": "live", "intents": ["price"], "hourlyCap": 50},
     )
-    assert r_upd.status_code == 200 and r_upd.json()["setting"]["hourlyCap"] == 50
+    assert r_upd2.status_code == 200 and r_upd2.json()["setting"]["hourlyCap"] == 50
+
+    # Attempts to disable or switch to dry_run -> 400 with a clear message
+    for bad_toggle in (
+        {"enabled": False, "mode": "live", "intents": ["price"]},
+        {"enabled": False, "intents": ["price"]},
+        {"enabled": True, "mode": "dry_run", "intents": ["price"]},
+        {"mode": "dry_run", "intents": ["price"]},
+    ):
+        r_bad = client.put(f"/api/comments/auto-reply-settings/{PAGE_ID}", json=bad_toggle)
+        assert r_bad.status_code == 400, (bad_toggle, r_bad.text)
+        assert r_bad.json()["code"] == "INVALID_INPUT"
+        assert r_bad.json()["message"]
+
+    # Legacy DB row with enabled=0 and mode='dry_run' is still reported as enabled=True, mode='live'
+    with store.connect() as c:
+        c.execute(
+            """insert into auto_reply_setting(
+                 tenant_id, page_id, enabled, mode, intents, hourly_cap, daily_cap, updated_by, updated_at
+               ) values(%s,%s,0,'dry_run','["price","size"]',30,200,'legacy','2026-01-01T00:00:00.000Z')""",
+            (vpost_api.TENANT_ID, PAGE2_ID),
+        )
+    p2 = next(x for x in client.get("/api/comments/auto-reply-settings").json()["items"] if x["pageId"] == PAGE2_ID)
+    assert p2["enabled"] is True and p2["mode"] == "live" and p2["intents"] == ["price", "size"]
 
     # Validation errors & 404
     assert client.put(
         f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={"enabled": True, "mode": "dry_run", "intents": ["bogus"]},
+        json={"enabled": True, "mode": "live", "intents": ["bogus"]},
     ).status_code == 400
     assert client.put(
         f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={"enabled": True, "mode": "dry_run", "intents": ["price"], "hourlyCap": 201},
+        json={"enabled": True, "mode": "live", "intents": ["price"], "hourlyCap": 201},
     ).status_code == 400
     assert client.put(
         f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={"enabled": True, "mode": "dry_run", "intents": ["price"], "dailyCap": 0},
+        json={"enabled": True, "mode": "live", "intents": ["price"], "dailyCap": 0},
     ).status_code == 400
     assert client.put(
         "/api/comments/auto-reply-settings/nonexistent",
-        json={"enabled": False, "mode": "dry_run", "intents": ["price"]},
+        json={"enabled": True, "mode": "live", "intents": ["price"]},
     ).status_code == 404
 
 
@@ -440,9 +450,11 @@ def test_auto_reply_tenant_isolation():
         OTHER_TENANT, page_id=PAGE_ID, thread_id="t_other", comment_id="t_other", action="skipped", reason="Hỏi ship"
     )
 
-    # Current tenant cannot see OTHER_TENANT's setting, logs, threads, or clear its attention
+    # Current tenant cannot see OTHER_TENANT's setting (hourly_cap=5, intents=["price"]), logs, threads, or clear its attention
     s_cur = client.get("/api/comments/auto-reply-settings").json()["items"][0]
-    assert s_cur["enabled"] is False and s_cur["mode"] == "dry_run"
+    assert s_cur["enabled"] is True and s_cur["mode"] == "live"
+    assert s_cur["hourlyCap"] == 200 and s_cur["dailyCap"] == 2000
+    assert s_cur["intents"] == ["price", "size", "color", "size_advice"]
     assert client.get("/api/comments/auto-reply-log").json()["items"] == []
     assert client.get("/api/comments/threads?filter=can_ban").json()["items"] == []
     assert client.post("/api/comments/threads/t_other/attention/clear").status_code == 404
@@ -453,7 +465,7 @@ def test_auto_reply_tenant_isolation():
     other.cookies.set(vpost_api.TENANT_COOKIE, OTHER_TENANT)
     for method, path, payload in (
         ("GET", "/api/comments/auto-reply-settings", None),
-        ("PUT", f"/api/comments/auto-reply-settings/{PAGE_ID}", {"enabled": False, "mode": "dry_run", "intents": ["price"]}),
+        ("PUT", f"/api/comments/auto-reply-settings/{PAGE_ID}", {"intents": ["price"]}),
         ("GET", "/api/comments/auto-reply-log", None),
         ("POST", "/api/comments/threads/t_mine/attention/clear", None),
     ):
@@ -508,43 +520,37 @@ def test_finding12_manual_sync_runs_auto_reply_and_tags_can_ban():
     assert len(fb_calls) == 1
 
 
-def test_finding13_enabling_while_live_requires_confirm_live():
-    """#13: Toggling enabled false -> true while mode='live' requires confirmLive=true."""
-    # Save disabled + live with confirmLive=true
-    r_init = client.put(
-        f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={"enabled": False, "mode": "live", "intents": ["price"], "confirmLive": True},
-    )
-    assert r_init.status_code == 200, r_init.text
-    assert r_init.json()["setting"]["enabled"] is False and r_init.json()["setting"]["mode"] == "live"
-
-    # Attempting to enable while mode='live' WITHOUT confirmLive -> 400 CONFIRM_REQUIRED
-    r_no_conf = client.put(
-        f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={"enabled": True, "mode": "live", "intents": ["price"]},
-    )
-    assert r_no_conf.status_code == 400 and r_no_conf.json()["code"] == "CONFIRM_REQUIRED"
-
-    # confirmLive=false -> also 400 CONFIRM_REQUIRED
-    r_false = client.put(
-        f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={"enabled": True, "mode": "live", "intents": ["price"], "confirmLive": False},
-    )
-    assert r_false.status_code == 400 and r_false.json()["code"] == "CONFIRM_REQUIRED"
-
-    # confirmLive=true -> 200 and enabled=True
-    r_ok = client.put(
-        f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={"enabled": True, "mode": "live", "intents": ["price"], "confirmLive": True},
-    )
-    assert r_ok.status_code == 200 and r_ok.json()["setting"]["enabled"] is True
-
-    # Disabling (true -> false) while live does not require confirmLive
+def test_finding13_rejects_disable_and_dry_run_without_confirm_live():
+    """#13 updated: Auto-reply is always enabled+live; disabling or setting dry_run returns 400 and confirmLive is not required."""
+    # Attempting to disable -> 400
     r_off = client.put(
         f"/api/comments/auto-reply-settings/{PAGE_ID}",
         json={"enabled": False, "mode": "live", "intents": ["price"]},
     )
-    assert r_off.status_code == 200 and r_off.json()["setting"]["enabled"] is False
+    assert r_off.status_code == 400 and r_off.json()["code"] == "INVALID_INPUT"
+
+    # Attempting to set dry_run -> 400
+    r_dry = client.put(
+        f"/api/comments/auto-reply-settings/{PAGE_ID}",
+        json={"enabled": True, "mode": "dry_run", "intents": ["price"]},
+    )
+    assert r_dry.status_code == 400 and r_dry.json()["code"] == "INVALID_INPUT"
+
+    # Updating live settings without confirmLive (or with confirmLive=False) -> 200
+    r_no_conf = client.put(
+        f"/api/comments/auto-reply-settings/{PAGE_ID}",
+        json={"enabled": True, "mode": "live", "intents": ["price"]},
+    )
+    assert r_no_conf.status_code == 200 and r_no_conf.json()["setting"]["enabled"] is True
+    assert r_no_conf.json()["setting"]["mode"] == "live"
+
+    r_omit = client.put(
+        f"/api/comments/auto-reply-settings/{PAGE_ID}",
+        json={"intents": ["price", "size"], "hourlyCap": 100, "dailyCap": 1000},
+    )
+    assert r_omit.status_code == 200
+    assert r_omit.json()["setting"]["enabled"] is True and r_omit.json()["setting"]["mode"] == "live"
+    assert r_omit.json()["setting"]["hourlyCap"] == 100 and r_omit.json()["setting"]["dailyCap"] == 1000
 
 
 def test_finding14_operator_reply_rejects_auto_prefixed_client_id():

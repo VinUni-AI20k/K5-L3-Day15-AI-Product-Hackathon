@@ -190,39 +190,86 @@ describe("complaint v1 policy (PHASE2(complaint-autohide)) & settings-state", ()
     ]);
 
     const payload = buildSettingUpdatePayload({
-      enabled: true,
-      mode: "live",
       categories: sanitizeAutoHideCategories(["spam", "complaint"]),
       threshold: 0.9,
     });
-    expect(payload.categories).toEqual(["spam"]);
+    expect(payload).toEqual({
+      enabled: true,
+      mode: "live",
+      categories: ["spam"],
+      threshold: 0.9,
+    });
     expect(payload).not.toHaveProperty("acknowledgeComplaintRisk");
   });
 
-  it("rejects complaint client-side in updateModerationSetting without calling fetch", async () => {
+  it("rejects complaint, enabled=false, and mode=dry_run client-side in updateModerationSetting and always sends active live mode", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
 
     await expect(
       updateModerationSetting("123", {
-        enabled: true,
-        mode: "live",
         categories: ["complaint" as never],
         threshold: 0.85,
       }),
     ).rejects.toBeInstanceOf(ApiError);
 
+    await expect(
+      updateModerationSetting("123", {
+        enabled: false as never,
+        categories: ["spam"],
+        threshold: 0.85,
+      }),
+    ).rejects.toBeInstanceOf(ApiError);
+
+    await expect(
+      updateModerationSetting("123", {
+        mode: "dry_run" as never,
+        categories: ["spam"],
+        threshold: 0.85,
+      }),
+    ).rejects.toBeInstanceOf(ApiError);
+
     expect(fetchSpy).not.toHaveBeenCalled();
+
+    const okSpy = vi.fn().mockResolvedValueOnce(
+      mockJsonResponse({
+        tenantId: "00000000-0000-4000-8000-000000000001",
+        setting: {
+          ...sampleSetting,
+          enabled: true,
+          mode: "live",
+          categories: ["spam", "pii"],
+          threshold: 0.9,
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", okSpy);
+
+    await updateModerationSetting("123", {
+      categories: ["spam", "pii", "spam"],
+      threshold: 0.9,
+    });
+    const [putUrl, putInit] = okSpy.mock.calls[0] as [string, RequestInit];
+    expect(putUrl).toBe("/api/comments/moderation-settings/123");
+    expect(putInit.method).toBe("PUT");
+    expect(JSON.parse(String(putInit.body))).toEqual({
+      enabled: true,
+      mode: "live",
+      categories: ["spam", "pii"],
+      threshold: 0.9,
+    });
   });
 
-  it("clamps threshold to 0.5..1.0 and detects dirty changes accurately", () => {
+  it("clamps threshold to 0.5..1.0 and detects dirty changes accurately while ignoring enabled/mode", () => {
     expect(clampModerationThreshold(0.2)).toBe(0.5);
     expect(clampModerationThreshold(1.5)).toBe(1.0);
     expect(clampModerationThreshold(0.85)).toBe(0.85);
 
     const draft = settingToDraft(sampleSetting);
     expect(isSettingDraftDirty(sampleSetting, draft)).toBe(false);
-    expect(isSettingDraftDirty(sampleSetting, { ...draft, enabled: true })).toBe(true);
+    expect(
+      isSettingDraftDirty({ ...sampleSetting, enabled: undefined, mode: undefined }, draft),
+    ).toBe(false);
     expect(isSettingDraftDirty(sampleSetting, { ...draft, threshold: 0.9 })).toBe(true);
     expect(
       isSettingDraftDirty(sampleSetting, { ...draft, categories: ["spam", "pii"] }),

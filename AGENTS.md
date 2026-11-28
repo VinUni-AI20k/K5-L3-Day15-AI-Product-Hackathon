@@ -43,4 +43,4 @@ Khung chỉ dùng thư viện chuẩn của Python. Thêm thư viện thì ghi v
 - Ngôn ngữ trả lời người dùng: __
 - Phong cách code / đặt tên: __
 - Ai duyệt thay đổi do agent tạo trước khi commit: __
-- Ngoại lệ luật "chỉ tạo bản nháp": tự trả lời bình luận hỏi giá / size / màu chỉ chạy khi người vận hành bật cho từng Page (lần bật đó là bước duyệt của con người). Mặc định tắt, chạy thử trước; câu trả lời ghép từ dữ liệu sản phẩm, không do AI viết; trường hợp khác gắn "Cần bạn" chờ người xử lý.
+- Ngoại lệ luật "chỉ tạo bản nháp" (quyết định của chủ shop): tự trả lời bình luận (hỏi giá / size / màu + tư vấn size) và bộ lọc ngôn từ / tự kiểm duyệt (`spam`, `scam`, `abusive`, `pii`; khiếu nại `complaint` KHÔNG BAO GIỜ bị tự ẩn) luôn chạy thẳng chế độ thật (`live`) mặc định cho mọi Fanpage đã kết nối, không có công tắc bật/tắt theo từng Page; chỉ giữ công tắc khẩn cấp toàn hệ thống (`VPOST_AUTO_REPLY_DISABLED=1`, `VPOST_AUTO_MODERATION_DISABLED=1`). Trần tự trả lời mặc định ở mức tối đa cho phép (200/giờ, 2000/ngày). Câu trả lời ghép từ dữ liệu sản phẩm và bảng size, không do AI viết; trường hợp khác gắn "Cần bạn" chờ người xử lý.

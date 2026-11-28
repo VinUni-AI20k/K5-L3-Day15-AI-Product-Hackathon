@@ -3,7 +3,6 @@ import {
   MODERATION_THRESHOLD_MAX,
   MODERATION_THRESHOLD_MIN,
   type AutoHideCategory,
-  type ModerationMode,
   type ModerationSetting,
   type ModerationSettingUpdateInput,
 } from "@/ui/schemas/moderation.schema";
@@ -15,8 +14,6 @@ import {
 const AUTO_HIDE_SET = new Set<string>(AUTO_HIDE_CATEGORIES);
 
 export interface ModerationSettingDraft {
-  readonly enabled: boolean;
-  readonly mode: ModerationMode;
   readonly categories: readonly AutoHideCategory[];
   readonly threshold: number;
 }
@@ -56,8 +53,6 @@ export function isAutoHideCategorySelectable(category: string): category is Auto
 
 export function settingToDraft(setting: ModerationSetting): ModerationSettingDraft {
   return {
-    enabled: setting.enabled,
-    mode: setting.mode,
     categories: sanitizeAutoHideCategories(setting.categories),
     threshold: clampModerationThreshold(setting.threshold),
   };
@@ -68,8 +63,6 @@ export function isSettingDraftDirty(
   draft: ModerationSettingDraft,
 ): boolean {
   const baseline = settingToDraft(serverSetting);
-  if (baseline.enabled !== draft.enabled) return true;
-  if (baseline.mode !== draft.mode) return true;
   if (Math.abs(baseline.threshold - clampModerationThreshold(draft.threshold)) > 0.0001) {
     return true;
   }
@@ -82,8 +75,8 @@ export function buildSettingUpdatePayload(
   draft: ModerationSettingDraft,
 ): ModerationSettingUpdateInput {
   return {
-    enabled: draft.enabled,
-    mode: draft.mode,
+    enabled: true,
+    mode: "live",
     // PHASE2(complaint-autohide): guarantees `complaint` can never be sent in PUT.
     categories: sanitizeAutoHideCategories(draft.categories),
     threshold: clampModerationThreshold(draft.threshold),

@@ -191,8 +191,8 @@ def enable_page(
     *,
     mode="live",
     intents=("price", "size", "color", "size_advice"),
-    hourly_cap=30,
-    daily_cap=200,
+    hourly_cap=200,
+    daily_cap=2000,
 ):
     store.upsert_auto_reply_setting(
         vpost_api.TENANT_ID,
@@ -382,35 +382,44 @@ def test_never_proactive_on_regular_size_question_and_rejects_bad_triggers():
         assert r["ok"] is False, (bad, r)
 
 
-# ---------------- 3. Settings opt-in & backward compatibility ----------------
+# ---------------- 3. Default ON live & per-intent configuration via API ----------------
 
-def test_size_advice_setting_off_by_default_and_opt_in_via_api():
-    # Default setting has size enabled but size_advice OFF
+def test_size_advice_enabled_by_default_and_configurable_via_api():
+    # Default setting has enabled=True, mode='live', all 4 intents (including size_advice), and max caps
     r0 = client.get("/api/comments/auto-reply-settings")
     assert r0.status_code == 200
     s0 = r0.json()["items"][0]
-    assert s0["intents"] == ["price", "size", "color"]
-    assert "size_advice" not in s0["intents"]
+    assert s0["enabled"] is True
+    assert s0["mode"] == "live"
+    assert s0["intents"] == ["price", "size", "color", "size_advice"]
+    assert s0["hourlyCap"] == 200 and s0["dailyCap"] == 2000
 
-    # With default intents (price, size, color) enabled in live mode, size_advice question tags can_ban
-    enable_page(mode="live", intents=("price", "size", "color"))
+    # Without any settings row, size_advice question runs LIVE by default
     fb_calls = []
-    facebook.reply_comment = lambda *a, **kw: (fb_calls.append(a), "fb_never")[1]
-    c = seed_comment("c_sa_off", message="Cao 1m60 nặng 50kg mặc size nào?")
-    res = auto_reply.process_comment(vpost_api.TENANT_ID, c)
-    assert res["action"] == "skipped" and res["tagged"] is True
-    assert "tư vấn size" in res["reason"].lower()
-    assert fb_calls == []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_sa_def_{len(fb_calls)}")[1]
+    c_def = seed_comment("c_sa_def", from_id="u_sa_def", message="Cao 1m60 nặng 50kg mặc size nào?")
+    res_def = auto_reply.process_comment(vpost_api.TENANT_ID, c_def)
+    assert res_def["action"] == "sent" and res_def["tagged"] is False and "size M" in res_def["text"]
+    assert len(fb_calls) == 1
 
-    # Operator enables size_advice via PUT /api/comments/auto-reply-settings/{pageId}
+    # Operator can remove size_advice from intents via PUT without confirmLive -> size_advice question tags can_ban
+    r_off = client.put(
+        f"/api/comments/auto-reply-settings/{PAGE_ID}",
+        json={"intents": ["price", "size", "color"]},
+    )
+    assert r_off.status_code == 200, r_off.text
+    assert "size_advice" not in r_off.json()["setting"]["intents"]
+
+    c_off = seed_comment("c_sa_off", from_id="u_sa_off", message="Cao 1m60 nặng 50kg mặc size nào?")
+    res_off = auto_reply.process_comment(vpost_api.TENANT_ID, c_off)
+    assert res_off["action"] == "skipped" and res_off["tagged"] is True
+    assert "tư vấn size" in res_off["reason"].lower()
+    assert len(fb_calls) == 1
+
+    # Operator re-enables size_advice via PUT without confirmLive -> 200
     r_put = client.put(
         f"/api/comments/auto-reply-settings/{PAGE_ID}",
-        json={
-            "enabled": True,
-            "mode": "live",
-            "intents": ["price", "size", "color", "size_advice"],
-            "confirmLive": True,
-        },
+        json={"enabled": True, "mode": "live", "intents": ["price", "size", "color", "size_advice"]},
     )
     assert r_put.status_code == 200, r_put.text
     assert "size_advice" in r_put.json()["setting"]["intents"]
@@ -780,38 +789,48 @@ def test_anonymous_customer_scoped_to_same_thread_only(monkeypatch):
     assert len(fb_calls) == 3
 
 
-def test_dry_run_never_calls_facebook_for_ask_or_recommend():
-    enable_page(mode="dry_run")
+def test_default_live_and_kill_switch_blocks_ask_and_recommend(monkeypatch):
     fb_calls = []
-    facebook.reply_comment = lambda *a, **kw: (fb_calls.append(a), "fb_never")[1]
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_ks_{len(fb_calls)}")[1]
 
-    # Turn 1 ask in dry_run
-    c1 = seed_comment("c_dr_1", from_id="u_dr1", message="Tư vấn size ạ")
+    # Without any settings row, Turn 1 ask and Turn 1 with measurements both run live by default
+    c_ok1 = seed_comment("c_def_1", from_id="u_def1", message="Tư vấn size ạ")
+    r_ok1 = auto_reply.process_comment(vpost_api.TENANT_ID, c_ok1)
+    assert r_ok1["action"] == "sent" and "chiều cao và cân nặng" in r_ok1["text"]
+    assert store.get_thread_state(vpost_api.TENANT_ID, "c_def_1") is not None
+
+    c_ok2 = seed_comment("c_def_2", from_id="u_def2", message="Cao 1m60 nặng 50kg mặc size nào?")
+    r_ok2 = auto_reply.process_comment(vpost_api.TENANT_ID, c_ok2)
+    assert r_ok2["action"] == "sent" and "size M" in r_ok2["text"]
+    assert len(fb_calls) == 2
+
+    # Kill switch stops Turn 1 ask, Turn 1 with measurements, and Turn 2 follow-up with zero Facebook calls
+    monkeypatch.setenv("VPOST_AUTO_REPLY_DISABLED", "1")
+
+    c1 = seed_comment("c_ks_1", from_id="u_ks1", message="Tư vấn size ạ")
     r1 = auto_reply.process_comment(vpost_api.TENANT_ID, c1)
-    assert r1["action"] == "would_send" and "chiều cao và cân nặng" in r1["text"]
-    assert store.get_thread_state(vpost_api.TENANT_ID, "c_dr_1") is None
+    assert r1["action"] == "skipped" and r1["tagged"] is True
+    assert store.get_thread_state(vpost_api.TENANT_ID, "c_ks_1") is None
 
-    # Turn 1 with measurements in dry_run
-    c2 = seed_comment("c_dr_2", from_id="u_dr2", message="Cao 1m60 nặng 50kg mặc size nào?")
+    c2 = seed_comment("c_ks_2", from_id="u_ks2", message="Cao 1m60 nặng 50kg mặc size nào?")
     r2 = auto_reply.process_comment(vpost_api.TENANT_ID, c2)
-    assert r2["action"] == "would_send" and "size M" in r2["text"]
+    assert r2["action"] == "skipped" and r2["tagged"] is True
 
-    # Turn 2 follow-up in dry_run when state exists
     t0 = datetime.now(timezone.utc)
-    seed_comment("c_dr_3", from_id="u_dr3", message="Tư vấn size", created_time=iso_ts(t0 - timedelta(minutes=2)))
+    seed_comment("c_ks_3", from_id="u_ks3", message="Tư vấn size", created_time=iso_ts(t0 - timedelta(minutes=2)))
     store.set_thread_state(
         vpost_api.TENANT_ID,
-        "c_dr_3",
+        "c_ks_3",
         product_code="G1",
         state="awaiting_measurements",
-        asked_comment_id="c_dr_3",
-        bot_reply_id="fb_ask_dr",
+        asked_comment_id="c_ks_3",
+        bot_reply_id="fb_ask_ks",
         expires_at=iso_ts(t0 + timedelta(hours=24)),
     )
-    c3_fu = seed_comment("c_dr_3_fu", parent_id="c_dr_3", from_id="u_dr3", message="1m60 50kg", created_time=iso_ts(t0))
+    c3_fu = seed_comment("c_ks_3_fu", parent_id="c_ks_3", from_id="u_ks3", message="1m60 50kg", created_time=iso_ts(t0))
     r3 = auto_reply.process_comment(vpost_api.TENANT_ID, c3_fu, now_dt=t0)
-    assert r3["action"] == "would_send" and "size M" in r3["text"]
-    assert fb_calls == []
+    assert r3["action"] == "skipped" and r3["tagged"] is True
+    assert len(fb_calls) == 2
 
 
 # ---------------- 9. Existing safety layers intact on multi-turn flow ----------------

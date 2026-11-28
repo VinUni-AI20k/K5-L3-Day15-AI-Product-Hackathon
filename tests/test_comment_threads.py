@@ -890,6 +890,8 @@ def test_finding04_updates_feed_no_skip_on_split_snapshot_or_concurrent_writers(
 
 def test_finding05_autohidden_never_leaks_into_updates_during_sync_to_moderation_window(monkeypatch):
     """#5: Auto-hidden comments must never appear in /api/comments/updates between sync and moderation."""
+    # Isolate sync-to-moderation updates window from default-on live auto-reply (avoids outbound Graph reply call)
+    monkeypatch.setenv("VPOST_AUTO_REPLY_DISABLED", "1")
     seed_post_job(job_id="job-1", fb_post_id="123_1")
     seed_post_job(job_id="job-2", fb_post_id="123_2")
 

@@ -7,7 +7,6 @@ import {
   buildAutoReplyUpdatePayload,
   evaluateAutoReplySaveGate,
   isAutoReplyDraftDirty,
-  needsLiveModeConfirm,
   settingToAutoReplyDraft,
   validateAutoReplyDraft,
 } from "@/ui/components/inbox/auto-reply-state";
@@ -32,7 +31,6 @@ import {
 import { reconcileVisibleThreads } from "@/ui/components/inbox/inbox-scroll-state";
 import { InboxAutoReplyDialog } from "@/ui/components/inbox/InboxAutoReplyDialog";
 import {
-  AUTO_REPLY_LIVE_CONFIRM_COPY,
   DEFAULT_AUTO_REPLY_LOG_FILTER,
   type AutoReplyLogEntry,
   type AutoReplySetting,
@@ -507,45 +505,42 @@ describe("Conversation list & chat 'Cần bạn' + auto-reply rendering", () => 
   });
 });
 
-describe("Auto-reply settings state, live-mode confirm, intents/caps validation, read-only, and log", () => {
-  it("requires explicit live-mode confirmation when switching to or activating live mode", () => {
-    const dryOff = sampleSetting({ enabled: false, mode: "dry_run" });
-    const dryOn = sampleSetting({ enabled: true, mode: "dry_run" });
-    const liveOff = sampleSetting({ enabled: false, mode: "live" });
-    const liveOn = sampleSetting({ enabled: true, mode: "live" });
+describe("Auto-reply settings state, always-live payload, intents/caps validation, read-only, and log", () => {
+  it("always builds live/active update payloads and ignores legacy enabled/mode for dirty tracking", () => {
+    const legacyOffDry = sampleSetting({ enabled: false, mode: "dry_run" });
+    const minimalSetting = sampleSetting({ enabled: undefined, mode: undefined });
 
-    expect(needsLiveModeConfirm(dryOff, { enabled: true, mode: "live" })).toBe(true);
-    expect(needsLiveModeConfirm(dryOn, { enabled: true, mode: "live" })).toBe(true);
-    expect(needsLiveModeConfirm(liveOff, { enabled: true, mode: "live" })).toBe(true);
-    expect(needsLiveModeConfirm(dryOn, { enabled: true, mode: "dry_run" })).toBe(false);
-    expect(needsLiveModeConfirm(liveOn, { enabled: true, mode: "dry_run" })).toBe(false);
-    expect(needsLiveModeConfirm(liveOn, { enabled: true, mode: "live" })).toBe(false);
+    const draft = settingToAutoReplyDraft(legacyOffDry);
+    expect(isAutoReplyDraftDirty(legacyOffDry, draft)).toBe(false);
+    expect(isAutoReplyDraftDirty(minimalSetting, draft)).toBe(false);
+    expect(isAutoReplyDraftDirty(legacyOffDry, { ...draft, hourlyCap: 45 })).toBe(true);
 
-    const draftLive = { ...settingToAutoReplyDraft(dryOn), mode: "live" as const };
-    expect(
-      buildAutoReplyUpdatePayload(draftLive, { confirmedLive: false }).confirmLive,
-    ).toBeUndefined();
-    expect(
-      buildAutoReplyUpdatePayload(draftLive, { confirmedLive: true }).confirmLive,
-    ).toBe(true);
-    expect(
-      buildAutoReplyUpdatePayload(settingToAutoReplyDraft(dryOn), { confirmedLive: true })
-        .confirmLive,
-    ).toBeUndefined();
+    const payload = buildAutoReplyUpdatePayload({
+      intents: ["color", "price"],
+      hourlyCap: 45,
+      dailyCap: 300,
+    });
+    expect(payload).toEqual({
+      enabled: true,
+      mode: "live",
+      intents: ["price", "color"],
+      hourlyCap: 45,
+      dailyCap: 300,
+      confirmLive: true,
+    });
   });
 
-  it("validates intents (non-empty when enabled) and hourly/daily caps and gates saving", () => {
-    const base = sampleSetting({ enabled: false, mode: "dry_run" });
+  it("validates intents (always non-empty) and hourly/daily caps and gates saving", () => {
+    const base = sampleSetting({ enabled: undefined, mode: undefined });
 
-    // Enabled with zero intents -> invalid & blocks save
+    // Zero intents -> always invalid & blocks save
     const emptyIntentsDraft = {
       ...settingToAutoReplyDraft(base),
-      enabled: true,
       intents: [] as const,
     };
     const emptyIntentsVal = validateAutoReplyDraft(emptyIntentsDraft);
     expect(emptyIntentsVal.isValid).toBe(false);
-    expect(emptyIntentsVal.intentsError).toContain("Giá, Size hoặc Màu");
+    expect(emptyIntentsVal.intentsError).toContain("Giá, Size, Màu");
     const emptyIntentsGate = evaluateAutoReplySaveGate({
       isDirty: isAutoReplyDraftDirty(base, emptyIntentsDraft),
       isSaving: false,
@@ -553,16 +548,7 @@ describe("Auto-reply settings state, live-mode confirm, intents/caps validation,
       validation: emptyIntentsVal,
     });
     expect(emptyIntentsGate.canSave).toBe(false);
-    expect(emptyIntentsGate.saveDisabledReason).toContain("Giá, Size hoặc Màu");
-
-    // Disabled with zero intents -> valid
-    expect(
-      validateAutoReplyDraft({
-        ...settingToAutoReplyDraft(base),
-        enabled: false,
-        intents: [],
-      }).isValid,
-    ).toBe(true);
+    expect(emptyIntentsGate.saveDisabledReason).toContain("Giá, Size, Màu");
 
     // Out-of-range hourly / daily caps -> invalid
     const badHourly = validateAutoReplyDraft({
@@ -607,37 +593,47 @@ describe("Auto-reply settings state, live-mode confirm, intents/caps validation,
     expect(readOnlyGate.editDisabledReason).toBe("Phiên hỗ trợ chỉ đọc.");
   });
 
-  it("renders settings view with live confirm copy, intents validation error, read-only disabled controls, and dialog tabs", () => {
+  it("shows always-live status without enable/mode switches or confirm dialog, keeps intents/caps/validation/read-only and dialog tabs", () => {
+    // Even if server returns legacy enabled=false & mode=dry_run, display ignores them and shows "Đang bật · chạy thật"
     const html = renderMarkup(
       <AutoReplySettingsView
         isFirstLoad={false}
         showSkeleton={false}
         isError={false}
         error={null}
-        items={[sampleSetting()]}
+        items={[sampleSetting({ enabled: false, mode: "dry_run" })]}
         readOnlyReason={null}
         savingPageId={null}
         saveErrorByPageId={{}}
         savedMessageByPageId={{}}
         initialDraftOverrides={{
-          "123": { enabled: true, mode: "live", intents: [] },
+          "123": { intents: [] },
         }}
-        initialLiveConfirmPageId="123"
         onRetry={() => {}}
         onSave={() => {}}
+        onOpenLog={() => {}}
       />,
     );
 
     expect(html).toContain("WorkHardToday");
-    expect(html).toContain("Chạy thử");
-    expect(html).toContain("Chạy thật");
+    expect(html).toContain("Đang bật · chạy thật");
+    expect(html).toContain('data-auto-reply-status="active"');
+    expect(html).toContain("Nhật ký tự trả lời");
+    expect(html).toContain("Xem nhật ký tự trả lời");
     expect(html).toContain("Giá");
     expect(html).toContain("Size");
     expect(html).toContain("Màu");
-    expect(html).toContain(AUTO_REPLY_LIVE_CONFIRM_COPY);
     expect(html).toContain('data-auto-reply-validation="intents"');
-    expect(html).toContain("Xác nhận bật Chạy thật");
-    expect(html).toContain('role="alertdialog"');
+
+    // Removed controls must never appear
+    expect(html).not.toContain('role="switch"');
+    expect(html).not.toContain('type="radio"');
+    expect(html).not.toContain('role="alertdialog"');
+    expect(html).not.toContain("Bật tự động trả lời bình luận mới");
+    expect(html).not.toContain("Chế độ hoạt động");
+    expect(html).not.toContain("Chạy thử");
+    expect(html).not.toContain("Đang tắt");
+    expect(html).not.toContain("Xác nhận bật Chạy thật");
 
     // Read-only disables all settings controls and surfaces reason
     const readOnlyHtml = renderMarkup(
@@ -646,7 +642,7 @@ describe("Auto-reply settings state, live-mode confirm, intents/caps validation,
         showSkeleton={false}
         isError={false}
         error={null}
-        items={[sampleSetting()]}
+        items={[sampleSetting({ enabled: undefined, mode: undefined })]}
         readOnlyReason="Chế độ hỗ trợ chỉ được xem."
         savingPageId={null}
         saveErrorByPageId={{}}
@@ -655,10 +651,11 @@ describe("Auto-reply settings state, live-mode confirm, intents/caps validation,
         onSave={() => {}}
       />,
     );
+    expect(readOnlyHtml).toContain("Đang bật · chạy thật");
     expect(readOnlyHtml).toContain("Chế độ hỗ trợ chỉ được xem.");
     expect(readOnlyHtml).toContain('aria-disabled="true"');
 
-    // Dialog shell renders header & tabs
+    // Dialog shell renders header & tabs without dry-run copy
     const dialogHtml = renderMarkup(
       <InboxAutoReplyDialog
         isOpen
@@ -669,9 +666,11 @@ describe("Auto-reply settings state, live-mode confirm, intents/caps validation,
       />,
     );
     expect(dialogHtml).toContain("Tự động trả lời");
+    expect(dialogHtml).toContain("Đang bật · chạy thật".toLowerCase());
     expect(dialogHtml).toContain("Cài đặt theo Fanpage");
     expect(dialogHtml).toContain("Nhật ký tự trả lời");
     expect(dialogHtml).toContain("settings-slot");
+    expect(dialogHtml).not.toContain("Chạy thử");
   });
 
   it("renders auto-reply log view with Page/Action filters, badges, intents, and empty states", () => {

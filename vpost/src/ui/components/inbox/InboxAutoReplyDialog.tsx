@@ -63,7 +63,7 @@ export function InboxAutoReplyDialog({
           <div className="inbox-surface-page">
             <DialogHeader
               title="Tự động trả lời"
-              subtitle="Bật tự động trả lời giá, size, màu và tư vấn size theo từng Fanpage với chế độ Chạy thử trước khi Chạy thật."
+              subtitle="Tự động trả lời đang bật · chạy thật theo từng Fanpage. Điều chỉnh loại câu hỏi, giới hạn và xem nhật ký trả lời."
               onOpenChange={(open) => {
                 if (!open) onClose();
               }}
@@ -104,7 +104,10 @@ export function InboxAutoReplyDialog({
             >
               {isSettings
                 ? (settingsContent ?? (
-                    <AutoReplySettingsPanel readOnlyReason={readOnlyReason} />
+                    <AutoReplySettingsPanel
+                      readOnlyReason={readOnlyReason}
+                      onOpenLog={() => setActiveTab("log")}
+                    />
                   ))
                 : (logContent ?? (
                     <AutoReplyLogPanel

@@ -267,8 +267,8 @@ export function AutoReplyLogView({
             <Heading level={2}>Nhật ký tự động trả lời</Heading>
           </HStack>
           <Text type="supporting" color="secondary">
-            Theo dõi mọi lượt chạy thử, gửi thật, bỏ qua hoặc lỗi khi hệ thống xử lý câu hỏi giá,
-            size, màu.
+            Theo dõi mọi lượt tự động trả lời đã gửi, bỏ qua hoặc lỗi (bao gồm bản ghi chạy
+            thử cũ nếu có) khi hệ thống xử lý câu hỏi giá, size, màu và tư vấn size.
           </Text>
         </Stack>
 
@@ -359,7 +359,7 @@ export function AutoReplyLogView({
           <InboxEmptyState
             kind="first-run"
             title="Chưa có nhật ký tự động trả lời"
-            description="Khi bạn bật tự động trả lời (Chạy thử hoặc Chạy thật) cho Fanpage, lịch sử xử lý sẽ xuất hiện tại đây."
+            description="Khi hệ thống tự động xử lý bình luận hỏi giá, size, màu hoặc tư vấn size cho Fanpage, lịch sử sẽ xuất hiện tại đây."
           />
         )
       ) : (

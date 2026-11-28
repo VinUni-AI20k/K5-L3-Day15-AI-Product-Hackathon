@@ -327,10 +327,9 @@ export function extractTraceMeasurements(
 
   // Fallback: inspect step detail text (prioritizing measurement/size steps first)
   if (acc.heightCm === null || acc.weightKg === null) {
-    const prioritizedSteps = [
-      ...run.steps.filter((step) => MEASUREMENT_STEP_KEYS.has(step.key)),
-      ...run.steps.filter((step) => !MEASUREMENT_STEP_KEYS.has(step.key)),
-    ];
+    // Only measurement/size steps: other steps' free text ("AI đã soạn nháp (122 ký tự)")
+    // must never be read as a measurement.
+    const prioritizedSteps = run.steps.filter((step) => MEASUREMENT_STEP_KEYS.has(step.key));
     for (const step of prioritizedSteps) {
       const detail = step.detail?.trim() ?? "";
       if (detail.length === 0) continue;

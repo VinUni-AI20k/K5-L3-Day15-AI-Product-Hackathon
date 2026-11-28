@@ -128,14 +128,34 @@ def run_tick(stop_event: Optional[threading.Event] = None) -> dict:
         summary["updatedComments"] = int(sync_res.get("updatedComments", 0))
         summary["rateLimited"] = bool(rate_limited)
 
+        # Tìm bình luận <24h từng bị bỏ qua duy nhất vì Page chưa bật tự động trả lời để đánh giá lại đúng 1 lần
+        now_dt = vpost_api.now()
+        retry_disabled_ids: list[str] = []
+        if not (ev is not None and ev.is_set()):
+            try:
+                retry_disabled_ids = auto_reply.find_retryable_disabled_comments(
+                    vpost_api.TENANT_ID,
+                    now_dt=now_dt,
+                )
+            except Exception as e:
+                summary["autoFailed"] += 1
+                log.warning(
+                    "comment_poller_auto_reply_retry_scan_error tenant=%s err=%s",
+                    vpost_api.TENANT_ID,
+                    type(e).__name__,
+                )
+
+        auto_reply_ids = list(dict.fromkeys(list(new_customer_ids) + list(retry_disabled_ids)))
+
         # Chạy auto-reply TRƯỚC bước soạn nháp AI để thu hẹp cửa sổ đua với nhân viên
         # và không gọi LLM lãng phí cho hội thoại vừa được tự động trả lời.
-        if new_customer_ids and not (ev is not None and ev.is_set()):
+        if auto_reply_ids and not (ev is not None and ev.is_set()):
             try:
                 ar_res = auto_reply.run_auto_reply(
                     vpost_api.TENANT_ID,
-                    new_customer_ids,
+                    auto_reply_ids,
                     stop_event=ev,
+                    now_dt=now_dt,
                 )
                 summary["autoReplied"] = int(ar_res.get("sent", 0))
                 summary["autoWouldSend"] = int(ar_res.get("wouldSend", 0))

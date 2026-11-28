@@ -1,6 +1,5 @@
 import {
   AUTO_REPLY_INTENTS,
-  AUTO_REPLY_LIVE_CONFIRM_COPY,
   AUTO_REPLY_LOG_DEFAULT_LIMIT,
   AutoReplyLogResponseSchema,
   AutoReplySettingsListResponseSchema,
@@ -64,7 +63,8 @@ export async function listAutoReplySettings(
 
 /**
  * Saves per-Page auto-reply configuration (`PUT /api/comments/auto-reply-settings/{pageId}`).
- * Enforces explicit `confirmLive: true` when mode is `"live"` and validates intents & caps.
+ * Always sends active live mode (`enabled: true, mode: "live", confirmLive: true`) and never
+ * sends `enabled: false` or `mode: "dry_run"`.
  */
 export async function updateAutoReplySetting(
   pageId: string,
@@ -77,22 +77,13 @@ export async function updateAutoReplySetting(
     "Thiếu mã Fanpage cần lưu cài đặt tự động trả lời.",
   );
 
-  if (input.mode === "live" && input.confirmLive !== true) {
-    throw new ApiError({
-      code: "CONFIRM_REQUIRED",
-      status: 400,
-      message: "Live auto-reply mode requires explicit confirmLive=true",
-      userMessage: `${AUTO_REPLY_LIVE_CONFIRM_COPY}. Vui lòng xác nhận trước khi lưu.`,
-    });
-  }
-
-  const candidate: AutoReplySettingUpdateInput = {
-    enabled: input.enabled,
-    mode: input.mode,
+  const candidate = {
+    ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
+    ...(input.mode !== undefined ? { mode: input.mode } : {}),
     intents: dedupeIntents(input.intents),
     ...(input.hourlyCap !== undefined ? { hourlyCap: input.hourlyCap } : {}),
     ...(input.dailyCap !== undefined ? { dailyCap: input.dailyCap } : {}),
-    ...(input.mode === "live" ? { confirmLive: true } : {}),
+    ...(input.confirmLive !== undefined ? { confirmLive: input.confirmLive } : {}),
   };
 
   const validated = AutoReplySettingUpdateInputSchema.safeParse(candidate);
@@ -110,9 +101,22 @@ export async function updateAutoReplySetting(
     });
   }
 
+  const body = {
+    enabled: true as const,
+    mode: "live" as const,
+    intents: validated.data.intents,
+    ...(validated.data.hourlyCap !== undefined
+      ? { hourlyCap: validated.data.hourlyCap }
+      : {}),
+    ...(validated.data.dailyCap !== undefined
+      ? { dailyCap: validated.data.dailyCap }
+      : {}),
+    confirmLive: true as const,
+  };
+
   return apiRequest(`/api/comments/auto-reply-settings/${encodeURIComponent(safePageId)}`, {
     method: "PUT",
-    body: validated.data,
+    body,
     schema: AutoReplySettingUpdateResponseSchema,
     signal,
     malformedMessage:
