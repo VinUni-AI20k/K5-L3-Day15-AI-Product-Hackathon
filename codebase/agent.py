@@ -69,11 +69,11 @@ RECEIPT_IMAGE_PROMPT = (
     '{"merchant": tên cửa hàng hoặc "", "date": "YYYY-MM-DD" in trên hóa đơn hoặc "", '
     '"paid_total": tổng phải thanh toán (số nguyên VND) hoặc 0, "uncertain": true/false}\n'
     "paid_total lấy ở dòng Tổng cộng / Tổng tiền phải thanh toán / Tổng số thanh toán / Thanh toán / "
-    "Cộng tiền hàng / Thành công (chấp nhận số dính ký hiệu tiền như VND229,869 hoặc VNĐ 229.869). "
+    "Cộng tiền hàng (chấp nhận số dính ký hiệu tiền như VND229,869 hoặc VNĐ 229.869). "
     "KHÔNG lấy tiền khách đưa, tiền khách trả, tiền thừa, tiền trả lại, tiền đã giảm/chiết khấu, mã số, số điện thoại. "
-    "Nếu ngày trên hóa đơn bị mờ, thiếu hoặc năm bất hợp lý, trả date=\"\" để dùng ngày chụp. "
+    "Đọc đúng ngày in trên hóa đơn (DD/MM/YYYY -> YYYY-MM-DD); chỉ trả date=\"\" khi hóa đơn không in ngày. "
     "Đặt uncertain=true và paid_total=0 khi số thực trả bị mờ, bị che, hoặc có nhiều mức tổng mâu thuẫn. "
-    "Không đoán số không nhìn thấy trên ảnh."
+    "Không đoán số hoặc ngày không nhìn thấy trên ảnh."
 )
 
 
@@ -126,16 +126,15 @@ def read_receipt_image(scan: dict, image_bytes: bytes, capture_date: str) -> dic
     # OCR cục bộ đã đọc được tổng mà model đọc số khác → mâu thuẫn, không chọn hộ người dùng.
     grounded = bool(total) and (total == ocr_total if ocr_total else total in _digits_seen_in_ocr(ocr_text))
     date = normalize_receipt_date(str(fields.get("date") or ""))
-    future = bool(date and date > capture_date)
+    scan_date = scan.get("date") or ""
+    chosen_date = date or scan_date or capture_date
+    future = bool(chosen_date and chosen_date > capture_date)
     if total and not grounded:
         note(f"Số model đọc ({total}) không có trong chữ OCR của ảnh → Cần đọc lại")
     merchant = str(fields.get("merchant") or "").strip()
-    scan_date = scan.get("date") or ""
-    valid_scan_date = scan_date if (scan_date and scan_date <= capture_date) else ""
-    chosen_date = date or valid_scan_date or capture_date
     chosen_date_source = (
         "hóa đơn"
-        if (date or (scan.get("date_source") == "hóa đơn" and chosen_date == valid_scan_date))
+        if (date or (scan.get("date_source") == "hóa đơn" and chosen_date == scan_date))
         else "ngày chụp"
     )
     return {

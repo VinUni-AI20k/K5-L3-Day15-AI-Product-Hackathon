@@ -549,15 +549,12 @@ def _ParseVietnameseMoneyToken(RawDigits: str) -> int:
 
 
 def normalize_receipt_date(raw_date: str) -> str:
-    """Chuẩn hóa ngày in ISO, DD/MM/YYYY hoặc DD-MM-YYYY; bỏ qua năm lỗi OCR ngoài [1990, 2100]."""
+    """Chuẩn hóa ngày in ISO, DD/MM/YYYY hoặc DD-MM-YYYY."""
     try:
         first, second, third = re.split(r"[-/]", raw_date)
-        parsed = (
-            datetime.date(int(first), int(second), int(third))
-            if len(first) == 4
-            else datetime.date(int(third), int(second), int(first))
-        )
-        return parsed.isoformat() if 1990 <= parsed.year <= 2100 else ""
+        if len(first) == 4:
+            return datetime.date(int(first), int(second), int(third)).isoformat()
+        return datetime.date(int(third), int(second), int(first)).isoformat()
     except (TypeError, ValueError):
         return ""
 
@@ -644,7 +641,7 @@ ImageTotalHighPattern = re.compile(
     r"tien\s*thanh\s*toan|tong\s*tien\b(?!\s*hang)|grand\s*total|\btotal\b)"
 )
 ImageTotalMediumPattern = re.compile(r"(cong\s*tien\s*hang|cong\s*tien|thanh\s*toan)")
-ImageTotalLowPattern = re.compile(r"(tong\s*tien\s*hang|\bthanh\s*cong\b)")
+ImageTotalLowPattern = re.compile(r"(tong\s*tien\s*hang)")
 ImageSkipRowPattern = re.compile(
     r"(tien\s*khach|tien\s*dua|khach\s*(?:dua|tra)|tien\s*thua|tien\s*mat|tra\s*lai|change|cash|"
     r"don\s*gia|thanh\s*tien|ten\s*hang)"
