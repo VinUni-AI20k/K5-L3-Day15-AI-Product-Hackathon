@@ -209,8 +209,8 @@ function FilePreviewPanel({ preview }: { preview: CatalogFilePreview }) {
   const hiddenColumnCount = preview.columns.length - shownColumns.length;
 
   return (
-    <Section variant="muted" padding={3}>
-      <Stack direction="vertical" gap={3}>
+    <Section variant="muted" padding={5}>
+      <Stack direction="vertical" gap={4}>
         <Stack direction="vertical" gap={1}>
           <Heading level={4}>Đã đọc được file</Heading>
           <Text type="supporting">
@@ -284,12 +284,14 @@ function FilePreviewPanel({ preview }: { preview: CatalogFilePreview }) {
               Kiểm tra chữ tiếng Việt có dấu hiển thị đúng, và các cột có nằm đúng chỗ không. Chữ
               hiện thành “Vßy hoa nhÝ” nghĩa là file chưa lưu bảng mã UTF-8.
             </Text>
-            <Table
-              data={preview.sampleRows}
-              columns={shownColumns.map((column) => ({ key: column, header: column }))}
-              density="compact"
-              textOverflow="truncate"
-            />
+            <div className="scroll-cue-x overflow-x-auto">
+              <Table
+                data={preview.sampleRows}
+                columns={shownColumns.map((column) => ({ key: column, header: column }))}
+                density="compact"
+                textOverflow="truncate"
+              />
+            </div>
             {hiddenColumnCount > 0 ? (
               <Text type="supporting">
                 {`Bảng xem trước hiển thị ${shownColumns.length} cột đầu; ${hiddenColumnCount} cột còn lại vẫn được đọc và có trong danh sách bên trên.`}

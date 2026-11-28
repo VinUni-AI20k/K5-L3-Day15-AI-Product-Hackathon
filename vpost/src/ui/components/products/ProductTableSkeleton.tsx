@@ -3,7 +3,7 @@
 import { HStack, Skeleton, Stack } from "@astryxdesign/core";
 
 /** Column widths mirror ProductTable so the real rows land where these sat. */
-const COLUMNS = [210, null, null, 120, 140] as const;
+const COLUMNS = [184, null, null, 120, 140] as const;
 const ROWS = 8;
 
 /**

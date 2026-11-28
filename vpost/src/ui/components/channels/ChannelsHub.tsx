@@ -115,21 +115,9 @@ export function ChannelsHub({ tab }: { tab: ChannelsTab }) {
   /** Which sentence the tooltips carry. Secrets first: it is the harder stop. */
   const writeBlockReason = secretsMissing ? undefined : (readOnlyReason ?? undefined);
 
-  /**
-   * Set when a panel SENT the operator to "Kết nối thêm" to paste a token.
-   * STATE, not a ref: the token box now lives behind a disclosure in that
-   * panel, so the request has to reach the panel's render — a ref would be
-   * invisible to it, and `tokenInputRef.current` would be `null` while the
-   * disclosure was still shut.
-   */
-  const [shouldOpenTokenField, setShouldOpenTokenField] = useState(false);
-
   const goToTab = useCallback(
     (next: ChannelsTab) => {
       if (next === active) return;
-      // Leaving "Kết nối thêm" drops the request: an operator who wandered off
-      // and came back later did not ask for a password box to pop open at them.
-      if (next !== "connect") setShouldOpenTokenField(false);
       // Only `?tab=` survives the switch: the rest of the query belongs to the
       // view being left. replace(), not push() — this is one page seen three
       // ways, and pushing would make Back walk the operator through every tab
@@ -139,30 +127,19 @@ export function ChannelsHub({ tab }: { tab: ChannelsTab }) {
     [active, pathname, router],
   );
 
-  /**
-   * The flag is set in the SAME handler that switches the tab, so the panel is
-   * mounted with it already true and opens its token disclosure on the first
-   * frame — see `ChannelConnectPanel`. It is cleared on the way out of the tab
-   * (`goToTab` above), which is the only moment it could go stale.
-   */
-  function goToConnectAndFocusToken() {
-    setShouldOpenTokenField(true);
-    goToTab("connect");
-  }
-
   return (
     <Layout
       height="fill"
       header={
         <LayoutHeader hasDivider>
-          <Stack direction="vertical" gap={3} padding={4}>
-            <Stack direction="vertical" gap={1}>
+          <div className="w-full space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="max-w-prose space-y-1">
               <Heading level={1}>Kênh</Heading>
-              <Text type="supporting">
+              <Text type="supporting" color="secondary">
                 Những Page bài viết có thể được đăng lên, các nhóm kênh dùng để tick nhanh ở màn
                 soạn bài, và chỗ kết nối thêm Page mới.
               </Text>
-            </Stack>
+            </div>
 
             {/* The shell's side nav is the other <nav> on the page, so this one
                 says what it navigates (core-accessibility §2). */}
@@ -175,7 +152,7 @@ export function ChannelsHub({ tab }: { tab: ChannelsTab }) {
                 <Tab key={value} value={value} label={CHANNELS_TAB_LABELS[value]} />
               ))}
             </TabList>
-          </Stack>
+          </div>
         </LayoutHeader>
       }
       content={
@@ -185,20 +162,20 @@ export function ChannelsHub({ tab }: { tab: ChannelsTab }) {
                 with the two tabs that do it. Kept out of "Nhóm kênh", where
                 neither has anything to do with what is on screen. */}
             {active !== "groups" && outcome && !isOutcomeDismissed ? (
-              <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
+              <div className="px-4 pt-4 sm:px-6">
                 <ConnectOutcomeBanner
                   outcome={outcome}
                   onDismiss={() => setIsOutcomeDismissed(true)}
                 />
-              </Stack>
+              </div>
             ) : null}
 
             {/* Before anything is typed, not after it fails: the whole point of
                 the flag is that this gap is invisible on the read path. */}
             {active !== "groups" && secretsMissing ? (
-              <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
+              <div className="px-4 pt-4 sm:px-6">
                 <SecretsNotConfiguredBanner />
-              </Stack>
+              </div>
             ) : null}
 
             <StackItem size="fill">
@@ -206,20 +183,19 @@ export function ChannelsHub({ tab }: { tab: ChannelsTab }) {
                 <ConnectedChannelsScreen
                   areWritesBlocked={areWritesBlocked}
                   blockedReasonOverride={writeBlockReason}
-                  onGoToConnect={goToConnectAndFocusToken}
+                  onGoToConnect={() => goToTab("connect")}
                 />
               ) : active === "connect" ? (
-                <Stack direction="vertical" padding={4} maxWidth={880}>
+                <div className="w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
                   <ChannelConnectPanel
-                    shouldOpenTokenField={shouldOpenTokenField}
                     areWritesBlocked={areWritesBlocked}
                     blockedReasonOverride={writeBlockReason}
                   />
-                </Stack>
+                </div>
               ) : (
-                <Stack direction="vertical" padding={4} maxWidth={1024}>
+                <div className="w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
                   <ChannelGroupsScreen />
-                </Stack>
+                </div>
               )}
             </StackItem>
           </Stack>

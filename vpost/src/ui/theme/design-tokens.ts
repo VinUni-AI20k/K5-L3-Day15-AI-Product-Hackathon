@@ -5,8 +5,8 @@
  *
  * Consumed by:
  *   - `src/ui/theme/vpost-theme.ts`  → builds `vpost.css` / `vpost.js` (Astryx tokens + semantic aliases)
- *   - `scripts/build-theme-presets.ts` → builds `presets.css` (root Tailwind bridge, `color-scheme: inherit`,
- *     `prefers-reduced-motion: reduce`, and preset swatch previews)
+ *   - `src/ui/theme/root-tokens.css` → root Tailwind bridge, `[data-astryx-theme]` `color-scheme`
+ *     switching, and `prefers-reduced-motion: reduce` (verified in sync by `vpost-theme.test.ts`)
  *   - `src/ui/theme/__tests__/vpost-theme.test.ts` → automated WCAG AA contrast verification & token gates
  *
  * Colour rule 90 / 9 / 1:
@@ -314,7 +314,7 @@ export const DESIGN_DARK: DesignSchemePalette = {
 };
 
 /**
- * Scheme-independent scale tokens shared between `vpost.css` and `presets.css`.
+ * Scheme-independent scale tokens shared between `vpost.css` and `root-tokens.css`.
  *
  * Typography (§2): 12px hard floor (no 10px anywhere), 16/26 reading body,
  * 14/21 dense UI, H1 28/32, H2 22/30, H3 18/26, Display 56/60.
@@ -499,9 +499,10 @@ export const DESIGN_SCALE_TOKENS = {
 
 /**
  * Root Tailwind / shadcn + design system token values for a single colour scheme.
- * Emitted by `scripts/build-theme-presets.ts` into `src/ui/theme/presets.css`
- * for `:root` (light) and `:root.dark` (dark), so `<body>`, Tailwind utilities,
- * and portalled dialogs share the exact same design system palette as Astryx.
+ * Mirrored in `src/ui/theme/root-tokens.css` for `:root:not(.dark)` (light) and
+ * `:root.dark` (dark) — verified in sync by `vpost-theme.test.ts` — so `<body>`,
+ * Tailwind utilities, and portalled dialogs share the exact same design system
+ * palette as Astryx.
  */
 export function buildRootSchemeTokens(
   palette: DesignSchemePalette,

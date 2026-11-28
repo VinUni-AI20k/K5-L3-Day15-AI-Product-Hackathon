@@ -197,7 +197,7 @@ export function PlatformTenantTable({
       renderCell: (tenant) => (
         <Stack direction="vertical" gap={0.5}>
           <HStack gap={2} align="center" wrap="wrap">
-            <Text>{tenant.name}</Text>
+            <Text weight="medium">{tenant.name}</Text>
             {/* The one row where "khoá công ty này" means "khoá chính chúng
                 ta" — worth a mark, not worth a colour of its own. */}
             {isInternalTenant(tenant) ? <Badge variant="purple" label="Nội bộ VPOST" /> : null}
@@ -326,6 +326,7 @@ export function PlatformTenantTable({
       isScrollable
       height="100%"
       ref={listRef}
+      className="max-w-full min-w-0 overflow-x-auto"
       // Programmatic target only (never in the tab order): where focus goes
       // when the row it belonged to is gone. A scroll region you can reach with
       // the keyboard is what `core-accessibility` asks for anyway.
@@ -346,7 +347,15 @@ export function PlatformTenantTable({
           text lands in it, or screen readers announce nothing. Visible as well
           as announced — the operator watching the dialog disappear needs the
           same sentence, and focus has just been moved down here to the list. */}
-      <p role="status" aria-live="polite" className="text-muted-foreground px-4 py-2 text-sm">
+      <p
+        role="status"
+        aria-live="polite"
+        className={
+          droppedNotice
+            ? "text-muted-foreground border-border border-t px-4 py-2.5 text-sm"
+            : "sr-only"
+        }
+      >
         {droppedNotice ?? ""}
       </p>
 

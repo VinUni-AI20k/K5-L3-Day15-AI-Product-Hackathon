@@ -8,7 +8,6 @@ import { DrizzleAccessRequestRepo } from "@/adapters/db/access-request-repo.driz
 import { DrizzleAccountRepo } from "@/adapters/db/account-repo.drizzle";
 import { DrizzleInviteRepo } from "@/adapters/db/invite-repo.drizzle";
 import { DrizzleMemberRepo } from "@/adapters/db/member-repo.drizzle";
-import { DrizzleAppearanceSettingRepo } from "@/adapters/db/appearance-setting-repo.drizzle";
 import { DrizzlePlatformTenantRepo } from "@/adapters/db/platform-tenant-repo.drizzle";
 import { DrizzleSupportSessionRepo } from "@/adapters/db/support-session-repo.drizzle";
 import { DrizzleOAuthStateStore } from "@/adapters/db/oauth-state-store.drizzle";
@@ -85,7 +84,6 @@ import {
 } from "@/core/usecases/join-with-invite";
 import { makeManageInvites, type ManageInvites } from "@/core/usecases/manage-invites";
 import { makeManageMembers, type ManageMembers } from "@/core/usecases/manage-members";
-import { makePlatformAppearance } from "@/core/usecases/platform-appearance";
 import { makePlatformTenants, type PlatformTenants } from "@/core/usecases/platform-tenants";
 import {
   makeManageSupportSessions,
@@ -223,7 +221,6 @@ import {
   type AuthRateLimiter,
 } from "./auth-rate-limiter";
 import { makeOperatorAccountGate, type OperatorAccountGate } from "./operator-account-gate";
-import { makeAppearanceGate, type AppearanceGate } from "./appearance-gate";
 import { makeRequirePlatformAdmin, type RequirePlatformAdmin } from "./require-platform-admin";
 import { makeRequireTenant, type RequireTenant } from "./require-tenant";
 
@@ -378,12 +375,6 @@ export interface Usecases {
   requirePlatformAdmin: RequirePlatformAdmin;
   /** M3.2 — platform tenant administration: list / provision / (un)suspend. */
   platformTenants: PlatformTenants;
-  /**
-   * M3.4 — the colour of the product, one value for every company. Exposed as
-   * the GATE, not the bare usecase: the root layout reads it on the way to
-   * every page, so the cache is not optional and must not be bypassable.
-   */
-  platformAppearance: AppearanceGate;
   /** M3.3 — support mode: audited visits into customer tenants, read-only. */
   supportSessions: ManageSupportSessions;
   /**
@@ -989,19 +980,6 @@ export function makeUsecases(deps: Infra, overrides: UsecaseOverrides = {}): Use
     randomSuffix: () => randomBytes(2).toString("hex"),
   });
   /**
-   * M3.4 — the appearance setting, behind its own short cache (see
-   * `appearance-gate.ts`): the root layout asks for it on the way to EVERY
-   * page, so an uncached read would be a query per page view.
-   */
-  const platformAppearance = makeAppearanceGate({
-    appearance: makePlatformAppearance({
-      settings: new DrizzleAppearanceSettingRepo(deps.db, { logger: deps.logger }),
-      logger: deps.logger,
-    }),
-    clock: deps.clock,
-    logger: deps.logger,
-  });
-  /**
    * The cache is dropped the instant a decision is written — wired HERE rather
    * than inside the usecase so core stays free of caching, and so nobody can
    * call `decide` through a path that forgets it. Without this the operator we
@@ -1305,7 +1283,6 @@ export function makeUsecases(deps: Infra, overrides: UsecaseOverrides = {}): Use
         return result;
       },
     },
-    platformAppearance,
     supportSessions: makeManageSupportSessions({
       sessions: supportSessionRepo,
       clock: deps.clock,

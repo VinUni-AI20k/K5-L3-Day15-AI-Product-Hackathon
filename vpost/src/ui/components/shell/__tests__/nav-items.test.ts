@@ -39,17 +39,10 @@ describe("isNavItemActive", () => {
     expect(isNavItemActive("/parent/child", "/parent/child")).toBe(true);
   });
 
-  it("lights exactly one row inside the platform group (M3.4)", () => {
+  it("lights the platform row on /platform", () => {
     const platform = NAV_SECTIONS.find((section) => section.title === "Nền tảng");
     const items = platform?.items ?? [];
-    expect(items).toHaveLength(2);
-
-    // The whole point of `isExact` on "/platform": standing on the appearance
-    // screen must not light "Công ty khách" too.
-    const litOnAppearance = items.filter((item) =>
-      isNavItemActive("/platform/appearance", item.href, { exact: item.isExact }),
-    );
-    expect(litOnAppearance.map((item) => item.href)).toEqual(["/platform/appearance"]);
+    expect(items).toHaveLength(1);
 
     const litOnRoot = items.filter((item) =>
       isNavItemActive("/platform", item.href, { exact: item.isExact }),
@@ -59,7 +52,7 @@ describe("isNavItemActive", () => {
 });
 
 describe("NAV_SECTIONS", () => {
-  it("has the wave-1 IA plus onboarding, appearance and writing-style: 5 visible groups, 14 destinations, platform gated", () => {
+  it("has the wave-1 IA plus onboarding and writing-style: 5 visible groups, 13 destinations, platform gated", () => {
     const sections = visibleNavSections({ hasPlatformRole: true });
     expect(sections.map((s) => s.title)).toEqual([
       "Bàn làm việc",
@@ -86,7 +79,6 @@ describe("NAV_SECTIONS", () => {
       "/prompts",
       "/members",
       "/platform",
-      "/platform/appearance",
     ]);
   });
 
@@ -101,7 +93,13 @@ describe("NAV_SECTIONS", () => {
 
   it("no longer routes retired destinations", () => {
     const hrefs = flattenNavItems().map((i) => i.href);
-    for (const legacy of ["/scheduled", "/jobs", "/channels/groups", "/access"]) {
+    for (const legacy of [
+      "/scheduled",
+      "/jobs",
+      "/channels/groups",
+      "/access",
+      "/platform/appearance",
+    ]) {
       expect(hrefs).not.toContain(legacy);
     }
   });

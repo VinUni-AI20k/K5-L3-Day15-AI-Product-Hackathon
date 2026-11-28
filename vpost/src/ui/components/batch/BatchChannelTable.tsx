@@ -1,8 +1,9 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
 import { ExternalLink, Search } from "lucide-react";
+import { useId, useMemo, useState } from "react";
 
+import { cn } from "@/shared/utils";
 import {
   countChannelStatuses,
   filterBatchChannels,
@@ -55,37 +56,45 @@ export function BatchChannelTable({
       {/* Header & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <h2 id="batch-channels-heading" className="text-base font-semibold text-foreground">
+          <h2 id="batch-channels-heading" className="text-foreground text-lg font-semibold">
             Kết quả theo từng kênh
           </h2>
-          <span className="font-mono text-xs text-muted-foreground tabular-nums">
+          <span className="text-muted-foreground font-mono text-xs tabular-nums">
             ({filteredChannels.length}/{channels.length} kênh)
           </span>
         </div>
 
-        {/* Filter Pills + Search */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Status Filter Buttons */}
-          <div className="flex items-center gap-1 rounded-lg border border-border/80 bg-muted/30 p-1">
+        {/* Filter Chips + Search */}
+        <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
+          {/* Status Filter Chips — single horizontally scrollable row on mobile */}
+          <div
+            role="group"
+            aria-label="Lọc theo trạng thái kênh"
+            className="flex max-w-full items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0"
+          >
             <button
               type="button"
+              aria-pressed={statusFilter === "all"}
               onClick={() => setStatusFilter("all")}
-              className={`rounded-md px-2.5 py-1 font-mono text-xs transition-colors ${
+              className={cn(
+                "focus-visible:ring-ring inline-flex min-h-10 shrink-0 cursor-pointer items-center rounded-full px-3.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2",
                 statusFilter === "all"
-                  ? "bg-card text-foreground font-semibold shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-muted",
+              )}
             >
               Tất cả ({counts.all})
             </button>
             <button
               type="button"
+              aria-pressed={statusFilter === "published"}
               onClick={() => setStatusFilter("published")}
-              className={`rounded-md px-2.5 py-1 font-mono text-xs transition-colors ${
+              className={cn(
+                "focus-visible:ring-ring inline-flex min-h-10 shrink-0 cursor-pointer items-center rounded-full px-3.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2",
                 statusFilter === "published"
-                  ? "bg-card text-leaf-deep font-semibold shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-muted",
+              )}
             >
               Đã đăng ({counts.published})
             </button>
@@ -95,12 +104,14 @@ export function BatchChannelTable({
             {showsStatusPill(counts.active, "active", statusFilter) && (
               <button
                 type="button"
+                aria-pressed={statusFilter === "active"}
                 onClick={() => setStatusFilter("active")}
-                className={`rounded-md px-2.5 py-1 font-mono text-xs transition-colors ${
+                className={cn(
+                  "focus-visible:ring-ring inline-flex min-h-10 shrink-0 cursor-pointer items-center rounded-full px-3.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2",
                   statusFilter === "active"
-                    ? "bg-card text-primary font-semibold shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground hover:bg-muted",
+                )}
               >
                 Đang chạy ({counts.active})
               </button>
@@ -108,12 +119,14 @@ export function BatchChannelTable({
             {showsStatusPill(counts.issues, "issues", statusFilter) && (
               <button
                 type="button"
+                aria-pressed={statusFilter === "issues"}
                 onClick={() => setStatusFilter("issues")}
-                className={`rounded-md px-2.5 py-1 font-mono text-xs transition-colors ${
+                className={cn(
+                  "focus-visible:ring-ring inline-flex min-h-10 shrink-0 cursor-pointer items-center rounded-full px-3.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2",
                   statusFilter === "issues"
-                    ? "bg-card text-madder font-semibold shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground hover:bg-muted",
+                )}
               >
                 Lỗi/Chặn ({counts.issues})
               </button>
@@ -121,18 +134,21 @@ export function BatchChannelTable({
           </div>
 
           {/* Search Box */}
-          <div className="relative">
+          <div className="relative w-full sm:w-56">
             <label htmlFor={searchId} className="sr-only">
               Tìm trong danh sách kênh của lô này
             </label>
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search
+              aria-hidden="true"
+              className="text-foreground-subtle pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+            />
             <input
               id={searchId}
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm tên kênh hoặc mã..."
-              className="h-8 w-44 rounded-lg border border-border/80 bg-card pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary md:w-56"
+              placeholder="Tìm tên kênh hoặc mã…"
+              className="border-input bg-card text-foreground placeholder:text-foreground-subtle focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-offset-background h-10 w-full rounded-lg border pr-3 pl-9 text-sm transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
             />
           </div>
         </div>
@@ -140,35 +156,35 @@ export function BatchChannelTable({
 
       {/* Table Container */}
       <div
-        className="overflow-x-auto rounded-xl border border-border/80 bg-card shadow-xs"
+        className="border-border bg-card overflow-x-auto rounded-xl border"
         tabIndex={0}
         role="region"
         aria-label="Bảng kết quả theo kênh"
       >
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full min-w-160 border-collapse text-sm">
           <caption className="sr-only">
             Trạng thái đăng bài của từng kênh trong lô, kèm số lần thử và lý do lỗi
           </caption>
-          <thead className="border-b border-border/80 bg-muted/40 text-xs text-muted-foreground">
+          <thead className="border-border bg-sidebar text-muted-foreground border-b text-xs font-medium">
             <tr className="text-left">
-              <th scope="col" className="px-4 py-3 font-semibold">
+              <th scope="col" className="px-4 py-3 whitespace-nowrap">
                 Kênh Facebook
               </th>
-              <th scope="col" className="px-4 py-3 font-semibold w-32">
+              <th scope="col" className="w-36 px-4 py-3 whitespace-nowrap">
                 Trạng thái
               </th>
-              <th scope="col" className="px-4 py-3 font-semibold w-24 text-center">
+              <th scope="col" className="w-28 px-4 py-3 text-center whitespace-nowrap">
                 Số lần thử
               </th>
-              <th scope="col" className="px-4 py-3 font-semibold">
+              <th scope="col" className="px-4 py-3 whitespace-nowrap">
                 Kết quả chi tiết
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/60">
+          <tbody className="divide-border divide-y">
             {filteredChannels.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
+                <td colSpan={4} className="text-muted-foreground py-8 text-center text-sm">
                   Không tìm thấy kênh nào khớp với bộ lọc hiện tại.
                 </td>
               </tr>
@@ -181,12 +197,12 @@ export function BatchChannelTable({
                 return (
                   <tr
                     key={channel.postJobId}
-                    className="align-top transition-colors hover:bg-accent/20"
+                    className="hover:bg-sidebar/70 align-top transition-colors duration-150"
                   >
                     {/* Channel info — the row's header, so a screen reader can
                         name which channel a status cell belongs to. */}
                     <th scope="row" className="px-4 py-3.5 text-left">
-                      <div className="font-medium text-foreground">
+                      <div className="text-foreground font-medium">
                         <ChannelNameCell
                           channelId={channel.channelId}
                           label={labels.get(channel.channelId)}
@@ -200,7 +216,7 @@ export function BatchChannelTable({
                     </td>
 
                     {/* Attempt Count */}
-                    <td className="px-4 py-3.5 text-center font-mono text-xs tabular-nums text-muted-foreground">
+                    <td className="text-muted-foreground px-4 py-3.5 text-center font-mono text-xs tabular-nums">
                       {channel.attemptCount}
                     </td>
 
@@ -208,13 +224,14 @@ export function BatchChannelTable({
                     <td className="px-4 py-3.5">
                       <div className="flex flex-col gap-1.5">
                         <p
-                          className={`text-xs leading-relaxed ${
+                          className={cn(
+                            "text-sm leading-relaxed",
                             channel.status === "published"
-                              ? "font-medium text-foreground"
+                              ? "text-foreground font-medium"
                               : channel.status === "failed" || channel.status === "blocked"
-                                ? "text-madder"
-                                : "text-muted-foreground"
-                          }`}
+                                ? "text-destructive"
+                                : "text-muted-foreground",
+                          )}
                         >
                           {channel.userMessage}
                         </p>
@@ -226,22 +243,22 @@ export function BatchChannelTable({
                               href={link}
                               target="_blank"
                               rel="noreferrer noopener"
-                              className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+                              className="bg-accent text-accent-foreground hover:bg-accent/80 focus-visible:ring-ring inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-150 outline-none focus-visible:ring-2"
                             >
                               <span>Mở bài viết trên Facebook</span>
-                              <ExternalLink className="size-3" />
+                              <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
                             </a>
                           </div>
                         )}
 
                         {channel.publishedAt && (
-                          <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                          <span className="text-muted-foreground font-mono text-xs tabular-nums">
                             Đã đăng: {formatDateTime(channel.publishedAt)}
                           </span>
                         )}
 
                         {channel.lastErrorCode && (
-                          <span className="font-mono text-[11px] text-muted-foreground/80">
+                          <span className="text-foreground-subtle font-mono text-xs">
                             Mã lỗi: {channel.lastErrorCode}
                           </span>
                         )}

@@ -308,12 +308,20 @@ export function PromptVersionForm({
           )}
         />
 
-        <Collapsible
-          defaultIsOpen={false}
-          trigger={<Text type="label">Biến được phép dùng trong nội dung prompt</Text>}
-        >
-          <PromptVariablesHelp id={`${formId}-help`} />
-        </Collapsible>
+        <div className="border-border bg-muted/20 rounded-lg border px-4 py-1.5">
+          <Collapsible
+            defaultIsOpen={false}
+            trigger={
+              <span className="text-foreground text-sm leading-5 font-medium">
+                Biến được phép dùng trong nội dung prompt
+              </span>
+            }
+          >
+            <div className="pt-1 pb-3">
+              <PromptVariablesHelp id={`${formId}-help`} />
+            </div>
+          </Collapsible>
+        </div>
 
         {/* The whole refusal (code + sentence); the per-variable lines are above. */}
         {error ? <ApiErrorNotice error={error} /> : null}

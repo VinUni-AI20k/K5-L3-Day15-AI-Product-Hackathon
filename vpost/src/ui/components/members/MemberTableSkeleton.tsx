@@ -3,7 +3,7 @@
 import { HStack, Skeleton, Stack } from "@astryxdesign/core";
 
 /** Column widths mirror MemberTable so the real rows land where these sat. */
-const COLUMNS = [null, 150, 140, 170, 420] as const;
+const COLUMNS = [null, 140, 130, 160, 360] as const;
 const ROWS = 4;
 
 /**
@@ -13,17 +13,18 @@ const ROWS = 4;
  */
 export function MemberTableSkeleton() {
   return (
-    // `paddingInline={4}`: the real table now stands in the screen's 16px
-    // column (see MembersScreen), and a skeleton on a different edge is exactly
-    // the jump this component exists to prevent.
-    <Stack direction="vertical" gap={0} paddingBlock={0} paddingInline={4} aria-hidden="true">
-      {Array.from({ length: ROWS }, (_, row) => (
-        <HStack key={row} gap={3} padding={3} align="center">
-          {COLUMNS.map((width, column) => (
-            <Skeleton key={column} width={width ?? "100%"} height={16} index={row} />
+    <div className="px-4 pb-6 sm:px-6" aria-hidden="true">
+      <div className="border-border bg-card overflow-hidden rounded-xl border">
+        <Stack direction="vertical" gap={0} padding={0}>
+          {Array.from({ length: ROWS }, (_, row) => (
+            <HStack key={row} gap={3} padding={3} align="center">
+              {COLUMNS.map((width, column) => (
+                <Skeleton key={column} width={width ?? "100%"} height={16} index={row} />
+              ))}
+            </HStack>
           ))}
-        </HStack>
-      ))}
-    </Stack>
+        </Stack>
+      </div>
+    </div>
   );
 }

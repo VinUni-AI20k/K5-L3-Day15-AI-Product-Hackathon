@@ -1,11 +1,13 @@
 "use client";
 
+import { Button, HStack, Heading, Stack, Text } from "@astryxdesign/core";
+import { RefreshCw } from "lucide-react";
 import { useId } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
+import { EmptyState } from "@/ui/components/feedback/EmptyState";
 import { TenantHealthCard } from "@/ui/components/tenant/TenantHealthCard";
 import { TenantHealthSkeleton } from "@/ui/components/tenant/TenantHealthSkeleton";
-import { Button } from "@/ui/components/ui/button";
 import { useActiveTenant } from "@/ui/hooks/useMe";
 import { useDelayedFlag } from "@/ui/hooks/useDelayedFlag";
 import { useTenantHealth } from "@/ui/hooks/useTenantHealth";
@@ -34,28 +36,30 @@ export function TenantHealthPanel() {
 
   return (
     <section className="space-y-4" aria-labelledby={headingId}>
-      <div className="space-y-1">
-        <h2 id={headingId} className="text-lg font-semibold">
-          Sức khoẻ đơn vị (tenant)
-        </h2>
-        <p className="text-muted-foreground text-sm">
-          Kiểm tra toàn tuyến: giao diện → API nội bộ → usecase → cơ sở dữ liệu. Kiểm tra chạy trên
-          công ty bạn đang làm việc
-          {tenant ? ` — ${tenant.name}` : ""}.
-        </p>
-      </div>
+      <HStack gap={3} justify="between" align="start" wrap="wrap">
+        <Stack direction="vertical" gap={1} className="min-w-0 flex-1">
+          <Heading level={2} id={headingId}>
+            Sức khoẻ đơn vị (tenant)
+          </Heading>
+          <Text type="supporting" color="secondary" className="max-w-prose">
+            Kiểm tra toàn tuyến: giao diện → API nội bộ → usecase → cơ sở dữ liệu. Kiểm tra chạy
+            trên công ty bạn đang làm việc
+            {tenant ? ` — ${tenant.name}` : ""}.
+          </Text>
+        </Stack>
 
-      <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
-          size="lg"
-          variant="outline"
-          disabled={!isResolved || query.isFetching}
+          size="md"
+          variant="secondary"
+          icon={<RefreshCw className="size-4" aria-hidden="true" />}
+          label={query.isFetching ? "Đang kiểm tra…" : "Kiểm tra lại"}
+          isLoading={query.isFetching}
+          isDisabled={!isResolved || query.isFetching}
+          tooltip={!isResolved ? "Đang chờ hệ thống xác định công ty của bạn." : undefined}
           onClick={() => void query.refetch()}
-        >
-          {query.isFetching ? "Đang kiểm tra…" : "Kiểm tra lại"}
-        </Button>
-      </div>
+        />
+      </HStack>
 
       {/* Announce state changes to screen readers without moving focus. */}
       <p className="sr-only" role="status" aria-live="polite">
@@ -86,13 +90,11 @@ function TenantHealthResult({
   // --- Idle: the session's company is not known yet -------------------------
   if (!isResolved) {
     return (
-      <div className="text-muted-foreground bg-muted/30 rounded-xl border border-dashed p-6 text-sm">
-        <p className="text-foreground font-medium">Đang xác định công ty của bạn</p>
-        <p className="mt-1">
-          Kiểm tra này chạy trên công ty bạn đang làm việc, nên nó chờ hệ thống trả lời bạn thuộc
-          công ty nào.
-        </p>
-      </div>
+      <EmptyState
+        kind="idle"
+        title="Đang xác định công ty của bạn"
+        description="Kiểm tra này chạy trên công ty bạn đang làm việc, nên nó chờ hệ thống trả lời bạn thuộc công ty nào."
+      />
     );
   }
 

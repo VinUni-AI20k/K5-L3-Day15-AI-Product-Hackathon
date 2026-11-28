@@ -1,12 +1,13 @@
 "use client";
 
+import { EmptyState, Heading } from "@astryxdesign/core";
+import { Layers } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { resolveGroupChannelLabels } from "@/ui/components/channels/channel-group-labels";
 import { ChannelGroupForm } from "@/ui/components/channels/ChannelGroupForm";
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
-import { EmptyState } from "@/ui/components/feedback/EmptyState";
 import { ReadOnlyNotice } from "@/ui/components/feedback/ReadOnlyNotice";
 import { Badge } from "@/ui/components/ui/badge";
 import { Button } from "@/ui/components/ui/button";
@@ -86,12 +87,12 @@ export function ChannelGroupsScreen() {
   const gate = writeGate(readOnlyReason);
 
   return (
-    <section className="space-y-6" aria-labelledby="channel-groups-heading">
-      <header className="space-y-1">
-        <h2 id="channel-groups-heading" className="text-2xl font-semibold tracking-tight">
+    <section className="space-y-8" aria-labelledby="channel-groups-heading">
+      <header className="space-y-1.5">
+        <Heading level={2} id="channel-groups-heading">
           Nhóm kênh
-        </h2>
-        <p className="text-muted-foreground max-w-prose text-sm">
+        </Heading>
+        <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">
           Gom sẵn các kênh hay đăng cùng nhau để ở màn soạn bài chỉ cần tick một lần. Nhóm chỉ là
           lối tắt chọn kênh — mọi quy tắc đăng (kiểm tồn, giãn cách, chống trùng) vẫn giữ nguyên.
         </p>
@@ -99,11 +100,11 @@ export function ChannelGroupsScreen() {
 
       <section
         aria-labelledby="channels-create-heading"
-        className="bg-card space-y-4 rounded-xl border p-5"
+        className="border-border bg-card space-y-4 rounded-xl border p-5 sm:p-6"
       >
-        <h3 id="channels-create-heading" className="text-base font-semibold">
+        <Heading level={3} id="channels-create-heading">
           Tạo nhóm mới
-        </h3>
+        </Heading>
         {gate.isDisabled ? (
           // The whole form goes, not just its button: a form nobody can submit
           // invites typing that gets thrown away.
@@ -111,6 +112,7 @@ export function ChannelGroupsScreen() {
         ) : (
           <ChannelGroupForm
             mode="create"
+            submitVariant={editingId !== null ? "secondary" : "default"}
             channels={pickableChannels}
             pending={create.isPending}
             error={create.isError ? create.error : undefined}
@@ -123,18 +125,18 @@ export function ChannelGroupsScreen() {
         {create.isSuccess ? (
           <p
             role="status"
-            className="border-success/30 bg-success/10 text-success-foreground rounded-lg border px-3 py-2 text-sm"
+            className="border-success/30 bg-success/10 text-success-foreground rounded-lg border px-4 py-3 text-sm font-medium"
           >
             Đã tạo nhóm “{create.data.name}” với {create.data.channelCount} kênh.
           </p>
         ) : null}
       </section>
 
-      <section aria-labelledby="channels-list-heading" className="space-y-3">
+      <section aria-labelledby="channels-list-heading" className="space-y-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 id="channels-list-heading" className="text-base font-semibold">
+          <Heading level={3} id="channels-list-heading">
             Nhóm đã lưu
-          </h3>
+          </Heading>
           {/* Only once the list is real: "0 nhóm" while loading reads as an
               answer, and the operator would act on it. */}
           {groups.data ? (
@@ -154,16 +156,17 @@ export function ChannelGroupsScreen() {
             channel list did not. The cards below then have no names to print —
             say why instead of leaving the operator staring at raw ids. */}
         {channels.isError && items.length > 0 ? (
-          <div className="border-warning/40 bg-warning/10 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+          <div className="border-warning/40 bg-warning/10 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 text-sm">
             <p className="text-warning-foreground">
               Chưa tải được danh sách kênh — các nhóm bên dưới đang hiện mã kênh thay cho tên Page.
             </p>
             <Button
               type="button"
               size="sm"
-              variant="outline"
+              variant="secondary"
               disabled={channels.isFetching}
               onClick={() => void channels.refetch()}
+              className="min-h-10 sm:min-h-8"
             >
               {channels.isFetching ? "Đang tải…" : "Thử lại"}
             </Button>
@@ -171,24 +174,37 @@ export function ChannelGroupsScreen() {
         ) : null}
 
         {!isFirstLoad && !groups.isError && items.length === 0 ? (
-          <EmptyState
-            kind="first-run"
-            title="Chưa có nhóm kênh nào"
-            description="Tạo nhóm đầu tiên bằng biểu mẫu phía trên. Khi đã có nhóm, màn soạn bài sẽ hiện danh sách kênh theo nhóm để tick nhanh."
-            action={
-              <Button asChild variant="outline">
-                <Link href="/compose">Về màn soạn bài</Link>
-              </Button>
-            }
-          />
+          <div className="border-border bg-card rounded-xl border p-6">
+            <EmptyState
+              headingLevel={3}
+              icon={
+                <span
+                  aria-hidden="true"
+                  className="bg-accent text-accent-foreground inline-flex size-10 items-center justify-center rounded-lg"
+                >
+                  <Layers className="size-5" />
+                </span>
+              }
+              title="Chưa có nhóm kênh nào"
+              description="Tạo nhóm đầu tiên ở khung phía trên để chọn nhanh nhiều Fanpage cùng lúc khi soạn bài."
+              actions={
+                <Button asChild variant="secondary" className="min-h-10 px-4 sm:min-h-9">
+                  <Link href="/compose">Về màn soạn bài</Link>
+                </Button>
+              }
+            />
+          </div>
         ) : null}
 
         <ul className="space-y-3">
           {items.map((group) => (
-            <li key={group.id} className="bg-card space-y-3 rounded-xl border p-4">
+            <li
+              key={group.id}
+              className="border-border bg-card space-y-3 rounded-xl border p-5 transition-colors duration-150 ease-out"
+            >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-sm font-semibold">{group.name}</h4>
-                <Badge tone="info">{group.channelCount} kênh</Badge>
+                <h4 className="text-foreground text-base font-semibold">{group.name}</h4>
+                <Badge tone="neutral">{group.channelCount} kênh</Badge>
               </div>
 
               <GroupChannelList channelIds={group.channelIds} channels={knownChannels} />
@@ -198,7 +214,7 @@ export function ChannelGroupsScreen() {
               </p>
 
               {editingId === group.id ? (
-                <div className="border-t pt-3">
+                <div className="border-border border-t pt-4">
                   <ChannelGroupForm
                     mode="edit"
                     defaultValues={{
@@ -225,9 +241,9 @@ export function ChannelGroupsScreen() {
                 <div
                   role="alertdialog"
                   aria-label={`Xác nhận xoá nhóm ${group.name}`}
-                  className="border-destructive/30 bg-destructive/5 space-y-2 rounded-lg border p-3"
+                  className="border-destructive/30 bg-destructive/10 space-y-3 rounded-lg border p-4"
                 >
-                  <p className="text-sm">
+                  <p className="text-foreground text-sm leading-relaxed">
                     Xoá nhóm “{group.name}”? Các bài đã đăng không bị ảnh hưởng — chỉ mất lối tắt
                     chọn kênh này.
                   </p>
@@ -236,6 +252,7 @@ export function ChannelGroupsScreen() {
                       type="button"
                       variant="destructive"
                       disabled={remove.isPending}
+                      className="min-h-10 px-4 sm:min-h-9"
                       onClick={() => {
                         remove.reset();
                         remove.mutate(
@@ -249,6 +266,7 @@ export function ChannelGroupsScreen() {
                     <Button
                       type="button"
                       variant="ghost"
+                      className="min-h-10 px-4 sm:min-h-9"
                       onClick={() => setConfirmingId(null)}
                       disabled={remove.isPending}
                     >
@@ -257,12 +275,13 @@ export function ChannelGroupsScreen() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 pt-1">
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
+                    variant="secondary"
                     disabled={gate.isDisabled}
+                    className="min-h-10 px-3.5 sm:min-h-8"
                     onClick={() => {
                       update.reset();
                       setConfirmingId(null);
@@ -277,6 +296,7 @@ export function ChannelGroupsScreen() {
                     size="sm"
                     variant="ghost"
                     disabled={gate.isDisabled}
+                    className="min-h-10 px-3.5 sm:min-h-8"
                     onClick={() => {
                       remove.reset();
                       setEditingId(null);
@@ -338,13 +358,13 @@ function GroupChannelList({
   }
 
   return (
-    <ul className="flex flex-wrap gap-1.5">
+    <ul className="flex flex-wrap gap-2">
       {labels.map((label, index) => (
         // Index in the key as well as the id: a duplicated id must still render
         // as two chips rather than collapse into one.
         <li
           key={`${label.channelId}-${index}`}
-          className="bg-muted rounded-md px-2 py-0.5 text-xs break-all"
+          className="bg-muted rounded-full px-3 py-1 text-xs font-medium break-all"
         >
           {label.name === null ? (
             <span className="text-muted-foreground font-mono">{label.channelId}</span>
@@ -368,16 +388,16 @@ function ChannelGroupsSkeleton() {
   return (
     <div aria-hidden="true" className="space-y-3 motion-safe:animate-pulse">
       {[0, 1].map((card) => (
-        <div key={card} className="bg-card space-y-3 rounded-xl border p-4">
+        <div key={card} className="border-border bg-card space-y-3 rounded-xl border p-5">
           <div className="flex items-center justify-between gap-2">
-            <div className="bg-muted h-4 w-40 rounded" />
-            <div className="bg-muted h-5 w-16 rounded-full" />
+            <div className="bg-muted h-5 w-40 rounded" />
+            <div className="bg-muted h-6 w-16 rounded-full" />
           </div>
-          <div className="flex gap-1.5">
-            <div className="bg-muted h-5 w-24 rounded-md" />
-            <div className="bg-muted h-5 w-28 rounded-md" />
+          <div className="flex gap-2">
+            <div className="bg-muted h-6 w-24 rounded-full" />
+            <div className="bg-muted h-6 w-28 rounded-full" />
           </div>
-          <div className="bg-muted h-3 w-48 rounded" />
+          <div className="bg-muted h-3.5 w-48 rounded" />
         </div>
       ))}
     </div>

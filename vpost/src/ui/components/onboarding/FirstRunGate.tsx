@@ -77,14 +77,16 @@ export function FirstRunGate({ children }: { children: ReactNode }) {
    */
   if (ensureDefault.isError) {
     return (
-      <Stack direction="vertical" gap={3} padding={4}>
-        <Heading level={1}>Chưa mở được không gian làm việc</Heading>
-        <Text type="supporting">
-          Tài khoản của bạn chưa thuộc công ty nào, và hệ thống chưa tạo được công ty đầu tiên. Chưa
-          dùng được màn hình nào cho tới khi việc này xong.
-        </Text>
-        <ApiErrorNotice error={ensureDefault.error} onRetry={() => provision()} />
-      </Stack>
+      <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
+        <Stack direction="vertical" gap={4}>
+          <Heading level={1}>Chưa mở được không gian làm việc</Heading>
+          <Text type="supporting">
+            Tài khoản của bạn chưa thuộc công ty nào, và hệ thống chưa tạo được công ty đầu tiên. Chưa
+            dùng được màn hình nào cho tới khi việc này xong.
+          </Text>
+          <ApiErrorNotice error={ensureDefault.error} onRetry={() => provision()} />
+        </Stack>
+      </div>
     );
   }
 

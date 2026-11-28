@@ -4,49 +4,52 @@ export function BatchStatusSkeleton() {
   return (
     <div aria-hidden="true" className="flex flex-col gap-6 motion-safe:animate-pulse">
       {/* Top Card Skeleton */}
-      <div className="flex flex-col gap-4 rounded-xl border border-border/80 bg-card p-5">
-        <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-4">
+      <div className="border-border bg-card flex flex-col gap-5 rounded-xl border p-5 sm:p-6">
+        <div className="border-border flex flex-wrap items-center justify-between gap-3 border-b pb-4">
           <div className="flex flex-col gap-2">
-            <div className="h-4 w-28 rounded-md bg-muted" />
-            <div className="h-4 w-72 rounded-md bg-muted" />
+            <div className="bg-muted h-5 w-36 rounded-md" />
+            <div className="bg-muted h-4 w-72 max-w-full rounded-md" />
           </div>
-          <div className="h-10 w-36 rounded-lg bg-muted/60" />
+          <div className="bg-muted h-12 w-40 rounded-xl" />
         </div>
 
         {/* 6-cell Stat Tape Skeleton */}
-        <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-border/80 bg-border/40 gap-px sm:grid-cols-3 lg:grid-cols-6">
+        <div className="border-border bg-border grid grid-cols-2 gap-px overflow-hidden rounded-xl border sm:grid-cols-3 lg:grid-cols-6">
           {[0, 1, 2, 3, 4, 5].map((cell) => (
-            <div key={cell} className="flex flex-col justify-between bg-card p-3.5 h-20">
-              <div className="h-3 w-16 rounded bg-muted" />
-              <div className="h-6 w-10 rounded bg-muted font-mono" />
+            <div key={cell} className="bg-card flex h-20 flex-col justify-between p-3.5">
+              <div className="bg-muted h-3.5 w-20 rounded" />
+              <div className="bg-muted h-6 w-10 rounded" />
             </div>
           ))}
         </div>
 
         {/* Meta row */}
-        <div className="grid grid-cols-2 gap-3 pt-2 sm:grid-cols-4">
-          <div className="h-4 w-32 rounded bg-muted/60" />
-          <div className="h-4 w-32 rounded bg-muted/60" />
-          <div className="h-4 w-32 rounded bg-muted/60" />
-          <div className="h-4 w-32 rounded bg-muted/60" />
+        <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
+          <div className="bg-muted h-4 w-32 rounded" />
+          <div className="bg-muted h-4 w-32 rounded" />
+          <div className="bg-muted h-4 w-32 rounded" />
+          <div className="bg-muted h-4 w-32 rounded" />
         </div>
       </div>
 
       {/* Table Skeleton */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div className="h-5 w-44 rounded bg-muted" />
-          <div className="h-8 w-60 rounded-lg bg-muted/60" />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-muted h-5 w-44 rounded-md" />
+          <div className="bg-muted h-10 w-60 rounded-lg" />
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
-          <div className="h-10 bg-muted/40 border-b border-border/60" />
+        <div className="border-border bg-card overflow-hidden rounded-xl border">
+          <div className="border-border bg-sidebar h-10 border-b" />
           {[0, 1, 2, 3].map((row) => (
-            <div key={row} className="flex items-center justify-between gap-4 border-b border-border/40 p-4 last:border-0">
-              <div className="h-4 w-40 rounded bg-muted" />
-              <div className="h-6 w-24 rounded-full bg-muted" />
-              <div className="h-4 w-12 rounded bg-muted" />
-              <div className="h-4 w-64 rounded bg-muted" />
+            <div
+              key={row}
+              className="border-border flex items-center justify-between gap-4 border-b p-4 last:border-0"
+            >
+              <div className="bg-muted h-4 w-40 rounded" />
+              <div className="bg-muted h-6 w-24 rounded-full" />
+              <div className="bg-muted h-4 w-12 rounded" />
+              <div className="bg-muted h-4 w-64 rounded" />
             </div>
           ))}
         </div>

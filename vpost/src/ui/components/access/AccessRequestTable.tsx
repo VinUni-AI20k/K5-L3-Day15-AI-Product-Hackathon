@@ -58,7 +58,7 @@ export function AccessRequestTable({ items }: { items: readonly AccessRequest[] 
       width: proportional(2),
       renderCell: (request) => (
         <Stack direction="vertical" gap={0.5}>
-          <Text>{accessRequestDisplayName(request)}</Text>
+          <Text weight="medium">{accessRequestDisplayName(request)}</Text>
           {/* A provider that sent no e-mail is a fact, not a blank cell — and
               never the string "null". */}
           {hasEmail(request.email) ? (
@@ -125,7 +125,12 @@ export function AccessRequestTable({ items }: { items: readonly AccessRequest[] 
   ];
 
   return (
-    <Stack direction="vertical" isScrollable height="100%">
+    <Stack
+      direction="vertical"
+      isScrollable
+      height="100%"
+      className="max-w-full min-w-0 overflow-x-auto"
+    >
       <Table
         data={items as AccessRequestRow[]}
         columns={columns}

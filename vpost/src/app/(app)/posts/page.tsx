@@ -59,7 +59,7 @@ function PostsFallback({ tab }: { tab: PostsTab }) {
       {/* The header band: full-width divider, bounded column inside — the two
           boxes `PostsHub`'s LayoutHeader draws. */}
       <div className="border-border border-b">
-        <div className="mx-auto w-full max-w-5xl space-y-4 px-6 py-4">
+        <div className="mx-auto w-full max-w-5xl space-y-4 px-4 sm:px-6 py-4">
           <div className="space-y-2">
             <div className="bg-muted h-8 w-40 rounded" />
             <div className="bg-muted h-4 w-full max-w-md rounded" />
@@ -71,7 +71,7 @@ function PostsFallback({ tab }: { tab: PostsTab }) {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-8">
+      <div className="mx-auto w-full max-w-5xl space-y-6 px-4 sm:px-6 py-8">
         <div className="space-y-2">
           <div className="bg-muted h-8 w-48 rounded" />
           <div className="bg-muted h-4 w-full max-w-xl rounded" />

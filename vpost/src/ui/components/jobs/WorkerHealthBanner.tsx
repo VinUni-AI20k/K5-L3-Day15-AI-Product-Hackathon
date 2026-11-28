@@ -1,5 +1,7 @@
 "use client";
 
+import { AlertTriangle, Info } from "lucide-react";
+
 import { Button } from "@/ui/components/ui/button";
 import { cn } from "@/shared/utils";
 
@@ -23,7 +25,7 @@ const TONE_STYLES: Record<WorkerHealthTone, string> = {
   // Something is wrong but nothing is lost yet.
   warning: "border-warning/40 bg-warning/10 text-warning-foreground",
   // We could not take the reading; the log itself is unaffected.
-  muted: "border-border bg-muted/40 text-muted-foreground",
+  muted: "border-border bg-muted/50 text-muted-foreground",
 };
 
 export function WorkerHealthBanner({
@@ -40,6 +42,8 @@ export function WorkerHealthBanner({
 }) {
   if (!notice) return null;
 
+  const Icon = notice.tone === "muted" ? Info : AlertTriangle;
+
   return (
     <div
       data-notice-kind={notice.kind}
@@ -48,25 +52,28 @@ export function WorkerHealthBanner({
       role={notice.tone === "critical" ? "alert" : "status"}
       aria-live={notice.tone === "critical" ? "assertive" : "polite"}
       className={cn(
-        "flex flex-wrap items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm",
+        "flex flex-wrap items-start justify-between gap-3 rounded-xl border p-4 text-sm transition-colors duration-150 ease-out",
         TONE_STYLES[notice.tone],
         className,
       )}
     >
-      <div className="min-w-0 max-w-prose space-y-1">
-        <p className="font-semibold">{notice.title}</p>
-        <p>{notice.description}</p>
-        <p className="font-medium">{notice.action}</p>
+      <div className="flex min-w-0 max-w-prose items-start gap-3">
+        <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+        <div className="min-w-0 space-y-1">
+          <p className="font-semibold">{notice.title}</p>
+          <p className="leading-relaxed">{notice.description}</p>
+          <p className="font-medium">{notice.action}</p>
+        </div>
       </div>
 
       {onRecheck ? (
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={onRecheck}
           disabled={isChecking}
-          className="shrink-0"
+          className="min-h-10 shrink-0 px-3 sm:min-h-8"
         >
           {isChecking ? "Đang kiểm tra…" : "Kiểm tra lại"}
         </Button>

@@ -1,10 +1,11 @@
 "use client";
 
+import { EmptyState as AstryxEmptyState, Heading } from "@astryxdesign/core";
+import { AlertCircle, Clock, Database, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { cn } from "@/shared/utils";
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
-import { EmptyState } from "@/ui/components/feedback/EmptyState";
 import { CatalogSourceCard } from "@/ui/components/sync/CatalogSourceCard";
 import { RunSyncButton } from "@/ui/components/sync/RunSyncButton";
 import { SyncFunnel } from "@/ui/components/sync/SyncFunnel";
@@ -134,14 +135,14 @@ export function SyncScreen() {
           to live in here and pushed it to ~108px, swallowing the heading of
           every block an operator scrolled to (funnel stage "03" at a 900px
           viewport); it now scrolls with the content it introduces. */}
-      <div className="relative flex h-full min-h-0 scroll-pt-14 flex-col overflow-y-auto @5xl:flex-row @5xl:overflow-hidden">
-        <div className="relative flex min-w-0 flex-1 scroll-pt-14 flex-col @5xl:min-h-0 @5xl:overflow-y-auto @5xl:[scrollbar-gutter:stable]">
-          <header className="bg-background border-border sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b px-6">
-            <h1 className="min-w-0 truncate text-2xl leading-tight font-semibold tracking-tight">
-              Đồng bộ dữ liệu
-            </h1>
+      <div className="relative flex h-full min-h-0 scroll-pt-16 flex-col overflow-y-auto @5xl:flex-row @5xl:overflow-hidden">
+        <div className="relative flex min-w-0 flex-1 scroll-pt-16 flex-col @5xl:min-h-0 @5xl:overflow-y-auto @5xl:[scrollbar-gutter:stable]">
+          <header className="bg-background border-border sticky top-0 z-10 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-6">
+            <div className="min-w-0">
+              <Heading level={1}>Đồng bộ dữ liệu</Heading>
+            </div>
 
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
               {status.isFetching && !isFirstLoad ? (
                 <p className="text-muted-foreground text-sm whitespace-nowrap">Đang làm mới…</p>
               ) : null}
@@ -177,10 +178,10 @@ export function SyncScreen() {
                   : ""}
           </p>
 
-          <div className="flex min-w-0 flex-col gap-4 px-6 py-4">
+          <div className="flex min-w-0 flex-col gap-6 px-4 py-5 sm:px-6">
             {/* Body-quiet, and in the scrolling column: it is read once on the
                 first visit, so it does not get to sit on screen forever. */}
-            <p className="text-muted-foreground max-w-prose text-[13px]">
+            <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">
               Đọc ảnh/video từ Drive và sản phẩm từ Sheet, rồi ghi vào hệ thống. Mọi file bị bỏ qua
               đều được ghi nhận bên dưới.
             </p>
@@ -198,7 +199,7 @@ export function SyncScreen() {
               <div
                 role="status"
                 className={cn(
-                  "flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-sm",
+                  "flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm",
                   NOTICE_TONE.info,
                 )}
               >
@@ -207,7 +208,12 @@ export function SyncScreen() {
                   <span className="font-medium">đồng bộ vẫn đang chạy trên máy chủ</span>. Trang tự
                   cập nhật khi có kết quả, đừng bấm chạy lại.
                 </p>
-                <Button type="button" variant="outline" onClick={() => void status.refetch()}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="min-h-10 px-3.5"
+                  onClick={() => void status.refetch()}
+                >
                   Tải lại trạng thái
                 </Button>
               </div>
@@ -216,7 +222,12 @@ export function SyncScreen() {
                 error={run.error}
                 onRetry={() => run.mutate()}
                 extraAction={
-                  <Button type="button" variant="outline" onClick={() => void status.refetch()}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="min-h-10 px-3.5"
+                    onClick={() => void status.refetch()}
+                  >
                     Tải lại trạng thái
                   </Button>
                 }
@@ -230,7 +241,7 @@ export function SyncScreen() {
               <p
                 role="status"
                 className={cn(
-                  "rounded-xl border px-3.5 py-2.5 text-sm",
+                  "rounded-xl border px-4 py-3 text-sm",
                   NOTICE_TONE[SYNC_STATUS_TONES[run.data.status]],
                 )}
               >
@@ -255,7 +266,7 @@ export function SyncScreen() {
             {sourceChanged ? (
               <p
                 role="status"
-                className="border-warning/40 bg-warning/10 text-warning-foreground rounded-xl border px-3.5 py-2.5 text-sm"
+                className="border-warning/30 bg-warning/10 text-warning-foreground rounded-xl border px-4 py-3 text-sm"
               >
                 Đã đổi nguồn dữ liệu. Số liệu bên dưới vẫn là của nguồn cũ cho tới khi bạn bấm{" "}
                 <span className="font-medium">Chạy đồng bộ</span> — lần chạy đó cũng sẽ xoá sản
@@ -274,7 +285,7 @@ export function SyncScreen() {
 
         <aside
           aria-label="Chi tiết lần chạy"
-          className="border-border bg-card relative shrink-0 border-t px-5 py-5 @5xl:w-90 @5xl:min-h-0 @5xl:overflow-y-auto @5xl:border-t-0 @5xl:border-l"
+          className="border-border bg-sidebar relative shrink-0 border-t px-4 py-5 sm:px-6 @5xl:w-96 @5xl:min-h-0 @5xl:overflow-y-auto @5xl:border-t-0 @5xl:border-l"
         >
           <SyncRailContent
             isResolved={isResolved}
@@ -306,9 +317,20 @@ function SyncRailContent({
   // Still working out which company this session belongs to.
   if (!isResolved) {
     return (
-      <p className="text-muted-foreground text-sm">
-        Đang xác định công ty của bạn để đọc lần chạy gần nhất.
-      </p>
+      <div className="space-y-3">
+        <h2 className="text-foreground text-base font-semibold">Lần chạy gần nhất</h2>
+        <div className="border-border bg-card flex items-start gap-3 rounded-xl border p-4">
+          <span
+            aria-hidden="true"
+            className="bg-accent text-accent-foreground flex size-9 shrink-0 items-center justify-center rounded-lg"
+          >
+            <Clock className="size-4" aria-hidden="true" />
+          </span>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Đang xác định công ty của bạn để đọc lần chạy gần nhất.
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -318,17 +340,39 @@ function SyncRailContent({
   // would give the operator two buttons for one problem.
   if (hasError) {
     return (
-      <p className="text-muted-foreground text-sm">
-        Chưa đọc được trạng thái lần chạy. Xem thông báo lỗi ở cột bên trái.
-      </p>
+      <div className="space-y-3">
+        <h2 className="text-foreground text-base font-semibold">Lần chạy gần nhất</h2>
+        <div className="border-border bg-card flex items-start gap-3 rounded-xl border p-4">
+          <span
+            aria-hidden="true"
+            className="bg-destructive/10 text-destructive flex size-9 shrink-0 items-center justify-center rounded-lg"
+          >
+            <AlertCircle className="size-4" aria-hidden="true" />
+          </span>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Chưa đọc được trạng thái lần chạy. Xem thông báo lỗi ở cột bên trái.
+          </p>
+        </div>
+      </div>
     );
   }
 
   if (!run) {
     return (
-      <p className="text-muted-foreground text-sm">
-        Đơn vị này chưa từng đồng bộ, nên chưa có lần chạy nào để xem chi tiết.
-      </p>
+      <div className="space-y-3">
+        <h2 className="text-foreground text-base font-semibold">Lần chạy gần nhất</h2>
+        <div className="border-border bg-card flex items-start gap-3 rounded-xl border p-4">
+          <span
+            aria-hidden="true"
+            className="bg-accent text-accent-foreground flex size-9 shrink-0 items-center justify-center rounded-lg"
+          >
+            <RefreshCw className="size-4" aria-hidden="true" />
+          </span>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Đơn vị này chưa từng đồng bộ, nên chưa có lần chạy nào để xem chi tiết.
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -349,11 +393,22 @@ function SyncStatusResult({
   // --- Idle: the session's company is not known yet -------------------------
   if (!isResolved) {
     return (
-      <EmptyState
-        kind="idle"
-        title="Đang xác định công ty của bạn"
-        description="Số liệu đồng bộ thuộc về một công ty cụ thể, nên màn này chờ biết bạn đang làm việc ở công ty nào."
-      />
+      <div className="border-border bg-card rounded-xl border p-6">
+        <AstryxEmptyState
+          isCompact
+          headingLevel={2}
+          icon={
+            <span
+              aria-hidden="true"
+              className="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl"
+            >
+              <Clock className="size-5" aria-hidden="true" />
+            </span>
+          }
+          title="Đang xác định công ty của bạn"
+          description="Số liệu đồng bộ thuộc về một công ty cụ thể, nên màn này chờ biết bạn đang làm việc ở công ty nào."
+        />
+      </div>
     );
   }
 
@@ -362,7 +417,13 @@ function SyncStatusResult({
 
   // --- Error ---------------------------------------------------------------
   if (status.isError) {
-    return <ApiErrorNotice error={status.error} onRetry={() => void status.refetch()} />;
+    return (
+      <ApiErrorNotice
+        error={status.error}
+        shouldFocus={false}
+        onRetry={() => void status.refetch()}
+      />
+    );
   }
 
   if (!status.data) return null;
@@ -370,17 +431,22 @@ function SyncStatusResult({
   // --- Empty: this tenant has never synced ---------------------------------
   if (status.data.state === "never_synced") {
     return (
-      <EmptyState
-        kind="first-run"
-        title="Đơn vị này chưa từng đồng bộ"
-        description={
-          <>
-            Chưa có dữ liệu sản phẩm hay ảnh nào trong hệ thống. Bấm{" "}
-            <span className="font-medium">Chạy đồng bộ</span> ở trên để đọc Drive và Sheet lần đầu.
-            Cần khai báo thư mục Drive và bảng Sheet cho đơn vị trước khi chạy.
-          </>
-        }
-      />
+      <div className="border-border bg-card rounded-xl border p-6">
+        <AstryxEmptyState
+          isCompact
+          headingLevel={2}
+          icon={
+            <span
+              aria-hidden="true"
+              className="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl"
+            >
+              <Database className="size-5" aria-hidden="true" />
+            </span>
+          }
+          title="Đơn vị này chưa từng đồng bộ"
+          description="Chưa có dữ liệu sản phẩm hay ảnh nào trong hệ thống. Bấm “Chạy đồng bộ” ở trên để đọc Drive và Sheet lần đầu sau khi khai báo nguồn."
+        />
+      </div>
     );
   }
 
@@ -389,16 +455,27 @@ function SyncStatusResult({
 
   if (!run.counts) {
     return (
-      <EmptyState
-        kind="done"
-        title="Lần chạy này chưa có số liệu"
-        description="Số liệu chỉ được ghi khi lần đồng bộ kết thúc. Nếu trạng thái vẫn là “Đang chạy”, hãy đợi rồi tải lại trang."
-      />
+      <div className="border-border bg-card rounded-xl border p-6">
+        <AstryxEmptyState
+          isCompact
+          headingLevel={2}
+          icon={
+            <span
+              aria-hidden="true"
+              className="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl"
+            >
+              <RefreshCw className="size-5" aria-hidden="true" />
+            </span>
+          }
+          title="Lần chạy này chưa có số liệu"
+          description="Số liệu chỉ được ghi khi lần đồng bộ kết thúc. Nếu trạng thái vẫn là “Đang chạy”, hãy đợi rồi tải lại trang."
+        />
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <SyncFunnel counts={run.counts} finishedAt={run.finishedAt} />
       <SyncIssuesTable
         issues={run.issues}

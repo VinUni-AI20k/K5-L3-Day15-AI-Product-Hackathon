@@ -8,6 +8,7 @@ import {
   LayoutHeader,
 } from "@astryxdesign/core";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Check, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -34,17 +35,16 @@ import { ReadOnlyNotice } from "@/ui/components/feedback/ReadOnlyNotice";
 import { SchedulePicker } from "@/ui/components/scheduled/SchedulePicker";
 import { Badge } from "@/ui/components/ui/badge";
 import { Button } from "@/ui/components/ui/button";
-import { Eyebrow } from "@/ui/components/ui/eyebrow";
 import { Input } from "@/ui/components/ui/input";
 import { Progress } from "@/ui/components/ui/progress";
 import { Select } from "@/ui/components/ui/select";
 import { Textarea } from "@/ui/components/ui/textarea";
+import { writeGate } from "@/ui/hooks/read-only-gate";
 import { useBulkRun } from "@/ui/hooks/useBulkRun";
 import { useChannelGroups } from "@/ui/hooks/useChannelGroups";
 import { useChannels } from "@/ui/hooks/useChannels";
-import { useScheduleChoice } from "@/ui/hooks/useScheduleChoice";
-import { writeGate } from "@/ui/hooks/read-only-gate";
 import { useReadOnlyReason } from "@/ui/hooks/useReadOnlyReason";
+import { useScheduleChoice } from "@/ui/hooks/useScheduleChoice";
 import {
   BULK_CAPTION_MODES,
   BULK_CAPTION_MODE_LABELS,
@@ -149,7 +149,6 @@ export function BulkRunScreen() {
   const hasNoCodes = parsed.codes.length === 0;
   const runBlockedReason = gate.reason ?? (hasNoCodes ? EMPTY_CODES_REASON : null);
 
-
   useEffect(() => {
     if (phase === "finished") summaryRef.current?.focus();
   }, [phase]);
@@ -228,19 +227,22 @@ export function BulkRunScreen() {
         height="fill"
         header={
           <LayoutHeader hasDivider padding={0}>
-            <div className="mx-auto flex w-full max-w-5xl flex-wrap items-start justify-between gap-4 px-6 py-8 xl:max-w-7xl">
-              <div className="max-w-prose space-y-1.5">
-
+            <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6 sm:py-8 xl:max-w-7xl">
+              <div className="max-w-prose space-y-1">
                 <Heading level={1}>Chạy hàng loạt</Heading>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Nhập danh sách mã sản phẩm, chọn Fanpage và duyệt nội dung trước khi xuất bản.
+                </p>
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   aria-expanded={detailsOpen}
                   aria-controls={detailsId}
                   onClick={() => setDetailsOpen((open) => !open)}
+                  className="min-h-10 px-4"
                 >
                   Chi tiết
                 </Button>
@@ -250,13 +252,13 @@ export function BulkRunScreen() {
         }
         content={
           <LayoutContent padding={0} isScrollable>
-            <div className="relative mx-auto w-full max-w-5xl xl:max-w-7xl space-y-6 px-6 py-8">
+            <div className="relative mx-auto w-full max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8 xl:max-w-7xl">
               <ScopeDisclosure id={detailsId} isOpen={detailsOpen} onOpenChange={setDetailsOpen} />
 
               {/* Main responsive 2-column layout */}
-              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 xl:gap-8">
-                {/* Cột trái: các thẻ mẫu của form, mỗi thẻ tự mang ô rail của nó */}
-                <div className="lg:col-span-7">
+              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8">
+                {/* Cột trái: các thẻ bước của form, mỗi thẻ tự mang ô rail của nó */}
+                <div className="min-w-0 lg:col-span-7">
                   <form
                     noValidate
                     className="space-y-6"
@@ -312,18 +314,18 @@ export function BulkRunScreen() {
                           type="button"
                           onClick={() => setPickerOpen(true)}
                           disabled={isRunning}
-                          className="focus-visible:ring-ring border-border bg-card hover:bg-muted/30 group flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3.5 text-left shadow-xs transition-all outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="border-border bg-card hover:bg-sidebar focus-visible:ring-ring focus-visible:ring-offset-background group flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          <span className="text-foreground-subtle bg-muted shrink-0 rounded px-2 py-1 font-mono text-[10px] font-bold tracking-[0.1em]">
-                            FACEBOOK
+                          <span className="bg-muted text-muted-foreground shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                            Facebook
                           </span>
 
                           {selectedIds.length === 0 ? (
-                            <span className="text-muted-foreground text-sm font-medium">
+                            <span className="text-muted-foreground text-sm">
                               Chưa chọn kênh nào — bấm để mở danh sách Fanpage
                             </span>
                           ) : (
-                            <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <span className="flex min-w-0 flex-wrap items-center gap-2">
                               {shownChannels.map((channelId) => {
                                 const resolved = channelLabels.get(channelId);
                                 const label = resolved?.name ?? channelId;
@@ -333,18 +335,20 @@ export function BulkRunScreen() {
                                 return (
                                   <span
                                     key={channelId}
-                                    className="bg-muted/90 border-border/80 flex h-8 items-center gap-1.5 rounded-full border py-0 pr-3 pl-1 text-xs font-medium"
+                                    className="border-border bg-muted flex h-9 items-center gap-2 rounded-full border py-0 pr-3 pl-1 text-xs font-medium"
                                   >
                                     <span
                                       aria-hidden="true"
                                       style={avatarToneStyle(label)}
-                                      className="flex size-6 items-center justify-center rounded-full text-[10px] font-bold"
+                                      className="text-foreground flex size-7 items-center justify-center rounded-full text-xs font-semibold"
                                     >
                                       {channelInitials(label)}
                                     </span>
-                                    <span className="max-w-36 truncate text-xs">{label}</span>
+                                    <span className="text-foreground max-w-36 truncate text-sm font-medium">
+                                      {label}
+                                    </span>
                                     {gone || off ? (
-                                      <span className="text-warning-foreground text-[10px] font-semibold">
+                                      <span className="text-warning-foreground text-xs font-medium">
                                         {gone ? "(đã gỡ)" : "(đang tắt)"}
                                       </span>
                                     ) : null}
@@ -352,7 +356,7 @@ export function BulkRunScreen() {
                                 );
                               })}
                               {selectedIds.length > shownChannels.length ? (
-                                <span className="text-primary bg-primary/10 rounded-full px-2.5 py-1 text-xs font-semibold">
+                                <span className="bg-accent text-accent-foreground rounded-full px-2.5 py-1 text-xs font-medium">
                                   +{selectedIds.length - shownChannels.length} kênh khác
                                 </span>
                               ) : null}
@@ -360,15 +364,19 @@ export function BulkRunScreen() {
                           )}
 
                           <span className="flex-1" />
-                          <span className="text-primary shrink-0 text-xs font-semibold group-hover:underline">
+                          <span className="text-accent-foreground shrink-0 text-sm font-medium group-hover:underline">
                             {selectedIds.length === 0 ? "Chọn kênh" : "Thay đổi"}
                           </span>
+                          <ChevronRight
+                            aria-hidden="true"
+                            className="text-muted-foreground size-4 shrink-0"
+                          />
                         </button>
 
                         {/* Nhóm kênh đã lưu: bật/tắt cả nhóm trong một lần bấm. */}
                         {groupItems.length > 0 ? (
-                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                            <span className="text-muted-foreground text-[11px] font-medium">
+                          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap">
+                            <span className="text-muted-foreground shrink-0 text-xs font-medium">
                               Nhóm có sẵn:
                             </span>
                             {groupItems.map((group) => {
@@ -383,10 +391,10 @@ export function BulkRunScreen() {
                                   aria-pressed={isAllSelected}
                                   onClick={() => toggleGroup(group.channelIds, !isAllSelected)}
                                   className={cn(
-                                    "rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors",
+                                    "focus-visible:ring-ring focus-visible:ring-offset-background inline-flex min-h-10 shrink-0 cursor-pointer items-center rounded-full border px-3.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40",
                                     isAllSelected
-                                      ? "bg-primary text-primary-foreground border-primary"
-                                      : "bg-card text-foreground border-border hover:bg-muted/60",
+                                      ? "border-primary bg-primary text-primary-foreground"
+                                      : "border-border bg-secondary text-secondary-foreground hover:bg-muted",
                                   )}
                                 >
                                   {group.name} ({group.channelIds.length})
@@ -399,13 +407,13 @@ export function BulkRunScreen() {
                         {/* Nói thẳng: thiếu câu này thì danh sách âm thầm tụt về mã kênh
                               và không ai biết đó có phải chuyện bình thường không. */}
                         {channels.isError ? (
-                          <p className="text-muted-foreground text-xs">
+                          <p className="text-muted-foreground text-xs leading-relaxed">
                             Không tải được tên Page nên danh sách đang hiện mã kênh. Vẫn chọn và
                             chạy được bình thường.
                           </p>
                         ) : null}
 
-                        <div className="flex items-center justify-between text-xs text-muted-foreground pt-0.5">
+                        <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 pt-0.5 text-xs">
                           <span>
                             {selectedIds.length === 0
                               ? "Chọn ít nhất 1 kênh để tiến hành chạy."
@@ -413,32 +421,28 @@ export function BulkRunScreen() {
                           </span>
                           <Link
                             href="/channels?tab=groups"
-                            className="hover:text-primary font-medium text-foreground underline underline-offset-4 transition-colors inline-flex items-center gap-1"
+                            className="text-accent-foreground focus-visible:ring-ring inline-flex min-h-9 items-center rounded-md font-medium underline underline-offset-4 transition-opacity duration-150 outline-none hover:opacity-80 focus-visible:ring-2"
                           >
                             Quản lý nhóm kênh
                           </Link>
                         </div>
 
-                        {channels.isError ? (
-                          <p className="text-muted-foreground text-xs">
-                            Không tải được tên Page nên danh sách đang hiện mã kênh. Vẫn chọn và chạy được bình thường.
-                          </p>
-                        ) : null}
-
                         {prune.changed ? (
                           <div
                             role="status"
-                            className="border-warning/40 bg-warning/10 text-warning-foreground flex items-start gap-2.5 rounded-xl border p-3 text-sm"
+                            className="border-warning/40 bg-warning/10 text-warning-foreground flex items-start gap-2.5 rounded-xl border p-3.5 text-sm"
                           >
                             <p className="text-xs leading-relaxed">
-                              <strong>{prune.removedLabels.length} Page</strong> đã tick sẽ KHÔNG được đăng vì kênh đang tắt hoặc đã bị gỡ:{" "}
-                              <span className="font-medium">{prune.removedLabels.join(", ")}</span>. Bật lại ở màn Kênh nếu vẫn muốn đăng.
+                              <strong>{prune.removedLabels.length} Page</strong> đã tick sẽ KHÔNG
+                              được đăng vì kênh đang tắt hoặc đã bị gỡ:{" "}
+                              <span className="font-medium">{prune.removedLabels.join(", ")}</span>.
+                              Bật lại ở màn Kênh nếu vẫn muốn đăng.
                             </p>
                           </div>
                         ) : null}
 
                         {channelError ? (
-                          <p role="alert" className="text-destructive text-sm font-semibold">
+                          <p role="alert" className="text-destructive text-sm font-medium">
                             {channelError}
                           </p>
                         ) : null}
@@ -454,7 +458,7 @@ export function BulkRunScreen() {
                       railDetail={captionMode === "ai" ? "AI sáng tạo" : "Mẫu chung"}
                       isDone
                     >
-                      <fieldset className="space-y-3.5" aria-describedby={`${captionModeId}-hint`}>
+                      <fieldset className="space-y-4" aria-describedby={`${captionModeId}-hint`}>
                         <legend className="sr-only">Cách viết caption</legend>
 
                         {/* Interactive Visual Cards for Caption Mode */}
@@ -464,22 +468,25 @@ export function BulkRunScreen() {
                             return (
                               <label
                                 key={mode}
-                                className={`relative flex cursor-pointer flex-col justify-between rounded-xl border p-4 transition-all ${isSelected
-                                  ? "border-primary bg-primary/[0.04] ring-2 ring-primary/25 shadow-sm"
-                                  : "border-border bg-card hover:border-border/80 hover:bg-muted/20"
-                                  } ${isRunning ? "opacity-60 cursor-not-allowed" : ""}`}
+                                className={cn(
+                                  "has-focus-visible:ring-ring relative flex cursor-pointer flex-col justify-between rounded-xl border p-4 transition-colors duration-150 has-focus-visible:ring-2",
+                                  isSelected
+                                    ? "border-ring bg-accent/60 ring-ring ring-1"
+                                    : "border-border bg-card hover:bg-sidebar",
+                                  isRunning && "cursor-not-allowed opacity-40",
+                                )}
                               >
                                 <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
+                                  <div className="flex items-center justify-between gap-2">
                                     <div className="flex items-center gap-2">
                                       <input
                                         type="radio"
                                         value={mode}
-                                        className="accent-primary size-4"
+                                        className="accent-ring size-4"
                                         disabled={isRunning}
                                         {...form.register("captionMode")}
                                       />
-                                      <span className="text-sm font-semibold text-foreground">
+                                      <span className="text-foreground text-sm font-semibold">
                                         {BULK_CAPTION_MODE_LABELS[mode]}
                                       </span>
                                     </div>
@@ -513,7 +520,7 @@ export function BulkRunScreen() {
                               disabled={isRunning}
                               aria-describedby={`${captionToneId}-hint`}
                               {...form.register("captionTone")}
-                              className="max-w-xs"
+                              className="h-11 max-w-xs rounded-lg"
                             >
                               {CAPTION_TONES.map((tone) => (
                                 <option key={tone} value={tone}>
@@ -523,7 +530,7 @@ export function BulkRunScreen() {
                             </Select>
                             <p
                               id={`${captionToneId}-hint`}
-                              className="text-muted-foreground text-[11px] leading-relaxed"
+                              className="text-muted-foreground text-xs leading-relaxed"
                             >
                               {captionTone === DEFAULT_CAPTION_TONE
                                 ? "Để AI tự quyết giọng viết — giống hệt cách chạy trước nay."
@@ -532,17 +539,24 @@ export function BulkRunScreen() {
                           </div>
                         ) : null}
 
-                        <p id={`${captionModeId}-hint`} className="text-muted-foreground text-[11px] leading-relaxed flex items-center gap-1">
-                          Bảo mật: Caption chỉ lấy Tên, Mô tả, Chủng loại, Mùa vụ. Giá bán và số lượng tồn kho không bao giờ đi vào bài đăng.
+                        <p
+                          id={`${captionModeId}-hint`}
+                          className="text-muted-foreground text-xs leading-relaxed"
+                        >
+                          Bảo mật: Caption chỉ lấy Tên, Mô tả, Chủng loại, Mùa vụ. Giá bán và số
+                          lượng tồn kho không bao giờ đi vào bài đăng.
                         </p>
 
                         {captionMode === "template" ? (
-                          <div className="space-y-3.5 pt-1">
-                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                          <div className="space-y-4 pt-1">
+                            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
                               {/* Left side: Template Editor */}
                               <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <label htmlFor={templateId} className="text-sm font-medium text-foreground">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <label
+                                    htmlFor={templateId}
+                                    className="text-foreground text-sm font-medium"
+                                  >
                                     Mẫu caption dùng chung
                                   </label>
                                   {/* Preset buttons */}
@@ -556,11 +570,13 @@ export function BulkRunScreen() {
                                           { shouldValidate: true },
                                         )
                                       }
-                                      className="text-[11px] text-primary hover:underline font-medium"
+                                      className="text-accent-foreground focus-visible:ring-ring inline-flex min-h-9 cursor-pointer items-center rounded-md px-1.5 text-xs font-medium outline-none hover:underline focus-visible:ring-2"
                                     >
                                       Mẫu tư vấn
                                     </button>
-                                    <span className="text-muted-foreground text-[10px]">·</span>
+                                    <span className="text-muted-foreground text-xs" aria-hidden="true">
+                                      ·
+                                    </span>
                                     <button
                                       type="button"
                                       onClick={() =>
@@ -570,7 +586,7 @@ export function BulkRunScreen() {
                                           { shouldValidate: true },
                                         )
                                       }
-                                      className="text-[11px] text-primary hover:underline font-medium"
+                                      className="text-accent-foreground focus-visible:ring-ring inline-flex min-h-9 cursor-pointer items-center rounded-md px-1.5 text-xs font-medium outline-none hover:underline focus-visible:ring-2"
                                     >
                                       Mẫu BST mới
                                     </button>
@@ -582,50 +598,63 @@ export function BulkRunScreen() {
                                   {...form.register("captionTemplate")}
                                   rows={5}
                                   disabled={isRunning}
-                                  aria-invalid={form.formState.errors.captionTemplate ? true : undefined}
+                                  aria-invalid={
+                                    form.formState.errors.captionTemplate ? true : undefined
+                                  }
                                   aria-describedby={`${templateId}-hint`}
-                                  placeholder={"{name} — mã {code}\nInbox để được tư vấn size và xem bảng màu mới nhất!"}
-                                  className="font-mono text-sm leading-relaxed"
+                                  placeholder={
+                                    "{name} — mã {code}\nInbox để được tư vấn size và xem bảng màu mới nhất!"
+                                  }
+                                  className="rounded-lg font-mono text-sm leading-relaxed"
                                 />
 
                                 {/* Interactive Variable Insertion Buttons */}
-                                <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                  <span className="text-muted-foreground text-[11px]">Chèn nhanh biến:</span>
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                  <span className="text-muted-foreground text-xs">
+                                    Chèn nhanh biến:
+                                  </span>
                                   {CAPTION_TEMPLATE_VARIABLES.map((name) => (
                                     <button
                                       key={name}
                                       type="button"
                                       onClick={() => handleInsertVariable(name)}
-                                      className="bg-muted hover:bg-muted/80 text-foreground border border-border/80 px-2 py-0.5 rounded text-[11px] font-mono font-semibold transition-colors inline-flex items-center gap-0.5"
-                                    > {"{" + name + "}"}
+                                      className="border-border bg-secondary text-secondary-foreground hover:bg-muted focus-visible:ring-ring inline-flex min-h-9 cursor-pointer items-center rounded-full border px-3 py-1 font-mono text-xs font-medium transition-colors duration-150 outline-none focus-visible:ring-2"
+                                    >
+                                      {"{" + name + "}"}
                                     </button>
                                   ))}
                                 </div>
 
                                 {form.formState.errors.captionTemplate ? (
-                                  <p role="alert" className="text-destructive text-sm font-semibold">
+                                  <p role="alert" className="text-destructive text-sm font-medium">
                                     {form.formState.errors.captionTemplate.message}
                                   </p>
                                 ) : null}
                                 {unknownVariables.length > 0 ? (
                                   <p role="alert" className="text-warning-foreground text-xs">
-                                    Không nhận ra biến {unknownVariables.map((name) => `{${name}}`).join(", ")} — sẽ giữ nguyên chữ trong bài đăng.
+                                    Không nhận ra biến{" "}
+                                    {unknownVariables.map((name) => `{${name}}`).join(", ")} — sẽ
+                                    giữ nguyên chữ trong bài đăng.
                                   </p>
                                 ) : null}
                               </div>
 
                               {/* Right side: Live Facebook Post Mockup */}
-                              <div className="space-y-2 rounded-xl border border-border/80 bg-muted/40 p-3.5">
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="font-semibold text-foreground flex items-center gap-1.5"> Xem trước bài đăng thực tế:
+                              <div className="border-border bg-sidebar space-y-3 rounded-xl border p-4">
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                  <span className="text-foreground font-medium">
+                                    Xem trước bài đăng thực tế
                                   </span>
                                   {parsed.codes.length > 1 ? (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-muted-foreground text-[11px]">Mã thử:</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-muted-foreground text-xs">Mã thử:</span>
                                       <select
+                                        aria-label="Chọn mã sản phẩm để xem trước"
                                         value={previewCodeIndex}
-                                        onChange={(e) => setPreviewCodeIndex(Number(e.target.value))}
-                                        className="bg-card border-border rounded px-2 py-0.5 text-xs font-mono font-medium"
+                                        onChange={(e) =>
+                                          setPreviewCodeIndex(Number(e.target.value))
+                                        }
+                                        className="border-input bg-card text-foreground focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-offset-sidebar h-9 rounded-lg border px-2.5 font-mono text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                                       >
                                         {parsed.codes.slice(0, 10).map((c, i) => (
                                           <option key={c.code} value={i}>
@@ -635,28 +664,35 @@ export function BulkRunScreen() {
                                       </select>
                                     </div>
                                   ) : (
-                                    <span className="text-muted-foreground font-mono">Mã: {currentPreviewCode || "(chưa có)"}</span>
+                                    <span className="text-muted-foreground font-mono text-xs">
+                                      Mã: {currentPreviewCode || "(chưa có)"}
+                                    </span>
                                   )}
                                 </div>
-                                <div className="rounded-xl border border-border bg-card p-3 shadow-xs space-y-2.5">
-                                  <div className="flex items-center gap-2">
-                                    <div className="size-7 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
+                                <div className="border-border bg-card space-y-3 rounded-xl border p-4">
+                                  <div className="flex items-center gap-2.5">
+                                    <div
+                                      aria-hidden="true"
+                                      className="bg-accent text-accent-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                                    >
                                       V
                                     </div>
                                     <div>
-                                      <p className="text-xs font-semibold text-foreground leading-none">
+                                      <p className="text-foreground text-sm leading-tight font-semibold">
                                         Trang của bạn
                                       </p>
-                                      <span className="text-[10px] text-muted-foreground">Vừa xong · Công khai</span>
+                                      <span className="text-foreground-subtle text-xs">
+                                        Vừa xong · Công khai
+                                      </span>
                                     </div>
                                   </div>
-                                  <pre className="text-xs break-words whitespace-pre-wrap text-foreground font-sans leading-relaxed min-h-16">
+                                  <pre className="text-foreground min-h-16 font-sans text-sm leading-relaxed break-words whitespace-pre-wrap">
                                     {captionTemplate.trim().length > 0
                                       ? renderCaptionTemplate(captionTemplate, {
-                                        code: currentPreviewCode || "(mã sản phẩm)",
-                                        name: "(tên sản phẩm)",
-                                      })
-                                      : "Nội dung caption sẽ hiển thị tại đây khi bạn nhập mẫu..."}
+                                          code: currentPreviewCode || "(mã sản phẩm)",
+                                          name: "(tên sản phẩm)",
+                                        })
+                                      : "Nội dung caption sẽ hiển thị tại đây khi bạn nhập mẫu…"}
                                   </pre>
                                 </div>
                               </div>
@@ -692,11 +728,9 @@ export function BulkRunScreen() {
                       {/*
                         Giãn cách RIÊNG cho lượt chạy này. Bỏ trống thì máy chủ
                         dùng cấu hình của công ty, đúng hành vi trước nay.
-                        PENDING(E1): khoảng cách tính giữa các bài của CÙNG MỘT
-                        kênh; hai kênh khác nhau không chờ nhau.
                       */}
-                      <div className="border-border space-y-1.5 border-t pt-5">
-                        <label htmlFor={spacingId} className="block text-sm font-medium">
+                      <div className="border-border space-y-2 border-t pt-5">
+                        <label htmlFor={spacingId} className="text-foreground block text-sm font-medium">
                           Giãn cách giữa các bài (phút)
                         </label>
                         <Input
@@ -710,10 +744,10 @@ export function BulkRunScreen() {
                           disabled={isRunning}
                           aria-describedby={`${spacingId}-hint`}
                           aria-invalid={form.formState.errors.spacingMinutes ? true : undefined}
-                          className="max-w-45"
+                          className="h-11 max-w-48 rounded-lg"
                           {...form.register("spacingMinutes")}
                         />
-                        <p id={`${spacingId}-hint`} className="text-muted-foreground text-xs">
+                        <p id={`${spacingId}-hint`} className="text-muted-foreground text-xs leading-relaxed">
                           Nên để tối thiểu {RECOMMENDED_MIN_SPACING_MS / MS_PER_MINUTE} phút. Bỏ
                           trống để dùng cấu hình của công ty; nhập 0 để đăng liên tục.
                         </p>
@@ -734,7 +768,7 @@ export function BulkRunScreen() {
                         ) : null}
                       </div>
 
-                      <div className="border-border space-y-3.5 border-t pt-5">
+                      <div className="border-border space-y-4 border-t pt-5">
                         {/* Con số của lượt chạy, nói ngay cạnh nút bấm. */}
                         {estimatedTotalPosts > 0 ? (
                           <p className="text-muted-foreground text-sm">
@@ -748,14 +782,13 @@ export function BulkRunScreen() {
                         ) : null}
 
                         <div className="flex flex-wrap items-center gap-3">
-                          {/* Việc cuối của màn nằm ở cuối màn: sau khi đã chọn xong
-                              mã, kênh, caption và giờ đăng. */}
+                          {/* Single primary ink CTA of the bulk screen */}
                           <Button
                             type="submit"
                             size="lg"
                             disabled={isRunning || gate.isDisabled || hasNoCodes}
+                            className="min-h-11 px-5 shadow-xs disabled:opacity-40"
                           >
-                            {/* VPOST: bước này chỉ kiểm dữ liệu + AI viết; tạo lô sau khi người duyệt. */}
                             {isRunning
                               ? "Đang chạy lượt này…"
                               : hasNoCodes
@@ -770,6 +803,7 @@ export function BulkRunScreen() {
                               variant="secondary"
                               disabled={summary.approved === 0}
                               onClick={() => void run.publishApproved()}
+                              className="min-h-11 px-4 disabled:opacity-40"
                             >
                               {summary.approved === 0
                                 ? `Duyệt bài trong bảng (${summary.review} bài chờ)`
@@ -785,13 +819,19 @@ export function BulkRunScreen() {
                               variant="destructive"
                               onClick={run.stop}
                               disabled={phase === "stopping"}
+                              className="min-h-11 px-4"
                             >
                               {phase === "stopping" ? "Đang dừng…" : "Dừng lượt chạy"}
                             </Button>
                           ) : null}
 
                           {phase === "finished" ? (
-                            <Button type="button" variant="outline" onClick={run.reset}>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={run.reset}
+                              className="min-h-11 px-4"
+                            >
                               Xoá kết quả để chạy lượt mới
                             </Button>
                           ) : null}
@@ -808,22 +848,20 @@ export function BulkRunScreen() {
                 </div>
 
                 {/* Right column: what the run is doing, right now. */}
-                <div className="space-y-5 lg:col-span-5 lg:sticky lg:top-4">
+                <div className="min-w-0 space-y-5 lg:sticky lg:top-6 lg:col-span-5">
                   <section
                     aria-labelledby="bulk-progress-heading"
                     className={cn(
-                      "space-y-3.5 rounded-xl border p-5",
-                      // Viền đứt khi chưa có gì: khung đang chờ được lấp đầy,
-                      // chứ không phải một thẻ rỗng ai đó quên xoá.
+                      "space-y-4 rounded-xl border p-5 sm:p-6",
                       rows.length === 0
-                        ? "border-border border-dashed"
-                        : "border-border bg-card shadow-xs",
+                        ? "border-border bg-sidebar border-dashed"
+                        : "border-border bg-card shadow-sm",
                     )}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h2
                         id="bulk-progress-heading"
-                        className="text-foreground text-base font-semibold"
+                        className="text-foreground text-lg font-semibold"
                       >
                         Tiến độ
                       </h2>
@@ -832,7 +870,7 @@ export function BulkRunScreen() {
                           <Badge tone="info">
                             <span
                               aria-hidden="true"
-                              className="bg-primary size-1.5 rounded-full motion-safe:animate-pulse"
+                              className="bg-ring size-1.5 rounded-full motion-safe:animate-pulse"
                             />
                             Đang chạy
                           </Badge>
@@ -852,7 +890,7 @@ export function BulkRunScreen() {
                     {toneDropped ? (
                       <p
                         role="status"
-                        className="border-warning/40 bg-warning/10 text-warning-foreground rounded-md border px-3 py-2 text-xs"
+                        className="border-warning/40 bg-warning/10 text-warning-foreground rounded-xl border px-3.5 py-2.5 text-xs leading-relaxed"
                       >
                         Máy chủ chưa nhận phong cách nội dung nên caption của lượt này được viết
                         bằng giọng mặc định.
@@ -863,32 +901,32 @@ export function BulkRunScreen() {
                       <EmptyState
                         kind="idle"
                         title="Chưa chạy lượt nào"
-                        description="Nhập mã, chọn kênh rồi bấm “Chạy”. Bảng này sẽ hiện trạng thái của từng mã ngay khi bắt đầu."
+                        description="Nhập mã, chọn kênh rồi bấm “Soạn bài để duyệt”. Bảng này sẽ hiện trạng thái của từng mã ngay khi bắt đầu."
                         action={
                           <Link
                             href="/posts?tab=log"
-                            className="text-primary text-sm font-medium underline underline-offset-4"
+                            className="text-accent-foreground focus-visible:ring-ring inline-flex min-h-10 items-center rounded-md text-sm font-medium underline underline-offset-4 outline-none hover:opacity-80 focus-visible:ring-2"
                           >
                             Xem nhật ký các lượt trước
                           </Link>
                         }
                       />
                     ) : (
-                      <div className="space-y-3.5">
+                      <div className="space-y-4">
                         {/* Live Progress Card */}
                         <div
                           ref={summaryRef}
                           tabIndex={-1}
                           role={phase === "finished" ? "alert" : undefined}
-                          className="border-border/90 bg-card space-y-4 rounded-xl border p-5 shadow-sm outline-none"
+                          className="border-border bg-sidebar space-y-4 rounded-xl border p-4 outline-none"
                         >
                           {/* Progress bar with percentage */}
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs font-semibold">
+                            <div className="flex items-center justify-between text-xs font-medium">
                               <span className="text-foreground">
                                 Đã xử lý: {summary.processed}/{summary.total} mã
                               </span>
-                              <span className="font-mono text-sm font-bold tabular-nums text-primary">
+                              <span className="text-accent-foreground font-mono text-sm font-semibold tabular-nums">
                                 {progressPercent}%
                               </span>
                             </div>
@@ -902,28 +940,36 @@ export function BulkRunScreen() {
 
                           {/* Metric stats grid */}
                           <div className="grid grid-cols-3 gap-2">
-                            <div className="border-success/30 bg-success/10 rounded-xl border p-2.5 text-center shadow-2xs">
-                              <span className="text-success-foreground block font-mono text-lg font-bold tabular-nums">
+                            <div className="border-success/30 bg-success/10 rounded-xl border p-3 text-center">
+                              <span className="text-success-foreground block font-mono text-lg font-semibold tabular-nums">
                                 {summary.done}
                               </span>
-                              <span className="text-success-foreground text-[11px] font-medium">Thành công</span>
+                              <span className="text-success-foreground text-xs font-medium">
+                                Thành công
+                              </span>
                             </div>
-                            <div className="border-warning/30 bg-warning/10 rounded-xl border p-2.5 text-center shadow-2xs">
-                              <span className="text-warning-foreground block font-mono text-lg font-bold tabular-nums">
+                            <div className="border-warning/30 bg-warning/10 rounded-xl border p-3 text-center">
+                              <span className="text-warning-foreground block font-mono text-lg font-semibold tabular-nums">
                                 {summary.skipped}
                               </span>
-                              <span className="text-warning-foreground text-[11px] font-medium">Bỏ qua</span>
+                              <span className="text-warning-foreground text-xs font-medium">
+                                Bỏ qua
+                              </span>
                             </div>
-                            <div className="border-destructive/30 bg-destructive/10 rounded-xl border p-2.5 text-center shadow-2xs">
-                              <span className="text-destructive block font-mono text-lg font-bold tabular-nums">
+                            <div className="border-destructive/30 bg-destructive/10 rounded-xl border p-3 text-center">
+                              <span className="text-destructive block font-mono text-lg font-semibold tabular-nums">
                                 {summary.failed}
                               </span>
-                              <span className="text-destructive text-[11px] font-medium">Lỗi</span>
+                              <span className="text-destructive text-xs font-medium">Lỗi</span>
                             </div>
                           </div>
 
                           {/* Status sentence */}
-                          <p role="status" aria-live="polite" className="text-muted-foreground text-xs leading-relaxed">
+                          <p
+                            role="status"
+                            aria-live="polite"
+                            className="text-muted-foreground text-xs leading-relaxed"
+                          >
                             {summary.cancelled > 0
                               ? `${summary.cancelled} mã chưa chạy nên không bị ảnh hưởng gì. `
                               : ""}
@@ -933,14 +979,14 @@ export function BulkRunScreen() {
                             {ranScheduled ? (
                               <Link
                                 href="/posts?tab=scheduled"
-                                className="underline underline-offset-4 font-semibold text-foreground hover:text-primary"
+                                className="text-accent-foreground font-medium underline underline-offset-4 hover:opacity-80"
                               >
                                 Bài đã hẹn
                               </Link>
                             ) : (
                               <Link
                                 href="/posts?tab=log"
-                                className="underline underline-offset-4 font-semibold text-foreground hover:text-primary"
+                                className="text-accent-foreground font-medium underline underline-offset-4 hover:opacity-80"
                               >
                                 Nhật ký đăng
                               </Link>
@@ -949,42 +995,55 @@ export function BulkRunScreen() {
                           </p>
                         </div>
 
-                        {/* Filter tabs */}
-                        <div className="flex items-center justify-between gap-2 pt-1">
-                          <div className="bg-muted/40 p-0.5 rounded-lg border border-border/60 flex items-center gap-1">
+                        {/* Filter chips: single scrollable row */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                          <div
+                            role="group"
+                            aria-label="Lọc bảng tiến độ"
+                            className="flex max-w-full items-center gap-1.5 overflow-x-auto pb-1"
+                          >
                             <button
                               type="button"
+                              aria-pressed={tableFilter === "all"}
                               onClick={() => setTableFilter("all")}
-                              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${tableFilter === "all"
-                                ? "bg-card text-foreground shadow-xs"
-                                : "text-muted-foreground hover:text-foreground"
-                                }`}
+                              className={cn(
+                                "focus-visible:ring-ring inline-flex min-h-10 shrink-0 cursor-pointer items-center rounded-full px-3.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2",
+                                tableFilter === "all"
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-secondary text-secondary-foreground hover:bg-muted",
+                              )}
                             >
                               Tất cả ({rows.length})
                             </button>
                             <button
                               type="button"
+                              aria-pressed={tableFilter === "done"}
                               onClick={() => setTableFilter("done")}
-                              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${tableFilter === "done"
-                                ? "bg-card text-success-foreground shadow-xs"
-                                : "text-muted-foreground hover:text-foreground"
-                                }`}
+                              className={cn(
+                                "focus-visible:ring-ring inline-flex min-h-10 shrink-0 cursor-pointer items-center rounded-full px-3.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2",
+                                tableFilter === "done"
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-secondary text-secondary-foreground hover:bg-muted",
+                              )}
                             >
                               Thành công ({summary.done})
                             </button>
                             <button
                               type="button"
+                              aria-pressed={tableFilter === "issues"}
                               onClick={() => setTableFilter("issues")}
-                              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${tableFilter === "issues"
-                                ? "bg-card text-destructive shadow-xs"
-                                : "text-muted-foreground hover:text-foreground"
-                                }`}
+                              className={cn(
+                                "focus-visible:ring-ring inline-flex min-h-10 shrink-0 cursor-pointer items-center rounded-full px-3.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2",
+                                tableFilter === "issues"
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-secondary text-secondary-foreground hover:bg-muted",
+                              )}
                             >
-                              Bỏ qua & Lỗi ({summary.skipped + summary.failed})
+                              Bỏ qua &amp; Lỗi ({summary.skipped + summary.failed})
                             </button>
                           </div>
                           {tableFilter !== "all" ? (
-                            <span className="text-[11px] text-muted-foreground font-mono">
+                            <span className="text-muted-foreground font-mono text-xs tabular-nums">
                               Đang lọc: {filteredRows.length} dòng
                             </span>
                           ) : null}
@@ -1024,7 +1083,7 @@ export function BulkRunScreen() {
 }
 
 /**
- * Clean Step Card container with modern visual hierarchy and status badges.
+ * Clean Step Card container with semantic design system hierarchy and step rail.
  */
 function StepCard({
   step,
@@ -1054,51 +1113,38 @@ function StepCard({
 
   return (
     <div className="flex gap-4">
-      {/*
-        Dải bước sống TRONG từng thẻ chứ không phải một cột riêng: các thẻ cao
-        thấp rất khác nhau, nên một cột rail rời sẽ không bao giờ thẳng hàng với
-        thẻ nó đang nói tới. `aria-hidden`: số bước và trạng thái đã có trong
-        chính thẻ, đọc lại lần nữa chỉ làm dài thêm cho trình đọc màn hình.
-      */}
       <div aria-hidden="true" className="hidden w-16 shrink-0 flex-col items-center lg:flex">
         <span
           className={cn(
-            "grid size-8 shrink-0 place-items-center rounded-full border font-mono text-xs font-semibold",
+            "grid size-8 shrink-0 place-items-center rounded-full border font-mono text-xs font-semibold transition-colors duration-150",
             isDone
-              ? "border-primary bg-primary text-primary-foreground"
+              ? "border-ring bg-accent text-accent-foreground"
               : "border-border bg-card text-muted-foreground",
           )}
         >
-          {step}
+          {isDone ? <Check className="size-4" strokeWidth={2.5} aria-hidden="true" /> : step}
         </span>
-        <span className="text-foreground-subtle mt-1.5 text-center font-mono text-[10px] tracking-[0.14em] uppercase">
-          {railLabel}
-        </span>
-        <span className="text-muted-foreground text-center text-[10px] leading-tight">
+        <span className="text-foreground mt-1.5 text-center text-xs font-medium">{railLabel}</span>
+        <span className="text-muted-foreground text-center text-xs leading-tight">
           {railDetail}
         </span>
         {isLast ? null : <span className="bg-border mt-2 w-px flex-1" />}
       </div>
 
       <section aria-labelledby={labelId} className="min-w-0 flex-1">
-        {/*
-          Mấu thẻ mẫu thò ra khỏi tay áo (DESIGN.md): nhãn dệt mono ngồi trên một
-          mấu nhô lên khỏi mép thẻ. Là `<p>`, không phải heading — thẻ vẫn có tên
-          cho trình đọc màn hình mà không thêm một mục nữa vào outline bên cạnh
-          nhãn của từng ô nhập bên trong.
-        */}
-        <div className="bg-muted ml-4 inline-block rounded-t-md px-3.5 py-1.5">
-          <Eyebrow id={labelId}>
-            Bước {step} — {title}
-          </Eyebrow>
-        </div>
-
-        <div className="border-border bg-card space-y-4 rounded-xl border p-5 shadow-xs">
+        <div className="border-border bg-card space-y-4 rounded-xl border p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-foreground text-base font-semibold">{title}</p>
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="bg-sidebar text-muted-foreground inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">
+                  Bước {step}
+                </span>
+                <h2 id={labelId} className="text-foreground text-lg leading-snug font-semibold">
+                  {title}
+                </h2>
+              </div>
               {description ? (
-                <p className="text-muted-foreground mt-0.5 text-xs leading-normal">{description}</p>
+                <p className="text-muted-foreground text-sm leading-relaxed">{description}</p>
               ) : null}
             </div>
             {badge ? <div className="shrink-0">{badge}</div> : null}
@@ -1111,7 +1157,7 @@ function StepCard({
 }
 
 /**
- * Modern structured scope disclosure with rich card visual hierarchy.
+ * Structured scope disclosure using design system subtle surface tokens.
  */
 function ScopeDisclosure({
   id,
@@ -1126,20 +1172,31 @@ function ScopeDisclosure({
     <section
       id={id}
       aria-label="Chi tiết cách chạy hàng loạt"
-      className="border-border bg-card rounded-md border px-2"
+      className="border-border bg-sidebar rounded-xl border px-4 py-2"
     >
+      {/* Astryx standalone <Collapsible> sets padding-block: 0 on its <button>
+          and text-box-trim on its wrapper span; a block-flex min-h-10 trigger
+          keeps >= 40px touch height and prevents Vietnamese diacritics clipping
+          while py-2 on the section satisfies padding >= radius/2 for rounded-xl. */}
       <Collapsible
         isOpen={isOpen}
         onOpenChange={onOpenChange}
-        trigger={<span className="text-sm font-medium">Chi tiết</span>}
+        trigger={
+          <span className="text-foreground flex min-h-10 items-center text-sm leading-5 font-medium">
+            Chi tiết
+          </span>
+        }
       >
-        <div className="grid grid-cols-1 gap-3 px-2 pb-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 px-1 pt-1 pb-2 md:grid-cols-2">
           <div className="space-y-1.5">
-            <p className="text-foreground text-xs font-semibold">Màn này đăng bài ảnh</p>
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              Bài video đơn và Reels phải chọn đích rồi kiểm thông số từng clip, nên chúng đi
-              qua màn{" "}
-              <Link href="/compose" className="text-primary font-medium underline underline-offset-4">
+            <p className="text-foreground text-sm font-semibold">Màn này đăng bài ảnh</p>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Bài video đơn và Reels phải chọn đích rồi kiểm thông số từng clip, nên chúng đi qua
+              màn{" "}
+              <Link
+                href="/compose"
+                className="text-accent-foreground font-medium underline underline-offset-4 hover:opacity-80"
+              >
                 Soạn bài
               </Link>
               .
@@ -1147,8 +1204,8 @@ function ScopeDisclosure({
           </div>
 
           <div className="space-y-1.5">
-            <p className="text-foreground text-xs font-semibold">Chạy tuần tự, đóng tab thì sao</p>
-            <p className="text-muted-foreground text-xs leading-relaxed">
+            <p className="text-foreground text-sm font-semibold">Chạy tuần tự, đóng tab thì sao</p>
+            <p className="text-muted-foreground text-sm leading-relaxed">
               Mỗi mã lần lượt được tra sản phẩm, lấy caption rồi tạo lô. {TAB_BOUNDARY_NOTICE}
             </p>
           </div>

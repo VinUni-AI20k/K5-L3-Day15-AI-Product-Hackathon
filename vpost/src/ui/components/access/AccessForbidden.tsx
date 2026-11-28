@@ -1,6 +1,9 @@
 "use client";
 
-import { EmptyState, Heading, Stack, Text } from "@astryxdesign/core";
+import { Heading, Stack, Text } from "@astryxdesign/core";
+import { Lock } from "lucide-react";
+
+import { EmptyState } from "@/ui/components/feedback/EmptyState";
 
 /**
  * What an operator without the admin role sees on the "Lịch sử duyệt" tab.
@@ -20,17 +23,23 @@ import { EmptyState, Heading, Stack, Text } from "@astryxdesign/core";
  */
 export function AccessForbidden({ email }: { email: string }) {
   return (
-    <Stack direction="vertical" gap={3} padding={4}>
-      <Stack direction="vertical" gap={1}>
-        <Heading level={2}>Lịch sử duyệt</Heading>
-        <Text type="supporting">Chỉ quản trị viên của đơn vị mới mở được mục này.</Text>
-      </Stack>
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
+      <Stack direction="vertical" gap={5}>
+        <Stack direction="vertical" gap={1}>
+          <Heading level={2}>Lịch sử duyệt</Heading>
+          <Text type="supporting" color="secondary">
+            Chỉ quản trị viên của đơn vị mới mở được mục này.
+          </Text>
+        </Stack>
 
-      <EmptyState
-        headingLevel={3}
-        title="Bạn không có quyền xem mục này"
-        description={`Tài khoản ${email} đang đăng nhập bình thường, nhưng lịch sử duyệt người dùng chỉ dành cho vai trò Chủ sở hữu và Quản trị. Nhờ quản trị viên cấp quyền nếu bạn cần tra cứu mục này.`}
-      />
-    </Stack>
+        <EmptyState
+          kind="idle"
+          headingLevel={3}
+          icon={<Lock className="size-5" aria-hidden="true" />}
+          title="Bạn không có quyền xem mục này"
+          description={`Tài khoản ${email} đang đăng nhập bình thường, nhưng lịch sử duyệt người dùng chỉ dành cho vai trò Chủ sở hữu và Quản trị. Nhờ quản trị viên cấp quyền nếu bạn cần tra cứu mục này.`}
+        />
+      </Stack>
+    </div>
   );
 }

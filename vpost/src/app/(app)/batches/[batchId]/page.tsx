@@ -32,7 +32,7 @@ export default async function BatchPage({ params }: { params: Promise<{ batchId:
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-8">
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-8">
       <BatchStatusScreen batchId={batchId} />
     </div>
   );
