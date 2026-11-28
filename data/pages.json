@@ -3,7 +3,7 @@
   "global": {
     "footer": "🌸 Được kiểm tra hàng trước khi thanh toán\n🔰 Hỗ trợ đổi hàng",
     "banned": ["chính hãng", "auth", "real 100%", "hàng hiệu", "hàng xịn", "like auth", "super fake", "rep 1:1", "rẻ nhất", "tốt nhất", "số 1", "duy nhất", "cam kết", "đảm bảo 100%", "siêu rẻ", "không đâu rẻ hơn", "hoàn tiền 100%"],
-    "brands": ["chanel", "dior", "gucci", "zara", "louis vuitton", "prada", "hermes", "hermès", "versace", "balenciaga", "uniqlo", "h&m", "mango", "burberry"],
+    "brands": ["chanel", "dior", "gucci", "zara", "louis vuitton", "prada", "hermes", "hermès", "versace", "balenciaga", "uniqlo", "h&m", "mango", "burberry", "nike"],
     "conditional": ["freeship", "miễn phí ship", "miễn phí vận chuyển", "giảm giá", "khuyến mãi", "sale", "giảm %", "tặng kèm", "quà tặng", "trả góp", "hỏa tốc", "hoả tốc", "đổi trả 30 ngày", "bảo hành"]
   },
   "pages": [
