@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
 import { StockCheckSkippedBanner } from "@/ui/components/inventory/StockCheckSkippedBanner";
 import { firstSkippedReason, hasSkippedStockCheck } from "@/ui/components/inventory/stock-check";
+import { toProductDetailViewState } from "@/ui/components/products/product-detail-helpers";
 import {
   inspectorRecovery,
   isInspectorDrawerOpen,
@@ -35,7 +36,10 @@ import { ProductInspectorDrawer } from "@/ui/components/products/ProductInspecto
 import { ProductStatusLegend } from "@/ui/components/products/ProductStatusLegend";
 import { ProductTable } from "@/ui/components/products/ProductTable";
 import { ProductTableSkeleton } from "@/ui/components/products/ProductTableSkeleton";
-import { useCatalogProducts } from "@/ui/hooks/useCatalogProducts";
+import {
+  useCatalogProductDetail,
+  useCatalogProducts,
+} from "@/ui/hooks/useCatalogProducts";
 import { useDelayedFlag } from "@/ui/hooks/useDelayedFlag";
 import {
   formatCount,
@@ -97,6 +101,7 @@ export function ProductListScreen() {
   const selectedCode = searchParams.get(SELECTED_PARAM);
 
   const products = useCatalogProducts(filter);
+  const productDetail = useCatalogProductDetail(selectedCode);
   const isFirstLoad = products.isPending && products.fetchStatus === "fetching";
   const showSkeleton = useDelayedFlag(isFirstLoad);
 
@@ -119,6 +124,14 @@ export function ProductListScreen() {
   // moment must not turn the open inspector into "không thấy mã này".
   const inspector = productInspectorState(selectedCode, items, {
     isLoading: products.isFetching,
+  });
+  const detailState = toProductDetailViewState({
+    code: selectedCode,
+    isPending: productDetail.isPending,
+    isFetching: productDetail.isFetching,
+    data: productDetail.data?.product,
+    error: productDetail.error,
+    onRetry: () => void productDetail.refetch(),
   });
   const isDrawerOpen = isInspectorDrawerOpen(isNarrow, inspector);
 
@@ -315,7 +328,10 @@ export function ProductListScreen() {
                   size={controlSize}
                   label={products.isFetching ? "Đang tải…" : "Tải lại"}
                   isDisabled={products.isFetching}
-                  onClick={() => void products.refetch()}
+                  onClick={() => {
+                    void products.refetch();
+                    if (selectedCode?.trim()) void productDetail.refetch();
+                  }}
                 />
               </HStack>
 
@@ -340,7 +356,7 @@ export function ProductListScreen() {
           </LayoutHeader>
         }
         content={
-          <LayoutContent padding={0}>
+          <LayoutContent padding={0} className="min-w-0 max-w-full overflow-x-hidden">
             {/* Above the table, inside the scroll region: it belongs to the data
                 below it, and pinning it to the header would push the filters off
                 a short screen. */}
@@ -367,10 +383,15 @@ export function ProductListScreen() {
         }
         end={
           isNarrow ? undefined : (
-            <LayoutPanel width={380} hasDivider label="Chi tiết sản phẩm">
+            <LayoutPanel
+              width={440}
+              hasDivider
+              label="Chi tiết sản phẩm"
+              className="min-w-0 overflow-x-hidden"
+            >
               {/* The panel is not modal, so the header controls stay usable —
                   but one press beats two, here as much as in the drawer. */}
-              <ProductInspector state={inspector} recovery={recovery} />
+              <ProductInspector state={inspector} detail={detailState} recovery={recovery} />
             </LayoutPanel>
           )
         }
@@ -381,6 +402,7 @@ export function ProductListScreen() {
           the row that opened it. */}
       <ProductInspectorDrawer
         state={inspector}
+        detail={detailState}
         isOpen={isDrawerOpen}
         onClose={closeDrawer}
         recovery={recovery}
@@ -475,12 +497,12 @@ function ProductListBody({
 
   // --- Data ----------------------------------------------------------------
   return (
-    <Stack direction="vertical" height="100%">
+    <Stack direction="vertical" height="100%" className="min-w-0 max-w-full">
       {/* Above the rows, not below: the key has to be read before the dots are,
           and it must survive the table scrolling. */}
       <ProductStatusLegend items={items} />
 
-      <StackItem size="fill">
+      <StackItem size="fill" className="min-w-0 max-w-full">
         <ProductTable items={items} selectedCode={selectedCode} onSelect={onSelect} />
       </StackItem>
 
