@@ -31,6 +31,7 @@ import {
   useSaveWritingStyle,
   useWritingStyleOverview,
 } from "@/ui/hooks/useWritingStyle";
+import { abortWithReason, isAbortError } from "@/ui/services/abort";
 import { listCatalogProducts } from "@/ui/services/catalog.api";
 
 import { PreviewPanel, type ProductPreviewOption } from "./PreviewPanel";
@@ -68,6 +69,111 @@ import {
 } from "./writing-style-preview";
 
 const PRODUCT_PICKER_LIMIT = 10;
+
+export interface WritingStyleProductSearchDeps {
+  readonly setCatalogError: (message: string | null) => void;
+  readonly fetchProducts?: typeof listCatalogProducts;
+}
+
+export interface WritingStyleProductSearchSource extends SearchSource<ProductPreviewOption> {
+  /** Aborts any in-flight search with an explicit lifecycle reason (e.g. unmount). */
+  readonly dispose: (reason?: string) => void;
+}
+
+/**
+ * Builds the product picker `SearchSource` backed by `listCatalogProducts`.
+ * Exported so unit tests can exercise superseding/cancelling searches without a DOM:
+ *  - every abort carries a meaningful `AbortError` reason;
+ *  - intentional aborts resolve cleanly to `[]` without setting `catalogError`;
+ *  - real API/network errors still populate `catalogError` and offer manual code entry.
+ */
+export function createWritingStyleProductSearchSource({
+  setCatalogError,
+  fetchProducts = listCatalogProducts,
+}: WritingStyleProductSearchDeps): WritingStyleProductSearchSource {
+  let activeController: AbortController | null = null;
+
+  async function runSearch(query: string): Promise<ProductPreviewOption[]> {
+    abortWithReason(activeController, "writing-style: product search superseded");
+    const controller = new AbortController();
+    activeController = controller;
+
+    const q = query.trim();
+    try {
+      const response = await fetchProducts(
+        { filter: { status: "ok", q: q.length > 0 ? q : null }, limit: PRODUCT_PICKER_LIMIT },
+        controller.signal,
+      );
+      if (controller.signal.aborted) return [];
+      setCatalogError(null);
+      const suggestions = selectableSuggestions(response.items);
+      const options: ProductPreviewOption[] = suggestions.map((item) => ({
+        id: item.code,
+        label: `${item.code} — ${item.name}`,
+        auxiliaryData: {
+          code: item.code,
+          name: item.name,
+          meta: item.meta,
+        },
+      }));
+
+      if (
+        q.length > 0 &&
+        !options.some((opt) => opt.id.toLowerCase() === q.toLowerCase())
+      ) {
+        const normalizedCode = q.toUpperCase();
+        options.push({
+          id: normalizedCode,
+          label: `Dùng mã “${normalizedCode}”`,
+          auxiliaryData: {
+            code: normalizedCode,
+            name: "Nhập tay mã sản phẩm để viết thử",
+            meta: "Mã nhập tay",
+            isManual: true,
+          },
+        });
+      }
+      return options;
+    } catch (error) {
+      if (isAbortError(error, controller.signal)) return [];
+      const view = presentApiError(toApiError(error));
+      setCatalogError(
+        `${view.title}. Bạn vẫn có thể gõ thẳng mã sản phẩm để viết thử.`,
+      );
+      if (q.length > 0) {
+        const normalizedCode = q.toUpperCase();
+        return [
+          {
+            id: normalizedCode,
+            label: `Dùng mã “${normalizedCode}”`,
+            auxiliaryData: {
+              code: normalizedCode,
+              name: "Nhập tay mã sản phẩm để viết thử",
+              meta: "Mã nhập tay",
+              isManual: true,
+            },
+          },
+        ];
+      }
+      return [];
+    } finally {
+      if (activeController === controller) activeController = null;
+    }
+  }
+
+  return {
+    bootstrap: () => runSearch(""),
+    search: (query) => runSearch(query),
+    cancel: () => {
+      abortWithReason(activeController, "writing-style: product search cancelled");
+      activeController = null;
+    },
+    dispose: (reason = "writing-style: component unmounted") => {
+      abortWithReason(activeController, reason);
+      activeController = null;
+    },
+  };
+}
 
 export function WritingStyleScreen() {
   const router = useRouter();
@@ -327,6 +433,7 @@ export function WritingStyleScreen() {
           );
         },
         onError: (error) => {
+          if (isAbortError(error)) return;
           const mapped = mapServerFieldErrors(error);
           if (
             mapped.firstInvalidField !== null ||
@@ -366,83 +473,20 @@ export function WritingStyleScreen() {
   }
 
   // Product picker SearchSource backed by existing `listCatalogProducts`.
-  const productAbortRef = useRef<AbortController | null>(null);
-  const productSearchSource = useMemo<SearchSource<ProductPreviewOption>>(() => {
-    async function runSearch(query: string): Promise<ProductPreviewOption[]> {
-      productAbortRef.current?.abort();
-      const controller = new AbortController();
-      productAbortRef.current = controller;
+  const productSearchSource = useMemo(
+    () =>
+      createWritingStyleProductSearchSource({
+        setCatalogError,
+      }),
+    [],
+  );
 
-      const q = query.trim();
-      try {
-        const response = await listCatalogProducts(
-          { filter: { status: "ok", q: q.length > 0 ? q : null }, limit: PRODUCT_PICKER_LIMIT },
-          controller.signal,
-        );
-        setCatalogError(null);
-        const suggestions = selectableSuggestions(response.items);
-        const options: ProductPreviewOption[] = suggestions.map((item) => ({
-          id: item.code,
-          label: `${item.code} — ${item.name}`,
-          auxiliaryData: {
-            code: item.code,
-            name: item.name,
-            meta: item.meta,
-          },
-        }));
-
-        if (
-          q.length > 0 &&
-          !options.some((opt) => opt.id.toLowerCase() === q.toLowerCase())
-        ) {
-          const normalizedCode = q.toUpperCase();
-          options.push({
-            id: normalizedCode,
-            label: `Dùng mã “${normalizedCode}”`,
-            auxiliaryData: {
-              code: normalizedCode,
-              name: "Nhập tay mã sản phẩm để viết thử",
-              meta: "Mã nhập tay",
-              isManual: true,
-            },
-          });
-        }
-        return options;
-      } catch (error) {
-        if (controller.signal.aborted) return [];
-        const view = presentApiError(toApiError(error));
-        setCatalogError(
-          `${view.title}. Bạn vẫn có thể gõ thẳng mã sản phẩm để viết thử.`,
-        );
-        if (q.length > 0) {
-          const normalizedCode = q.toUpperCase();
-          return [
-            {
-              id: normalizedCode,
-              label: `Dùng mã “${normalizedCode}”`,
-              auxiliaryData: {
-                code: normalizedCode,
-                name: "Nhập tay mã sản phẩm để viết thử",
-                meta: "Mã nhập tay",
-                isManual: true,
-              },
-            },
-          ];
-        }
-        return [];
-      }
-    }
-
-    return {
-      bootstrap: () => runSearch(""),
-      search: (query) => runSearch(query),
-      cancel: () => {
-        productAbortRef.current?.abort();
-      },
-    };
-  }, []);
-
-  useEffect(() => () => productAbortRef.current?.abort(), []);
+  useEffect(
+    () => () => {
+      productSearchSource.dispose("writing-style: component unmounted");
+    },
+    [productSearchSource],
+  );
 
   function handleRunPreview() {
     if (!selectedProduct) return;
@@ -465,6 +509,7 @@ export function WritingStyleScreen() {
       },
       {
         onError: (error) => {
+          if (isAbortError(error)) return;
           const mapped = mapServerFieldErrors(error);
           if (mapped.firstInvalidField !== null) {
             setFieldErrors(mapped.fieldErrors);
@@ -481,7 +526,10 @@ export function WritingStyleScreen() {
       derivePreviewViewState({
         isPending: previewMutation.isPending,
         data: previewMutation.data,
-        error: previewMutation.isError ? previewMutation.error : null,
+        error:
+          previewMutation.isError && !isAbortError(previewMutation.error)
+            ? previewMutation.error
+            : null,
       }),
     [previewMutation.isPending, previewMutation.data, previewMutation.isError, previewMutation.error],
   );
@@ -551,20 +599,20 @@ export function WritingStyleScreen() {
                 />
               ) : null}
 
-              {deleteMutation.isError ? (
+              {deleteMutation.isError && !isAbortError(deleteMutation.error) ? (
                 <ApiErrorNotice error={deleteMutation.error} />
               ) : null}
 
               {showInitialSkeleton ? <WritingStyleSkeleton /> : null}
 
-              {!showInitialSkeleton && overview.isError ? (
+              {!showInitialSkeleton && overview.isError && !isAbortError(overview.error) ? (
                 <ApiErrorNotice
                   error={overview.error}
                   onRetry={() => void overview.refetch()}
                 />
               ) : null}
 
-              {!overview.isError && overview.data ? (
+              {!(overview.isError && !isAbortError(overview.error)) && overview.data ? (
                 <>
                   <ScopeSelector
                     options={scopeOptions}
@@ -576,7 +624,7 @@ export function WritingStyleScreen() {
                     onDeleteOverride={handleDeleteOverride}
                   />
 
-                  {isChannelScope && channelQuery.isError ? (
+                  {isChannelScope && channelQuery.isError && !isAbortError(channelQuery.error) ? (
                     <ApiErrorNotice
                       error={channelQuery.error}
                       onRetry={() => void channelQuery.refetch()}

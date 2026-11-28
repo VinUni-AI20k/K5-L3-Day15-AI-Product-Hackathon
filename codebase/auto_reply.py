@@ -2,10 +2,11 @@
 
 Nguyên tắc cốt lõi:
 - CHỈ trả lời bình luận gốc (top-level) của khách trên bài đăng đã xuất bản bởi VPOST, khi hội thoại chưa có
-  bất kỳ phản hồi nào từ Fanpage hay thao tác của nhân viên, và toàn bộ nội dung (sau chuẩn hoá Unicode NFKC,
-  bỏ ký tự vô hình/filler/variation selector, quy đổi homoglyph Cyrillic/Greek/toàn chiều rộng/toán học, bỏ từ
-  đệm lịch sự đầu/cuối và tối đa 2 dấu câu/emoji lành tính ở cuối) khớp TRỌN VẸN một mẫu trong `allow` của
-  `data/auto_reply_rules.json` (tối đa 80 ký tự, đúng 1 câu).
+  bất kỳ phản hồi nào từ Fanpage hay thao tác của nhân viên, dữ liệu sản phẩm vượt qua `tools.check_product()`
+  không có lỗi cứng, và toàn bộ nội dung kiểm tra trực tiếp trên NFC(văn bản gốc) chỉ gồm chữ cái tiếng Việt,
+  chữ số ASCII, dấu câu cơ bản và tối đa 2 dấu câu/emoji trong danh sách cho phép ở cuối câu (tuyệt đối từ chối
+  ký tự vô hình, Bidi, Unicode Tag, homoglyph Cyrillic/Greek, fullwidth/math/Roman/superscript, xuống dòng/\v/\f),
+  khớp TRỌN VẸN một mẫu trong `allow` của `data/auto_reply_rules.json` (tối đa 80 ký tự, đúng 1 câu).
 - Mọi trường hợp khác (châm biếm, khen, cảm ơn, khiếu nại, câu hỏi hỗn hợp, số đo, sản phẩm/mã khác, trích dẫn,
   chỉ emoji, bình luận phản hồi trong chuỗi...) đều gắn nhãn 'Cần bạn' cho nhân viên xử lý.
 - Các lớp bảo vệ an toàn được giữ nguyên và mở rộng cho khách thật (Facebook ẩn `from.id`): kill switch, chế độ dry-run,
@@ -27,6 +28,7 @@ import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Optional
 
+import agent_runs
 import facebook
 import moderation
 import rules
@@ -171,19 +173,30 @@ _VI_LOWER_LETTERS = (
     "ỳýỷỹỵ"
 )
 _ALLOWED_LETTER_DIGIT_SET = frozenset(_VI_LOWER_LETTERS + "0123456789")
+_ALLOWED_CASE_LETTER_DIGIT_SET = frozenset(_VI_LOWER_LETTERS + _VI_LOWER_LETTERS.upper() + "0123456789")
 _ALLOWED_BASIC_PUNCT = frozenset(" .,?!-")
 _TRAILING_PUNCT = frozenset("?!.")
+_NEWLINE_OR_BREAK_CHARS = frozenset("\n\r\v\f\x85\u2028\u2029")
+# Đúng 8 dấu tổ hợp NFD của tiếng Việt (chấp nhận trước NFC, sau NFC phải tổ hợp hoàn toàn thành chữ tiếng Việt)
+_VI_COMBINING_MARKS = frozenset("\u0300\u0301\u0302\u0303\u0306\u0309\u031b\u0323")
 
-# Biểu tượng thù địch / châm biếm / tiêu cực — không bao giờ bỏ qua để tự động trả lời (N10)
-_NEGATIVE_EMOJIS = frozenset(
-    "😂🤣🤮🤢🤡👎😡🤬😠🖕💩😒🙄😤😭😢😥😰😨😱😩😫😖😣😞😔😟😕🙁☹💔😈👿💀☠😑😐🤨😬🤦🤷💢💥"
+# Danh sách ALLOWLIST nhỏ các emoji lành tính được phép xuất hiện ở CUỐI câu (R2; mọi emoji khác đều bị chặn → Cần bạn)
+_BENIGN_TRAILING_EMOJIS = frozenset(
+    "🌸🌺🌷🌹💐❤💖💗💕🥰😍😊☺🙏✨👍👌🫶"
+)
+_ALLOWED_RAW_PRE_NFC_SET = (
+    _ALLOWED_CASE_LETTER_DIGIT_SET
+    | _ALLOWED_BASIC_PUNCT
+    | _BENIGN_TRAILING_EMOJIS
+    | _VI_COMBINING_MARKS
+    | frozenset(("\ufe0f",))
 )
 
 _INTERNAL_SENTENCE_RE = re.compile(r"[.!?]\s*[" + _VI_LOWER_LETTERS + r"0-9]")
 
 # Các từ không bao giờ là tên màu hợp lệ trong nhóm `color_named`
 _INVALID_COLOR_TOKENS_VI = frozenset((
-    "gì", "nào", "j", "khác", "này", "đó", "kia", "size", "sz", "cỡ", "sai", "giá", "gía",
+    "gì", "nào", "j", "khác", "này", "đó", "đấy", "đây", "ấy", "kia", "size", "sz", "cỡ", "sai", "giá", "gía",
     "ship", "giao", "phí", "mặc", "đẹp", "xinh", "nóng", "mát", "tôn", "hợp", "vải", "chất",
     "số", "ảnh", "hình", "mẫu", "bộ", "váy", "đầm", "áo", "quần", "cái", "set", "chiếc",
     "shop", "ad", "em", "chị", "mình", "bạn", "còn", "có", "không", "ko", "k", "và", "hay",
@@ -193,10 +206,10 @@ _INVALID_COLOR_TOKENS_VI = frozenset((
     "chật", "rộng", "dài", "ngắn", "mấy", "bao", "nhiêu", "tiền",
 ))
 _INVALID_COLOR_TOKENS_ASCII = frozenset((
-    "gi", "nao", "j", "khac", "nay", "kia", "size", "sz", "sai", "gia",
-    "ship", "giao", "phi", "mac", "dep", "xinh", "nong", "mat", "ton", "hop", "chat",
+    "gi", "nao", "j", "khac", "nay", "do", "day", "ay", "kia", "size", "sz", "sai", "gia",
+    "ship", "giao", "phi", "mac", "dep", "xinh", "nong", "mat", "ton", "hop", "vai", "chat",
     "so", "anh", "hinh", "mau", "bo", "vay", "ao", "quan", "cai", "set", "chiec",
-    "shop", "ad", "em", "chi", "minh", "con", "khong", "ko", "k", "va", "hay",
+    "shop", "ad", "em", "chi", "minh", "ban", "con", "khong", "ko", "k", "va", "hay",
     "hoac", "voi", "bi", "duoc", "dc", "moi", "cu", "nua", "them", "nhu", "tren", "ngoai",
     "lam", "qua", "roi", "chua", "dau", "ma", "thi", "cua", "ve", "di", "toi",
     "mua", "dat", "chot", "lay", "doi", "tra", "sale", "giam", "tot", "re", "cao",
@@ -363,13 +376,16 @@ def _is_variation_selector(cp: int) -> bool:
     return (0xFE00 <= cp <= 0xFE0F) or (0xE0100 <= cp <= 0xE01EF)
 
 
-def _is_emoji_char(ch: str) -> bool:
-    cp = ord(ch)
-    return (
-        (0x1F300 <= cp <= 0x1FAFF)
-        or (0x2600 <= cp <= 0x27BF)
-        or cp in (0x2B50, 0x2B55, 0x203C, 0x2049)
-    )
+def _decode_unicode_tags(text: str) -> str:
+    """Giải mã các ký tự Unicode Tag (U+E0020–U+E007E) về ASCII để phát hiện chèn lệnh ẩn trong detector."""
+    out: list[str] = []
+    for ch in str(text or ""):
+        cp = ord(ch)
+        if 0xE0020 <= cp <= 0xE007E:
+            out.append(chr(cp - 0xE0000))
+        else:
+            out.append(ch)
+    return "".join(out)
 
 
 def _strip_invisible(text: str) -> str:
@@ -414,43 +430,57 @@ def _fold_hoi_nga(token: str) -> str:
 
 
 def normalize_text(text: str) -> dict:
-    """Chuẩn hoá văn bản trước khi đối chiếu allowlist.
+    """Kiểm tra tập ký tự allowlist trực tiếp trên NFC(văn bản gốc) rồi chuẩn hoá chữ thường/khoảng trắng (R2, R4).
 
-    Các bước:
-    1. Unicode NFKC (gộp cả fullwidth & mathematical alphanumeric về ASCII và chuẩn tổ hợp tiếng Việt)
-    2. Loại bỏ toàn bộ ký tự vô hình / định dạng / đệm (Cf, U+3164, U+2800, zero-width, variation selectors)
-    3. Quy đổi homoglyph phổ biến (Cyrillic/Greek/lookalike) về ASCII
-    4. Chuyển chữ thường, gộp khoảng trắng, giữ bản gốc có dấu và sinh bản bỏ dấu
-    5. Kiểm tra tập ký tự cho phép (chữ cái tiếng Việt, chữ số, dấu câu cơ bản, emoji)
+    KHÔNG dùng NFKC, KHÔNG bỏ ký tự vô hình/Bidi/Unicode Tag và KHÔNG quy đổi homoglyph trước khi kiểm tra
+    `charset_ok`, để mọi ký tự giả mạo/điều hướng/vô hình/emoji ngoài danh sách lành tính bị từ chối ngay.
+    Chỉ chấp nhận:
+    - Chữ cái tiếng Việt NFC (thường/hoa), chữ số ASCII 0-9
+    - Dấu câu cơ bản ` .,?!-`
+    - Emoji trong danh sách `_BENIGN_TRAILING_EMOJIS` (kèm tối đa 1 `U+FE0F` ngay sau chính emoji đó)
     """
     raw = str(text or "")
-    raw_stripped = raw.strip()
-    has_newline = ("\n" in raw_stripped) or ("\r" in raw_stripped)
-
-    step = unicodedata.normalize("NFKC", raw)
-    step = _strip_invisible(step)
-    step = _fold_homoglyphs(step)
-    step = step.lower()
-
-    # Quy mọi khoảng trắng Unicode (Zs, tab, xuống dòng) về dấu cách ASCII
-    chars = []
-    for ch in step:
-        if ch in "\t\n\r\v\f" or unicodedata.category(ch) == "Zs":
-            chars.append(" ")
-        else:
-            chars.append(ch)
-    normalized = unicodedata.normalize("NFC", re.sub(r" +", " ", "".join(chars)).strip())
-    ascii_copy = _strip_diacritics(normalized)
+    has_newline = any(ch in _NEWLINE_OR_BREAK_CHARS for ch in raw)
+    raw_stripped = raw.strip(" ")
+    # Chặn cả ký tự phân rã đơn nhất chuẩn tắc Unicode (vd Kelvin K U+212A → K khi qua NFC) trước khi gọi NFC
+    if any(ch not in _ALLOWED_RAW_PRE_NFC_SET for ch in raw_stripped):
+        return {
+            "raw": raw,
+            "raw_stripped": raw_stripped,
+            "normalized": "",
+            "ascii": "",
+            "has_newline": has_newline,
+            "charset_ok": False,
+        }
+    raw_nfc = unicodedata.normalize("NFC", raw_stripped)
 
     charset_ok = True
-    has_negative_emoji = False
-    for ch in normalized:
-        if ch in _NEGATIVE_EMOJIS:
-            has_negative_emoji = True
-        if ch in _ALLOWED_LETTER_DIGIT_SET or ch in _ALLOWED_BASIC_PUNCT or _is_emoji_char(ch):
+    cleaned_chars: list[str] = []
+    prev_ch = ""
+    for ch in raw_nfc:
+        if ch == "\ufe0f":
+            if prev_ch in _BENIGN_TRAILING_EMOJIS:
+                prev_ch = ""
+                continue
+            charset_ok = False
+            break
+        if ch in _ALLOWED_CASE_LETTER_DIGIT_SET:
+            cleaned_chars.append(ch.lower())
+            prev_ch = ch
+            continue
+        if ch in _ALLOWED_BASIC_PUNCT or ch in _BENIGN_TRAILING_EMOJIS:
+            cleaned_chars.append(ch)
+            prev_ch = ch
             continue
         charset_ok = False
         break
+
+    if charset_ok:
+        normalized = re.sub(r" +", " ", "".join(cleaned_chars)).strip()
+        ascii_copy = _strip_diacritics(normalized)
+    else:
+        normalized = ""
+        ascii_copy = ""
 
     return {
         "raw": raw,
@@ -459,7 +489,6 @@ def normalize_text(text: str) -> dict:
         "ascii": ascii_copy,
         "has_newline": has_newline,
         "charset_ok": charset_ok,
-        "has_negative_emoji": has_negative_emoji,
     }
 
 
@@ -602,6 +631,7 @@ def _compile_rules(raw: dict) -> dict:
             "intents": tuple(intents),
             "vi_re": re.compile(vi_pat) if vi_pat else None,
             "ascii_re": re.compile(ascii_pat) if ascii_pat else None,
+            "forbid_trailing": frozenset(_normalize_polite_list(entry.get("forbid_trailing") or ())),
         })
 
     cooldown_minutes = int(raw.get("cooldown_minutes") or DEFAULT_COOLDOWN_MINUTES)
@@ -666,83 +696,87 @@ def has_url(text: str) -> bool:
 
 
 def has_prompt_injection(text: str, *, rules_cfg: Optional[dict] = None) -> bool:
-    """True nếu văn bản chứa dấu hiệu chèn lệnh / yêu cầu nhập vai / lộ prompt hệ thống (kể cả homoglyph/vô hình/leet)."""
-    raw = _fold_homoglyphs(_strip_invisible(unicodedata.normalize("NFKC", str(text or ""))))
-    if not raw.strip():
-        return False
-    if rules.INJECTION.search(raw) or _INJECTION_STRUCT_RE.search(raw):
-        return True
-
+    """True nếu văn bản chứa dấu hiệu chèn lệnh / yêu cầu nhập vai / lộ prompt hệ thống (kể cả homoglyph/vô hình/Unicode Tag/leet)."""
+    raw_src = str(text or "")
+    tag_decoded = _decode_unicode_tags(raw_src)
+    candidates_raw = [raw_src] if tag_decoded == raw_src else [raw_src, tag_decoded]
     compiled = _get_compiled_rules(rules_cfg)
     markers = compiled["injection"]
 
-    sep_removed = _INTERNAL_SEP_RE.sub("", raw)
-    leet_raw = _strip_diacritics(_apply_inline_symbol_leet(raw)).lower()
-    leet_sep = _strip_diacritics(_apply_inline_symbol_leet(sep_removed)).lower()
-
-    leet_words_str = " ".join(_leet_token(t) for t in re.findall(r"[^\s]+", leet_raw))
-    if _INJECTION_STRUCT_RE.search(leet_words_str) or rules.INJECTION.search(leet_words_str):
-        return True
-
-    aligned_views: list[tuple[list[str], list[str]]] = []
-    for candidate in (raw, sep_removed):
-        orig, norm = _tokenize_aligned(candidate)
-        if not orig:
+    for src in candidates_raw:
+        raw = _fold_homoglyphs(_strip_invisible(unicodedata.normalize("NFKC", src)))
+        if not raw.strip():
             continue
-        aligned_views.append((orig, norm))
-        collapsed_norm = [_COLLAPSE_1_RE.sub(r"\1", t) for t in norm]
-        aligned_views.append((orig, collapsed_norm))
-
-    ascii_views: list[list[str]] = []
-    for candidate in (leet_raw, leet_sep):
-        toks = _WORD_TOKEN_RE.findall(candidate)
-        if not toks:
-            continue
-        leet_toks = [_leet_token(t) for t in toks]
-        ascii_views.append(leet_toks)
-        ascii_views.append([_COLLAPSE_1_RE.sub(r"\1", t) for t in leet_toks])
-        joined_runs = _collapse_single_char_runs(leet_toks)
-        if joined_runs != leet_toks:
-            ascii_views.append(joined_runs)
-            ascii_views.append([_COLLAPSE_1_RE.sub(r"\1", t) for t in joined_runs])
-
-    for orig, norm in aligned_views:
-        for _, p_orig, p_norm in markers:
-            if _match_guarded(orig, norm, p_orig, p_norm):
-                return True
-            p_col = tuple(_COLLAPSE_1_RE.sub(r"\1", t) for t in p_norm)
-            if _match_guarded(orig, norm, p_orig, p_col):
-                return True
-
-    for toks in ascii_views:
-        for _, _, p_norm in markers:
-            p_col = tuple(_COLLAPSE_1_RE.sub(r"\1", t) for t in p_norm)
-            if _match_exact(toks, p_norm) or _match_exact(toks, p_col):
-                return True
-
-    squashed_views = {"".join(toks) for toks in ascii_views if toks}
-    for _, _, p_norm in markers:
-        sq = "".join(p_norm)
-        if len(sq) >= 6 and any(sq in sv for sv in squashed_views):
+        if rules.INJECTION.search(raw) or _INJECTION_STRUCT_RE.search(raw):
             return True
-    for toks in ascii_views:
-        for _, _, p_norm in markers:
-            if len(p_norm) >= 2:
-                sq = "".join(p_norm)
-                if len(sq) >= 5 and sq in toks:
+
+        sep_removed = _INTERNAL_SEP_RE.sub("", raw)
+        leet_raw = _strip_diacritics(_apply_inline_symbol_leet(raw)).lower()
+        leet_sep = _strip_diacritics(_apply_inline_symbol_leet(sep_removed)).lower()
+
+        leet_words_str = " ".join(_leet_token(t) for t in re.findall(r"[^\s]+", leet_raw))
+        if _INJECTION_STRUCT_RE.search(leet_words_str) or rules.INJECTION.search(leet_words_str):
+            return True
+
+        aligned_views: list[tuple[list[str], list[str]]] = []
+        for candidate in (raw, sep_removed):
+            orig, norm = _tokenize_aligned(candidate)
+            if not orig:
+                continue
+            aligned_views.append((orig, norm))
+            collapsed_norm = [_COLLAPSE_1_RE.sub(r"\1", t) for t in norm]
+            aligned_views.append((orig, collapsed_norm))
+
+        ascii_views: list[list[str]] = []
+        for candidate in (leet_raw, leet_sep):
+            toks = _WORD_TOKEN_RE.findall(candidate)
+            if not toks:
+                continue
+            leet_toks = [_leet_token(t) for t in toks]
+            ascii_views.append(leet_toks)
+            ascii_views.append([_COLLAPSE_1_RE.sub(r"\1", t) for t in leet_toks])
+            joined_runs = _collapse_single_char_runs(leet_toks)
+            if joined_runs != leet_toks:
+                ascii_views.append(joined_runs)
+                ascii_views.append([_COLLAPSE_1_RE.sub(r"\1", t) for t in joined_runs])
+
+        for orig, norm in aligned_views:
+            for _, p_orig, p_norm in markers:
+                if _match_guarded(orig, norm, p_orig, p_norm):
                     return True
+                p_col = tuple(_COLLAPSE_1_RE.sub(r"\1", t) for t in p_norm)
+                if _match_guarded(orig, norm, p_orig, p_col):
+                    return True
+
+        for toks in ascii_views:
+            for _, _, p_norm in markers:
+                p_col = tuple(_COLLAPSE_1_RE.sub(r"\1", t) for t in p_norm)
+                if _match_exact(toks, p_norm) or _match_exact(toks, p_col):
+                    return True
+
+        squashed_views = {"".join(toks) for toks in ascii_views if toks}
+        for _, _, p_norm in markers:
+            sq = "".join(p_norm)
+            if len(sq) >= 6 and any(sq in sv for sv in squashed_views):
+                return True
+        for toks in ascii_views:
+            for _, _, p_norm in markers:
+                if len(p_norm) >= 2:
+                    sq = "".join(p_norm)
+                    if len(sq) >= 5 and sq in toks:
+                        return True
     return False
 
 
 # ---------------- Step 2: Allowlist intent matching ----------------
 
 def _strip_trailing_punct_emoji(text: str, *, max_count: int = 2) -> str:
-    """Bỏ tối đa `max_count` dấu câu kết thúc (?, !, .) hoặc emoji lành tính ở CUỐI câu."""
+    """Bỏ tối đa `max_count` dấu câu kết thúc (?, !, .) hoặc emoji thuộc danh sách lành tính ở CUỐI câu."""
     s = text.rstrip()
     removed = 0
     while s and removed < max_count:
         ch = s[-1]
-        if ch in _TRAILING_PUNCT or (_is_emoji_char(ch) and ch not in _NEGATIVE_EMOJIS):
+        if ch in _TRAILING_PUNCT or ch in _BENIGN_TRAILING_EMOJIS:
             s = s[:-1].rstrip()
             removed += 1
         else:
@@ -772,9 +806,10 @@ def _strip_polite_leading(text: str, compiled: dict) -> str:
     return s
 
 
-def _strip_polite_trailing(text: str, compiled: dict) -> str:
-    """Bỏ các từ đệm lịch sự / gọi shop ở cuối câu (vd 'ạ', 'vậy', 'thế', 'nhé', 'ơi', 'shop ơi')."""
+def _strip_polite_trailing_tokens(text: str, compiled: dict) -> tuple[str, list[str]]:
+    """Bỏ các từ đệm lịch sự / gọi shop ở cuối câu và trả về `(phần_còn_lại, danh_sách_từ_đã_bỏ)`."""
     s = text.strip()
+    removed: list[str] = []
     for _ in range(4):
         if not s:
             break
@@ -782,16 +817,24 @@ def _strip_polite_trailing(text: str, compiled: dict) -> str:
         matched = False
         for p in phrases:
             if s == p:
-                return ""
+                removed.append(p)
+                return "", removed
             if s.endswith(p):
                 head = s[:-len(p)]
                 if head and head[-1] in (" ", ","):
                     s = head.rstrip(" ,")
+                    removed.append(p)
                     matched = True
                     break
         if not matched:
             break
-    return s
+    return s, removed
+
+
+def _strip_polite_trailing(text: str, compiled: dict) -> str:
+    """Bỏ các từ đệm lịch sự / gọi shop ở cuối câu (vd 'ạ', 'vậy', 'thế', 'nhé', 'ơi', 'shop ơi')."""
+    core, _ = _strip_polite_trailing_tokens(text, compiled)
+    return core
 
 
 def _is_invalid_color_capture(color_text: str, *, is_ascii_only: bool) -> bool:
@@ -800,6 +843,88 @@ def _is_invalid_color_capture(color_text: str, *, is_ascii_only: bool) -> bool:
         return True
     invalid_set = _INVALID_COLOR_TOKENS_ASCII if is_ascii_only else _INVALID_COLOR_TOKENS_VI
     return any(tok in invalid_set for tok in tokens)
+
+
+# ---------------- Quantity ("lấy 2 bộ giá bao nhiêu", "size M còn 2 cái không") ----------------
+
+MAX_AUTO_QTY = 10  # above this the customer is buying in bulk — a human quotes wholesale
+
+_QTY_WORDS = {
+    "một": 1, "mot": 1, "hai": 2, "ba": 3, "bốn": 4, "bon": 4, "tư": 4, "năm": 5,
+    "sáu": 6, "sau": 6, "bảy": 7, "bay": 7, "tám": 8, "tam": 8, "chín": 9, "chin": 9,
+    "mười": 10, "muoi": 10,
+}
+_QTY_NUM = r"(?P<q>\d{1,3}|%s)" % "|".join(sorted(_QTY_WORDS, key=len, reverse=True))
+_QTY_UNIT = r"(?P<u>cái|cai|bộ|bo|chiếc|chiec|set|váy|vay|đầm|dam|sp|sản\s+phẩm|san\s+pham|món|mon)"
+_QTY_BUYER = r"(?:(?:em|e|mình|minh|chị|chi|c|tôi|toi|t|tớ|to)\s+)?"
+_QTY_VERB = r"(?:lấy|lay|mua|đặt|dat|order|ship|chốt|chot)"
+_QTY_LINK = r"(?:\s+(?:thì|thi|là|la))?"
+_QTY_PREFIX_RES = [
+    re.compile(r"^%s%s\s+%s\s+%s%s\s+" % (_QTY_BUYER, _QTY_VERB, _QTY_NUM, _QTY_UNIT, _QTY_LINK)),
+    re.compile(r"^%s\s+%s%s\s+" % (_QTY_NUM, _QTY_UNIT, _QTY_LINK)),
+]
+_QTY_SUFFIX_RE = re.compile(r"\s+(?:cho|lấy|lay|mua|đặt|dat)\s+%s\s+%s$" % (_QTY_NUM, _QTY_UNIT))
+# "size M còn 2 cái không" -> "size M còn không"
+_QTY_AVAIL_RE = re.compile(r"\s+(?P<v>còn|con|có|co)\s+%s\s+%s\s+(?P<neg>không|ko|k)$" % (_QTY_NUM, _QTY_UNIT))
+
+
+def _qty_value(raw: str) -> Optional[int]:
+    raw = raw.strip()
+    if raw.isdigit():
+        return int(raw)
+    return _QTY_WORDS.get(raw)
+
+
+def _unit_label(raw: str) -> str:
+    u = re.sub(r"\s+", " ", raw.strip())
+    folded = _strip_diacritics(u)
+    return {"cai": "cái", "bo": "bộ", "chiec": "chiếc", "vay": "váy", "dam": "đầm",
+            "san pham": "sản phẩm", "sp": "sản phẩm", "mon": "món", "set": "set"}.get(folded, u)
+
+
+def extract_quantity(core: str) -> tuple[Optional[int], Optional[str], str]:
+    """Tách cụm số lượng khỏi câu hỏi; trả (số lượng, đơn vị, phần câu còn lại để đối chiếu allowlist).
+
+    Không có cụm số lượng → (None, None, core) giữ nguyên câu.
+    """
+    for rx in _QTY_PREFIX_RES:
+        m = rx.match(core)
+        if m:
+            q = _qty_value(m.group("q"))
+            if q:
+                return q, _unit_label(m.group("u")), core[m.end():].strip()
+    m = _QTY_SUFFIX_RE.search(core)
+    if m:
+        q = _qty_value(m.group("q"))
+        if q:
+            return q, _unit_label(m.group("u")), core[: m.start()].strip()
+    m = _QTY_AVAIL_RE.search(core)
+    if m:
+        q = _qty_value(m.group("q"))
+        if q:
+            rest = "%s %s %s" % (core[: m.start()].strip(), m.group("v"), m.group("neg"))
+            return q, _unit_label(m.group("u")), rest.strip()
+    return None, None, core
+
+
+def available_quantity(stock: dict, *, asked_size: Optional[str], asked_color: Optional[str]) -> Optional[int]:
+    """Tổng tồn kho khớp size/màu khách hỏi (bỏ trống = mọi size/màu); None khi không có dữ liệu tồn theo biến thể."""
+    variants = stock.get("variants") or []
+    if not variants:
+        return None
+    size_canon = _canonical_size(asked_size) if asked_size else None
+    color_fold = _fold_exact(asked_color) if asked_color else None
+    total = 0
+    for v in variants:
+        if size_canon and _canonical_size(str(v.get("size") or "")) != size_canon:
+            continue
+        if color_fold and _fold_exact(str(v.get("mau") or "")) != color_fold:
+            continue
+        try:
+            total += max(0, int(v.get("ton") or 0))
+        except (TypeError, ValueError):
+            continue
+    return total
 
 
 def classify_intent_rules(
@@ -812,7 +937,7 @@ def classify_intent_rules(
     compiled = _get_compiled_rules(rules_cfg)
     norm = normalize_text(text)
 
-    if not norm["normalized"]:
+    if not norm["raw"].strip():
         return {
             "ok": False,
             "intents": set(),
@@ -823,23 +948,34 @@ def classify_intent_rules(
             "asked_color": None,
         }
 
-    if not norm["charset_ok"]:
+    if norm["has_newline"]:
         return {
             "ok": False,
             "intents": set(),
             "source": "rule",
-            "reason": "Bình luận chứa ký tự ngoài phạm vi cho phép — cần nhân viên xử lý",
+            "reason": "Bình luận có nhiều câu hoặc nhiều dòng — cần nhân viên xử lý",
             "pattern_id": None,
             "asked_size": None,
             "asked_color": None,
         }
 
-    if norm["has_negative_emoji"]:
+    if not norm["charset_ok"]:
         return {
             "ok": False,
             "intents": set(),
             "source": "rule",
-            "reason": "Bình luận chứa biểu tượng cảm xúc tiêu cực/châm biếm — cần nhân viên xử lý",
+            "reason": "Bình luận chứa ký tự hoặc biểu tượng ngoài phạm vi cho phép — cần nhân viên xử lý",
+            "pattern_id": None,
+            "asked_size": None,
+            "asked_color": None,
+        }
+
+    if not norm["normalized"]:
+        return {
+            "ok": False,
+            "intents": set(),
+            "source": "rule",
+            "reason": "Bình luận không có nội dung chữ — cần nhân viên xem trực tiếp",
             "pattern_id": None,
             "asked_size": None,
             "asked_color": None,
@@ -857,7 +993,7 @@ def classify_intent_rules(
             "asked_color": None,
         }
 
-    if norm["has_newline"] or _INTERNAL_SENTENCE_RE.search(norm["normalized"]):
+    if _INTERNAL_SENTENCE_RE.search(norm["normalized"]):
         return {
             "ok": False,
             "intents": set(),
@@ -881,7 +1017,7 @@ def classify_intent_rules(
         }
 
     # Không chấp nhận emoji đứng đầu/giữa hoặc hơn 2 dấu câu/emoji ở cuối
-    if any(_is_emoji_char(ch) or ch in _TRAILING_PUNCT for ch in core):
+    if any(ch in _BENIGN_TRAILING_EMOJIS or ch in _TRAILING_PUNCT for ch in core):
         return {
             "ok": False,
             "intents": set(),
@@ -893,9 +1029,21 @@ def classify_intent_rules(
         }
 
     core = _strip_polite_leading(core, compiled)
-    core = _strip_polite_trailing(core, compiled)
+    core, stripped_trailing = _strip_polite_trailing_tokens(core, compiled)
     # Quét lại 1 lượt đầu câu phòng trường hợp mở đầu đứng trước/sau cấu trúc ngắn
     core = _strip_polite_leading(core, compiled)
+    if not core:
+        return {
+            "ok": False,
+            "intents": set(),
+            "source": "rule",
+            "reason": "Bình luận không phải câu hỏi giá/size/màu rõ ràng",
+            "pattern_id": None,
+            "asked_size": None,
+            "asked_color": None,
+        }
+
+    asked_qty, asked_unit, core = extract_quantity(core)
     if not core:
         return {
             "ok": False,
@@ -914,6 +1062,9 @@ def classify_intent_rules(
             m = pat["ascii_re"].fullmatch(core)
         if m is None:
             continue
+        forbid_trailing = pat.get("forbid_trailing")
+        if forbid_trailing and any(tok in forbid_trailing for tok in stripped_trailing):
+            continue
         gd = m.groupdict()
         asked_size = (gd.get("size") or "").strip() or None
         asked_color = (gd.get("color") or "").strip() or None
@@ -927,6 +1078,8 @@ def classify_intent_rules(
             "pattern_id": pat["id"],
             "asked_size": asked_size,
             "asked_color": asked_color,
+            "asked_qty": asked_qty,
+            "asked_unit": asked_unit,
         }
 
     return {
@@ -962,8 +1115,14 @@ def render_template(
     colors: Iterable[str] = (),
     variant_pairs: Optional[Iterable[tuple[str, Iterable[str]]]] = None,
     style: Optional[dict] = None,
+    qty: Optional[int] = None,
+    unit: str = "cái",
 ) -> str:
-    """Sinh câu trả lời xác định hoàn toàn từ dữ liệu sản phẩm và phong cách viết (KHÔNG gọi LLM)."""
+    """Sinh câu trả lời xác định hoàn toàn từ dữ liệu sản phẩm và phong cách viết (KHÔNG gọi LLM).
+
+    qty > 1: giá nêu theo đơn vị ("giá X mỗi bộ") và xác nhận còn đủ số lượng — không tự tính tổng
+    hay hứa giảm giá (bộ kiểm tra đầu ra chỉ chấp nhận đúng giá bán).
+    """
     intent_set = {i for i in intents if i in _VALID_INTENT_SET}
     if not intent_set:
         raise ValueError("Cần ít nhất một ý định trong {price, size, color}")
@@ -981,7 +1140,10 @@ def render_template(
     if "price" in intent_set:
         if price is None:
             raise ValueError("Thiếu giá bán để ghép mẫu trả lời")
-        parts.append("giá %s" % rules.fmt_vnd(price))
+        if qty and qty > 1:
+            parts.append("giá %s mỗi %s" % (rules.fmt_vnd(price), unit))
+        else:
+            parts.append("giá %s" % rules.fmt_vnd(price))
 
     size_list = [str(s).strip() for s in sizes if str(s).strip()]
     color_list = [str(c).strip() for c in colors if str(c).strip()]
@@ -1002,6 +1164,8 @@ def render_template(
         parts.append("còn size %s" % ", ".join(size_list))
     elif "color" in intent_set:
         parts.append("còn màu %s" % ", ".join(color_list))
+    if qty and qty > 1:
+        parts.append("còn đủ %d %s" % (qty, unit))
 
     fact_str = ", ".join(parts)
     code = str(product_code).strip()
@@ -1236,13 +1400,22 @@ def _evaluate_comment(
     ts: str,
     check_cooldown: bool = True,
     allow_child_for_lookahead: bool = False,
+    step_cb=None,
 ) -> dict:
-    """Đánh giá thuần đọc Steps 1–5 (KHÔNG ghi DB, KHÔNG gọi Facebook).
+    """Đánh giá thuần đọc Steps 1–5 (KHÔNG ghi DB nghiệp vụ, KHÔNG gọi Facebook; chỉ gọi `step_cb` nếu có).
 
     Trả `{"status": "reject", "reason": ..., "intents": [...]}` hoặc
     `{"status": "ready", "intents": [...], "reply_text": ..., "product_code": ...}`.
     """
     import vpost_api
+
+    def _emit(key: str, status: str, detail: Optional[str] = None, *, label: Optional[str] = None) -> None:
+        if step_cb is not None:
+            step_cb(key, status, detail, label=label)
+
+    def _reject(stage: str, reason: str, intents_val: Iterable[str] = ()) -> dict:
+        _emit(stage, "blocked", reason)
+        return {"status": "reject", "reason": reason, "intents": list(intents_val)}
 
     page_id = _comment_page_id(comment)
     channel_id = _comment_channel_id(comment)
@@ -1251,71 +1424,66 @@ def _evaluate_comment(
 
     # ---------- BƯỚC 1: Input guard & Thread scope (N2) ----------
     if is_kill_switch_enabled():
-        return {"status": "reject", "reason": "Tự động trả lời đang tạm tắt toàn hệ thống", "intents": []}
+        return _reject("safety", "Tự động trả lời đang tạm tắt toàn hệ thống")
 
     if failed_pages is not None and page_id and page_id in failed_pages:
-        return {
-            "status": "reject",
-            "reason": "Tạm dừng tự động trả lời trên Fanpage trong lượt này do lỗi Facebook trước đó",
-            "intents": [],
-        }
+        return _reject(
+            "safety",
+            "Tạm dừng tự động trả lời trên Fanpage trong lượt này do lỗi Facebook trước đó",
+        )
 
     if not setting["enabled"]:
-        return {"status": "reject", "reason": "Chưa bật tự động trả lời cho Fanpage này", "intents": []}
+        return _reject("safety", "Chưa bật tự động trả lời cho Fanpage này")
 
     enabled_intents = set(setting.get("intents") or ()) & _VALID_INTENT_SET
     if not enabled_intents:
-        return {"status": "reject", "reason": "Chưa chọn nhóm câu hỏi được phép tự động trả lời", "intents": []}
+        return _reject("safety", "Chưa chọn nhóm câu hỏi được phép tự động trả lời")
 
     if not allow_child_for_lookahead:
         if (comment.get("parent_id") or "").strip():
-            return {
-                "status": "reject",
-                "reason": "Bình luận phản hồi trong chuỗi hội thoại — cần nhân viên xử lý",
-                "intents": [],
-            }
+            return _reject(
+                "safety",
+                "Bình luận phản hồi trong chuỗi hội thoại — cần nhân viên xử lý",
+            )
         if store.thread_has_any_page_reply_or_operator_activity(tenant_id, thread_id, now_ts=ts):
-            return {
-                "status": "reject",
-                "reason": "Hội thoại đã có phản hồi của Fanpage hoặc thao tác nhân viên — cần nhân viên xử lý",
-                "intents": [],
-            }
+            return _reject(
+                "safety",
+                "Hội thoại đã có phản hồi của Fanpage hoặc thao tác nhân viên — cần nhân viên xử lý",
+            )
 
     published_ok, post_job = _is_published_vpost_post(comment)
     if not published_ok:
-        return {
-            "status": "reject",
-            "reason": "Bình luận không thuộc bài đăng đã xuất bản bởi VPOST — cần nhân viên xử lý",
-            "intents": [],
-        }
+        return _reject(
+            "safety",
+            "Bình luận không thuộc bài đăng đã xuất bản bởi VPOST — cần nhân viên xử lý",
+        )
 
     if not message.strip():
-        return {"status": "reject", "reason": "Bình luận không có nội dung chữ — cần nhân viên xem trực tiếp", "intents": []}
+        return _reject("safety", "Bình luận không có nội dung chữ — cần nhân viên xem trực tiếp")
 
     if not comment.get("can_comment", 1):
-        return {"status": "reject", "reason": "Facebook không cho phép trả lời bình luận này", "intents": []}
+        return _reject("safety", "Facebook không cho phép trả lời bình luận này")
 
     if comment.get("is_hidden"):
-        return {"status": "reject", "reason": "Bình luận đang bị ẩn", "intents": []}
+        return _reject("safety", "Bình luận đang bị ẩn")
 
     mod_action = str(comment.get("moderation_action") or "").strip()
     mod_cat = str(comment.get("moderation_category") or "").strip()
     if mod_action in ("auto_hidden", "would_hide", "flagged") or mod_cat in ("spam", "scam", "abusive", "pii", "complaint"):
-        return {
-            "status": "reject",
-            "reason": "Bình luận đã bị kiểm duyệt gắn cờ cần nhân viên xem xét",
-            "intents": [],
-        }
+        return _reject(
+            "safety",
+            "Bình luận đã bị kiểm duyệt gắn cờ cần nhân viên xem xét",
+        )
 
     if has_url(message):
-        return {"status": "reject", "reason": "Bình luận có chứa đường dẫn (URL)", "intents": []}
+        return _reject("safety", "Bình luận có chứa đường dẫn (URL)")
 
     max_chars = compiled["max_chars"]
     if len(message) > max_chars:
-        return {"status": "reject", "reason": "Bình luận dài hơn %d ký tự" % max_chars, "intents": []}
+        return _reject("safety", "Bình luận dài hơn %d ký tự" % max_chars)
 
     if has_prompt_injection(message, rules_cfg=rules_cfg):
-        return {"status": "reject", "reason": "Phát hiện dấu hiệu chèn lệnh (prompt injection)", "intents": []}
+        return _reject("safety", "Phát hiện dấu hiệu chèn lệnh (prompt injection)")
 
     fb_post_id = str(comment.get("fb_post_id") or (post_job.get("fb_post_id") if post_job else "") or "").strip()
 
@@ -1332,7 +1500,7 @@ def _evaluate_comment(
         recent_texts=recents,
     )
     if mod_hit is not None and mod_hit.get("category") in ("abusive", "spam", "scam", "pii", "complaint"):
-        return {"status": "reject", "reason": _moderation_block_reason(mod_hit["category"]), "intents": []}
+        return _reject("safety", _moderation_block_reason(mod_hit["category"]))
 
     # Chống spam lặp nội dung giống nhau trên cùng bài đăng trong 10 phút, không phân biệt tác giả (kể cả from_id trống)
     post_spam_window = compiled["post_spam_window_minutes"]
@@ -1343,11 +1511,10 @@ def _evaluate_comment(
         else _recent_post_texts(tenant_id, page_id, fb_post_id, ref_dt, window_minutes=post_spam_window)
     )
     if _count_post_identical_texts(message, p_recents) >= post_spam_threshold:
-        return {
-            "status": "reject",
-            "reason": "Phát hiện spam lặp cùng nội dung trên bài đăng trong vòng %d phút gần đây" % post_spam_window,
-            "intents": [],
-        }
+        return _reject(
+            "safety",
+            "Phát hiện spam lặp cùng nội dung trên bài đăng trong vòng %d phút gần đây" % post_spam_window,
+        )
 
     cooldown_minutes = compiled["cooldown_minutes"]
     post_rate_limit = compiled["post_rate_limit"]
@@ -1359,11 +1526,10 @@ def _evaluate_comment(
             thread_id,
             ref_dt - timedelta(minutes=cooldown_minutes),
         ):
-            return {
-                "status": "reject",
-                "reason": "Hội thoại này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
-                "intents": [],
-            }
+            return _reject(
+                "safety",
+                "Hội thoại này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
+            )
 
         # 2. Giới hạn tốc độ theo bài đăng: tối đa 10 câu tự động trả lời mỗi bài trong 10 phút
         if fb_post_id and store.count_auto_replies_for_post_since(
@@ -1371,12 +1537,11 @@ def _evaluate_comment(
             fb_post_id,
             ref_dt - timedelta(minutes=post_rate_window),
         ) >= post_rate_limit:
-            return {
-                "status": "reject",
-                "reason": "Bài đăng đã đạt giới hạn %d lượt tự động trả lời trong vòng %d phút gần đây"
+            return _reject(
+                "safety",
+                "Bài đăng đã đạt giới hạn %d lượt tự động trả lời trong vòng %d phút gần đây"
                 % (post_rate_limit, post_rate_window),
-                "intents": [],
-            }
+            )
 
         # 3. Lớp bảo vệ bổ sung theo khách hàng khi có from_id
         if from_id and store.has_recent_auto_reply_for_customer(
@@ -1385,49 +1550,61 @@ def _evaluate_comment(
             from_id,
             ref_dt - timedelta(minutes=cooldown_minutes),
         ):
-            return {
-                "status": "reject",
-                "reason": "Khách hàng này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
-                "intents": [],
-            }
+            return _reject(
+                "safety",
+                "Khách hàng này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
+            )
+
+    _emit("safety", "ok", "Đạt kiểm tra an toàn, phạm vi hội thoại và chống spam")
 
     # ---------- BƯỚC 2: Allowlist Intent ----------
     intent_res = classify_intent(message, rules_cfg=rules_cfg)
     if not intent_res["ok"]:
-        return {"status": "reject", "reason": intent_res["reason"], "intents": []}
+        return _reject("intent", intent_res["reason"])
 
     intents = intent_res["intents"]
     sorted_ints = _sorted_intents(intents)
     disabled_ints = [i for i in sorted_ints if i not in enabled_intents]
     if disabled_ints:
         labels = ", ".join(_INTENT_LABELS[i] for i in disabled_ints)
-        return {
-            "status": "reject",
-            "reason": "Fanpage chưa bật tự động trả lời cho nhóm câu hỏi: %s" % labels,
-            "intents": sorted_ints,
-        }
+        return _reject(
+            "intent",
+            "Fanpage chưa bật tự động trả lời cho nhóm câu hỏi: %s" % labels,
+            sorted_ints,
+        )
+
+    intent_desc = ", ".join(_INTENT_LABELS[i] for i in sorted_ints)
+    intent_extras: list[str] = []
+    if intent_res.get("asked_size"):
+        intent_extras.append("size %s" % str(intent_res["asked_size"]).upper())
+    if intent_res.get("asked_color"):
+        intent_extras.append("màu %s" % str(intent_res["asked_color"]))
+    intent_detail = "Nhận diện câu hỏi: %s" % intent_desc
+    if intent_extras:
+        intent_detail += " (%s)" % ", ".join(intent_extras)
+    _emit("intent", "ok", intent_detail)
 
     # ---------- BƯỚC 3: Facts ----------
     product_code = _resolve_product_code(tenant_id, comment, thread_id, job=post_job)
     if not product_code:
-        return {"status": "reject", "reason": "Bài đăng chưa gắn mã sản phẩm", "intents": sorted_ints}
+        return _reject("facts", "Bài đăng chưa gắn mã sản phẩm", sorted_ints)
 
     row = store.catalog_row(product_code)
     if not row:
-        return {
-            "status": "reject",
-            "reason": "Không tìm thấy sản phẩm mã %s trong danh mục" % product_code,
-            "intents": sorted_ints,
-        }
+        return _reject(
+            "facts",
+            "Không tìm thấy sản phẩm mã %s trong danh mục" % product_code,
+            sorted_ints,
+        )
 
     stock = tools.check_stock(row)
     if stock.get("hard"):
         hard_msg = "; ".join(m for _, m in stock["hard"])
-        return {
-            "status": "reject",
-            "reason": "Sản phẩm mã %s hết hàng hoặc không kiểm được tồn kho: %s" % (product_code, hard_msg),
-            "intents": sorted_ints,
-        }
+        return _reject(
+            "facts",
+            "Sản phẩm mã %s hết hàng hoặc không kiểm được tồn kho: %s" % (product_code, hard_msg),
+            sorted_ints,
+        )
 
     base_page, _ = tools.page_for(row)
     if channel_id in tools.PAGES:
@@ -1436,35 +1613,40 @@ def _evaluate_comment(
     styled_page = writing_style.apply(base_page, tenant_id, channel_id)
     allowed = vpost_api._allowed_for_comment(row, stock, styled_page)
 
-    # N7: Câu hỏi giá chỉ trả lời khi tools.check_product KHÔNG có bất kỳ lỗi cứng (hard error) nào cho dòng sản phẩm
+    # R1 / N7: Kiểm tra dữ liệu dòng sản phẩm vô điều kiện cho mọi ý định (giá/size/màu)
+    prod_check = tools.check_product(row, base_page)
+    all_hard = [m for _, m in prod_check.get("hard", [])]
+    if all_hard:
+        return _reject(
+            "facts",
+            "Sản phẩm mã %s có dữ liệu không hợp lệ (%s)" % (product_code, "; ".join(all_hard)),
+            sorted_ints,
+        )
+
     price_val: Optional[int] = allowed["prices"][0] if allowed["prices"] else None
-    if "price" in intents:
-        prod_check = tools.check_product(row, base_page)
-        all_hard = [m for _, m in prod_check.get("hard", [])]
-        if price_val is None or all_hard or not (rules.PRICE_MIN <= price_val <= rules.PRICE_MAX):
-            detail = "; ".join(all_hard) if all_hard else "thiếu giá bán hợp lệ"
-            return {
-                "status": "reject",
-                "reason": "Sản phẩm mã %s có dữ liệu không hợp lệ (%s)" % (product_code, detail),
-                "intents": sorted_ints,
-            }
+    if "price" in intents and (price_val is None or not (rules.PRICE_MIN <= price_val <= rules.PRICE_MAX)):
+        return _reject(
+            "facts",
+            "Sản phẩm mã %s có dữ liệu không hợp lệ (thiếu giá bán hợp lệ)" % product_code,
+            sorted_ints,
+        )
 
     in_stock_sizes = list(allowed.get("sizes") or [])
     if "size" in intents and not in_stock_sizes:
-        return {
-            "status": "reject",
-            "reason": "Sản phẩm mã %s chưa có thông tin size còn hàng" % product_code,
-            "intents": sorted_ints,
-        }
+        return _reject(
+            "facts",
+            "Sản phẩm mã %s chưa có thông tin size còn hàng" % product_code,
+            sorted_ints,
+        )
 
     in_stock_colors = list(allowed.get("colors") or [])
     has_color = bool(allowed.get("has_color"))
     if "color" in intents and (not has_color or not in_stock_colors):
-        return {
-            "status": "reject",
-            "reason": "Sản phẩm mã %s chưa có thông tin màu còn hàng" % product_code,
-            "intents": sorted_ints,
-        }
+        return _reject(
+            "facts",
+            "Sản phẩm mã %s chưa có thông tin màu còn hàng" % product_code,
+            sorted_ints,
+        )
 
     # Kiểm tra size/màu định danh khớp CHÍNH XÁC với giá trị còn hàng của sản phẩm bài đăng (không substring)
     named_err = _check_named_variant_in_stock(
@@ -1476,7 +1658,28 @@ def _evaluate_comment(
         has_color=has_color,
     )
     if named_err:
-        return {"status": "reject", "reason": named_err, "intents": sorted_ints}
+        return _reject("facts", named_err, sorted_ints)
+
+    asked_qty = intent_res.get("asked_qty")
+    asked_unit = intent_res.get("asked_unit") or "cái"
+    if asked_qty is not None:
+        if asked_qty < 1:
+            return _reject("facts", "Số lượng khách hỏi không hợp lệ — cần nhân viên xem", sorted_ints)
+        if asked_qty > MAX_AUTO_QTY:
+            return _reject(
+                "facts",
+                "Khách hỏi số lượng lớn (%d %s) — cần nhân viên báo giá sỉ" % (asked_qty, asked_unit),
+                sorted_ints,
+            )
+        avail = available_quantity(
+            stock, asked_size=intent_res.get("asked_size"), asked_color=intent_res.get("asked_color")
+        )
+        if avail is None or avail < asked_qty:
+            return _reject(
+                "facts",
+                "Tồn kho mã %s không đủ %d %s khách hỏi — cần nhân viên tư vấn" % (product_code, asked_qty, asked_unit),
+                sorted_ints,
+            )
 
     _, pairs_by_color, is_full_matrix = _build_stock_matrix(
         stock,
@@ -1484,6 +1687,20 @@ def _evaluate_comment(
         in_stock_sizes,
         has_color=has_color,
     )
+
+    fact_parts: list[str] = []
+    if price_val is not None:
+        fact_parts.append("giá %s" % rules.fmt_vnd(price_val))
+    if in_stock_sizes:
+        fact_parts.append("size %s" % ", ".join(in_stock_sizes))
+    if has_color and in_stock_colors:
+        fact_parts.append("màu %s" % ", ".join(in_stock_colors))
+    facts_detail = (
+        "Mã %s: %s" % (product_code, ", ".join(fact_parts))
+        if fact_parts
+        else ("Tìm thấy dữ liệu sản phẩm mã %s" % product_code)
+    )
+    _emit("facts", "ok", facts_detail)
 
     # ---------- BƯỚC 4: Deterministic template answer (NO LLM) ----------
     use_pairs = (not is_full_matrix) and bool(pairs_by_color) and ("size" in intents or "color" in intents)
@@ -1495,13 +1712,19 @@ def _evaluate_comment(
         colors=in_stock_colors,
         variant_pairs=pairs_by_color if use_pairs else None,
         style=resolved_style,
+        qty=asked_qty,
+        unit=asked_unit,
     )
+    _emit("compose", "ok", "Soạn từ mẫu dữ liệu sản phẩm (%d ký tự, không dùng AI)" % len(reply_text))
 
     # ---------- BƯỚC 5: Output guard ----------
     check = vpost_api._check_reply_text(reply_text, row, styled_page)
     if check["block"]:
         reason = "kiểm tra chặn: %s" % "; ".join(check["block"])
-        return {"status": "reject", "reason": reason, "intents": sorted_ints}
+        return _reject("output_check", reason, sorted_ints)
+
+    warn_note = " (%d cảnh báo)" % len(check["warn"]) if check.get("warn") else ""
+    _emit("output_check", "ok", "Đạt kiểm tra đầu ra (khớp giá, tồn kho, không có PII/link)%s" % warn_note)
 
     return {
         "status": "ready",
@@ -1524,28 +1747,32 @@ def _find_later_can_ban_in_thread(
     ref_dt: datetime,
     ts: str,
     candidate_later: Optional[list[dict]] = None,
-) -> Optional[str]:
-    """Kiểm tra xem hội thoại có tin nhắn khách MỚI HƠN có nội dung rơi vào `can_ban` hay không (#6).
+) -> Optional[tuple[str, str]]:
+    """Kiểm tra xem hội thoại có tin nhắn khách MỚI HƠN có nội dung rơi vào `can_ban` hay không (#6, R6).
 
-    Dùng `allow_child_for_lookahead=True` để phân biệt:
-    - Tin mới hơn có nội dung không hợp lệ (vd hỏi ship, khiếu nại, hết hàng) → chặn trả lời tin gốc (#6).
-    - Tin mới hơn là câu hỏi hợp lệ bổ sung trong cùng lượt tick (N9) → vẫn trả lời 1 lần cho tin gốc và
-      để tin bổ sung tự gắn nhãn 'Cần bạn' ở lượt xử lý tiếp theo.
+    Luôn hợp nhất (union theo `id`) bình luận hiện có trong DB của hội thoại với `candidate_later` để không
+    bỏ sót tin nhắn mới hơn đã đồng bộ trước đó trong cùng hội thoại.
+    Trả `(reason, blocking_comment_id)` nếu phát hiện, ngược lại `None`.
     """
     cur_key = _comment_sort_key(comment)
-    later_msgs: list[dict] = []
-    if candidate_later is not None:
-        later_msgs = [m for m in candidate_later if _comment_sort_key(m) > cur_key]
-    else:
-        for m in store.list_thread_comments(tenant_id, thread_id):
-            if m.get("is_from_page") or m.get("status") in ("deleted", "ignored"):
-                continue
-            if m["id"] == comment["id"]:
-                continue
-            if _comment_sort_key(m) > cur_key:
-                later_msgs.append(m)
+    by_id: dict[str, dict] = {}
+    for m in store.list_thread_comments(tenant_id, thread_id):
+        if m.get("is_from_page") or m.get("status") in ("deleted", "ignored"):
+            continue
+        if m["id"] == comment["id"]:
+            continue
+        if _comment_sort_key(m) > cur_key:
+            by_id[m["id"]] = m
 
-    later_msgs.sort(key=_comment_sort_key)
+    for m in candidate_later or ():
+        if m.get("is_from_page") or m.get("status") in ("deleted", "ignored"):
+            continue
+        if m["id"] == comment["id"]:
+            continue
+        if _comment_sort_key(m) > cur_key:
+            by_id.setdefault(m["id"], m)
+
+    later_msgs = sorted(by_id.values(), key=_comment_sort_key)
     for lm in later_msgs:
         if store.has_sent_auto_reply_for_comment(tenant_id, lm["id"]):
             continue
@@ -1566,7 +1793,7 @@ def _find_later_can_ban_in_thread(
             allow_child_for_lookahead=True,
         )
         if ev["status"] == "reject":
-            return ev["reason"]
+            return ev["reason"], lm["id"]
     return None
 
 
@@ -1616,249 +1843,211 @@ def process_comment(
             "commentId": cid,
         }
 
-    # N9: tối đa 1 lần tự động trả lời mỗi hội thoại trong 1 lượt tick; bình luận bổ sung gắn 'Cần bạn', không bỏ rơi
-    if _replied_threads_in_tick is not None and thread_id in _replied_threads_in_tick:
-        return _record_rejection(
-            tenant_id,
-            page_id=page_id,
-            fb_post_id=fb_post_id,
-            thread_id=thread_id,
-            comment_id=cid,
-            from_id=from_id,
-            reason="Hội thoại đã có 1 phản hồi tự động trong lượt này — gắn 'Cần bạn' cho bình luận bổ sung",
-            ts=ts,
-        )
+    def _step_now() -> datetime:
+        return now_dt if now_dt is not None else _now()
 
-    compiled = _get_compiled_rules(rules_cfg)
-    setting = (
-        store.get_auto_reply_setting_or_default(tenant_id, page_id)
-        if page_id
-        else store.default_auto_reply_setting(tenant_id, "")
-    )
-
-    ev = _evaluate_comment(
+    run_id = agent_runs.start_run(
         tenant_id,
-        comment,
-        thread_id=thread_id,
-        setting=setting,
-        compiled=compiled,
-        rules_cfg=rules_cfg,
-        recent_texts=recent_texts,
-        post_recent_texts=_post_recent_texts,
-        failed_pages=failed_pages,
-        ref_dt=ref_dt,
-        ts=ts,
-        check_cooldown=True,
-    )
-    if ev["status"] == "reject":
-        return _record_rejection(
-            tenant_id,
-            page_id=page_id,
-            fb_post_id=fb_post_id,
-            thread_id=thread_id,
-            comment_id=cid,
-            from_id=from_id,
-            intents=ev["intents"],
-            reason=ev["reason"],
-            ts=ts,
-        )
-
-    sorted_ints = ev["intents"]
-    reply_text = ev["reply_text"]
-    fb_post_id = ev.get("fb_post_id") or fb_post_id
-
-    # Nếu hội thoại đang mang nhãn 'can_ban' chưa được nhân viên xử lý → không tự động trả lời đè lên
-    existing_att = store.get_thread_attentions(tenant_id, [thread_id]).get(thread_id)
-    if existing_att and existing_att.get("tag") == "can_ban":
-        return _record_rejection(
-            tenant_id,
-            page_id=page_id,
-            fb_post_id=fb_post_id,
-            thread_id=thread_id,
-            comment_id=cid,
-            from_id=from_id,
-            intents=sorted_ints,
-            reason="Hội thoại đang gắn nhãn 'Cần bạn' chờ nhân viên xử lý",
-            ts=ts,
-            tag_attention=False,
-        )
-
-    # Nếu cùng hội thoại đã có tin nhắn khách MỚI HƠN rơi vào `can_ban` → không trả lời tin nhắn cũ (#6)
-    later_reason = _find_later_can_ban_in_thread(
-        tenant_id,
-        comment,
         thread_id,
-        setting=setting,
-        compiled=compiled,
-        rules_cfg=rules_cfg,
-        failed_pages=failed_pages,
-        ref_dt=ref_dt,
-        ts=ts,
-        candidate_later=_later_in_tick,
+        "auto_reply",
+        comment_id=cid,
+        now_dt=_step_now(),
     )
-    if later_reason:
-        should_tag = _later_in_tick is None
-        return _record_rejection(
+
+    def _add_step(
+        key: str,
+        status: str,
+        detail: Optional[str] = None,
+        *,
+        label: Optional[str] = None,
+    ) -> None:
+        agent_runs.add_step(
             tenant_id,
-            page_id=page_id,
-            fb_post_id=fb_post_id,
-            thread_id=thread_id,
-            comment_id=cid,
-            from_id=from_id,
-            intents=sorted_ints,
-            reason=later_reason if should_tag else "Bỏ qua bình luận cũ vì có tin nhắn mới hơn cần nhân viên xử lý",
-            ts=ts,
-            tag_attention=should_tag,
+            run_id,
+            key,
+            status,
+            label=label,
+            detail=detail,
+            now_dt=_step_now(),
         )
 
-    # ---------- BƯỚC 6: Action ----------
-    if is_kill_switch_enabled():
-        return _record_rejection(
-            tenant_id,
-            page_id=page_id,
-            fb_post_id=fb_post_id,
-            thread_id=thread_id,
-            comment_id=cid,
-            from_id=from_id,
-            intents=sorted_ints,
-            reason="Tự động trả lời đang tạm tắt toàn hệ thống",
-            ts=ts,
+    def _finish_can_ban(
+        res: dict,
+        *,
+        action_status: str = "ok",
+        action_detail: Optional[str] = None,
+    ) -> dict:
+        detail = action_detail
+        if detail is None:
+            detail = (
+                "Đã gắn nhãn Cần bạn chờ nhân viên xử lý"
+                if res.get("tagged")
+                else (res.get("reason") or "Chuyển nhân viên xử lý")
+            )
+        _add_step("action", action_status, detail, label="Cần bạn")
+        agent_runs.finish_run(tenant_id, run_id, status="done", outcome="can_ban", now_dt=_step_now())
+        res["agentRunId"] = run_id
+        return res
+
+    def _finish_would_send(res: dict) -> dict:
+        _add_step(
+            "action",
+            "ok",
+            "Chế độ chạy thử — đã tạo câu trả lời mẫu, chưa gửi lên Facebook",
+            label="Chạy thử",
+        )
+        agent_runs.finish_run(tenant_id, run_id, status="done", outcome="would_send", now_dt=_step_now())
+        res["agentRunId"] = run_id
+        return res
+
+    def _finish_failed(res: dict) -> dict:
+        _add_step("action", "error", res.get("reason") or "Gửi tự động lên Facebook thất bại", label="Gửi")
+        agent_runs.finish_run(tenant_id, run_id, status="error", outcome="failed", now_dt=_step_now())
+        res["agentRunId"] = run_id
+        return res
+
+    try:
+        msg_len = len(str(comment.get("message") or "").strip())
+        _add_step(
+            "read",
+            "ok",
+            "Đã đọc bình luận khách hàng (%d ký tự)" % msg_len if msg_len else "Đã đọc bình luận (không có nội dung chữ)",
         )
 
-    if setting["mode"] != "live":
-        store.append_auto_reply_log(
-            tenant_id,
-            page_id=page_id,
-            fb_post_id=fb_post_id,
-            thread_id=thread_id,
-            comment_id=cid,
-            from_id=from_id,
-            intents=sorted_ints,
-            action="would_send",
-            reason="",
-            text=reply_text,
-            created_at=ts,
-        )
-        log.info(
-            "comment_auto_reply tenant=%s page_id=%s thread_id=%s comment_id=%s action=would_send intents=%s",
-            tenant_id,
-            page_id,
-            thread_id,
-            cid,
-            ",".join(sorted_ints),
-        )
-        return {
-            "action": "would_send",
-            "tagged": False,
-            "threadId": thread_id,
-            "commentId": cid,
-            "intents": sorted_ints,
-            "reason": None,
-            "text": reply_text,
-        }
-
-    # Mode live: giữ khoá tư vấn theo (tenant_id, page_id) để tuần tự hoá kiểm tra đã trả lời,
-    # phạm vi hội thoại, intents đang bật (N11), cooldown hội thoại/bài đăng/khách, trần giờ/ngày, gửi FB và ghi log.
-    cooldown_minutes = compiled["cooldown_minutes"]
-    post_rate_limit = compiled["post_rate_limit"]
-    post_rate_window = compiled["post_rate_window_minutes"]
-    with store.auto_reply_page_lock(tenant_id, page_id):
-        if store.has_sent_auto_reply_for_comment(tenant_id, cid):
-            return {
-                "action": "already_sent",
-                "tagged": False,
-                "threadId": thread_id,
-                "commentId": cid,
-                "intents": sorted_ints,
-                "reason": None,
-                "text": reply_text,
-            }
-
-        if store.has_thread_reply_or_operator_activity(tenant_id, comment, now_ts=ts):
-            return {
-                "action": "ignored",
-                "tagged": False,
-                "threadId": thread_id,
-                "commentId": cid,
-            }
-
-        if store.thread_has_any_page_reply_or_operator_activity(tenant_id, thread_id, now_ts=ts):
-            return _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                reason="Hội thoại đã có phản hồi của Fanpage hoặc thao tác nhân viên — cần nhân viên xử lý",
-                ts=ts,
+        # N9: tối đa 1 lần tự động trả lời mỗi hội thoại trong 1 lượt tick; bình luận bổ sung gắn 'Cần bạn', không bỏ rơi
+        if _replied_threads_in_tick is not None and thread_id in _replied_threads_in_tick:
+            tick_reason = "Hội thoại đã có 1 phản hồi tự động trong lượt này — gắn 'Cần bạn' cho bình luận bổ sung"
+            _add_step("safety", "blocked", tick_reason)
+            return _finish_can_ban(
+                _record_rejection(
+                    tenant_id,
+                    page_id=page_id,
+                    fb_post_id=fb_post_id,
+                    thread_id=thread_id,
+                    comment_id=cid,
+                    from_id=from_id,
+                    reason=tick_reason,
+                    ts=ts,
+                )
             )
 
-        att_now = store.get_thread_attentions(tenant_id, [thread_id]).get(thread_id)
-        if att_now and att_now.get("tag") == "can_ban":
-            return _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                reason="Hội thoại đang gắn nhãn 'Cần bạn' chờ nhân viên xử lý",
-                ts=ts,
-                tag_attention=False,
-            )
-
-        if is_kill_switch_enabled():
-            return _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                reason="Tự động trả lời đang tạm tắt toàn hệ thống",
-                ts=ts,
-            )
-
-        live_setting = (
+        compiled = _get_compiled_rules(rules_cfg)
+        setting = (
             store.get_auto_reply_setting_or_default(tenant_id, page_id)
             if page_id
-            else setting
+            else store.default_auto_reply_setting(tenant_id, "")
         )
-        if not live_setting["enabled"]:
-            return _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                reason="Chưa bật tự động trả lời cho Fanpage này",
-                ts=ts,
+
+        ev = _evaluate_comment(
+            tenant_id,
+            comment,
+            thread_id=thread_id,
+            setting=setting,
+            compiled=compiled,
+            rules_cfg=rules_cfg,
+            recent_texts=recent_texts,
+            post_recent_texts=_post_recent_texts,
+            failed_pages=failed_pages,
+            ref_dt=ref_dt,
+            ts=ts,
+            check_cooldown=True,
+            step_cb=_add_step,
+        )
+        if ev["status"] == "reject":
+            return _finish_can_ban(
+                _record_rejection(
+                    tenant_id,
+                    page_id=page_id,
+                    fb_post_id=fb_post_id,
+                    thread_id=thread_id,
+                    comment_id=cid,
+                    from_id=from_id,
+                    intents=ev["intents"],
+                    reason=ev["reason"],
+                    ts=ts,
+                )
             )
 
-        # N11: kiểm tra lại danh sách intents đang bật của Page ngay dưới khoá
-        live_enabled_intents = set(live_setting.get("intents") or ()) & _VALID_INTENT_SET
-        live_disabled_ints = [i for i in sorted_ints if i not in live_enabled_intents]
-        if live_disabled_ints:
-            labels = ", ".join(_INTENT_LABELS[i] for i in live_disabled_ints)
-            return _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                reason="Fanpage chưa bật tự động trả lời cho nhóm câu hỏi: %s" % labels,
-                ts=ts,
+        sorted_ints = ev["intents"]
+        reply_text = ev["reply_text"]
+        fb_post_id = ev.get("fb_post_id") or fb_post_id
+
+        # Nếu hội thoại đang mang nhãn 'can_ban' chưa được nhân viên xử lý → không tự động trả lời đè lên
+        existing_att = store.get_thread_attentions(tenant_id, [thread_id]).get(thread_id)
+        if existing_att and existing_att.get("tag") == "can_ban":
+            reason = "Hội thoại đang gắn nhãn 'Cần bạn' chờ nhân viên xử lý"
+            return _finish_can_ban(
+                _record_rejection(
+                    tenant_id,
+                    page_id=page_id,
+                    fb_post_id=fb_post_id,
+                    thread_id=thread_id,
+                    comment_id=cid,
+                    from_id=from_id,
+                    intents=sorted_ints,
+                    reason=reason,
+                    ts=ts,
+                    tag_attention=False,
+                ),
+                action_status="blocked",
+                action_detail=reason,
             )
 
-        if live_setting["mode"] != "live":
+        # Nếu cùng hội thoại đã có tin nhắn khách MỚI HƠN rơi vào `can_ban` → không trả lời tin nhắn cũ (#6, R6)
+        later_hit = _find_later_can_ban_in_thread(
+            tenant_id,
+            comment,
+            thread_id,
+            setting=setting,
+            compiled=compiled,
+            rules_cfg=rules_cfg,
+            failed_pages=failed_pages,
+            ref_dt=ref_dt,
+            ts=ts,
+            candidate_later=_later_in_tick,
+        )
+        if later_hit:
+            later_reason, blocking_cid = later_hit
+            later_tick_ids = {m["id"] for m in (_later_in_tick or ())}
+            should_tag = blocking_cid not in later_tick_ids
+            reason = later_reason if should_tag else "Bỏ qua bình luận cũ vì có tin nhắn mới hơn cần nhân viên xử lý"
+            return _finish_can_ban(
+                _record_rejection(
+                    tenant_id,
+                    page_id=page_id,
+                    fb_post_id=fb_post_id,
+                    thread_id=thread_id,
+                    comment_id=cid,
+                    from_id=from_id,
+                    intents=sorted_ints,
+                    reason=reason,
+                    ts=ts,
+                    tag_attention=should_tag,
+                ),
+                action_status="blocked",
+                action_detail=reason,
+            )
+
+        # ---------- BƯỚC 6: Action ----------
+        if is_kill_switch_enabled():
+            reason = "Tự động trả lời đang tạm tắt toàn hệ thống"
+            return _finish_can_ban(
+                _record_rejection(
+                    tenant_id,
+                    page_id=page_id,
+                    fb_post_id=fb_post_id,
+                    thread_id=thread_id,
+                    comment_id=cid,
+                    from_id=from_id,
+                    intents=sorted_ints,
+                    reason=reason,
+                    ts=ts,
+                ),
+                action_status="blocked",
+                action_detail=reason,
+            )
+
+        if setting["mode"] != "live":
             store.append_auto_reply_log(
                 tenant_id,
                 page_id=page_id,
@@ -1872,7 +2061,15 @@ def process_comment(
                 text=reply_text,
                 created_at=ts,
             )
-            return {
+            log.info(
+                "comment_auto_reply tenant=%s page_id=%s thread_id=%s comment_id=%s action=would_send intents=%s",
+                tenant_id,
+                page_id,
+                thread_id,
+                cid,
+                ",".join(sorted_ints),
+            )
+            return _finish_would_send({
                 "action": "would_send",
                 "tagged": False,
                 "threadId": thread_id,
@@ -1880,95 +2077,142 @@ def process_comment(
                 "intents": sorted_ints,
                 "reason": None,
                 "text": reply_text,
-            }
+            })
 
-        # Kiểm tra lại cooldown theo hội thoại, tốc độ theo bài đăng và (khi có from_id) cooldown theo khách dưới khoá
-        if store.has_recent_auto_reply_for_thread(
-            tenant_id,
-            thread_id,
-            ref_dt - timedelta(minutes=cooldown_minutes),
-        ):
-            return _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                reason="Hội thoại này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
-                ts=ts,
-            )
+        # Mode live: giữ khoá tư vấn theo (tenant_id, page_id) để tuần tự hoá kiểm tra đã trả lời,
+        # phạm vi hội thoại, intents đang bật (N11), cooldown hội thoại/bài đăng/khách, trần giờ/ngày, gửi FB và ghi log.
+        cooldown_minutes = compiled["cooldown_minutes"]
+        post_rate_limit = compiled["post_rate_limit"]
+        post_rate_window = compiled["post_rate_window_minutes"]
+        with store.auto_reply_page_lock(tenant_id, page_id):
+            if store.has_sent_auto_reply_for_comment(tenant_id, cid):
+                _add_step("action", "skipped", "Bình luận này đã được tự động trả lời trước đó", label="Gửi")
+                agent_runs.finish_run(tenant_id, run_id, status="done", outcome="sent", now_dt=_step_now())
+                return {
+                    "action": "already_sent",
+                    "tagged": False,
+                    "threadId": thread_id,
+                    "commentId": cid,
+                    "intents": sorted_ints,
+                    "reason": None,
+                    "text": reply_text,
+                    "agentRunId": run_id,
+                }
 
-        if fb_post_id and store.count_auto_replies_for_post_since(
-            tenant_id,
-            fb_post_id,
-            ref_dt - timedelta(minutes=post_rate_window),
-        ) >= post_rate_limit:
-            return _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                reason="Bài đăng đã đạt giới hạn %d lượt tự động trả lời trong vòng %d phút gần đây"
-                % (post_rate_limit, post_rate_window),
-                ts=ts,
-            )
+            if store.has_thread_reply_or_operator_activity(tenant_id, comment, now_ts=ts):
+                _add_step("action", "skipped", "Hội thoại đã có phản hồi của Fanpage hoặc thao tác nhân viên", label="Cần bạn")
+                agent_runs.finish_run(tenant_id, run_id, status="done", outcome=None, now_dt=_step_now())
+                return {
+                    "action": "ignored",
+                    "tagged": False,
+                    "threadId": thread_id,
+                    "commentId": cid,
+                    "agentRunId": run_id,
+                }
 
-        if from_id and store.has_recent_auto_reply_for_customer(
-            tenant_id,
-            page_id,
-            from_id,
-            ref_dt - timedelta(minutes=cooldown_minutes),
-        ):
-            return _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                reason="Khách hàng này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
-                ts=ts,
-            )
+            if store.thread_has_any_page_reply_or_operator_activity(tenant_id, thread_id, now_ts=ts):
+                reason = "Hội thoại đã có phản hồi của Fanpage hoặc thao tác nhân viên — cần nhân viên xử lý"
+                return _finish_can_ban(
+                    _record_rejection(
+                        tenant_id,
+                        page_id=page_id,
+                        fb_post_id=fb_post_id,
+                        thread_id=thread_id,
+                        comment_id=cid,
+                        from_id=from_id,
+                        intents=sorted_ints,
+                        reason=reason,
+                        ts=ts,
+                    ),
+                    action_status="blocked",
+                    action_detail=reason,
+                )
 
-        # Kiểm tra trần giờ & ngày của Page dưới khoá
-        hourly_sent = store.count_auto_replies_since(tenant_id, page_id, ref_dt - timedelta(hours=1))
-        daily_sent = store.count_auto_replies_since(tenant_id, page_id, _local_day_start(ref_dt))
-        if hourly_sent >= int(live_setting["hourly_cap"]) or daily_sent >= int(live_setting["daily_cap"]):
-            return _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                reason="vượt trần tự trả lời",
-                ts=ts,
-            )
+            att_now = store.get_thread_attentions(tenant_id, [thread_id]).get(thread_id)
+            if att_now and att_now.get("tag") == "can_ban":
+                reason = "Hội thoại đang gắn nhãn 'Cần bạn' chờ nhân viên xử lý"
+                return _finish_can_ban(
+                    _record_rejection(
+                        tenant_id,
+                        page_id=page_id,
+                        fb_post_id=fb_post_id,
+                        thread_id=thread_id,
+                        comment_id=cid,
+                        from_id=from_id,
+                        intents=sorted_ints,
+                        reason=reason,
+                        ts=ts,
+                        tag_attention=False,
+                    ),
+                    action_status="blocked",
+                    action_detail=reason,
+                )
 
-        # Gửi qua đúng đường gửi của người vận hành với clientId = "auto:" + comment_id
-        client_id = "auto:" + cid
-        try:
-            send_res = vpost_api.send_thread_reply(
-                thread_id,
-                reply_text,
-                client_id,
-                tenant_id=tenant_id,
-                sent_by="auto",
-                clear_attention=False,
+            if is_kill_switch_enabled():
+                reason = "Tự động trả lời đang tạm tắt toàn hệ thống"
+                return _finish_can_ban(
+                    _record_rejection(
+                        tenant_id,
+                        page_id=page_id,
+                        fb_post_id=fb_post_id,
+                        thread_id=thread_id,
+                        comment_id=cid,
+                        from_id=from_id,
+                        intents=sorted_ints,
+                        reason=reason,
+                        ts=ts,
+                    ),
+                    action_status="blocked",
+                    action_detail=reason,
+                )
+
+            live_setting = (
+                store.get_auto_reply_setting_or_default(tenant_id, page_id)
+                if page_id
+                else setting
             )
-        except vpost_api.ApiError as e:
-            detail = e.detail if isinstance(e.detail, dict) else {}
-            err_code = str(detail.get("code") or "UPSTREAM_ERROR")
-            err_msg = str(detail.get("message") or "Lỗi gửi bình luận lên Facebook")
-            if err_code == "BLOCKED":
-                return _record_rejection(
+            if not live_setting["enabled"]:
+                reason = "Chưa bật tự động trả lời cho Fanpage này"
+                return _finish_can_ban(
+                    _record_rejection(
+                        tenant_id,
+                        page_id=page_id,
+                        fb_post_id=fb_post_id,
+                        thread_id=thread_id,
+                        comment_id=cid,
+                        from_id=from_id,
+                        intents=sorted_ints,
+                        reason=reason,
+                        ts=ts,
+                    ),
+                    action_status="blocked",
+                    action_detail=reason,
+                )
+
+            # N11: kiểm tra lại danh sách intents đang bật của Page ngay dưới khoá
+            live_enabled_intents = set(live_setting.get("intents") or ()) & _VALID_INTENT_SET
+            live_disabled_ints = [i for i in sorted_ints if i not in live_enabled_intents]
+            if live_disabled_ints:
+                labels = ", ".join(_INTENT_LABELS[i] for i in live_disabled_ints)
+                reason = "Fanpage chưa bật tự động trả lời cho nhóm câu hỏi: %s" % labels
+                return _finish_can_ban(
+                    _record_rejection(
+                        tenant_id,
+                        page_id=page_id,
+                        fb_post_id=fb_post_id,
+                        thread_id=thread_id,
+                        comment_id=cid,
+                        from_id=from_id,
+                        intents=sorted_ints,
+                        reason=reason,
+                        ts=ts,
+                    ),
+                    action_status="blocked",
+                    action_detail=reason,
+                )
+
+            if live_setting["mode"] != "live":
+                store.append_auto_reply_log(
                     tenant_id,
                     page_id=page_id,
                     fb_post_id=fb_post_id,
@@ -1976,171 +2220,350 @@ def process_comment(
                     comment_id=cid,
                     from_id=from_id,
                     intents=sorted_ints,
-                    reason="kiểm tra chặn: %s" % err_msg,
-                    ts=ts,
+                    action="would_send",
+                    reason="",
+                    text=reply_text,
+                    created_at=ts,
                 )
-            if err_code == "CONFLICT":
-                if store.has_sent_auto_reply_for_comment(tenant_id, cid):
-                    return {
-                        "action": "already_sent",
-                        "tagged": False,
-                        "threadId": thread_id,
-                        "commentId": cid,
-                        "intents": sorted_ints,
-                        "reason": None,
-                        "text": reply_text,
-                    }
-                return _record_rejection(
-                    tenant_id,
-                    page_id=page_id,
-                    fb_post_id=fb_post_id,
-                    thread_id=thread_id,
-                    comment_id=cid,
-                    from_id=from_id,
-                    intents=sorted_ints,
-                    reason="Bỏ qua do đang có lượt gửi khác trên hội thoại này (CONFLICT)",
-                    ts=ts,
-                    tag_attention=False,
-                )
-            if err_code == "NOT_FOUND":
-                return _record_rejection(
-                    tenant_id,
-                    page_id=page_id,
-                    fb_post_id=fb_post_id,
-                    thread_id=thread_id,
-                    comment_id=cid,
-                    from_id=from_id,
-                    intents=sorted_ints,
-                    reason="Không tìm thấy hội thoại gốc để tự động trả lời — cần nhân viên kiểm tra",
-                    ts=ts,
-                )
-            if failed_pages is not None and page_id:
-                failed_pages.add(page_id)
-            log.warning(
-                "comment_auto_reply_error tenant=%s page_id=%s thread_id=%s comment_id=%s code=%s",
-                tenant_id,
-                page_id,
-                thread_id,
-                cid,
-                err_code,
-            )
-            res = _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                action="failed",
-                reason="Gửi tự động lên Facebook thất bại (%s)" % err_code,
-                text=reply_text,
-                ts=ts,
-            )
-            res["errorCode"] = err_code
-            res["rateLimited"] = err_code == "RATE_LIMITED"
-            return res
-        except facebook.FacebookError as e:
-            if failed_pages is not None and page_id:
-                failed_pages.add(page_id)
-            log.warning(
-                "comment_auto_reply_error tenant=%s page_id=%s thread_id=%s comment_id=%s code=%s",
-                tenant_id,
-                page_id,
-                thread_id,
-                cid,
-                e.code,
-            )
-            res = _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                action="failed",
-                reason="Gửi tự động lên Facebook thất bại (%s)" % e.code,
-                text=reply_text,
-                ts=ts,
-            )
-            res["errorCode"] = e.code
-            res["rateLimited"] = e.code == "RATE_LIMITED"
-            return res
-        except Exception as e:
-            if failed_pages is not None and page_id:
-                failed_pages.add(page_id)
-            log.warning(
-                "comment_auto_reply_error tenant=%s page_id=%s thread_id=%s comment_id=%s err=%s",
-                tenant_id,
-                page_id,
-                thread_id,
-                cid,
-                type(e).__name__,
-            )
-            res = _record_rejection(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                action="failed",
-                reason="Gửi tự động lên Facebook thất bại (%s)" % type(e).__name__,
-                text=reply_text,
-                ts=ts,
-            )
-            res["errorCode"] = "UPSTREAM_ERROR"
-            res["rateLimited"] = False
-            return res
+                return _finish_would_send({
+                    "action": "would_send",
+                    "tagged": False,
+                    "threadId": thread_id,
+                    "commentId": cid,
+                    "intents": sorted_ints,
+                    "reason": None,
+                    "text": reply_text,
+                })
 
-        if send_res.get("alreadySent"):
+            # Kiểm tra lại cooldown theo hội thoại, tốc độ theo bài đăng và (khi có from_id) cooldown theo khách dưới khoá
+            if store.has_recent_auto_reply_for_thread(
+                tenant_id,
+                thread_id,
+                ref_dt - timedelta(minutes=cooldown_minutes),
+            ):
+                reason = "Hội thoại này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes
+                return _finish_can_ban(
+                    _record_rejection(
+                        tenant_id,
+                        page_id=page_id,
+                        fb_post_id=fb_post_id,
+                        thread_id=thread_id,
+                        comment_id=cid,
+                        from_id=from_id,
+                        intents=sorted_ints,
+                        reason=reason,
+                        ts=ts,
+                    ),
+                    action_status="blocked",
+                    action_detail=reason,
+                )
+
+            if fb_post_id and store.count_auto_replies_for_post_since(
+                tenant_id,
+                fb_post_id,
+                ref_dt - timedelta(minutes=post_rate_window),
+            ) >= post_rate_limit:
+                reason = (
+                    "Bài đăng đã đạt giới hạn %d lượt tự động trả lời trong vòng %d phút gần đây"
+                    % (post_rate_limit, post_rate_window)
+                )
+                return _finish_can_ban(
+                    _record_rejection(
+                        tenant_id,
+                        page_id=page_id,
+                        fb_post_id=fb_post_id,
+                        thread_id=thread_id,
+                        comment_id=cid,
+                        from_id=from_id,
+                        intents=sorted_ints,
+                        reason=reason,
+                        ts=ts,
+                    ),
+                    action_status="blocked",
+                    action_detail=reason,
+                )
+
+            if from_id and store.has_recent_auto_reply_for_customer(
+                tenant_id,
+                page_id,
+                from_id,
+                ref_dt - timedelta(minutes=cooldown_minutes),
+            ):
+                reason = "Khách hàng này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes
+                return _finish_can_ban(
+                    _record_rejection(
+                        tenant_id,
+                        page_id=page_id,
+                        fb_post_id=fb_post_id,
+                        thread_id=thread_id,
+                        comment_id=cid,
+                        from_id=from_id,
+                        intents=sorted_ints,
+                        reason=reason,
+                        ts=ts,
+                    ),
+                    action_status="blocked",
+                    action_detail=reason,
+                )
+
+            # Kiểm tra trần giờ & ngày của Page dưới khoá
+            hourly_sent = store.count_auto_replies_since(tenant_id, page_id, ref_dt - timedelta(hours=1))
+            daily_sent = store.count_auto_replies_since(tenant_id, page_id, _local_day_start(ref_dt))
+            if hourly_sent >= int(live_setting["hourly_cap"]) or daily_sent >= int(live_setting["daily_cap"]):
+                reason = "vượt trần tự trả lời"
+                return _finish_can_ban(
+                    _record_rejection(
+                        tenant_id,
+                        page_id=page_id,
+                        fb_post_id=fb_post_id,
+                        thread_id=thread_id,
+                        comment_id=cid,
+                        from_id=from_id,
+                        intents=sorted_ints,
+                        reason=reason,
+                        ts=ts,
+                    ),
+                    action_status="blocked",
+                    action_detail=reason,
+                )
+
+            # Gửi qua đúng đường gửi của người vận hành với clientId = "auto:" + comment_id
+            _add_step("action", "running", "Đang gửi trả lời tự động lên Facebook…", label="Gửi")
+            client_id = "auto:" + cid
+            try:
+                send_res = vpost_api.send_thread_reply(
+                    thread_id,
+                    reply_text,
+                    client_id,
+                    tenant_id=tenant_id,
+                    sent_by="auto",
+                    clear_attention=False,
+                    agent_run_id=run_id,
+                )
+            except vpost_api.ApiError as e:
+                detail = e.detail if isinstance(e.detail, dict) else {}
+                err_code = str(detail.get("code") or "UPSTREAM_ERROR")
+                err_msg = str(detail.get("message") or "Lỗi gửi bình luận lên Facebook")
+                if err_code == "BLOCKED":
+                    reason = "kiểm tra chặn: %s" % err_msg
+                    return _finish_can_ban(
+                        _record_rejection(
+                            tenant_id,
+                            page_id=page_id,
+                            fb_post_id=fb_post_id,
+                            thread_id=thread_id,
+                            comment_id=cid,
+                            from_id=from_id,
+                            intents=sorted_ints,
+                            reason=reason,
+                            ts=ts,
+                        ),
+                        action_status="blocked",
+                        action_detail=reason,
+                    )
+                if err_code == "CONFLICT":
+                    if store.has_sent_auto_reply_for_comment(tenant_id, cid):
+                        _add_step("action", "skipped", "Bình luận này đã được tự động trả lời trước đó", label="Gửi")
+                        agent_runs.finish_run(tenant_id, run_id, status="done", outcome="sent", now_dt=_step_now())
+                        return {
+                            "action": "already_sent",
+                            "tagged": False,
+                            "threadId": thread_id,
+                            "commentId": cid,
+                            "intents": sorted_ints,
+                            "reason": None,
+                            "text": reply_text,
+                            "agentRunId": run_id,
+                        }
+                    reason = "Bỏ qua do đang có lượt gửi khác trên hội thoại này (CONFLICT)"
+                    return _finish_can_ban(
+                        _record_rejection(
+                            tenant_id,
+                            page_id=page_id,
+                            fb_post_id=fb_post_id,
+                            thread_id=thread_id,
+                            comment_id=cid,
+                            from_id=from_id,
+                            intents=sorted_ints,
+                            reason=reason,
+                            ts=ts,
+                            tag_attention=False,
+                        ),
+                        action_status="blocked",
+                        action_detail=reason,
+                    )
+                if err_code == "NOT_FOUND":
+                    reason = "Không tìm thấy hội thoại gốc để tự động trả lời — cần nhân viên kiểm tra"
+                    return _finish_can_ban(
+                        _record_rejection(
+                            tenant_id,
+                            page_id=page_id,
+                            fb_post_id=fb_post_id,
+                            thread_id=thread_id,
+                            comment_id=cid,
+                            from_id=from_id,
+                            intents=sorted_ints,
+                            reason=reason,
+                            ts=ts,
+                        ),
+                        action_status="blocked",
+                        action_detail=reason,
+                    )
+                if failed_pages is not None and page_id:
+                    failed_pages.add(page_id)
+                log.warning(
+                    "comment_auto_reply_error tenant=%s page_id=%s thread_id=%s comment_id=%s code=%s",
+                    tenant_id,
+                    page_id,
+                    thread_id,
+                    cid,
+                    err_code,
+                )
+                res = _record_rejection(
+                    tenant_id,
+                    page_id=page_id,
+                    fb_post_id=fb_post_id,
+                    thread_id=thread_id,
+                    comment_id=cid,
+                    from_id=from_id,
+                    intents=sorted_ints,
+                    action="failed",
+                    reason="Gửi tự động lên Facebook thất bại (%s)" % err_code,
+                    text=reply_text,
+                    ts=ts,
+                )
+                res["errorCode"] = err_code
+                res["rateLimited"] = err_code == "RATE_LIMITED"
+                return _finish_failed(res)
+            except facebook.FacebookError as e:
+                if failed_pages is not None and page_id:
+                    failed_pages.add(page_id)
+                log.warning(
+                    "comment_auto_reply_error tenant=%s page_id=%s thread_id=%s comment_id=%s code=%s",
+                    tenant_id,
+                    page_id,
+                    thread_id,
+                    cid,
+                    e.code,
+                )
+                res = _record_rejection(
+                    tenant_id,
+                    page_id=page_id,
+                    fb_post_id=fb_post_id,
+                    thread_id=thread_id,
+                    comment_id=cid,
+                    from_id=from_id,
+                    intents=sorted_ints,
+                    action="failed",
+                    reason="Gửi tự động lên Facebook thất bại (%s)" % e.code,
+                    text=reply_text,
+                    ts=ts,
+                )
+                res["errorCode"] = e.code
+                res["rateLimited"] = e.code == "RATE_LIMITED"
+                return _finish_failed(res)
+            except Exception as e:
+                if failed_pages is not None and page_id:
+                    failed_pages.add(page_id)
+                log.warning(
+                    "comment_auto_reply_error tenant=%s page_id=%s thread_id=%s comment_id=%s err=%s",
+                    tenant_id,
+                    page_id,
+                    thread_id,
+                    cid,
+                    type(e).__name__,
+                )
+                res = _record_rejection(
+                    tenant_id,
+                    page_id=page_id,
+                    fb_post_id=fb_post_id,
+                    thread_id=thread_id,
+                    comment_id=cid,
+                    from_id=from_id,
+                    intents=sorted_ints,
+                    action="failed",
+                    reason="Gửi tự động lên Facebook thất bại (%s)" % type(e).__name__,
+                    text=reply_text,
+                    ts=ts,
+                )
+                res["errorCode"] = "UPSTREAM_ERROR"
+                res["rateLimited"] = False
+                return _finish_failed(res)
+
+            if send_res.get("alreadySent"):
+                reply_msg_id = str((send_res.get("message") or {}).get("id") or "")
+                _add_step("action", "skipped", "Bình luận này đã được tự động trả lời trước đó", label="Gửi")
+                agent_runs.finish_run(
+                    tenant_id,
+                    run_id,
+                    status="done",
+                    outcome="sent",
+                    reply_message_id=reply_msg_id or None,
+                    now_dt=_step_now(),
+                )
+                return {
+                    "action": "already_sent",
+                    "tagged": False,
+                    "threadId": thread_id,
+                    "commentId": cid,
+                    "intents": sorted_ints,
+                    "reason": None,
+                    "text": reply_text,
+                    "agentRunId": run_id,
+                }
+
+            reply_msg = send_res.get("message") or {}
+            reply_msg_id = str(reply_msg.get("id") or "")
+            store.append_auto_reply_log(
+                tenant_id,
+                page_id=page_id,
+                fb_post_id=fb_post_id,
+                thread_id=thread_id,
+                comment_id=cid,
+                from_id=from_id,
+                intents=sorted_ints,
+                action="sent",
+                reason="",
+                text=reply_text,
+                fb_reply_id=reply_msg_id,
+                created_at=ts,
+            )
+            _add_step("action", "ok", "Đã gửi trả lời tự động lên Facebook", label="Gửi")
+            agent_runs.finish_run(
+                tenant_id,
+                run_id,
+                status="done",
+                outcome="sent",
+                reply_message_id=reply_msg_id or None,
+                now_dt=_step_now(),
+            )
+            log.info(
+                "comment_auto_reply tenant=%s page_id=%s thread_id=%s comment_id=%s action=sent reply_id=%s intents=%s",
+                tenant_id,
+                page_id,
+                thread_id,
+                cid,
+                reply_msg_id,
+                ",".join(sorted_ints),
+            )
             return {
-                "action": "already_sent",
+                "action": "sent",
                 "tagged": False,
                 "threadId": thread_id,
                 "commentId": cid,
+                "messageId": reply_msg_id,
                 "intents": sorted_ints,
                 "reason": None,
                 "text": reply_text,
+                "agentRunId": run_id,
             }
-
-        reply_msg = send_res.get("message") or {}
-        reply_msg_id = str(reply_msg.get("id") or "")
-        store.append_auto_reply_log(
-            tenant_id,
-            page_id=page_id,
-            fb_post_id=fb_post_id,
-            thread_id=thread_id,
-            comment_id=cid,
-            from_id=from_id,
-            intents=sorted_ints,
-            action="sent",
-            reason="",
-            text=reply_text,
-            fb_reply_id=reply_msg_id,
-            created_at=ts,
-        )
-        log.info(
-            "comment_auto_reply tenant=%s page_id=%s thread_id=%s comment_id=%s action=sent reply_id=%s intents=%s",
-            tenant_id,
-            page_id,
-            thread_id,
-            cid,
-            reply_msg_id,
-            ",".join(sorted_ints),
-        )
-        return {
-            "action": "sent",
-            "tagged": False,
-            "threadId": thread_id,
-            "commentId": cid,
-            "messageId": reply_msg_id,
-            "intents": sorted_ints,
-            "reason": None,
-            "text": reply_text,
-        }
+    except Exception as exc:
+        try:
+            _add_step("action", "error", "Lỗi hệ thống khi xử lý (%s)" % type(exc).__name__, label="Gửi")
+            agent_runs.finish_run(tenant_id, run_id, status="error", outcome="failed", now_dt=_step_now())
+        except Exception:
+            pass
+        raise
 
 
 def run_auto_reply(

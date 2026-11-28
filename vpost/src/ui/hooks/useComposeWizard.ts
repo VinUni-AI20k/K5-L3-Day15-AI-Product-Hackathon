@@ -69,6 +69,7 @@ export type ComposeRestorePhase = "idle" | "restoring" | "done";
 export type ProductStepOutcome =
   | { ok: true; composed: ComposeResponse }
   | { ok: false; reason: "invalid" }
+  | { ok: false; reason: "aborted" }
   | { ok: false; reason: "failed"; error: ApiError | null };
 
 export interface ComposeRestoreOutcome {
@@ -341,6 +342,9 @@ export function useComposeWizard() {
       // become an unhandled rejection.
       return { ok: true, composed: await compose.mutateAsync() };
     } catch (error) {
+      if (isAbortError(error)) {
+        return { ok: false, reason: "aborted" };
+      }
       // The error is HANDED BACK, not just swallowed into a boolean: the caller
       // pins the server's own sentence on the colour chip that caused it, and
       // reading it from `compose.error` instead would be a stale closure — the
@@ -598,6 +602,7 @@ export function useComposeWizard() {
       // this build refuses, and that has to be visible, not swallowed.
       const outcome = await submitProductStep();
       if (!outcome.ok) {
+        if (outcome.reason === "aborted") return finish(false);
         // Compose refused (hết hàng, thiếu ảnh…): nothing below the field is
         // drawn, and `compose.error` under it carries the real sentence.
         notices.push(

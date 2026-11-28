@@ -9,6 +9,7 @@ import {
   type CaptionFanOutStatus,
 } from "@/ui/components/compose/caption-fanout";
 import { COMPOSE_CHANNELS, type ProductContent } from "@/ui/schemas/compose.schema";
+import { abortWithReason, isAbortError, suppressAbortRejection } from "@/ui/services/abort";
 import { ApiError } from "@/ui/services/api-error";
 import { generateCaptions } from "@/ui/services/post.api";
 
@@ -80,18 +81,23 @@ export function useCaptionFanOut(input: {
   });
 
   const mountedRef = useRef(true);
+  /** Bumped per run: answers from an older run are ignored, never applied. */
+  const generationRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      abortWithReason(abortRef.current, "caption-fanout: component unmounted");
+      abortRef.current = null;
     };
   }, []);
 
-  /** Bumped per run: answers from an older run are ignored, never applied. */
-  const generationRef = useRef(0);
-
   const reset = useCallback(() => {
     generationRef.current += 1;
+    abortWithReason(abortRef.current, "caption-fanout: reset");
+    abortRef.current = null;
     setStatuses({});
     setErrors({});
     setDone(0);
@@ -110,13 +116,21 @@ export function useCaptionFanOut(input: {
     const startedWith: ProductContent = started;
 
     const generation = (generationRef.current += 1);
+    abortWithReason(abortRef.current, "caption-fanout: superseded by new run");
+    const controller = new AbortController();
+    abortRef.current = controller;
     setStatuses({});
     setErrors({});
     setDone(0);
     setTotal(plan.channelIds.length);
     setIsRunning(true);
 
-    const isCurrent = () => mountedRef.current && generationRef.current === generation;
+    let aborted = false;
+    const isCurrent = () =>
+      !aborted &&
+      !controller.signal.aborted &&
+      mountedRef.current &&
+      generationRef.current === generation;
 
     /**
      * One call for one channel. The endpoint takes the PLATFORM catalogue, so
@@ -124,15 +138,18 @@ export function useCaptionFanOut(input: {
      * lands on, and that a fresh call produces a fresh variation.
      */
     async function generateOne(): Promise<{ text?: string; reason?: string }> {
-      const result = await generateCaptions({
-        // The product as it is NOW, falling back to the one the run started
-        // with: a compose that failed mid-run nulls `content`, and finishing the
-        // run for the product the operator actually pressed for is the honest
-        // outcome.
-        content: inputRef.current.content ?? startedWith,
-        channels: COMPOSE_CHANNELS.map((channel) => channel.id),
-        tone: inputRef.current.tone,
-      });
+      const result = await generateCaptions(
+        {
+          // The product as it is NOW, falling back to the one the run started
+          // with: a compose that failed mid-run nulls `content`, and finishing the
+          // run for the product the operator actually pressed for is the honest
+          // outcome.
+          content: inputRef.current.content ?? startedWith,
+          channels: COMPOSE_CHANNELS.map((channel) => channel.id),
+          tone: inputRef.current.tone,
+        },
+        controller.signal,
+      );
       const platformId = COMPOSE_CHANNELS[0].id;
       const text = result.generated.find((item) => item.channelId === platformId)?.text;
       if (text) return { text };
@@ -143,34 +160,50 @@ export function useCaptionFanOut(input: {
       };
     }
 
-    void runCaptionFanOut({
-      channelIds: plan.channelIds,
-      concurrency: plan.concurrency,
-      isCurrent,
-      generate: () =>
-        generateOne().catch((error: unknown) => {
-          // Turned into this channel's reason by the loop; ApiError carries the
-          // operator sentence the server wrote.
-          throw ApiError.is(error) ? new Error(error.userMessage) : error;
+    suppressAbortRejection(
+      runCaptionFanOut({
+        channelIds: plan.channelIds,
+        concurrency: plan.concurrency,
+        isCurrent,
+        generate: () =>
+          generateOne().catch((error: unknown) => {
+            if (isAbortError(error, controller.signal)) {
+              aborted = true;
+              abortWithReason(controller, "caption-fanout: request aborted");
+              throw error;
+            }
+            // Turned into this channel's reason by the loop; ApiError carries the
+            // operator sentence the server wrote.
+            throw ApiError.is(error) ? new Error(error.userMessage) : error;
+          }),
+        events: {
+          onPending: (channelId) =>
+            setStatuses((current) => ({ ...current, [channelId]: "pending" })),
+          onText: (channelId, text) => {
+            inputRef.current.onText(channelId, text);
+            setStatuses((current) => ({ ...current, [channelId]: "done" }));
+          },
+          onError: (channelId, reason) => {
+            setStatuses((current) => ({ ...current, [channelId]: "error" }));
+            setErrors((current) => ({ ...current, [channelId]: reason }));
+          },
+          onSettled: () => setDone((current) => current + 1),
+        },
+      })
+        .then(() => {
+          if (mountedRef.current && generationRef.current === generation && aborted) {
+            setIsRunning(false);
+            return;
+          }
+          if (!isCurrent()) return;
+          setIsRunning(false);
+          inputRef.current.onSettled?.();
+        })
+        .finally(() => {
+          if (abortRef.current === controller) abortRef.current = null;
         }),
-      events: {
-        onPending: (channelId) =>
-          setStatuses((current) => ({ ...current, [channelId]: "pending" })),
-        onText: (channelId, text) => {
-          inputRef.current.onText(channelId, text);
-          setStatuses((current) => ({ ...current, [channelId]: "done" }));
-        },
-        onError: (channelId, reason) => {
-          setStatuses((current) => ({ ...current, [channelId]: "error" }));
-          setErrors((current) => ({ ...current, [channelId]: reason }));
-        },
-        onSettled: () => setDone((current) => current + 1),
-      },
-    }).then(() => {
-      if (!isCurrent()) return;
-      setIsRunning(false);
-      inputRef.current.onSettled?.();
-    });
+      (error) => isAbortError(error, controller.signal),
+    );
   }, []);
 
   return { statuses, errors, isRunning, done, total, run, reset };

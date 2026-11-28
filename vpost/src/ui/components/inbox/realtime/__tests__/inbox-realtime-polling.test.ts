@@ -734,4 +734,102 @@ describe("TanStack Query polling lifecycle (initial cursor, visibility, catch-up
     expect(alreadyNullFetcher).toHaveBeenCalledTimes(1);
     expect(state.consecutiveErrors).toBe(2);
   });
+
+  it("treats query cancellation and AbortError during polling as a quiet no-op with zero backoff or unhandledRejection", async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+
+    try {
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const storage = createMemoryStorage();
+      const cursorStore = createCommentUpdatesCursorStore(() => storage);
+      cursorStore.handleTenantTransition("tenant-1");
+      cursorStore.set("tenant-1", "c-10");
+
+      const state: CommentUpdatesPollerState = {
+        consecutiveErrors: 0,
+        activeTenantKey: "tenant-1",
+        isActive: true,
+      };
+      const onUpdates = vi.fn();
+
+      // 1. In-flight poll cancelled via queryClient.cancelQueries (tab hide / unmount / tenant switch)
+      let pollSignal: AbortSignal | undefined;
+      const cancellingFetcher = vi.fn(
+        (_params: { since?: string | null }, signal?: AbortSignal) => {
+          pollSignal = signal;
+          return new Promise<CommentUpdatesResponse>((_resolve, reject) => {
+            signal?.addEventListener("abort", () => {
+              reject(new DOMException("signal is aborted without reason", "AbortError"));
+            });
+          });
+        },
+      );
+
+      const queryFn = createCommentUpdatesQueryFn({
+        queryClient,
+        tenantKey: "tenant-1",
+        tenantId: "tenant-1",
+        cursorStore,
+        state,
+        fetcher: cancellingFetcher,
+        onUpdates,
+      });
+
+      const observer = new QueryObserver<CommentUpdatesTick, ApiError>(queryClient, {
+        queryKey: inboxKeys.updates("tenant-1"),
+        queryFn: ({ signal }) => queryFn({ signal }),
+        retry: false,
+        staleTime: 0,
+        gcTime: 0,
+      });
+      const unsubscribe = observer.subscribe(() => {});
+
+      await vi.waitFor(() => expect(pollSignal).toBeDefined());
+      await queryClient.cancelQueries({ queryKey: inboxKeys.updates("tenant-1") });
+
+      expect(pollSignal?.aborted).toBe(true);
+      expect(state.consecutiveErrors).toBe(0);
+      expect(cursorStore.get("tenant-1")).toBe("c-10");
+      expect(onUpdates).not.toHaveBeenCalled();
+      expect(observer.getCurrentResult().isError).toBe(false);
+
+      // 2. External/navigation AbortError (even when caller signal was not aborted)
+      const externalAbortFetcher = vi
+        .fn()
+        .mockRejectedValueOnce(new DOMException("GET /api/comments/updates aborted", "AbortError"));
+      const runExternalAbort = createCommentUpdatesQueryFn({
+        queryClient,
+        tenantKey: "tenant-1",
+        tenantId: "tenant-1",
+        cursorStore,
+        state,
+        fetcher: externalAbortFetcher,
+        onUpdates,
+      });
+
+      const tick = await runExternalAbort({ signal: new AbortController().signal });
+      expect(tick.response.items).toEqual([]);
+      expect(state.consecutiveErrors).toBe(0);
+      expect(onUpdates).not.toHaveBeenCalled();
+
+      // 3. invalidateInboxOnUpdates must never leak an unhandled AbortError rejection
+      vi.spyOn(queryClient, "invalidateQueries").mockImplementation(() =>
+        Promise.reject(new DOMException("signal is aborted without reason", "AbortError")),
+      );
+      invalidateInboxOnUpdates(queryClient, "tenant-1", {
+        items: [makeItem({ threadId: "th-abort" })],
+        draftsReady: [],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(unhandled).toHaveLength(0);
+
+      unsubscribe();
+      queryClient.clear();
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
 });

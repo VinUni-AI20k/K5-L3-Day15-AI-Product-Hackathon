@@ -183,4 +183,59 @@ describe("adoptActiveTenantCache", () => {
 
     await expect(adoptActiveTenantCache(queryClient)).rejects.toBe(failure);
   });
+
+  it("cancels in-flight tenant queries before removal without leaking an unhandled AbortError", async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+
+    try {
+      fetchMeMock.mockResolvedValue(session(["t-new"]));
+      const queryClient = newClient();
+      let seenSignal: AbortSignal | undefined;
+
+      const productsObserver = new QueryObserver(queryClient, {
+        queryKey: ["products", "t-old"],
+        queryFn: ({ signal }) => {
+          seenSignal = signal;
+          return new Promise<unknown>((_resolve, reject) => {
+            signal.addEventListener("abort", () => {
+              reject(new DOMException("signal is aborted without reason", "AbortError"));
+            });
+          });
+        },
+      });
+      const unsubscribe = productsObserver.subscribe(() => {});
+      await vi.waitFor(() => expect(seenSignal).toBeDefined());
+
+      await adoptActiveTenantCache(queryClient);
+
+      expect(seenSignal?.aborted).toBe(true);
+      expect(queryClient.getQueryData(["products", "t-old"])).toBeUndefined();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(unhandled).toHaveLength(0);
+      unsubscribe();
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
+  it("treats an aborted /api/me re-read as a quiet no-op without unhandledRejection", async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+
+    try {
+      fetchMeMock.mockRejectedValueOnce(
+        new DOMException("GET /api/me aborted", "AbortError"),
+      );
+      const queryClient = newClient();
+
+      await expect(adoptActiveTenantCache(queryClient)).resolves.toBeUndefined();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(unhandled).toHaveLength(0);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
 });

@@ -1015,9 +1015,19 @@ def test_other_tenant_cookie_403_and_cross_tenant_404():
 
 # ---------------- 7. Real server.app wiring & Asia/Ho_Chi_Minh daily cap boundary ----------------
 
+def _effective_route_paths(app_obj: FastAPI) -> list[str]:
+    """Return effective route paths in dispatch order across FastAPI <0.16 (flat routes) and >=0.16 (_IncludedRouter)."""
+    from fastapi import routing as fastapi_routing
+
+    iter_contexts = getattr(fastapi_routing, "iter_route_contexts", None)
+    if callable(iter_contexts):
+        return [getattr(rc, "path", None) or "" for rc in iter_contexts(app_obj.routes)]
+    return [getattr(r, "path", None) or "" for r in app_obj.routes]
+
+
 def test_real_server_app_exposes_all_moderation_routes_without_shadowing(monkeypatch):
     # Verify route registration order on the real server.app: static moderation routes come BEFORE /api/comments/{id}
-    route_paths = [getattr(r, "path", "") for r in server.app.routes]
+    route_paths = _effective_route_paths(server.app)
     idx_bulk = route_paths.index("/api/comments/bulk")
     idx_settings = route_paths.index("/api/comments/moderation-settings")
     idx_settings_put = route_paths.index("/api/comments/moderation-settings/{page_id}")
@@ -1158,13 +1168,17 @@ def test_auto_moderation_daily_cap_race_safe_under_concurrency(monkeypatch):
     from concurrent.futures import ThreadPoolExecutor
     import threading
 
+    # Pin clock to midday Asia/Ho_Chi_Minh so the test never crosses VN midnight mid-run.
+    fixed_now = datetime(2026, 11, 28, 6, 0, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(moderation_api, "_now", lambda: fixed_now)
+
     assert client.put(
         f"/api/comments/moderation-settings/{PAGE_A}",
         json={"enabled": True, "mode": "live", "categories": ["spam"], "threshold": 0.85},
     ).status_code == 200
 
     # Pre-seed 96 auto-hides today -> only 4 daily slots remain out of 100.
-    today_ts = iso_ago(minutes=2)
+    today_ts = schedule.iso_z(fixed_now - timedelta(minutes=2))
     for i in range(moderation_api.AUTO_HIDE_DAILY_CAP - 4):
         moderation_store.append_moderation_log(
             vpost_api.TENANT_ID,
@@ -1207,8 +1221,58 @@ def test_auto_moderation_daily_cap_race_safe_under_concurrency(monkeypatch):
 
     total_hidden = sum(r["autoHidden"] for r in results)
     total_flagged = sum(r["flagged"] for r in results)
+    total_failed = sum(r["failed"] for r in results)
+    assert total_failed == 0
     assert total_hidden == 4
     assert total_flagged == 12
     assert len(fb_calls) == 4
-    day_start = moderation_api._local_day_start(moderation_api._now())
+    day_start = moderation_api._local_day_start(fixed_now)
     assert moderation_store.count_auto_actions_since(vpost_api.TENANT_ID, PAGE_A, day_start) == moderation_api.AUTO_HIDE_DAILY_CAP
+
+
+def test_init_moderation_concurrent_with_auto_moderation_never_deadlocks(monkeypatch):
+    """Regression test: repeated init_moderation() calls alongside concurrent auto-moderation must never deadlock."""
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+
+    fixed_now = datetime(2026, 11, 28, 6, 0, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(moderation_api, "_now", lambda: fixed_now)
+
+    assert client.put(
+        f"/api/comments/moderation-settings/{PAGE_A}",
+        json={"enabled": True, "mode": "live", "categories": ["spam"], "threshold": 0.85},
+    ).status_code == 200
+
+    batches = []
+    for w in range(8):
+        ids = []
+        for j in range(4):
+            cid = f"dl_{w}_{j}"
+            seed_comment(cid, page_id=PAGE_A, message="Follow chéo tương tác chéo nha")
+            ids.append(cid)
+        batches.append(ids)
+
+    monkeypatch.setattr(tools, "hide_fb_comment", lambda cid, hidden, ch: True)
+    stop_init = threading.Event()
+    barrier = threading.Barrier(len(batches) + 1)
+
+    def init_spammer():
+        barrier.wait()
+        while not stop_init.is_set():
+            moderation_store.init_moderation()
+
+    def run_worker(comment_ids):
+        barrier.wait()
+        return moderation_api.run_auto_moderation(vpost_api.TENANT_ID, comment_ids)
+
+    with ThreadPoolExecutor(max_workers=len(batches) + 1) as pool:
+        init_future = pool.submit(init_spammer)
+        try:
+            results = list(pool.map(run_worker, batches))
+        finally:
+            stop_init.set()
+            init_future.result()
+
+    assert sum(r["failed"] for r in results) == 0
+    assert sum(r["autoHidden"] for r in results) == 32
+    assert sum(r["flagged"] for r in results) == 0

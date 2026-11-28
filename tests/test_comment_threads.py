@@ -272,7 +272,7 @@ def test_threads_list_shapes_filters_counts_and_has_phone():
         "id", "channelId", "channelName", "pageId", "postJobId", "productCode", "postCaption",
         "postUrl", "postImageUrl", "customer", "lastMessage", "needsReply", "unread", "unreadCount",
         "status", "isHidden", "messageCount", "hasPhone", "draft", "moderation", "attention",
-        "autoReply", "updatedAt",
+        "autoReply", "agentRun", "updatedAt",
     }
     assert set(tf.keys()) == expected_thread_keys
     assert tf["customer"] == {"id": "u3", "name": "Quỳnh", "tags": []}
@@ -383,7 +383,7 @@ def test_thread_detail_before_pagination_and_batch_inbox_store_calls():
     expected_msg_keys = {
         "id", "threadId", "fromPage", "fromId", "fromName", "text", "createdAt",
         "permalinkUrl", "isHidden", "canComment", "likedByPage", "delivery",
-        "errorCode", "userMessage", "clientId", "sentBy", "moderation",
+        "errorCode", "userMessage", "clientId", "sentBy", "agentRunId", "moderation",
     }
     assert set(b1["messages"][0].keys()) == expected_msg_keys
 

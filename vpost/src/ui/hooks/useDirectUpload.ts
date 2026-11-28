@@ -113,7 +113,12 @@ export async function runDirectUpload(
         if (failure === null || (isAbortError(failure) && !isAbortError(error))) {
           failure = error;
         }
-        abortWithReason(controller, `direct-upload: sibling file "${job.file.name}" failed`);
+        abortWithReason(
+          controller,
+          isAbortError(error)
+            ? `direct-upload: upload aborted during "${job.file.name}"`
+            : `direct-upload: sibling file "${job.file.name}" failed`,
+        );
         throw error;
       }
       done += 1;

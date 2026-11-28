@@ -139,6 +139,7 @@ export function beaconComposeDraft(params: { payload: ComposeDraftPayload }): bo
     });
     return true;
   } catch (cause) {
+    if (isAbortError(cause)) return false;
     console.warn("[draft.api] draft flush could not be handed to the browser", {
       scope: "ui/draft.api",
       action: "beacon",

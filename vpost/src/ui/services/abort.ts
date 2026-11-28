@@ -55,8 +55,8 @@ export function isCallerSignalAborted(signal?: AbortSignal): boolean {
  * real network errors (`TypeError: Failed to fetch`, HTTP 4xx/5xx `ApiError`).
  */
 export function isAbortError(error: unknown, signal?: AbortSignal): boolean {
-  if (isCallerSignalAborted(signal)) return true;
   if (isTimeoutError(error)) return false;
+  if (isCallerSignalAborted(signal)) return true;
   if (ApiError.is(error)) {
     return error.cause !== undefined && isAbortError(error.cause);
   }
@@ -66,6 +66,33 @@ export function isAbortError(error: unknown, signal?: AbortSignal): boolean {
     return (error as { name?: unknown }).name === "AbortError";
   }
   return false;
+}
+
+/**
+ * Cancels an unread `Response.body` stream without letting a stream-cancel
+ * rejection escape as an unhandled promise rejection.
+ */
+export function cancelResponseBody(response: Response): void {
+  try {
+    void response.body?.cancel().catch(() => {});
+  } catch {
+    // Stream may already be locked or disturbed; nothing left to cancel.
+  }
+}
+
+/**
+ * Attaches a rejection handler to a fire-and-forget promise so intentional
+ * cancellation/abort rejections never escape as unhandled rejections, while
+ * unexpected non-abort rejections still surface.
+ */
+export function suppressAbortRejection(
+  promise: Promise<unknown> | null | undefined,
+  isBenignCancellation: (error: unknown) => boolean = isAbortError,
+): void {
+  if (!promise || typeof promise.then !== "function") return;
+  void Promise.resolve(promise).catch((error: unknown) => {
+    if (!isBenignCancellation(error)) throw error;
+  });
 }
 
 function isMeaningfulAbortMessage(message: string): boolean {

@@ -18,6 +18,7 @@ import {
   type InboxThreadRunsResponse,
 } from "@/ui/schemas/inbox.schema";
 import {
+  cancelResponseBody,
   createRequestSignal,
   isAbortError,
   isCallerSignalAborted,
@@ -227,6 +228,10 @@ export async function sendThreadReply(
   let response: Response;
   let payload: unknown;
   try {
+    if (isCallerSignalAborted(signal)) {
+      throw normalizeAbortError(signal?.reason, signal, fallbackReason);
+    }
+
     try {
       response = await fetch(path, {
         method: "POST",
@@ -255,6 +260,11 @@ export async function sendThreadReply(
           : "Không kết nối được máy chủ. Kiểm tra mạng rồi bấm Thử lại.",
         cause,
       });
+    }
+
+    if (isCallerSignalAborted(signal)) {
+      cancelResponseBody(response);
+      throw normalizeAbortError(signal?.reason, signal, fallbackReason);
     }
 
     try {
