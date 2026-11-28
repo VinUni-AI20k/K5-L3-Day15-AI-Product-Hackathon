@@ -76,10 +76,10 @@ export function CancelDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Huỷ bài đã hẹn?</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="border-border bg-popover max-w-md gap-5 rounded-2xl border p-6 shadow-[var(--shadow-pop)]">
+        <DialogHeader className="gap-1.5">
+          <DialogTitle className="text-lg font-semibold">Huỷ bài đã hẹn?</DialogTitle>
+          <DialogDescription className="text-sm leading-relaxed">
             {job
               ? `Bài ${job.productCode}${job.color.trim() ? ` · ${job.color}` : ""} trên kênh ${channelName ?? job.channelId}, đang hẹn lúc ${formatScheduledAt(job.scheduledAt)}.`
               : "Không tìm thấy bài này trong danh sách đang xem — có thể bài đã đăng, đã huỷ, hoặc nằm ở trang khác."}
@@ -88,7 +88,7 @@ export function CancelDialog({
 
         {job ? (
           <form noValidate className="space-y-4" onSubmit={handleSubmit}>
-            <p className="border-warning/40 bg-warning/10 text-warning-foreground rounded-lg border px-3 py-2 text-sm">
+            <p className="border-warning/40 bg-warning/10 text-warning-foreground rounded-xl border px-4 py-3 text-sm leading-relaxed">
               {isHeldByPlatform(job.status)
                 ? // E8.6: this cancel reaches OUT to Facebook and deletes the
                   // post there first. Saying only "chuyển sang Bị chặn" would
@@ -140,23 +140,34 @@ export function CancelDialog({
             */}
             {error ? <ApiErrorNotice error={error} operation="cancel" /> : null}
 
-            <DialogFooter>
+            <DialogFooter className="border-border gap-2 border-t pt-4">
               <Button
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 onClick={() => onOpenChange(false)}
                 disabled={isPending}
+                className="min-h-10 px-4"
               >
                 Giữ lịch đăng
               </Button>
-              <Button type="submit" variant="destructive" disabled={isPending}>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={isPending}
+                className="min-h-10 px-4"
+              >
                 {isPending ? "Đang huỷ…" : "Huỷ bài này"}
               </Button>
             </DialogFooter>
           </form>
         ) : (
-          <DialogFooter>
-            <Button type="button" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="border-border border-t pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onOpenChange(false)}
+              className="min-h-10 px-4"
+            >
               Đóng
             </Button>
           </DialogFooter>

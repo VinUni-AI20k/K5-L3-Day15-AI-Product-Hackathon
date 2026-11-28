@@ -74,7 +74,7 @@ export function InlineMediaGrid({
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2.5">
       <div className="flex flex-wrap items-center gap-3">
         {media.map((asset, index) => (
           <div
@@ -84,8 +84,8 @@ export function InlineMediaGrid({
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleItemDropOn(e, index)}
             className={cn(
-              "group relative h-22 w-22 shrink-0 overflow-hidden rounded-xl border border-border bg-muted shadow-xs transition-all",
-              draggedIndex === index && "opacity-50 ring-2 ring-[#622FF6]",
+              "border-border bg-muted group relative size-22 shrink-0 overflow-hidden rounded-lg border transition-colors duration-150",
+              draggedIndex === index && "ring-ring opacity-50 ring-2",
               media.length > 1 && "cursor-grab active:cursor-grabbing",
             )}
           >
@@ -93,39 +93,40 @@ export function InlineMediaGrid({
 
             {/* Top Badge: Ảnh bìa (Cover) */}
             {index === 0 && !isVideo && (
-              <span className="absolute top-1.5 left-1.5 rounded-md bg-foreground/80 px-1.5 py-0.5 text-[9px] font-bold text-background tracking-wider uppercase backdrop-blur-xs">
+              <span className="bg-inverse-surface/90 text-inverse-foreground absolute top-1.5 left-1.5 rounded-sm px-2 py-0.5 text-xs font-medium backdrop-blur-xs">
                 Bìa
               </span>
             )}
 
             {/* Video Indicator */}
             {isVideo && (
-              <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-md bg-foreground/80 px-1.5 py-0.5 text-[10px] font-medium text-background backdrop-blur-xs">
-                <VideoIcon className="size-3" />
+              <span className="bg-inverse-surface/90 text-inverse-foreground absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs font-medium backdrop-blur-xs">
+                <VideoIcon className="size-3.5" aria-hidden="true" />
                 <span>Clip</span>
               </span>
             )}
 
-            {/* Hover Actions: Drag Grip & Delete */}
+            {/* Hover / Focus Actions: Drag Grip & Delete */}
             {!disabled && (
-              <div className="absolute inset-0 flex items-center justify-between p-1.5 opacity-0 transition-opacity group-hover:opacity-100 bg-black/40">
+              <div className="bg-inverse-surface/60 absolute inset-0 flex items-center justify-between p-1.5 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
                 {media.length > 1 && (
-                  <span className="text-white/90">
-                    <GripVertical className="size-4" />
+                  <span className="text-inverse-foreground" aria-hidden="true">
+                    <GripVertical className="size-4" aria-hidden="true" />
                   </span>
                 )}
                 <span className="flex-1" />
                 {onRemove && (
                   <button
                     type="button"
+                    aria-label={`Xoá ${asset.fileName}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       onRemove(index);
                     }}
-                    className="flex size-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-transform active:scale-90"
+                    className="bg-destructive text-primary-foreground focus-visible:ring-ring flex size-8 cursor-pointer items-center justify-center rounded-full transition-opacity duration-150 outline-none hover:opacity-90 focus-visible:ring-2"
                     title="Xoá file này"
                   >
-                    <Trash2 className="size-3.5" />
+                    <Trash2 className="size-4" aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -142,12 +143,7 @@ export function InlineMediaGrid({
             }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={handleFileDrop}
-            onClick={() => !disabled && fileInputRef.current?.click()}
-            className={cn(
-              "flex h-22 w-22 shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border bg-card text-muted-foreground transition-colors hover:border-[#622FF6] hover:bg-[#622FF6]/5 hover:text-foreground",
-              isDragOver && "border-[#622FF6] bg-[#622FF6]/10 text-[#622FF6]",
-              disabled && "cursor-not-allowed opacity-50",
-            )}
+            className="shrink-0"
           >
             <input
               ref={fileInputRef}
@@ -163,15 +159,26 @@ export function InlineMediaGrid({
               disabled={disabled}
               className="sr-only"
             />
-            <Plus className="size-5" />
-            <span className="px-1 text-center text-[10px] font-medium leading-tight">
-              {isVideo ? "Thêm video" : "Thêm ảnh"}
-            </span>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => !disabled && fileInputRef.current?.click()}
+              className={cn(
+                "border-border bg-card text-muted-foreground hover:border-ring hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring focus-visible:ring-offset-background flex size-22 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-1 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                isDragOver && "border-ring bg-accent text-accent-foreground",
+                disabled && "cursor-not-allowed opacity-40",
+              )}
+            >
+              <Plus className="size-5" aria-hidden="true" />
+              <span className="text-center text-xs leading-tight font-medium">
+                {isVideo ? "Thêm video" : "Thêm ảnh"}
+              </span>
+            </button>
           </div>
         )}
       </div>
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-muted-foreground text-xs leading-relaxed">
         {isVideo
           ? "Đăng 1 video clip cho bài viết."
           : `Đã chọn ${media.length}/${maxFiles} ảnh. Kéo thả để đổi ảnh bìa.`}

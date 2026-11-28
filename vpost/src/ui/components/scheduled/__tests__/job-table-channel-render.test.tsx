@@ -106,7 +106,7 @@ describe("ScheduledJobTable channel column", () => {
  */
 describe("ScheduledJobTable folding", () => {
   function countRows(html: string): number {
-    return (html.match(/<tr class="border-t align-top">/g) ?? []).length;
+    return (html.match(/<tr class="[^"]*\bborder-t align-top\b[^"]*">/g) ?? []).length;
   }
 
   it("leaves a single row alone — no disclosure, actions still on the row", () => {

@@ -40,7 +40,6 @@ import { CaptionBlock } from "@/ui/components/compose/CaptionBlock";
 import { PublishConfirmDialog } from "@/ui/components/compose/PublishConfirmDialog";
 import { SchedulePickerDialog } from "@/ui/components/compose/SchedulePickerDialog";
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
-import { SchedulePicker } from "@/ui/components/scheduled/SchedulePicker";
 import { useChannels } from "@/ui/hooks/useChannels";
 import { useComposeDraft } from "@/ui/hooks/useComposeDraft";
 import { useComposeWizard } from "@/ui/hooks/useComposeWizard";
@@ -288,7 +287,7 @@ export function ComposeFocus() {
         return;
       }
     }
-    wizard.setAlbum(nextMedia as any);
+    wizard.setAlbum(nextMedia);
   };
 
   const displayMedia: MediaAsset[] = useMemo(() => {
@@ -313,18 +312,20 @@ export function ComposeFocus() {
 
   return (
     <div className="bg-background text-foreground relative h-full min-h-0 overflow-y-auto">
-      <div className="@container mx-auto flex w-full max-w-[1600px] flex-col gap-5 p-4 lg:p-6">
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border/80 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
-              <Sparkles className="size-5" />
+      <div className="@container mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4 py-6 lg:px-6 lg:py-8">
+        <header className="border-border flex flex-wrap items-center justify-between gap-4 border-b pb-5">
+          <div className="flex items-start gap-3 sm:items-center">
+            <div
+              aria-hidden="true"
+              className="bg-accent text-accent-foreground flex size-10 shrink-0 items-center justify-center rounded-xl"
+            >
+              <Sparkles className="size-5" aria-hidden="true" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold tracking-tight">Tạo bài viết mới</h1>
-
-              </div>
-              <p className="text-xs text-muted-foreground">
+            <div className="min-w-0 space-y-0.5">
+              <h1 className="text-foreground text-2xl leading-8 font-semibold tracking-tight">
+                Tạo bài viết mới
+              </h1>
+              <p className="text-muted-foreground text-sm leading-relaxed">
                 Soạn bài đăng đa kênh với trợ lý AI, tự động đồng bộ kho ảnh và lên lịch thông minh.
               </p>
             </div>
@@ -336,65 +337,96 @@ export function ComposeFocus() {
         </header>
 
         {/* 2-COLUMN SPLIT STUDIO LAYOUT */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8">
           {/* CỘT CHÍNH 1: KHU VỰC THIẾT LẬP & SOẠN BÀI (Col 1-7) */}
           <main
             aria-label="Khu vực thiết lập và soạn bài viết"
-            className="lg:col-span-7 flex flex-col gap-5"
+            className="flex min-w-0 flex-col gap-6 lg:col-span-7"
           >
             {/* KHỐI 1: CHỌN CHẾ ĐỘ DỮ LIỆU & ĐỊNH DẠNG SẢN PHẨM (PROMINENT AT TOP) */}
             <section
-              aria-label="Chế độ dữ liệu và định dạng"
-              className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-xs"
+              aria-labelledby={`${fieldId}-setup-heading`}
+              className="border-border bg-card flex flex-col gap-5 rounded-xl border p-5 sm:p-6"
             >
-              <div className="flex items-center justify-between border-b border-border/70 pb-3">
-                <h2 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
-                  <Layers className="size-4 text-primary" />
-                  1. Chế độ nhập dữ liệu & Định dạng bài
+              <div className="border-border flex items-center gap-2.5 border-b pb-3.5">
+                <Layers className="text-accent-foreground size-5 shrink-0" aria-hidden="true" />
+                <h2
+                  id={`${fieldId}-setup-heading`}
+                  className="text-foreground text-lg leading-snug font-semibold"
+                >
+                  Chế độ nhập dữ liệu &amp; định dạng bài
                 </h2>
               </div>
 
               {/* Nguồn bài viết */}
               <div className="flex flex-col gap-2">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                <span
+                  id={`${fieldId}-source-label`}
+                  className="text-foreground text-sm font-medium"
+                >
                   Nguồn dữ liệu sản phẩm
-                </label>
-                <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/80 p-1.5 border border-border/50">
+                </span>
+                <div
+                  role="group"
+                  aria-labelledby={`${fieldId}-source-label`}
+                  className="bg-muted grid grid-cols-1 gap-1.5 rounded-xl p-1 sm:grid-cols-2"
+                >
                   <button
                     type="button"
+                    aria-pressed={source === "drive"}
                     onClick={() => handleSourceChange("drive")}
                     className={cn(
-                      "flex items-center justify-center gap-2.5 rounded-lg py-2.5 px-3 text-xs font-bold transition-all cursor-pointer",
+                      "focus-visible:ring-ring focus-visible:ring-offset-background flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                       source === "drive"
-                        ? "bg-card text-foreground shadow-sm ring-1 ring-border"
-                        : "text-muted-foreground hover:text-foreground hover:bg-card/40",
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
                     )}
                   >
-                    <FolderSync className="size-4 text-sky-500" />
+                    <FolderSync
+                      className={cn(
+                        "size-4 shrink-0",
+                        source === "drive" ? "text-accent-foreground" : "text-muted-foreground",
+                      )}
+                      aria-hidden="true"
+                    />
                     <span>Từ Kho Drive / Catalog</span>
                   </button>
                   <button
                     type="button"
+                    aria-pressed={source === "upload"}
                     onClick={() => handleSourceChange("upload")}
                     className={cn(
-                      "flex items-center justify-center gap-2.5 rounded-lg py-2.5 px-3 text-xs font-bold transition-all cursor-pointer",
+                      "focus-visible:ring-ring focus-visible:ring-offset-background flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                       source === "upload"
-                        ? "bg-card text-foreground shadow-sm ring-1 ring-border"
-                        : "text-muted-foreground hover:text-foreground hover:bg-card/40",
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
                     )}
                   >
-                    <UploadCloud className="size-4 text-emerald-500" />
-                    <span>Tải Ảnh Lên (Tự nhận mã)</span>
+                    <UploadCloud
+                      className={cn(
+                        "size-4 shrink-0",
+                        source === "upload" ? "text-accent-foreground" : "text-muted-foreground",
+                      )}
+                      aria-hidden="true"
+                    />
+                    <span>Tải ảnh lên (Tự nhận mã)</span>
                   </button>
                 </div>
               </div>
 
               {/* Kiểu bài đăng */}
               <div className="flex flex-col gap-2">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                <span
+                  id={`${fieldId}-kind-label`}
+                  className="text-foreground text-sm font-medium"
+                >
                   Định dạng bài đăng
-                </label>
-                <div className="grid grid-cols-3 gap-2">
+                </span>
+                <div
+                  role="group"
+                  aria-labelledby={`${fieldId}-kind-label`}
+                  className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+                >
                   {POST_KINDS.map((kind) => {
                     const Icon = kind.icon;
                     const active = postKindOf(mediaKind, videoTarget) === kind.value;
@@ -402,16 +434,17 @@ export function ComposeFocus() {
                       <button
                         key={kind.value}
                         type="button"
+                        aria-pressed={active}
                         onClick={() => handlePostKindChange(kind.value)}
                         className={cn(
-                          "flex items-center justify-center gap-2 rounded-xl border p-2.5 text-center transition-all cursor-pointer",
+                          "focus-visible:ring-ring focus-visible:ring-offset-background flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                           active
-                            ? "border-primary bg-primary/5 text-primary font-bold shadow-xs ring-1 ring-primary"
-                            : "border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-muted/40 hover:text-foreground",
+                            ? "border-ring bg-accent text-accent-foreground font-semibold"
+                            : "border-border bg-card text-muted-foreground hover:bg-[var(--bg-subtle)] hover:text-foreground",
                         )}
                       >
-                        <Icon className="size-4" />
-                        <span className="text-xs">{kind.label}</span>
+                        <Icon className="size-4 shrink-0" aria-hidden="true" />
+                        <span>{kind.label}</span>
                       </button>
                     );
                   })}
@@ -419,7 +452,7 @@ export function ComposeFocus() {
               </div>
 
               {/* Thông tin mã & tồn kho tương ứng */}
-              <div className="flex flex-col gap-2.5 border-t border-border/70 pt-3">
+              <div className="border-border flex flex-col gap-3 border-t pt-4">
                 {source === "drive" ? (
                   <form
                     noValidate
@@ -427,31 +460,53 @@ export function ComposeFocus() {
                       e.preventDefault();
                       void lookUp(color);
                     }}
-                    className="flex flex-col gap-2.5"
+                    className="flex flex-col gap-3"
                   >
-                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                    <label
+                      htmlFor={`${fieldId}-code`}
+                      className="text-foreground text-sm font-medium"
+                    >
                       Mã sản phẩm từ Catalog
                     </label>
 
-                    <ProductPicker
-                      id={`${fieldId}-code`}
-                      register={form.register("productCode")}
-                      value={productCode}
-                      onSelectCode={(code) => {
-                        form.setValue("productCode", code, { shouldDirty: true, shouldValidate: true });
-                        void lookUp(color);
-                      }}
-                      onSubmit={() => void lookUp(color)}
-                      suppressSuggestions={isManualOpen}
-                      disabled={compose.isPending}
-                      invalid={Boolean(errors.productCode)}
-                      describedBy={errors.productCode ? `${codeErrorId} ${codeHintId}` : codeHintId}
-                      placeholder="Nhập hoặc chọn mã sản phẩm (VD: AT01, DM02)…"
-                      inputClassName="h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium"
-                    />
+                    <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start">
+                      <div className="min-w-0 flex-1">
+                        <ProductPicker
+                          id={`${fieldId}-code`}
+                          register={form.register("productCode")}
+                          value={productCode}
+                          onSelectCode={(code) => {
+                            form.setValue("productCode", code, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                            void lookUp(color);
+                          }}
+                          onSubmit={() => void lookUp(color)}
+                          suppressSuggestions={isManualOpen}
+                          disabled={compose.isPending}
+                          invalid={Boolean(errors.productCode)}
+                          describedBy={
+                            errors.productCode ? `${codeErrorId} ${codeHintId}` : codeHintId
+                          }
+                          placeholder="Nhập hoặc chọn mã sản phẩm (VD: AT01, DM02)…"
+                          inputClassName="h-11 rounded-lg border-input bg-card px-4 text-sm"
+                        />
+                      </div>
+
+                      {!composed ? (
+                        <button
+                          type="submit"
+                          disabled={compose.isPending}
+                          className="border-border bg-secondary text-secondary-foreground hover:bg-muted focus-visible:ring-ring focus-visible:ring-offset-background flex h-11 shrink-0 cursor-pointer items-center justify-center rounded-lg border px-5 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:bg-[var(--color-overlay-pressed)] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {compose.isPending ? "Đang tra cứu…" : "Tra dữ liệu kho"}
+                        </button>
+                      ) : null}
+                    </div>
 
                     {errors.productCode && (
-                      <p id={codeErrorId} role="alert" className="text-xs text-destructive">
+                      <p id={codeErrorId} role="alert" className="text-destructive text-sm">
                         {errors.productCode.message}
                       </p>
                     )}
@@ -469,15 +524,7 @@ export function ComposeFocus() {
                           form.setFocus("productCode");
                         }}
                       />
-                    ) : (
-                      <button
-                        type="submit"
-                        disabled={compose.isPending}
-                        className="flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer shadow-xs"
-                      >
-                        {compose.isPending ? "Đang tra cứu…" : "Tra dữ liệu kho"}
-                      </button>
-                    )}
+                    ) : null}
 
                     {compose.isError && !isManualOpen && (
                       <ApiErrorNotice
@@ -557,8 +604,11 @@ export function ComposeFocus() {
                   </form>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Tải tệp & Tự nhận diện mã
+                    <label
+                      htmlFor={`${fieldId}-upload-code`}
+                      className="text-foreground text-sm font-medium"
+                    >
+                      Tải tệp &amp; tự nhận diện mã
                     </label>
 
                     <div className="flex flex-col gap-1.5">
@@ -567,9 +617,9 @@ export function ComposeFocus() {
                         type="text"
                         placeholder="Mã lưu nhật ký (tùy chọn)…"
                         {...form.register("productCode")}
-                        className="h-10 w-full rounded-lg border border-input bg-card px-3 text-sm font-medium outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                        className="border-input bg-card text-foreground placeholder:text-foreground-subtle focus-visible:border-ring focus-visible:ring-ring/40 h-11 w-full rounded-lg border px-4 text-sm transition-colors duration-150 outline-none focus-visible:ring-2"
                       />
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-muted-foreground text-xs leading-relaxed">
                         Hệ thống sẽ tự động quét mã sản phẩm từ tên file ảnh bạn tải lên.
                       </p>
                     </div>
@@ -588,7 +638,7 @@ export function ComposeFocus() {
             {/* KHỐI 2: CHỌN KÊNH & SOẠN THẢO BÀI VIẾT */}
             <section
               aria-label="Khu vực soạn bài viết"
-              className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-5 shadow-xs"
+              className="border-border bg-card flex flex-col gap-5 rounded-xl border p-5 sm:p-6"
             >
               {/* Postiz Social Bar */}
               <PostizSocialsBar
@@ -601,11 +651,14 @@ export function ComposeFocus() {
 
               {/* Internal Warnings: Above and outside the Caption Block */}
               {composed && composed.warnings.length > 0 && (
-                <ul aria-label="Cảnh báo nội bộ" className="flex flex-col gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                <ul
+                  aria-label="Cảnh báo nội bộ"
+                  className="border-warning/40 bg-warning/10 flex flex-col gap-1.5 rounded-xl border p-3.5"
+                >
                   {composed.warnings.map((warning) => (
                     <li
                       key={warning}
-                      className="text-amber-900 dark:text-amber-200 text-xs leading-relaxed"
+                      className="text-warning-foreground text-sm leading-relaxed"
                     >
                       {warning}
                     </li>
@@ -624,12 +677,12 @@ export function ComposeFocus() {
               />
 
               {/* Inline Media Grid */}
-              <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
-                    Ảnh & Video đính kèm ({displayMedia.length} tệp)
-                  </label>
-                  <span className="text-[11px] text-muted-foreground">
+              <div className="border-border bg-[var(--bg-subtle)] rounded-xl border p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-foreground text-sm font-medium">
+                    Ảnh &amp; video đính kèm ({displayMedia.length} tệp)
+                  </h3>
+                  <span className="text-foreground-subtle text-xs">
                     Kéo thả để đổi thứ tự ảnh
                   </span>
                 </div>
@@ -643,10 +696,10 @@ export function ComposeFocus() {
                 />
               </div>
 
-              {/* Sticky Action Tray - Postiz Style Action Buttons */}
-              <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-col gap-3.5 rounded-b-2xl border-t border-border bg-card/95 p-5 shadow-sm backdrop-blur-xs">
+              {/* Sticky Action Tray */}
+              <div className="border-border bg-card/95 sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-col gap-3 rounded-b-xl border-t px-5 py-4 backdrop-blur-xs sm:-mx-6 sm:-mb-6 sm:px-6">
                 {publish.formError && (
-                  <p role="alert" className="text-xs font-semibold text-destructive">
+                  <p role="alert" className="text-destructive text-sm font-medium">
                     {publish.formError}
                   </p>
                 )}
@@ -678,7 +731,7 @@ export function ComposeFocus() {
           {/* CỘT PHỤ 2: UNIVERSAL LIVE PREVIEW ĐA NỀN TẢNG (Col 8-12) */}
           <aside
             aria-label="Xem trước bài đăng đa nền tảng"
-            className="lg:col-span-5 flex flex-col gap-5 lg:sticky lg:top-5"
+            className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-6 lg:col-span-5"
           >
             <UniversalLivePreview
               caption={previewCaption}
@@ -736,13 +789,13 @@ export function ComposeFocus() {
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
           <p
             role="status"
-            className="pointer-events-auto rounded-xl bg-foreground text-background px-5 py-3 text-xs font-semibold shadow-lg flex items-center gap-3"
+            className="bg-inverse-surface text-inverse-foreground pointer-events-auto flex items-center gap-3 rounded-xl px-5 py-3 text-sm font-medium shadow-[var(--shadow-float)]"
           >
             <span>{flash}</span>
             <button
               type="button"
               onClick={() => setFlash(null)}
-              className="cursor-pointer underline font-bold"
+              className="focus-visible:ring-ring cursor-pointer rounded-sm font-semibold underline underline-offset-4 outline-none focus-visible:ring-2"
             >
               Đóng
             </button>

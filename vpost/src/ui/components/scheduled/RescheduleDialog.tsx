@@ -100,10 +100,13 @@ export function RescheduleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby={`${fieldId}-dialog-description`}>
-        <DialogHeader>
-          <DialogTitle>Đổi giờ đăng</DialogTitle>
-          <DialogDescription id={`${fieldId}-dialog-description`}>
+      <DialogContent
+        aria-describedby={`${fieldId}-dialog-description`}
+        className="border-border bg-popover max-w-md gap-5 rounded-2xl border p-6 shadow-[var(--shadow-pop)]"
+      >
+        <DialogHeader className="gap-1.5">
+          <DialogTitle className="text-lg font-semibold">Đổi giờ đăng</DialogTitle>
+          <DialogDescription id={`${fieldId}-dialog-description`} className="text-sm leading-relaxed">
             {job
               ? `Bài ${job.productCode}${job.color.trim() ? ` · ${job.color}` : ""} trên kênh ${channelName ?? job.channelId}. Đang hẹn lúc ${formatScheduledAt(job.scheduledAt)}.`
               : "Không tìm thấy bài này trong danh sách đang xem — có thể bài đã đăng, đã huỷ, hoặc nằm ở trang khác."}
@@ -114,12 +117,17 @@ export function RescheduleDialog({
           <>
             <p
               role="status"
-              className="border-warning/40 bg-warning/10 text-warning-foreground rounded-lg border px-3 py-2 text-sm"
+              className="border-warning/40 bg-warning/10 text-warning-foreground rounded-xl border px-4 py-3 text-sm leading-relaxed"
             >
               {blockedReason}
             </p>
-            <DialogFooter>
-              <Button type="button" onClick={() => onOpenChange(false)}>
+            <DialogFooter className="border-border border-t pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => onOpenChange(false)}
+                className="min-h-10 px-4"
+              >
                 Đóng
               </Button>
             </DialogFooter>
@@ -140,13 +148,13 @@ export function RescheduleDialog({
               nowMs={nowMs}
             />
 
-            <p className="text-muted-foreground text-sm">
+            <p className="text-muted-foreground text-sm leading-relaxed">
               Đổi giờ không bỏ qua bất kỳ quy tắc nào: tồn kho vẫn được kiểm tra lại ngay trước khi
               đăng, nên bài vẫn có thể bị chặn nếu lúc đó mã đã hết hàng.
             </p>
 
             {isQueueWarning ? (
-              <div className="border-warning/40 bg-warning/10 text-warning-foreground space-y-1 rounded-lg border px-3 py-2 text-sm">
+              <div className="border-warning/40 bg-warning/10 text-warning-foreground space-y-1 rounded-xl border px-4 py-3 text-sm leading-relaxed">
                 <p className="font-medium">Giờ đã đổi, nhưng chưa vào được hàng đợi</p>
                 <p>
                   Hệ thống đã lưu giờ mới, nhưng chưa xếp được bài vào hàng đợi đăng. Bài sẽ KHÔNG
@@ -159,23 +167,33 @@ export function RescheduleDialog({
               <ApiErrorNotice error={error} />
             ) : null}
 
-            <DialogFooter>
+            <DialogFooter className="border-border gap-2 border-t pt-4">
               <Button
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 onClick={() => onOpenChange(false)}
                 disabled={isPending}
+                className="min-h-10 px-4"
               >
                 Đóng
               </Button>
-              <Button type="submit" disabled={isPending}>
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="min-h-10 px-5 shadow-[var(--shadow-button)]"
+              >
                 {isPending ? "Đang lưu…" : "Lưu giờ mới"}
               </Button>
             </DialogFooter>
           </form>
         ) : (
-          <DialogFooter>
-            <Button type="button" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="border-border border-t pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onOpenChange(false)}
+              className="min-h-10 px-4"
+            >
               Đóng
             </Button>
           </DialogFooter>

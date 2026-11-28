@@ -1,6 +1,7 @@
 "use client";
 
 import { Token } from "@astryxdesign/core";
+import { Check } from "lucide-react";
 
 import { stockLabel } from "@/ui/components/inventory/stock-check";
 import type { ComposeResponse } from "@/ui/schemas/compose.schema";
@@ -55,27 +56,17 @@ export function ResolvedProductLine({
   return (
     <div
       id={id}
-      className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[13px] text-[var(--muted-foreground)]"
+      className="text-muted-foreground flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm"
     >
       <span
         aria-hidden="true"
-        className="flex size-5.5 shrink-0 items-center justify-center rounded-full bg-success/20 text-success-foreground text-[11px]"
+        className="bg-success/15 text-success-foreground flex size-6 shrink-0 items-center justify-center rounded-full"
       >
-        ✓
+        <Check className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
       </span>
-      <span className="text-sm font-semibold text-[var(--foreground)]">{content.name}</span>
-      <span className="font-mono text-[11px] tracking-wide">{content.code}</span>
+      <span className="text-foreground text-sm font-semibold">{content.name}</span>
+      <span className="font-mono text-xs">{content.code}</span>
 
-      {/*
-        Provenance, read from the SERVER's answer and never from "was a form
-        open a moment ago": a product typed last week and reused today comes
-        back as `manual` with nothing in this session's state. It sits next to
-        the code because that is where somebody asks "dữ liệu này ở đâu ra?" —
-        and it is a word, not only a colour (DESIGN.md §The Named Status Rule).
-
-        Nothing is drawn for a synced product: a badge on every post would be
-        noise, and "no badge" is already the overwhelmingly common case.
-      */}
       {composed.productOrigin === "manual" ? (
         <Token
           size="sm"
@@ -97,7 +88,7 @@ export function ResolvedProductLine({
       <button
         type="button"
         onClick={onChangeProduct}
-        className="focus-visible:ring-ring cursor-pointer rounded-md text-[13px] font-medium text-[var(--primary)] outline-none focus-visible:ring-3"
+        className="text-accent-foreground focus-visible:ring-ring inline-flex min-h-10 cursor-pointer items-center rounded-lg px-2 text-sm font-medium transition-colors duration-150 outline-none hover:underline focus-visible:ring-2"
       >
         Đổi sản phẩm
       </button>

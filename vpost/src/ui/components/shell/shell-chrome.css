@@ -1,0 +1,184 @@
+/**
+ * design system app shell chrome — scopes surface hierarchy, side nav states,
+ * group labels, 8px item radius, and top bar control alignment strictly to the
+ * authenticated AppShell (`.vpost-app-shell`).
+ *
+ * Uses semantic theme tokens only (no raw hex, no arbitrary pixel font sizes).
+ */
+
+@layer components {
+  .vpost-app-shell {
+    background-color: var(--bg-page);
+  }
+
+  /* Top bar: crisp white/page ground with a single subtle bottom hairline
+     (AppShell variant="section" renders the hairline on its inner LayoutHeader). */
+  .vpost-app-shell .astryx-app-shell-header {
+    background-color: var(--bg-page);
+  }
+
+  .vpost-app-shell .astryx-app-shell-header > .astryx-layout-header {
+    border-bottom-color: var(--border-default);
+  }
+
+  .vpost-app-shell .astryx-top-nav {
+    min-height: 56px;
+    padding-block: var(--space-2);
+    padding-inline: var(--space-4);
+    align-items: center;
+  }
+
+  @media (min-width: 768px) {
+    .vpost-app-shell .astryx-top-nav {
+      padding-inline: var(--space-5);
+    }
+  }
+
+  /* Side nav: subtle surface separated from the white content canvas by a 1px hairline */
+  .vpost-app-shell .astryx-app-shell-sidenav {
+    background-color: var(--bg-subtle);
+    border-inline-end: 1px solid var(--border-default);
+  }
+
+  .vpost-app-shell .astryx-side-nav {
+    background-color: var(--bg-subtle);
+  }
+
+  /* Main content canvas: pure page ground */
+  .vpost-app-shell [role="main"] {
+    background-color: var(--bg-page);
+  }
+
+  /* Mobile navigation drawer inherits the same subtle nav surface */
+  .vpost-app-shell .astryx-mobile-nav > div {
+    background-color: var(--bg-subtle);
+  }
+
+  /* Side nav section spacing & 12/500 tertiary sentence-case group labels */
+  .vpost-app-shell .astryx-side-nav-section {
+    margin-top: var(--space-3);
+  }
+
+  .vpost-app-shell .astryx-side-nav-section:first-child {
+    margin-top: var(--space-1);
+  }
+
+  .vpost-app-shell .astryx-side-nav-section > div:first-child span {
+    font-size: var(--text-caption-size);
+    font-weight: var(--text-caption-weight);
+    line-height: var(--text-caption-leading);
+    color: var(--text-tertiary);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  /* Side nav items: consistent 8px radius, readable 14px text, clear hover/pressed/focus states */
+  .vpost-app-shell .astryx-side-nav-item {
+    position: relative;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    transition: var(--transition-interactive);
+  }
+
+  .vpost-app-shell .astryx-side-nav-item:hover:not([aria-disabled="true"]):not([data-selected="selected"]) {
+    background-color: var(--state-hover-overlay);
+    color: var(--text-primary);
+  }
+
+  .vpost-app-shell .astryx-side-nav-item:active:not([aria-disabled="true"]) {
+    background-color: var(--state-pressed-overlay);
+  }
+
+  .vpost-app-shell .astryx-side-nav-item:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 var(--focus-ring-offset) var(--bg-subtle),
+      0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--focus-ring-color);
+  }
+
+  /* Selected nav item: accent bar + subtle accent-muted fill + high-contrast ink text */
+  .vpost-app-shell .astryx-side-nav-item[data-selected="selected"] {
+    background-color: var(--state-selected-bg);
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .vpost-app-shell .astryx-side-nav-item[data-selected="selected"]:hover {
+    background-color: color-mix(in srgb, var(--state-selected-bg) 90%, var(--color-tint-hover) 6%);
+  }
+
+  .vpost-app-shell .astryx-side-nav-item[data-selected="selected"]::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: var(--space-1-5);
+    bottom: var(--space-1-5);
+    width: 3px;
+    border-radius: var(--radius-pill);
+    background-color: var(--state-selected-bar);
+  }
+
+  .vpost-app-shell .astryx-side-nav-item[data-selected="selected"] svg {
+    color: var(--color-icon-accent);
+  }
+
+  /* Top bar search pill & theme toggle: aligned on the same baseline */
+  .vpost-app-shell .vpost-topbar-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .vpost-app-shell .vpost-search-trigger {
+    border-radius: var(--radius-pill);
+    background-color: var(--bg-subtle);
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+    transition: var(--transition-interactive);
+  }
+
+  .vpost-app-shell .vpost-search-trigger:hover:not(:disabled) {
+    background-color: var(--bg-muted);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+  }
+
+  .vpost-app-shell .vpost-theme-toggle {
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    transition: var(--transition-interactive);
+  }
+
+  .vpost-app-shell .vpost-theme-toggle:hover:not(:disabled) {
+    background-color: var(--bg-subtle);
+    border-color: var(--border-default);
+    color: var(--text-primary);
+  }
+
+  /* Mobile touch targets (>= 40px) & clean bar at 390px (matches AppShell md=768px breakpoint) */
+  @media (max-width: 768px) {
+    .vpost-app-shell .astryx-side-nav-item {
+      min-height: 40px;
+    }
+
+    .vpost-app-shell .astryx-top-nav .astryx-button {
+      min-height: 40px;
+    }
+
+    .vpost-app-shell .astryx-top-nav .vpost-theme-toggle,
+    .vpost-app-shell .astryx-top-nav button[data-testid="mobile-nav-toggle"] {
+      min-width: 40px;
+      min-height: 40px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vpost-app-shell .astryx-side-nav-item,
+    .vpost-app-shell .vpost-search-trigger,
+    .vpost-app-shell .vpost-theme-toggle {
+      transition: none;
+    }
+  }
+}

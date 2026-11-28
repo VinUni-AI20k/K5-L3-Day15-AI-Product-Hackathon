@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Check, CheckCheck, Plus } from "lucide-react";
 
 import { cn } from "@/shared/utils";
 import { avatarToneStyle, channelInitials } from "@/ui/components/compose/channel-picker";
@@ -63,11 +63,11 @@ export function PostizSocialsBar({
   };
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-border/70 bg-card/60 p-3.5 backdrop-blur-xs">
-      <div className="flex items-center justify-between">
+    <div className="border-border bg-[var(--bg-subtle)] flex flex-col gap-3 rounded-xl border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-[13px] font-semibold text-foreground">Kênh đăng</span>
-          <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
+          <h3 className="text-foreground text-base font-semibold">Kênh đăng</h3>
+          <span className="bg-secondary text-secondary-foreground inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums">
             {selectedIds.length}/{channels.length} đã chọn
           </span>
         </div>
@@ -77,34 +77,36 @@ export function PostizSocialsBar({
             type="button"
             onClick={onOpenPicker}
             disabled={disabled}
-            className="cursor-pointer text-[12px] font-medium text-primary hover:underline disabled:opacity-50"
+            className="text-accent-foreground focus-visible:ring-ring inline-flex min-h-10 cursor-pointer items-center rounded-lg px-2 text-sm font-medium transition-colors duration-150 outline-none hover:underline focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Quản lý kênh
           </button>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3.5 pt-1">
+      <div className="flex items-start gap-3 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
         {/* Nút "Tất cả" (Select All Toggle) */}
-        <div className="relative flex flex-col items-center gap-1.5">
+        <div className="relative flex w-16 shrink-0 flex-col items-center gap-1.5">
           <button
             type="button"
             disabled={disabled}
+            aria-pressed={allSelected}
+            aria-label={allSelected ? "Bỏ chọn tất cả kênh" : "Chọn tất cả kênh"}
             onClick={handleToggleAll}
             className={cn(
-              "relative flex size-12 cursor-pointer items-center justify-center rounded-full border-2 transition-all duration-200 outline-none select-none",
+              "focus-visible:ring-ring focus-visible:ring-offset-background relative flex size-12 cursor-pointer items-center justify-center rounded-full border-2 transition-colors duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40",
               allSelected
-                ? "border-primary bg-primary text-primary-foreground shadow-md ring-2 ring-primary/30 scale-100 opacity-100"
-                : "border-border/60 bg-muted/50 text-muted-foreground opacity-50 hover:opacity-100 hover:border-primary/50 hover:text-foreground",
+                ? "border-ring bg-accent text-accent-foreground"
+                : "border-border bg-card text-foreground hover:border-ring/60 hover:bg-muted",
             )}
             title={allSelected ? "Bấm để bỏ chọn tất cả các kênh" : "Bấm để chọn tất cả các kênh"}
           >
-            <span className="text-xs font-bold uppercase tracking-wider">Tất cả</span>
+            <CheckCheck className="size-5" aria-hidden="true" />
           </button>
           <span
             className={cn(
-              "max-w-16 truncate text-[11px] text-center transition-colors",
-              allSelected ? "text-primary font-bold" : "text-muted-foreground",
+              "w-full truncate text-center text-xs transition-colors",
+              allSelected ? "text-accent-foreground font-semibold" : "text-muted-foreground font-medium",
             )}
           >
             Tất cả
@@ -112,7 +114,7 @@ export function PostizSocialsBar({
         </div>
 
         {/* Divider */}
-        <span aria-hidden="true" className="h-8 w-px bg-border/80 self-start mt-2" />
+        <span aria-hidden="true" className="bg-border mt-2 h-8 w-px shrink-0 self-start" />
 
         {/* Các kênh đơn lẻ */}
         {channels.map((channel) => {
@@ -122,46 +124,60 @@ export function PostizSocialsBar({
           return (
             <div
               key={channel.channelId}
-              className="relative flex flex-col items-center gap-1.5 group"
+              className="group relative flex w-16 shrink-0 flex-col items-center gap-1.5"
             >
               <button
                 type="button"
                 disabled={disabled}
+                aria-pressed={isSelected}
+                aria-label={`${channel.name} — ${isSelected ? "đã chọn" : "chưa chọn"}`}
                 onClick={() => handleChannelClick(channel.channelId)}
                 className={cn(
-                  "relative flex size-12 cursor-pointer items-center justify-center rounded-full border-2 transition-all duration-200 outline-none select-none",
+                  "focus-visible:ring-ring focus-visible:ring-offset-background relative flex size-12 cursor-pointer items-center justify-center rounded-full border-2 p-0.5 transition-colors duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40",
                   isSelected
-                    ? "border-primary ring-2 ring-primary/30 shadow-md scale-100 opacity-100"
-                    : "border-border/50 grayscale opacity-40 hover:opacity-80 hover:grayscale-0 hover:border-primary/40 hover:scale-105",
-                  isFocused && isSelected && "ring-4 ring-primary/50 scale-105 border-primary",
+                    ? isFocused
+                      ? "border-ring ring-ring/30 bg-accent ring-2"
+                      : "border-ring bg-accent/60"
+                    : "border-border bg-card hover:border-ring/60",
                 )}
-                title={`${channel.name} (${isSelected ? (isFocused ? "Đang mở tab - Click để tắt kênh" : "Đã bật - Click để mở tab") : "Đang tắt - Click để bật"})`}
+                title={`${channel.name} (${isSelected ? (isFocused ? "Đang mở tab - Bấm để tắt kênh" : "Đã bật - Bấm để tắt kênh") : "Đang tắt - Bấm để bật"})`}
               >
-                {/* Channel Avatar */}
+                {/* Channel Avatar — crisp full-contrast ink on hashed accent tint */}
                 <span
+                  aria-hidden="true"
                   style={avatarToneStyle(channel.name)}
-                  className="flex size-11 items-center justify-center rounded-full text-xs font-bold text-white shadow-inner"
+                  className="text-foreground flex size-full items-center justify-center rounded-full text-xs font-semibold"
                 >
                   {channelInitials(channel.name)}
                 </span>
 
-                {/* Platform Badge Overlay at bottom-right */}
+                {/* Selection / Platform Badge at bottom-right */}
                 <span
+                  aria-hidden="true"
                   className={cn(
-                    "absolute -bottom-0.5 -right-0.5 flex size-4.5 items-center justify-center rounded-full border border-background shadow-xs text-[9px] font-bold text-white transition-transform",
-                    channel.platform === "tiktok" ? "bg-black" : "bg-[#1877F2]",
-                    !isSelected && "opacity-60",
+                    "border-card absolute -right-0.5 -bottom-0.5 flex size-5 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors",
+                    isSelected
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-muted-foreground border-border border",
                   )}
                 >
-                  {channel.platform === "tiktok" ? "TT" : "f"}
+                  {isSelected ? (
+                    <Check className="size-3" strokeWidth={3} aria-hidden="true" />
+                  ) : (
+                    <span>{channel.platform === "tiktok" ? "T" : "f"}</span>
+                  )}
                 </span>
               </button>
 
               {/* Channel Name */}
               <span
                 className={cn(
-                  "max-w-16 truncate text-[11px] text-center transition-colors",
-                  isFocused ? "text-primary font-bold" : isSelected ? "text-foreground font-semibold" : "text-muted-foreground",
+                  "w-full truncate text-center text-xs transition-colors",
+                  isFocused
+                    ? "text-accent-foreground font-semibold"
+                    : isSelected
+                      ? "text-foreground font-medium"
+                      : "text-muted-foreground",
                 )}
               >
                 {channel.name}
@@ -172,17 +188,18 @@ export function PostizSocialsBar({
 
         {/* Add Channel Button if picker available */}
         {onOpenPicker && (
-          <div className="flex flex-col items-center gap-1.5">
+          <div className="flex w-16 shrink-0 flex-col items-center gap-1.5">
             <button
               type="button"
               onClick={onOpenPicker}
               disabled={disabled}
-              className="flex size-12 cursor-pointer flex-col items-center justify-center rounded-full border-2 border-dashed border-border text-muted-foreground transition-all hover:border-primary hover:bg-primary/5 hover:text-primary"
+              aria-label="Thêm kênh đăng"
+              className="border-border bg-card text-muted-foreground hover:border-ring hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring focus-visible:ring-offset-background flex size-12 cursor-pointer items-center justify-center rounded-full border-2 border-dashed transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
               title="Thêm kênh mới"
             >
-              <Plus className="size-5" />
+              <Plus className="size-5" aria-hidden="true" />
             </button>
-            <span className="text-[11px] font-medium text-muted-foreground">Thêm</span>
+            <span className="text-muted-foreground text-xs font-medium">Thêm</span>
           </div>
         )}
       </div>

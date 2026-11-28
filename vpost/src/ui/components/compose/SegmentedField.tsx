@@ -59,18 +59,17 @@ export function SegmentedField({
     >
       {/* <legend> must stay the first child of <fieldset>: moving it into a
           wrapper to sit it beside the track would drop the group's name. */}
-      <legend className="text-muted-foreground text-xs">{legend}</legend>
+      <legend className="text-foreground text-sm font-medium">{legend}</legend>
 
-      {/* Track and pill sized as the ComposeFocus template draws them
-          (lines 61–63): 4px inset track, 38px pills, accent text when active. */}
+      {/* Track and pill on the 4-pt grid: 4px inset track, 40px pills, accent text when active. */}
       <div className="bg-muted inline-flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl p-1">
         {options.map((option) => (
           <label
             key={option.value}
             htmlFor={`${name}-${option.value}`}
             className={cn(
-              "text-muted-foreground has-checked:bg-card has-checked:text-primary has-focus-visible:ring-ring/50 flex h-9.5 cursor-pointer items-center rounded-md px-5 text-sm whitespace-nowrap transition-colors has-checked:font-semibold has-checked:shadow-sm has-focus-visible:ring-3",
-              disabled && "cursor-not-allowed opacity-60",
+              "text-muted-foreground has-checked:bg-card has-checked:text-accent-foreground has-focus-visible:ring-ring flex h-10 cursor-pointer items-center rounded-lg px-4 text-sm font-medium whitespace-nowrap transition-colors duration-150 has-checked:font-semibold has-checked:shadow-xs has-focus-visible:ring-2",
+              disabled && "cursor-not-allowed opacity-40",
             )}
           >
             {register ? (

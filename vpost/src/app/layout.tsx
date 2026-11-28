@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Be_Vietnam_Pro, JetBrains_Mono } from "next/font/google";
+import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 
 import { readAppearancePreset } from "@/app/_lib/appearance";
@@ -17,12 +17,12 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 /**
- * The approved design draws in Outfit, which ships latin + latin-ext only —
- * every Vietnamese tone mark would fall back to a different face mid-word. Be
- * Vietnam Pro is the same geometric sans register and was drawn for this
- * script, so the diacritics come from the same family as the letters.
+ * design system primary sans face: Hanken Grotesk ships full `vietnamese` + `latin`
+ * subsets in `next/font/google`, so Vietnamese diacritics render natively in
+ * the same family across both Tailwind (`--font-sans`) and Astryx
+ * (`--font-family-body` / `--font-family-heading`).
  */
-const appSans = Be_Vietnam_Pro({
+const appSans = Hanken_Grotesk({
   variable: "--font-app-sans",
   weight: ["400", "500", "600", "700"],
   subsets: ["latin", "vietnamese"],
@@ -60,6 +60,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="vi"
+      /* The bootstrap script below adds `.dark` synchronously before hydration
+         whenever the viewer's preference is "system" on a dark OS. Suppress the
+         expected root attribute mismatch so React keeps the pre-paint class
+         without surfacing a hydration error in the Next dev overlay.
+         `suppressHydrationWarning` applies only one level deep (to `<html>`). */
+      suppressHydrationWarning
       /* The preset's stylesheet is already in the <head> (globals.css imports
          it), and it is scoped to this attribute — so the colour arrives with
          the markup and never flips after hydration. */

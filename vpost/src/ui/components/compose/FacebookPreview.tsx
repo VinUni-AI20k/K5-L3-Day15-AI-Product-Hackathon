@@ -59,29 +59,19 @@ export function FacebookPreview({
     >
       <div
         className={cn(
-          "border-border flex flex-col overflow-hidden border bg-[var(--card)] transition-[max-width]",
-          isMobile ? "max-w-90 self-center rounded-2xl shadow-md" : "w-full rounded-lg",
+          "border-border bg-card flex flex-col overflow-hidden rounded-xl border transition-[max-width]",
+          isMobile ? "max-w-90 self-center shadow-[var(--shadow-card)]" : "w-full",
         )}
       >
-        {/* OUR chrome, on the frame — not part of the post below it.
-            It lives inside the frame so the top edge of this column lines up
-            with the top edge of the compose card beside it; with the label
-            floating above, the preview started 46px lower than the card it is
-            meant to sit next to and left a hole in the corner of the screen.
-            The hairline under it is what keeps it readable as a viewport bar
-            rather than something Facebook draws. */}
-        <div className="border-border flex flex-wrap items-center gap-3 border-b px-4 py-2.5">
-          <h2
-            id={`${groupId}-heading`}
-            className="flex-1 font-mono text-[10px] tracking-[0.12em] text-[var(--foreground-subtle)] uppercase"
-          >
+        <div className="border-border flex flex-wrap items-center gap-3 border-b px-4 py-3">
+          <h2 id={`${groupId}-heading`} className="text-foreground flex-1 text-sm font-medium">
             Xem trước · Facebook
           </h2>
 
           <div
             role="group"
             aria-label="Khổ màn hình xem trước"
-            className="flex gap-[3px] rounded-lg bg-[var(--muted)] p-[3px]"
+            className="bg-muted flex gap-1 rounded-lg p-1"
           >
             {(["desktop", "mobile"] as const).map((option) => (
               <button
@@ -90,9 +80,8 @@ export function FacebookPreview({
                 aria-pressed={device === option}
                 onClick={() => setDevice(option)}
                 className={cn(
-                  "focus-visible:ring-ring h-7 cursor-pointer rounded-lg px-3 text-xs font-medium text-[var(--muted-foreground)] transition-colors outline-none focus-visible:ring-3",
-                  device === option &&
-                    "bg-[var(--card)] font-semibold text-[var(--primary)] shadow-sm",
+                  "focus-visible:ring-ring text-muted-foreground hover:text-foreground h-8 cursor-pointer rounded-md px-3 text-xs font-medium transition-colors duration-150 outline-none focus-visible:ring-2",
+                  device === option && "bg-card text-accent-foreground font-semibold shadow-xs",
                 )}
               >
                 {option === "desktop" ? "Desktop" : "Mobile"}
@@ -104,19 +93,19 @@ export function FacebookPreview({
         <div className="flex items-center gap-3 px-4 py-3.5">
           <span
             aria-hidden="true"
-            className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[13px] font-semibold text-[var(--accent-foreground)]"
+            className="bg-accent text-accent-foreground flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
           >
             {initialsOf(pageName)}
           </span>
           <span className="flex min-w-0 flex-col">
-            <span className="truncate text-sm font-semibold">{pageName}</span>
-            <span className="text-xs text-[var(--muted-foreground)]">Vừa xong · Công khai</span>
+            <span className="text-foreground truncate text-sm font-semibold">{pageName}</span>
+            <span className="text-foreground-subtle text-xs">Vừa xong · Công khai</span>
           </span>
         </div>
 
-        <div className="px-4 pb-3 text-sm leading-[23px]">
+        <div className="text-foreground px-4 pb-3 text-sm leading-relaxed">
           {text.length === 0 ? (
-            <p className="text-[var(--muted-foreground)] italic">
+            <p className="text-muted-foreground italic">
               Chưa có caption — bài chưa đăng được.
             </p>
           ) : isCut ? (
@@ -125,7 +114,7 @@ export function FacebookPreview({
               <button
                 type="button"
                 onClick={() => setExpanded(true)}
-                className="focus-visible:ring-ring cursor-pointer rounded-sm font-semibold outline-none focus-visible:ring-3"
+                className="text-accent-foreground focus-visible:ring-ring cursor-pointer rounded-sm font-semibold outline-none hover:underline focus-visible:ring-2"
               >
                 Xem thêm
               </button>
@@ -136,24 +125,21 @@ export function FacebookPreview({
         </div>
 
         {tags.length > 0 ? (
-          <div className="px-4 pb-3 text-sm break-words text-[var(--primary)]">{tags}</div>
+          <div className="text-accent-foreground px-4 pb-3 text-sm break-words">{tags}</div>
         ) : null}
 
         <PreviewCollage media={media} isVideo={isVideo} compact={isMobile} />
 
-        <div className="flex h-12 items-center shadow-[inset_0_1px_0_var(--border)]">
+        <div className="border-border flex h-12 items-center border-t">
           {["Thích", "Bình luận", "Chia sẻ"].map((action) => (
-            <span
-              key={action}
-              className="flex-1 text-center text-[13px] text-[var(--muted-foreground)]"
-            >
+            <span key={action} className="text-muted-foreground flex-1 text-center text-sm">
               {action}
             </span>
           ))}
         </div>
       </div>
 
-      <p className="text-xs leading-relaxed text-[var(--muted-foreground)]">
+      <p className="text-muted-foreground text-xs leading-relaxed">
         Facebook cắt caption sau khoảng {MOBILE_CUTOFF} ký tự — phần quan trọng nên ở hai dòng đầu.
         Khung ảnh bên trên là cách Facebook ghép album, không phải kích thước thật của ảnh.
       </p>
@@ -205,8 +191,8 @@ function PreviewCollage({
 
   return (
     <figure className="m-0">
-      <div className="grid grid-cols-[1.55fr_1fr] gap-[3px] bg-[var(--card)]">
-        <div className="flex flex-col gap-[3px]">
+      <div className="bg-card grid grid-cols-[1.55fr_1fr] gap-1">
+        <div className="flex flex-col gap-1">
           {left.map((asset, index) => (
             <div
               key={asset.driveFileId}
@@ -218,7 +204,7 @@ function PreviewCollage({
         </div>
 
         {right.length > 0 ? (
-          <div className="flex flex-col gap-[3px]">
+          <div className="flex flex-col gap-1">
             {right.map((asset, index) => (
               <div
                 key={asset.driveFileId}
@@ -228,7 +214,7 @@ function PreviewCollage({
                 {overflow > 0 && index === right.length - 1 ? (
                   <span
                     aria-hidden="true"
-                    className="absolute inset-0 z-1 flex items-center justify-center bg-foreground/50 text-[22px] font-semibold text-white"
+                    className="bg-inverse-surface/75 text-inverse-foreground absolute inset-0 z-1 flex items-center justify-center text-xl font-semibold"
                   >
                     +{overflow}
                   </span>

@@ -84,7 +84,13 @@ export function DraftStatusBar({ draft }: { draft: ComposeDraftState }) {
 
           <div className="ms-auto flex items-center gap-2">
             {draft.phase === "error" ? (
-              <Button type="button" variant="outline" size="sm" onClick={draft.retry}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={draft.retry}
+                className="min-h-10 px-3.5"
+              >
                 Thử lại
               </Button>
             ) : null}
@@ -100,6 +106,7 @@ export function DraftStatusBar({ draft }: { draft: ComposeDraftState }) {
             size="sm"
             onClick={() => setConfirmOpen(true)}
             disabled={draft.isRestoring}
+            className="min-h-10 px-3"
           >
             Xoá nháp
           </Button>
@@ -129,16 +136,24 @@ export function DraftStatusBar({ draft }: { draft: ComposeDraftState }) {
       {/* Destructive and not undoable -> confirmed, with the consequence spelled
           out before the button (core-feedback-states §Ma trận thông báo). */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent aria-describedby="discard-draft-description">
+        <DialogContent
+          aria-describedby="discard-draft-description"
+          className="border-border bg-popover max-w-md gap-5 rounded-2xl border p-6 shadow-[var(--shadow-pop)]"
+        >
           <DialogHeader>
-            <DialogTitle>Xoá nháp đang soạn?</DialogTitle>
-            <DialogDescription id="discard-draft-description">
+            <DialogTitle className="text-lg font-semibold">Xoá nháp đang soạn?</DialogTitle>
+            <DialogDescription id="discard-draft-description" className="text-sm leading-relaxed">
               Nội dung đang soạn sẽ bị xoá khỏi máy chủ và khỏi máy này, màn hình quay về bước 1
               trống. Việc này không hoàn tác được.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setConfirmOpen(false)}>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setConfirmOpen(false)}
+              className="min-h-10 px-4"
+            >
               Giữ lại nháp
             </Button>
             <Button
@@ -148,6 +163,7 @@ export function DraftStatusBar({ draft }: { draft: ComposeDraftState }) {
                 setConfirmOpen(false);
                 draft.discard();
               }}
+              className="min-h-10 px-4"
             >
               Xoá nháp
             </Button>

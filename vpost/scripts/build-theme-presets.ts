@@ -1,24 +1,30 @@
 /**
- * Generates `src/ui/theme/presets.css` from the preset table in
- * `src/shared/appearance-presets.ts`.
+ * Generates `src/ui/theme/presets.css` from:
+ *   1. design system UI Foundations v2 (`src/ui/theme/design-tokens.ts`) — the
+ *      app-wide `:root` / `:root.dark` tokens, the `[data-astryx-theme]`
+ *      `color-scheme: inherit` bridge, and the `prefers-reduced-motion: reduce`
+ *      override for motion/transition tokens;
+ *   2. The preset swatch table (`src/shared/appearance-presets.ts`) — scoped to
+ *      nested `[data-theme-preset="…"]:not(:root)` previews on `/platform/appearance`.
  *
  *   pnpm run theme:presets          write the stylesheet
  *   pnpm run theme:presets --check  fail if the committed file is stale
  *
- * WHY GENERATE INSTEAD OF HAND-WRITING THE CSS: the same six presets have to be
- * known by the stylesheet, by the usecase that validates what is stored, and by
- * the screen that draws the swatches. Hand-copying colours into CSS is the
- * second table that drifts (web-design-tokens §1: CSS variable là NƠI TIÊU THỤ,
- * không phải nguồn). `presets.generated.test.ts` runs the --check so a stale
- * file fails `pnpm verify` rather than shipping a swatch whose colour is a lie.
+ * WHY `:root:not(.dark)` / `:root.dark` LIVE HERE (UNLAYERED):
+ *   `app/globals.css` imports `presets.css` before its legacy `:root` and
+ *   `.dark` blocks. Unlayered `:root:not(.dark), :root[data-theme-preset]`
+ *   (0,2,0) and `:root.dark, :root.dark[data-theme-preset]` (0,2,0 / 0,3,0)
+ *   outrank bare `:root` / `.dark` (0,1,0) regardless of import order — so
+ *   `<body>`, Tailwind utilities, and portalled dialogs adopt design system cleanly
+ *   without touching `app/globals.css` or any screen/component file.
  *
- * WHY ATTRIBUTE SCOPES AND NOT AN INLINE `<style>` FROM THE SERVER: an inline
- * block would have to out-specify `:root` AND `.dark` by cascade order, which
- * is decided by where Next happens to put the tag. `:root[data-theme-preset=…]`
- * beats `:root` on specificity alone, `:root.dark[data-theme-preset=…]` beats
- * both, and the whole thing is a static stylesheet the browser already has
- * before first paint — so there is no flash to fix (the trap `vpost-theme.ts`
- * documents for runtime themes).
+ * WHY `[data-astryx-theme]:not([data-theme]) { color-scheme: inherit; }`:
+ *   Astryx's `<Theme>` defaults to `mode="system"`, applying a `@layer
+ *   astryx-base` class that sets `color-scheme: light dark`. That caused every
+ *   `light-dark()` token in `vpost.css` and `astryx.css` to follow the OS
+ *   instead of `<html class="dark">`. Unlayered `color-scheme: inherit` restores
+ *   class-driven light/dark switching while still respecting explicit
+ *   `<Theme mode="light|dark">` and `<MediaTheme>`.
  */
 
 import { writeFileSync, readFileSync } from "node:fs";
@@ -33,32 +39,67 @@ import {
   type AppearancePreset,
   type AppearanceScheme,
 } from "../src/shared/appearance-presets";
+import {
+  DESIGN_DARK,
+  DESIGN_LIGHT,
+  buildRootSchemeTokens,
+} from "../src/ui/theme/design-tokens";
 
 const OUTPUT_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../src/ui/theme/presets.css",
 );
 
+function formatDeclarations(tokens: Readonly<Record<string, string>>): string {
+  return Object.entries(tokens)
+    .map(([name, value]) => `  ${name}: ${value};`)
+    .join("\n");
+}
+
+function renderDesignRoot(): string[] {
+  const lightTokens = buildRootSchemeTokens(DESIGN_LIGHT);
+  const darkTokens = buildRootSchemeTokens(DESIGN_DARK);
+
+  return [
+    "/* design system UI Foundations v2 — app-wide root tokens (90/9/1 neutral palette,",
+    " * readable 12px+ type scale, 4-pt spacing, <=24px radii, soft elevation, states). */",
+    `:root:not(.dark),\n:root[${APPEARANCE_PRESET_ATTRIBUTE}] {`,
+    formatDeclarations(lightTokens),
+    "}",
+    "",
+    `:root.dark,\n:root.dark[${APPEARANCE_PRESET_ATTRIBUTE}] {`,
+    formatDeclarations(darkTokens),
+    "}",
+    "",
+    "/* Inherit class-switched color-scheme from <html> so light-dark() tokens in",
+    " * vpost.css and @astryxdesign/core flip with ColorSchemeToggle (.dark). */",
+    "[data-astryx-theme]:not([data-theme]) {",
+    "  color-scheme: inherit;",
+    "}",
+    "",
+    "/* Respect prefers-reduced-motion for design system transition & slide tokens (§6). */",
+    "@media (prefers-reduced-motion: reduce) {",
+    "  :root,",
+    "  [data-astryx-theme] {",
+    "    --motion-hover: 0ms;",
+    "    --motion-panel: 0ms;",
+    "    --motion-item-slide: 0px;",
+    "    --transition-interactive: none;",
+    "    --transition-panel: none;",
+    "  }",
+    "}",
+    "",
+  ];
+}
+
 /**
- * Two selectors per block, and both are load-bearing.
- *
- * `:root[…]` is the app-wide case — the attribute the root layout stamps on
- * `<html>`. It has to out-specify the bare `:root` palette in `globals.css`,
- * and `(0,2,0)` against `(0,1,0)` does that regardless of import order.
- *
- * The unqualified `[…]` is what makes a PREVIEW possible: any element carrying
- * the attribute re-declares the dye for its own subtree, so the settings screen
- * shows six real swatches instead of six hard-coded colours. Local declarations
- * beat inherited ones, so the nesting resolves without a specificity fight.
- *
- * Dark needs the class on BOTH forms: `:root.dark[…]` for the page itself, and
- * `.dark […]` (0,2,0) so a nested preview outranks its own light block (0,1,0).
+ * Nested swatch preview selector only (`:not(:root)`), so `<PresetSwatch>` on
+ * `/platform/appearance` continues to preview each stored preset without
+ * overriding the app-wide design system root palette on `<html>`.
  */
-function selectorFor(preset: AppearancePreset, scheme: AppearanceScheme): string {
-  const attribute = `[${APPEARANCE_PRESET_ATTRIBUTE}="${preset.id}"]`;
-  return scheme === "light"
-    ? `:root${attribute},\n${attribute}`
-    : `:root.dark${attribute},\n.dark ${attribute}`;
+function swatchSelectorFor(preset: AppearancePreset, scheme: AppearanceScheme): string {
+  const attribute = `[${APPEARANCE_PRESET_ATTRIBUTE}="${preset.id}"]:not(:root)`;
+  return scheme === "light" ? attribute : `.dark ${attribute}`;
 }
 
 function blockFor(preset: AppearancePreset, scheme: AppearanceScheme): string {
@@ -66,7 +107,7 @@ function blockFor(preset: AppearancePreset, scheme: AppearanceScheme): string {
   const declarations = APPEARANCE_TOKEN_NAMES.map(
     (name) => `  ${name}: ${tokens[name]};`,
   ).join("\n");
-  return `${selectorFor(preset, scheme)} {\n${declarations}\n}`;
+  return `${swatchSelectorFor(preset, scheme)} {\n${declarations}\n}`;
 }
 
 function render(): string {
@@ -81,7 +122,7 @@ function render(): string {
         : `nền xoay ${preset.groundShift}°, chroma x${preset.surfaceChromaScale} (mực x${preset.inkChromaScale}), cắt theo gamut từng lớp`;
 
     return [
-      `/* ${preset.label} — nhuộm hue ${preset.hue}, ${dye}; ${cloth}.`,
+      `/* ${preset.label} swatch preview — nhuộm hue ${preset.hue}, ${dye}; ${cloth}.`,
       ` * ${preset.description} */`,
       blockFor(preset, "light"),
       blockFor(preset, "dark"),
@@ -92,14 +133,13 @@ function render(): string {
   return [
     "/*",
     " * @generated by `pnpm run theme:presets` — do not edit manually.",
-    " * Source: src/shared/appearance-presets.ts",
+    " * Sources: src/ui/theme/design-tokens.ts, src/shared/appearance-presets.ts",
     " *",
-    " * One block per preset per scheme: the ground, every surface above it, the",
-    " * ink, the hairlines and the action colour. Lightness is never re-valued —",
-    " * only hue and chroma — and every status hue (lỗi, cảnh báo, thành công,",
-    " * thông tin) is left exactly as the approved palette set it.",
+    " * App-wide design system root tokens + color-scheme/reduced-motion bridges,",
+    " * followed by nested swatch preview scopes for /platform/appearance.",
     " */",
     "",
+    ...renderDesignRoot(),
     ...blocks,
   ]
     .join("\n")
@@ -111,7 +151,7 @@ const isCheck = process.argv.includes("--check");
 
 if (!isCheck) {
   writeFileSync(OUTPUT_PATH, rendered, "utf8");
-  console.log(`Wrote ${APPEARANCE_PRESETS.length} presets to ${OUTPUT_PATH}`);
+  console.log(`Wrote design system root tokens + ${APPEARANCE_PRESETS.length} preset swatches to ${OUTPUT_PATH}`);
   process.exit(0);
 }
 

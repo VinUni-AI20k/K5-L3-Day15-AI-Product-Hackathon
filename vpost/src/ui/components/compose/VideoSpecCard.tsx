@@ -40,10 +40,10 @@ export function VideoSpecCard({
   return (
     <section
       aria-labelledby="video-spec-heading"
-      className="bg-card space-y-3 rounded-xl border p-5"
+      className="border-border bg-card space-y-3 rounded-xl border p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id="video-spec-heading" className="text-base font-semibold">
+        <h3 id="video-spec-heading" className="text-foreground text-lg font-semibold">
           Video sẽ đăng
         </h3>
         <Badge tone="info">{VIDEO_TARGET_LABELS[video.target]}</Badge>
