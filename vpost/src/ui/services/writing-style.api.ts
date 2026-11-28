@@ -1,10 +1,13 @@
 import type { z } from "zod";
 
 import {
+  SizeChartResponseSchema,
   WritingStyleChannelResponseSchema,
   WritingStyleErrorBodySchema,
   WritingStyleOverviewResponseSchema,
   WritingStylePreviewResponseSchema,
+  type SizeChart,
+  type SizeChartResponse,
   type WritingStyle,
   type WritingStyleChannelResponse,
   type WritingStyleFieldError,
@@ -42,6 +45,13 @@ export const writingStyleKeys = {
   overview: (tenantKey: string) => ["writing-style", tenantKey, "overview"] as const,
   channel: (tenantKey: string, channelId: string) =>
     ["writing-style", tenantKey, "channel", channelId] as const,
+  sizeChartAll: (tenantKey: string) => ["writing-style", tenantKey, "size-chart"] as const,
+  sizeChartDefault: (tenantKey: string) =>
+    ["writing-style", tenantKey, "size-chart", "default"] as const,
+  sizeChartCategory: (tenantKey: string, category: string) =>
+    ["writing-style", tenantKey, "size-chart", "category", category] as const,
+  sizeChartCategories: (tenantKey: string) =>
+    ["writing-style", tenantKey, "size-chart-categories"] as const,
 };
 
 /**
@@ -313,5 +323,74 @@ export async function previewWritingStyle(
     signal,
     malformedMessage:
       "Kết quả viết thử không đúng định dạng. Hãy thử lại hoặc báo quản trị viên kiểm tra máy chủ.",
+  });
+}
+
+// --- Size chart API (`.swarm/specs/size-advice.md`) -------------------------
+
+function requireSizeChartCategory(category: string, caller: string): string {
+  const trimmed = category.trim();
+  if (trimmed.length === 0) {
+    throw new ApiError({
+      code: "INVALID_INPUT",
+      status: 0,
+      message: `${caller} requires a non-empty category`,
+      userMessage: "Thiếu tên loại sản phẩm để thao tác bảng size.",
+    });
+  }
+  return trimmed;
+}
+
+export async function fetchDefaultSizeChart(
+  signal?: AbortSignal,
+): Promise<SizeChartResponse> {
+  return apiRequest("/api/writing-style/size-chart", {
+    schema: SizeChartResponseSchema,
+    signal,
+    malformedMessage:
+      "Dữ liệu bảng size mặc định trả về không đúng định dạng. Hãy báo quản trị viên kiểm tra máy chủ.",
+  });
+}
+
+export async function saveDefaultSizeChart(
+  chart: SizeChart,
+  signal?: AbortSignal,
+): Promise<SizeChartResponse> {
+  return writingStyleJsonRequest("/api/writing-style/size-chart", {
+    method: "PUT",
+    body: { rows: chart.rows, note: chart.note },
+    schema: SizeChartResponseSchema,
+    signal,
+    malformedMessage:
+      "Kết quả lưu bảng size mặc định không đúng định dạng. Hãy tải lại trang để kiểm tra.",
+  });
+}
+
+export async function fetchCategorySizeChart(
+  category: string,
+  signal?: AbortSignal,
+): Promise<SizeChartResponse> {
+  const cat = requireSizeChartCategory(category, "fetchCategorySizeChart");
+  return apiRequest(`/api/writing-style/size-chart/${encodeURIComponent(cat)}`, {
+    schema: SizeChartResponseSchema,
+    signal,
+    malformedMessage:
+      "Dữ liệu bảng size theo loại sản phẩm trả về không đúng định dạng. Hãy báo quản trị viên kiểm tra máy chủ.",
+  });
+}
+
+export async function saveCategorySizeChart(
+  category: string,
+  chart: SizeChart,
+  signal?: AbortSignal,
+): Promise<SizeChartResponse> {
+  const cat = requireSizeChartCategory(category, "saveCategorySizeChart");
+  return writingStyleJsonRequest(`/api/writing-style/size-chart/${encodeURIComponent(cat)}`, {
+    method: "PUT",
+    body: { rows: chart.rows, note: chart.note },
+    schema: SizeChartResponseSchema,
+    signal,
+    malformedMessage:
+      "Kết quả lưu bảng size theo loại sản phẩm không đúng định dạng. Hãy tải lại trang để kiểm tra.",
   });
 }

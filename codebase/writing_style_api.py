@@ -148,6 +148,105 @@ def _require_channel(channel_id: str) -> dict:
     return chans[ch]
 
 
+def _extract_size_chart_body(body: Any) -> dict:
+    """Accept either `{rows, note?}` directly or `{chart: {rows, note?}}`."""
+    if not isinstance(body, dict):
+        _raise_validation([{"field": "body", "message": "dữ liệu gửi lên phải là một object"}])
+    if "chart" in body:
+        extra_keys = [k for k in body if k != "chart"]
+        if extra_keys:
+            _raise_validation([{"field": str(k), "message": "trường không được hỗ trợ"} for k in extra_keys])
+        chart = body["chart"]
+    else:
+        chart = body
+    errors = writing_style.validate_size_chart(chart)
+    if errors:
+        _raise_validation(errors)
+    return chart
+
+
+def _require_size_chart_category(category: str) -> str:
+    cat_key, cat_label = writing_style.normalize_size_chart_category(category)
+    if not cat_key:
+        _raise_validation([{"field": "category", "message": "tên loại sản phẩm không được để trống"}])
+    if cat_key == writing_style.DEFAULT_SCOPE:
+        _raise_validation([{"field": "category", "message": "không dùng 'default' làm tên loại sản phẩm"}])
+    if len(cat_label) > writing_style.SIZE_CHART_MAX_CATEGORY_CHARS:
+        _raise_validation([{
+            "field": "category",
+            "message": "tên loại sản phẩm tối đa %d ký tự" % writing_style.SIZE_CHART_MAX_CATEGORY_CHARS,
+        }])
+    return cat_label
+
+
+def _catalog_categories() -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    try:
+        rows = store.catalog_rows()
+    except Exception:
+        rows = []
+    for r in rows:
+        k, lbl = writing_style.normalize_size_chart_category(r.get("loai"))
+        if k and k not in seen:
+            seen.add(k)
+            out.append(lbl)
+    return out
+
+
+def _size_chart_default_view(tenant_id: str) -> dict:
+    rows = writing_style.list_size_chart_rows(tenant_id)
+    default_row = None
+    override_rows: list[dict] = []
+    for r in rows:
+        if r["category_key"] == writing_style.DEFAULT_SIZE_CHART_KEY:
+            default_row = r
+        else:
+            override_rows.append(r)
+
+    is_default = default_row is None
+    effective_chart = default_row["chart"] if default_row else writing_style.default_size_chart()
+    overrides = [
+        {
+            "category": r["category"],
+            "chart": r["chart"],
+            "updatedAt": _z(r["updated_at"]),
+        }
+        for r in override_rows
+    ]
+    seen_cats: set[str] = set()
+    categories: list[str] = []
+    for lbl in [o["category"] for o in overrides] + _catalog_categories():
+        k, clean_lbl = writing_style.normalize_size_chart_category(lbl)
+        if k and k not in seen_cats:
+            seen_cats.add(k)
+            categories.append(clean_lbl)
+
+    return {
+        "tenantId": tenant_id,
+        "category": None,
+        "chart": effective_chart,
+        "isDefault": is_default,
+        "defaultChart": writing_style.default_size_chart(),
+        "overrides": overrides,
+        "categories": categories,
+        "updatedAt": _z(default_row["updated_at"]) if default_row else None,
+    }
+
+
+def _size_chart_category_view(tenant_id: str, category_label: str) -> dict:
+    cat_row = writing_style.get_size_chart_row(tenant_id, category_label)
+    effective_chart, _ = writing_style.resolve_size_chart(tenant_id, category_label)
+    return {
+        "tenantId": tenant_id,
+        "category": (cat_row["category"] if cat_row else category_label),
+        "chart": cat_row["chart"] if cat_row else None,
+        "effective": effective_chart,
+        "isInherited": cat_row is None,
+        "updatedAt": _z(cat_row["updated_at"]) if cat_row else None,
+    }
+
+
 def _company_view(tenant_id: str) -> dict:
     rows = writing_style.list_scopes(tenant_id)
     chans = _channel_map()
@@ -319,6 +418,75 @@ def preview_writing_style(body: Any = Body(...)):
         "tokensIn": tok[0],
         "tokensOut": tok[1],
     }
+
+
+# ---------------- Size Chart routes (MUST stay before `/{channel_id}`) ----------------
+
+@router.get("/writing-style/size-chart")
+def get_default_size_chart():
+    """Đọc bảng size mặc định của shop (tự trả bảng mẫu nếu chưa lưu) và các bảng ghi đè theo loại sản phẩm."""
+    writing_style.init_writing_style()
+    return _size_chart_default_view(_tenant_id())
+
+
+@router.put("/writing-style/size-chart")
+def put_default_size_chart(body: Any = Body(...)):
+    """Lưu bảng size mặc định của shop."""
+    writing_style.init_writing_style()
+    chart = _extract_size_chart_body(body)
+    tenant_id = _tenant_id()
+    writing_style.upsert_size_chart(
+        tenant_id,
+        chart,
+        category=None,
+        updated_by="operator",
+        updated_at=_now_z(),
+    )
+    return _size_chart_default_view(tenant_id)
+
+
+@router.delete("/writing-style/size-chart")
+def delete_default_size_chart():
+    """Khôi phục bảng size mặc định về bảng size mẫu."""
+    writing_style.init_writing_style()
+    tenant_id = _tenant_id()
+    writing_style.delete_size_chart(tenant_id, category=None)
+    return _size_chart_default_view(tenant_id)
+
+
+@router.get("/writing-style/size-chart/{category}")
+def get_category_size_chart(category: str):
+    """Đọc bảng size riêng của một loại sản phẩm (loai) và bảng hiệu lực."""
+    writing_style.init_writing_style()
+    cat_label = _require_size_chart_category(category)
+    return _size_chart_category_view(_tenant_id(), cat_label)
+
+
+@router.put("/writing-style/size-chart/{category}")
+def put_category_size_chart(category: str, body: Any = Body(...)):
+    """Lưu bảng size ghi đè riêng cho một loại sản phẩm (loai)."""
+    writing_style.init_writing_style()
+    cat_label = _require_size_chart_category(category)
+    chart = _extract_size_chart_body(body)
+    tenant_id = _tenant_id()
+    writing_style.upsert_size_chart(
+        tenant_id,
+        chart,
+        category=cat_label,
+        updated_by="operator",
+        updated_at=_now_z(),
+    )
+    return _size_chart_category_view(tenant_id, cat_label)
+
+
+@router.delete("/writing-style/size-chart/{category}")
+def delete_category_size_chart(category: str):
+    """Xoá bảng size riêng của một loại sản phẩm để dùng lại bảng mặc định của shop."""
+    writing_style.init_writing_style()
+    cat_label = _require_size_chart_category(category)
+    tenant_id = _tenant_id()
+    writing_style.delete_size_chart(tenant_id, category=cat_label)
+    return _size_chart_category_view(tenant_id, cat_label)
 
 
 @router.get("/writing-style/{channel_id}")

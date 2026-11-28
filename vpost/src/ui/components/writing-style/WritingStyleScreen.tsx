@@ -36,6 +36,7 @@ import { listCatalogProducts } from "@/ui/services/catalog.api";
 
 import { PreviewPanel, type ProductPreviewOption } from "./PreviewPanel";
 import { ScopeSelector } from "./ScopeSelector";
+import { SizeChartSection } from "./SizeChartSection";
 import {
   WritingStyleForm,
   type FocusFieldTarget,
@@ -203,6 +204,10 @@ export function WritingStyleScreen() {
   const [pendingNav, setPendingNav] = useState<PendingDirtyNavigation | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<ProductPreviewOption | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [sizeChartDirty, setSizeChartDirty] = useState(false);
+  const [sizeChartSaving, setSizeChartSaving] = useState(false);
+  const [sizeChartResetNonce, setSizeChartResetNonce] = useState(0);
+  const [sizeChartReloadNonce, setSizeChartReloadNonce] = useState(0);
 
   const focusNonceRef = useRef(0);
   const noticeRef = useRef<HTMLDivElement>(null);
@@ -245,6 +250,8 @@ export function WritingStyleScreen() {
     () => isDraftDirty(serverDraft, draft),
     [serverDraft, draft],
   );
+  const hasAnyUnsavedChanges = isDirty || sizeChartDirty;
+  const isAnySaving = saveMutation.isPending || sizeChartSaving;
 
   const inheritedStyle = useMemo(
     () => resolveInheritedBase(activeScope, overview.data, channelQuery.data),
@@ -255,9 +262,9 @@ export function WritingStyleScreen() {
     if (notice) noticeRef.current?.focus();
   }, [notice]);
 
-  // Tab close / hard reload guard while dirty.
+  // Tab close / hard reload guard while either writing style or size chart is dirty.
   useEffect(() => {
-    if (!shouldWarnBeforeUnload(isDirty, saveMutation.isPending)) return;
+    if (!shouldWarnBeforeUnload(hasAnyUnsavedChanges, isAnySaving)) return;
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -266,11 +273,11 @@ export function WritingStyleScreen() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isDirty, saveMutation.isPending]);
+  }, [hasAnyUnsavedChanges, isAnySaving]);
 
   // In-app anchor navigation guard (sidebar, top bar, command links) while dirty.
   useEffect(() => {
-    if (!shouldWarnBeforeUnload(isDirty, saveMutation.isPending)) return;
+    if (!shouldWarnBeforeUnload(hasAnyUnsavedChanges, isAnySaving)) return;
 
     const handleDocumentClick = (event: MouseEvent) => {
       if (event.defaultPrevented) return;
@@ -281,8 +288,8 @@ export function WritingStyleScreen() {
 
       const rawHref = anchor.getAttribute("href") ?? "";
       const shouldBlock = shouldInterceptAnchorNavigation({
-        isDirty,
-        isSaving: saveMutation.isPending,
+        isDirty: hasAnyUnsavedChanges,
+        isSaving: isAnySaving,
         currentHref: window.location.href,
         targetHref: rawHref,
         targetAttr: anchor.getAttribute("target"),
@@ -303,7 +310,7 @@ export function WritingStyleScreen() {
 
     document.addEventListener("click", handleDocumentClick, true);
     return () => document.removeEventListener("click", handleDocumentClick, true);
-  }, [isDirty, saveMutation.isPending]);
+  }, [hasAnyUnsavedChanges, isAnySaving]);
 
   const applyScopeSwitch = useCallback(
     (nextScope: WritingStyleScope) => {
@@ -333,15 +340,16 @@ export function WritingStyleScreen() {
   );
 
   const handleRequestReload = useCallback(() => {
-    if (isDirty) {
+    if (hasAnyUnsavedChanges) {
       setPendingNav({ kind: "reload" });
       return;
     }
     setLocalEdit(null);
+    setSizeChartReloadNonce((n) => n + 1);
     void overview.refetch();
     void channels.refetch();
     if (isChannelScope) void channelQuery.refetch();
-  }, [isDirty, overview, channels, isChannelScope, channelQuery]);
+  }, [hasAnyUnsavedChanges, overview, channels, isChannelScope, channelQuery]);
 
   function handleConfirmDiscardNavigation() {
     const action = pendingNav;
@@ -358,6 +366,8 @@ export function WritingStyleScreen() {
       setFieldErrors({});
       setItemErrors({});
       setUnmappedServerErrors([]);
+      setSizeChartResetNonce((n) => n + 1);
+      setSizeChartReloadNonce((n) => n + 1);
       void overview.refetch();
       void channels.refetch();
       if (isChannelScope) void channelQuery.refetch();
@@ -366,12 +376,14 @@ export function WritingStyleScreen() {
 
     if (action.kind === "route") {
       setLocalEdit(null);
+      setSizeChartResetNonce((n) => n + 1);
       router.push(action.href);
       return;
     }
 
     if (action.kind === "back") {
       setLocalEdit(null);
+      setSizeChartResetNonce((n) => n + 1);
       router.back();
     }
   }
@@ -677,6 +689,14 @@ export function WritingStyleScreen() {
                       </div>
                     </div>
                   )}
+
+                  <SizeChartSection
+                    readOnlyReason={readOnlyReason}
+                    resetNonce={sizeChartResetNonce}
+                    reloadNonce={sizeChartReloadNonce}
+                    onDirtyChange={setSizeChartDirty}
+                    onSavingChange={setSizeChartSaving}
+                  />
                 </>
               ) : null}
 

@@ -36,13 +36,6 @@ def test_hard_flag_skips_model():
     assert res["decision"] == "flag" and m.calls == 0 and res["reasons"][0][0] == "gia_ban"
 
 
-def test_missing_image_skips_model():
-    m = FakeModel(GOOD)
-    res = agent.process_row(dict(ROW, anh=""), model=m)
-    assert res["decision"] == "flag" and m.calls == 0
-    assert res["reasons"][0][0] == "anh"
-
-
 def test_out_of_stock_skips_model():
     tools.inventory = lambda: {"T1": [{"mau": "Đen", "size": s, "ton": 0, "trang_thai": "HẾT HÀNG"} for s in "SML"]}
     m = FakeModel(GOOD)

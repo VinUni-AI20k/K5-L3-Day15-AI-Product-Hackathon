@@ -272,7 +272,7 @@ def test_threads_list_shapes_filters_counts_and_has_phone():
         "id", "channelId", "channelName", "pageId", "postJobId", "productCode", "postCaption",
         "postUrl", "postImageUrl", "customer", "lastMessage", "needsReply", "unread", "unreadCount",
         "status", "isHidden", "messageCount", "hasPhone", "draft", "moderation", "attention",
-        "autoReply", "agentRun", "updatedAt",
+        "autoReply", "agentRun", "awaitingMeasurements", "updatedAt",
     }
     assert set(tf.keys()) == expected_thread_keys
     assert tf["customer"] == {"id": "u3", "name": "Quỳnh", "tags": []}

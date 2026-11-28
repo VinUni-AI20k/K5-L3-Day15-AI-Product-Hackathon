@@ -254,7 +254,7 @@ function PageAutoReplySettingCard({
           />
         )}
 
-        {/* Intents checkboxes: Giá / Size / Màu */}
+        {/* Intents checkboxes: Giá / Size / Màu / Tư vấn size */}
         <CheckboxList
           label="Loại câu hỏi cho phép tự trả lời"
           description="Chỉ các loại câu hỏi được chọn mới được tự động trả lời; câu hỏi kèm ship, đổi trả, khuyến mãi hoặc thiếu dữ liệu luôn gắn “Cần bạn”."
@@ -278,6 +278,14 @@ function PageAutoReplySettingCard({
             />
           ))}
         </CheckboxList>
+
+        <Text type="supporting" size="xsm" color="secondary">
+          Tính năng Tư vấn size sử dụng bảng cân nặng/chiều cao của shop —{" "}
+          <Link href="/writing-style" hasUnderline>
+            xem hoặc chỉnh Bảng size tại Phong cách viết
+          </Link>
+          .
+        </Text>
 
         {validation.intentsError ? (
           <Banner

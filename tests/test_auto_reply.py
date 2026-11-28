@@ -334,8 +334,7 @@ def test_rule_table_accepts_price_size_color_variants(text, expected, asked_size
         "So sánh mẫu này với mẫu kia, giá sao ạ?",
         "Giao hàng mấy ngày tới ạ, còn size L không?",
         "Phí vận chuyển bao nhiêu, mẫu này giá sao?",
-        # Body measurements / fit advice -> human needed
-        "55kg cao 1m60 mặc vừa size nào shop?",
+        # Garment specs / fit questions outside height+weight size advice -> human needed
         "Cho em xin số đo size M với ạ",
         "Form rộng hay ôm ạ? có size L ko",
         "Eo 72 mặc vừa không shop?",
@@ -1001,8 +1000,6 @@ def test_finding03_blocks_bare_tokens_compliments_thanks_and_complaints(msg):
         "Giá bao nhiêu ạ, đặt hôm nay mấy hôm nhận được?",
         "Size M dài bn cm vậy shop?",
         "Size M rộng bn vậy shop?",
-        "Em 50kí mặc sz gì ạ?",
-        "Cao 1.6m mặc size nào shop?",
         "Vải có nhăn ko shop, giá bn?",
         "Vải có xù k shop, giá bao nhiêu?",
         "Màu đen này mặc có bị nóng không shop?",

@@ -504,3 +504,146 @@ def test_legacy_server_batch_path_applies_writing_style():
     assert "Giọng riêng cho Dịu Mây qua batch" in fake.calls[0]["system"]
     assert "#DiuMayBatch" in row["post"]
     assert "🌸 Chân bài riêng Dịu Mây" in row["post"]
+
+
+# ---------------- 8. Size chart storage & API ----------------
+
+def test_size_chart_default_seed_update_category_override_reset_and_tenant_isolation():
+    # Default GET returns seeded Vietnamese women's apparel chart ("Bảng size mẫu")
+    r0 = client.get("/api/writing-style/size-chart")
+    assert r0.status_code == 200, r0.text
+    b0 = r0.json()
+    assert b0["tenantId"] == vpost_api.TENANT_ID
+    assert b0["category"] is None
+    assert b0["isDefault"] is True
+    assert b0["updatedAt"] is None
+    assert b0["overrides"] == []
+    assert "Váy xoè" in b0["categories"]  # discovered from catalog `loai`
+    assert b0["chart"]["rows"] == [
+        {"size": "S", "weightKg": [40, 46], "heightCm": [145, 155]},
+        {"size": "M", "weightKg": [46, 52], "heightCm": [150, 160]},
+        {"size": "L", "weightKg": [52, 58], "heightCm": [155, 165]},
+        {"size": "XL", "weightKg": [58, 65], "heightCm": [158, 168]},
+        {"size": "2XL", "weightKg": [65, 72], "heightCm": [160, 170]},
+    ]
+    assert b0["chart"]["note"] is None
+
+    # PUT company default (direct SizeChart body)
+    custom_default = {
+        "rows": [
+            {"size": "s", "weightKg": [42, 48], "heightCm": [148, 158]},
+            {"size": "m", "weightKg": [48, 55], "heightCm": [155, 165]},
+            {"size": "l", "weightKg": [55, 62], "heightCm": None},
+        ],
+        "note": "Form suông thoải mái",
+    }
+    r1 = client.put("/api/writing-style/size-chart", json=custom_default)
+    assert r1.status_code == 200, r1.text
+    b1 = r1.json()
+    assert b1["isDefault"] is False
+    assert Z_RE.match(b1["updatedAt"])
+    assert b1["chart"] == {
+        "rows": [
+            {"size": "S", "weightKg": [42, 48], "heightCm": [148, 158]},
+            {"size": "M", "weightKg": [48, 55], "heightCm": [155, 165]},
+            {"size": "L", "weightKg": [55, 62], "heightCm": None},
+        ],
+        "note": "Form suông thoải mái",
+    }
+
+    # Category GET before override inherits company default
+    rc0 = client.get("/api/writing-style/size-chart/Váy")
+    assert rc0.status_code == 200, rc0.text
+    bc0 = rc0.json()
+    assert bc0["category"] == "Váy"
+    assert bc0["chart"] is None
+    assert bc0["isInherited"] is True
+    assert bc0["effective"] == b1["chart"]
+    assert bc0["updatedAt"] is None
+
+    # PUT category override (also accepts wrapped `{chart: ...}`)
+    vay_chart = {
+        "chart": {
+            "rows": [
+                {"size": "S", "weightKg": [38, 45], "heightCm": [145, 155]},
+                {"size": "M", "weightKg": [45, 51], "heightCm": [150, 160]},
+            ],
+            "note": "Váy ôm eo",
+        }
+    }
+    rc1 = client.put("/api/writing-style/size-chart/Váy", json=vay_chart)
+    assert rc1.status_code == 200, rc1.text
+    bc1 = rc1.json()
+    assert bc1["isInherited"] is False
+    assert bc1["chart"]["note"] == "Váy ôm eo"
+    assert bc1["effective"] == bc1["chart"]
+    assert Z_RE.match(bc1["updatedAt"])
+
+    # Case-insensitive lookup returns the same override
+    assert client.get("/api/writing-style/size-chart/váy").json()["isInherited"] is False
+
+    # Default GET lists the override
+    r_list = client.get("/api/writing-style/size-chart").json()
+    assert len(r_list["overrides"]) == 1
+    assert r_list["overrides"][0]["category"] == "Váy"
+
+    # DELETE category override reverts to company default
+    rc_del = client.delete("/api/writing-style/size-chart/Váy")
+    assert rc_del.status_code == 200
+    assert rc_del.json()["isInherited"] is True
+    assert rc_del.json()["chart"] is None
+    assert rc_del.json()["effective"] == b1["chart"]
+
+    # DELETE company default restores seeded default ("Khôi phục bảng mẫu")
+    r_reset = client.delete("/api/writing-style/size-chart")
+    assert r_reset.status_code == 200
+    assert r_reset.json()["isDefault"] is True
+    assert len(r_reset.json()["chart"]["rows"]) == 5
+
+    # Tenant isolation
+    writing_style.upsert_size_chart(
+        OTHER_TENANT,
+        {"rows": [{"size": "S", "weightKg": [40, 50], "heightCm": None}], "note": "Secret tenant"},
+    )
+    assert client.get("/api/writing-style/size-chart").json()["isDefault"] is True
+    client.cookies.set(vpost_api.TENANT_COOKIE, OTHER_TENANT)
+    for resp in (
+        client.get("/api/writing-style/size-chart"),
+        client.put("/api/writing-style/size-chart", json=custom_default),
+        client.delete("/api/writing-style/size-chart"),
+        client.get("/api/writing-style/size-chart/Váy"),
+        client.put("/api/writing-style/size-chart/Váy", json=vay_chart),
+        client.delete("/api/writing-style/size-chart/Váy"),
+    ):
+        assert resp.status_code == 403 and resp.json()["code"] == "FORBIDDEN"
+
+
+@pytest.mark.parametrize(
+    "payload,expected_field",
+    [
+        ({"rows": []}, "rows"),
+        ({"rows": [{"size": f"S{i}", "weightKg": [40, 50], "heightCm": None} for i in range(13)]}, "rows"),
+        ({"rows": [{"size": "S", "weightKg": [40, 46]}, {"size": "s", "weightKg": [46, 52]}]}, "rows[1].size"),
+        ({"rows": [{"size": "XXL", "weightKg": [65, 72]}, {"size": "2XL", "weightKg": [72, 80]}]}, "rows[1].size"),
+        ({"rows": [{"size": "S", "weightKg": [50, 50]}]}, "rows[0].weightKg"),
+        ({"rows": [{"size": "S", "weightKg": [55, 45]}]}, "rows[0].weightKg"),
+        ({"rows": [{"size": "S", "weightKg": [29, 45]}]}, "rows[0].weightKg"),
+        ({"rows": [{"size": "S", "weightKg": [45, 151]}]}, "rows[0].weightKg"),
+        ({"rows": [{"size": "S", "weightKg": [40, 46], "heightCm": [119, 155]}]}, "rows[0].heightCm"),
+        ({"rows": [{"size": "S", "weightKg": [40, 46], "heightCm": [155, 211]}]}, "rows[0].heightCm"),
+        ({"rows": [{"size": "S", "weightKg": [40, 46], "heightCm": [160, 155]}]}, "rows[0].heightCm"),
+        ({"rows": [{"size": "S", "weightKg": [40, 46], "heightCm": [155, 155]}]}, "rows[0].heightCm"),
+        ({"rows": [{"size": "", "weightKg": [40, 46]}]}, "rows[0].size"),
+        ({"rows": [{"size": "S", "weightKg": [40, 46]}], "extra": 1}, "extra"),
+        ({"rows": [{"size": "S", "weightKg": [40, 46]}], "note": "n" * 301}, "note"),
+    ],
+)
+def test_size_chart_validation_errors_return_400(payload, expected_field):
+    r = client.put("/api/writing-style/size-chart", json=payload)
+    assert r.status_code == 400, (payload, r.text)
+    data = r.json()
+    assert data["code"] == "INVALID_INPUT"
+    assert any(f["field"] == expected_field for f in data.get("fields", [])), (expected_field, data)
+
+    rc = client.put("/api/writing-style/size-chart/Váy", json=payload)
+    assert rc.status_code == 400 and rc.json()["code"] == "INVALID_INPUT"
