@@ -30,8 +30,10 @@ FB_COMMENT_MODERATION_COLUMNS = (
     ("moderated_at", "text default ''"),
 )
 
-MODERATION_SCHEMA_STATEMENTS = (
-    """
+_MODERATION_TABLE_DDL = (
+    (
+        "moderation_setting",
+        """
     create table if not exists moderation_setting(
       tenant_id text not null,
       page_id text not null,
@@ -44,7 +46,10 @@ MODERATION_SCHEMA_STATEMENTS = (
       primary key (tenant_id, page_id)
     )
     """,
-    """
+    ),
+    (
+        "moderation_log",
+        """
     create table if not exists moderation_log(
       seq bigint generated always as identity,
       id text primary key,
@@ -60,52 +65,123 @@ MODERATION_SCHEMA_STATEMENTS = (
       created_at text not null
     )
     """,
-    """
+    ),
+)
+
+_MODERATION_INDEX_DDL = (
+    (
+        "moderation_log_tenant_created",
+        """
     create index if not exists moderation_log_tenant_created
       on moderation_log(tenant_id, created_at desc, seq desc)
     """,
-    """
+    ),
+    (
+        "moderation_log_daily",
+        """
     create index if not exists moderation_log_daily
       on moderation_log(tenant_id, page_id, actor, action, result, created_at desc)
     """,
+    ),
 )
+
+MODERATION_SCHEMA_STATEMENTS = tuple(stmt for _, stmt in (_MODERATION_TABLE_DDL + _MODERATION_INDEX_DDL))
+
+_REQUIRED_MODERATION_TABLES = frozenset(name for name, _ in _MODERATION_TABLE_DDL)
+_REQUIRED_MODERATION_INDEXES = frozenset(name for name, _ in _MODERATION_INDEX_DDL)
+_FB_COMMENT_MODERATION_INDEX = "fb_comment_moderation"
+_FB_COMMENT_MODERATION_COL_NAMES = frozenset(col for col, _ in FB_COMMENT_MODERATION_COLUMNS)
+
+
+def _inspect_moderation_schema(c, schema: str) -> tuple[set[str], set[str], bool, set[str]]:
+    tables = {
+        r["tablename"]
+        for r in c.execute(
+            "select tablename from pg_tables where schemaname = %s",
+            (schema,),
+        ).fetchall()
+    }
+    indexes = {
+        r["indexname"]
+        for r in c.execute(
+            "select indexname from pg_indexes where schemaname = %s",
+            (schema,),
+        ).fetchall()
+    }
+    has_fb_comment = "fb_comment" in tables
+    fb_cols: set[str] = set()
+    if has_fb_comment:
+        fb_cols = {
+            r["column_name"]
+            for r in c.execute(
+                "select column_name from information_schema.columns "
+                "where table_schema = %s and table_name = 'fb_comment'",
+                (schema,),
+            ).fetchall()
+        }
+    return tables, indexes, has_fb_comment, fb_cols
+
+
+def _is_moderation_schema_ready(
+    tables: set[str],
+    indexes: set[str],
+    has_fb_comment: bool,
+    fb_cols: set[str],
+) -> bool:
+    if not (_REQUIRED_MODERATION_TABLES <= tables):
+        return False
+    if not (_REQUIRED_MODERATION_INDEXES <= indexes):
+        return False
+    if has_fb_comment:
+        if not (_FB_COMMENT_MODERATION_COL_NAMES <= fb_cols):
+            return False
+        if _FB_COMMENT_MODERATION_INDEX not in indexes:
+            return False
+    return True
 
 
 def init_moderation() -> None:
     """Khởi tạo bảng kiểm duyệt và thêm các cột `moderation_*` vào `fb_comment` một cách idempotent.
 
     An toàn khi gọi lặp lại nhiều lần và sẵn sàng được gọi từ `store.init()`.
+    Tránh chạy DDL (`CREATE INDEX IF NOT EXISTS`) khi bảng/cột/chỉ mục đã tồn tại để không giữ
+    `ShareLock` trên `moderation_log` / `fb_comment` gây deadlock với giao dịch `daily_cap_tx`.
     """
     schema = store.schema_name()
+    with store.connect() as c:
+        if _is_moderation_schema_ready(*_inspect_moderation_schema(c, schema)):
+            return
+
     with store.tx_locked("moderation:init") as c:
+        tables, indexes, has_fb_comment, fb_cols = _inspect_moderation_schema(c, schema)
+        if _is_moderation_schema_ready(tables, indexes, has_fb_comment, fb_cols):
+            return
+
         c.execute(pg_sql.SQL("create schema if not exists {}").format(pg_sql.Identifier(schema)))
         c.execute(pg_sql.SQL("set local search_path to {}").format(pg_sql.Identifier(schema)))
-        for stmt in MODERATION_SCHEMA_STATEMENTS:
-            c.execute(stmt)
-        has_fb_comment = c.execute(
-            "select 1 from information_schema.tables "
-            "where table_schema = current_schema() and table_name = 'fb_comment'"
-        ).fetchone()
+
+        # Đảm bảo thứ tự khoá thống nhất (fb_comment -> moderation_log) khớp với daily_cap_tx.
         if has_fb_comment:
-            existing = {
-                r["column_name"]
-                for r in c.execute(
-                    "select column_name from information_schema.columns "
-                    "where table_schema = current_schema() and table_name = 'fb_comment'"
-                ).fetchall()
-            }
             for col_name, col_def in FB_COMMENT_MODERATION_COLUMNS:
-                if col_name not in existing:
+                if col_name not in fb_cols:
                     c.execute(
                         pg_sql.SQL("alter table fb_comment add column if not exists {} {}").format(
                             pg_sql.Identifier(col_name),
                             pg_sql.SQL(col_def),
                         )
                     )
-            c.execute(
-                "create index if not exists fb_comment_moderation "
-                "on fb_comment(tenant_id, is_from_page, moderation_action, created_time desc)"
-            )
+            if _FB_COMMENT_MODERATION_INDEX not in indexes:
+                c.execute(
+                    "create index if not exists fb_comment_moderation "
+                    "on fb_comment(tenant_id, is_from_page, moderation_action, created_time desc)"
+                )
+
+        for tbl_name, stmt in _MODERATION_TABLE_DDL:
+            if tbl_name not in tables:
+                c.execute(stmt)
+        for idx_name, stmt in _MODERATION_INDEX_DDL:
+            if idx_name not in indexes:
+                c.execute(stmt)
 
 
 def _daily_cap_lock_key(tenant_id: str, page_id: str) -> str:
