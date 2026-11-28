@@ -76,3 +76,8 @@ export function enterIndex(index: number): CSSProperties {
   const safe = Number.isFinite(index) && index > 0 ? Math.floor(index) : 0;
   return { "--enter-index": Math.min(safe, LAST_STAGGERED_INDEX) } as CSSProperties;
 }
+
+/** Combined delay and stagger index when one element carries both variables. */
+export function enterStaggered(delay: string, index: number): CSSProperties {
+  return { ...enterDelay(delay), ...enterIndex(index) };
+}

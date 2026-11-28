@@ -8,6 +8,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
+import { inboxKeys } from "@/ui/hooks/inbox-keys";
 import { useActiveTenant } from "@/ui/hooks/useMe";
 import {
   MODERATION_LOG_DEFAULT_LIMIT,
@@ -41,11 +42,20 @@ function retryDelay(attempt: number): number {
   return Math.min(1_000 * 2 ** attempt, 5_000);
 }
 
-/** Invalidates comments list + counts and all moderation queries (settings + log) for a tenant. */
+/**
+ * Invalidates inbox thread lists and thread details, legacy comments list + counts, and all
+ * moderation queries (settings + log) for a tenant.
+ *
+ * Deliberately targets only inbox `threads` and `thread` keys — never `inboxKeys.all` — so
+ * moderation mutations do not trigger out-of-band `inboxKeys.updates` polls or unrelated
+ * `quick-replies`, `customer-tags`, or `customer` refetches.
+ */
 export function invalidateCommentsAndModeration(
   queryClient: Pick<QueryClient, "invalidateQueries">,
   tenantKey: string,
 ): void {
+  void queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) });
+  void queryClient.invalidateQueries({ queryKey: [...inboxKeys.all(tenantKey), "thread"] as const });
   void queryClient.invalidateQueries({ queryKey: commentKeys.all(tenantKey) });
   void queryClient.invalidateQueries({ queryKey: moderationKeys.all(tenantKey) });
 }

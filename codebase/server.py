@@ -2,6 +2,7 @@
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -15,6 +16,9 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
 
 import agent  # noqa: E402
+import comment_poller  # noqa: E402
+import inbox_api  # noqa: E402
+import inbox_store  # noqa: E402
 import moderation_api  # noqa: E402
 import moderation_store  # noqa: E402
 import rules  # noqa: E402
@@ -22,6 +26,8 @@ import schedule  # noqa: E402
 import store  # noqa: E402
 import tools  # noqa: E402
 import vpost_api  # noqa: E402
+import writing_style  # noqa: E402
+import writing_style_api  # noqa: E402
 from ai import MODEL_NAME, MODEL_PROVIDER, call_model  # noqa: E402
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
@@ -30,7 +36,18 @@ MAX_BYTES = 10 * 1024 * 1024
 MODEL = call_model      # test thay bằng model giả
 SYNC = False            # test: xử lý ngay trong request
 pool = ThreadPoolExecutor(max_workers=4)
-app = FastAPI(title="VPOST")
+
+
+@asynccontextmanager
+async def _lifespan(_app):
+    comment_poller.start()
+    try:
+        yield
+    finally:
+        comment_poller.stop()
+
+
+app = FastAPI(title="VPOST", lifespan=_lifespan)
 try:
     store.init()
 except Exception as e:
@@ -38,13 +55,17 @@ except Exception as e:
         "Không thể kết nối hoặc khởi tạo cơ sở dữ liệu PostgreSQL (DATABASE_URL): %s" % e
     ) from e
 moderation_store.init_moderation()
+inbox_store.init_inbox()
+writing_style.init_writing_style()
 app.include_router(moderation_api.router)
+app.include_router(inbox_api.router)
+app.include_router(writing_style_api.router)
 app.include_router(vpost_api.router)
 if not store.catalog_rows():  # máy mới: nạp sẵn file demo để giao diện có dữ liệu
     vpost_api.load_catalog(rules.read_table(open(os.path.join(rules.DATA, "demo_products.xlsx"), "rb").read(), "demo.xlsx"))
 
 ERROR_CODES = {400: "INVALID_INPUT", 404: "NOT_FOUND", 405: "INVALID_INPUT", 409: "CONFLICT", 413: "INVALID_INPUT",
-               422: "INVALID_INPUT", 502: "UPSTREAM_ERROR"}
+               422: "INVALID_INPUT", 429: "RATE_LIMITED", 502: "UPSTREAM_ERROR"}
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -85,6 +106,7 @@ def _process(row_id, default_page):
                 data = dict(data, anh="\n".join(chk["ok"]))
                 store.update(row_id, data=data)
         page, pwarn = tools.page_for(data, default_page)
+        page = writing_style.apply(page, vpost_api.TENANT_ID, page["id"])
         res = agent.process_row(data, page, model=counted)
         if pwarn:
             res["warnings"].insert(0, "%s: %s" % pwarn)
@@ -160,7 +182,8 @@ def _row_or_404(rid):
 
 def _allowed(r):
     page = tools.PAGES.get(r["page_id"]) or tools.PAGES[tools.DEFAULT_PAGE]
-    return rules.allowed_facts(r["data"], rules.check_stock(r["data"], tools.inventory()), page, tools.GLOB)
+    page = writing_style.apply(page, vpost_api.TENANT_ID, page["id"])
+    return rules.allowed_facts(r["data"], rules.check_stock(r["data"], tools.inventory()), page, agent._effective_glob(page))
 
 
 @app.patch("/api/rows/{rid}")

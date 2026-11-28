@@ -1,7 +1,6 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryObserver, environmentManager, isServer } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DEFAULT_COMMENT_FILTER } from "@/ui/components/comments/comment-filters";
 import {
   buildConfirmedBulkDeleteRequest,
   buildNonDeleteBulkRequest,
@@ -24,7 +23,9 @@ import {
   sanitizeAutoHideCategories,
   settingToDraft,
 } from "@/ui/components/comments/moderation/settings-state";
+import { inboxKeys } from "@/ui/hooks/inbox-keys";
 import { invalidateCommentsAndModeration } from "@/ui/hooks/useModeration";
+import type { CommentFilter } from "@/ui/schemas/comment.schema";
 import {
   DEFAULT_MODERATION_LOG_FILTER,
   type ModerationLogEntry,
@@ -42,6 +43,14 @@ import {
 } from "@/ui/services/moderation.api";
 
 const READ_ONLY_REASON = "Chế độ hỗ trợ chỉ được xem.";
+
+const DEFAULT_COMMENT_FILTER: CommentFilter = {
+  status: "unreplied",
+  moderation: null,
+  channelId: null,
+  postJobId: null,
+  q: null,
+};
 
 function mockJsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -363,5 +372,117 @@ describe("read-only disabled gates & log undo eligibility", () => {
     expect(queryClient.getQueryState(logKey)?.isInvalidated).toBe(true);
     // Tenant isolation preserved
     expect(queryClient.getQueryState(otherTenantKey)?.isInvalidated).toBe(false);
+  });
+
+  it("invalidates only inbox threads and thread detail keys without triggering updates polling or unrelated inbox refetches", () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const tenantKey = "tenant-1";
+    const threadListKey = inboxKeys.threadList(tenantKey, {
+      filter: "needs_reply",
+      channelId: null,
+      postJobId: null,
+      q: null,
+    });
+    const threadDetailKey = inboxKeys.thread(tenantKey, "thread-1");
+    const secondThreadDetailKey = inboxKeys.thread(tenantKey, "thread-2");
+    const updatesKey = inboxKeys.updates(tenantKey);
+    const quickRepliesKey = inboxKeys.quickReplies(tenantKey);
+    const customerTagsKey = inboxKeys.customerTags(tenantKey);
+    const customerKey = inboxKeys.customer(tenantKey, "cust-1");
+    const otherTenantThreadsKey = inboxKeys.threads("tenant-2");
+    const otherTenantThreadKey = inboxKeys.thread("tenant-2", "thread-1");
+
+    queryClient.setQueryData(threadListKey, { pages: [] });
+    queryClient.setQueryData(threadDetailKey, { pages: [] });
+    queryClient.setQueryData(secondThreadDetailKey, { pages: [] });
+    queryClient.setQueryData(updatesKey, { cursor: "c1" });
+    queryClient.setQueryData(quickRepliesKey, { items: [] });
+    queryClient.setQueryData(customerTagsKey, { items: [] });
+    queryClient.setQueryData(customerKey, { customer: { id: "cust-1" } });
+    queryClient.setQueryData(otherTenantThreadsKey, { pages: [] });
+    queryClient.setQueryData(otherTenantThreadKey, { pages: [] });
+
+    invalidateCommentsAndModeration(queryClient, tenantKey);
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: inboxKeys.threads(tenantKey) });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["inbox", tenantKey, "thread"] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: inboxKeys.all(tenantKey) });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: inboxKeys.updates(tenantKey) });
+
+    expect(queryClient.getQueryState(threadListKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(threadDetailKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(secondThreadDetailKey)?.isInvalidated).toBe(true);
+
+    // Must never trigger out-of-band /api/comments/updates polls or unrelated inbox caches
+    expect(queryClient.getQueryState(updatesKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(quickRepliesKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(customerTagsKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(customerKey)?.isInvalidated).toBe(false);
+
+    // Tenant isolation preserved
+    expect(queryClient.getQueryState(otherTenantThreadsKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(otherTenantThreadKey)?.isInvalidated).toBe(false);
+  });
+
+  it("refetches active thread list and detail observers without firing an out-of-band updates poll", async () => {
+    environmentManager.setIsServer(() => false);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const tenantKey = "tenant-1";
+    const updatesFetcher = vi.fn(async () => ({ cursor: "c1" }));
+    const threadsFetcher = vi.fn(async () => ({ pages: [] }));
+    const threadDetailFetcher = vi.fn(async () => ({ pages: [] }));
+
+    const updatesObserver = new QueryObserver(queryClient, {
+      queryKey: inboxKeys.updates(tenantKey),
+      queryFn: updatesFetcher,
+      staleTime: Infinity,
+    });
+    const threadsObserver = new QueryObserver(queryClient, {
+      queryKey: inboxKeys.threadList(tenantKey, {
+        filter: "needs_reply",
+        channelId: null,
+        postJobId: null,
+        q: null,
+      }),
+      queryFn: threadsFetcher,
+      staleTime: Infinity,
+    });
+    const threadDetailObserver = new QueryObserver(queryClient, {
+      queryKey: inboxKeys.thread(tenantKey, "thread-1"),
+      queryFn: threadDetailFetcher,
+      staleTime: Infinity,
+    });
+
+    const unsubUpdates = updatesObserver.subscribe(() => {});
+    const unsubThreads = threadsObserver.subscribe(() => {});
+    const unsubDetail = threadDetailObserver.subscribe(() => {});
+
+    try {
+      await vi.waitFor(() => {
+        expect(updatesObserver.getCurrentResult().isSuccess).toBe(true);
+        expect(threadsObserver.getCurrentResult().isSuccess).toBe(true);
+        expect(threadDetailObserver.getCurrentResult().isSuccess).toBe(true);
+      });
+      expect(updatesFetcher).toHaveBeenCalledTimes(1);
+      expect(threadsFetcher).toHaveBeenCalledTimes(1);
+      expect(threadDetailFetcher).toHaveBeenCalledTimes(1);
+
+      invalidateCommentsAndModeration(queryClient, tenantKey);
+
+      await vi.waitFor(() => {
+        expect(threadsFetcher).toHaveBeenCalledTimes(2);
+        expect(threadDetailFetcher).toHaveBeenCalledTimes(2);
+      });
+      expect(updatesFetcher).toHaveBeenCalledTimes(1);
+    } finally {
+      unsubUpdates();
+      unsubThreads();
+      unsubDetail();
+      queryClient.clear();
+      environmentManager.setIsServer(() => isServer);
+    }
   });
 });

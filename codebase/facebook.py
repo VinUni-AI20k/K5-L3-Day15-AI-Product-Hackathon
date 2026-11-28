@@ -200,6 +200,25 @@ def hide_comment(comment_id, hidden, page_token):
     return bool(body.get("success", True))
 
 
+def like_comment(comment_id, liked, page_token) -> bool:
+    """Thích (liked=True, POST /{id}/likes) hoặc bỏ thích (liked=False, DELETE /{id}/likes) bình luận với tư cách Page. → bool."""
+    if liked:
+        body = _post("/%s/likes" % comment_id, extended_errors=True, access_token=page_token)
+        return bool(body.get("success", True)) if isinstance(body, dict) else bool(body)
+    import httpx
+    try:
+        r = httpx.delete(
+            "https://graph.facebook.com/%s/%s/likes" % (_version(), comment_id),
+            headers={"Authorization": "Bearer %s" % page_token},
+            timeout=30,
+        )
+        body = r.json()
+    except (httpx.HTTPError, ValueError) as e:
+        raise FacebookError("UPSTREAM_ERROR", "Không gọi được Facebook: %s" % type(e).__name__)
+    _raise_for_error(r, body, extended=True)
+    return bool(body.get("success", True)) if isinstance(body, dict) else bool(body)
+
+
 def delete_comment(comment_id, page_token) -> bool:
     """Xoá vĩnh viễn bình luận trên Facebook (`DELETE /{comment_id}`). Mã 100 / not found coi như đã xoá → True."""
     import httpx

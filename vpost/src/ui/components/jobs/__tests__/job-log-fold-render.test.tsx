@@ -222,4 +222,21 @@ describe("JobLogTable provenance", () => {
     ]);
     expect(countRows(html)).toBe(2);
   });
+
+  it("links published rows to the comment inbox via buildInboxUrl", () => {
+    const publishedHtml = render([
+      entry({
+        postJobId: "job-pub-99",
+        status: "published",
+        canRetry: false,
+        publishedPostId: "123_999",
+        publishedUrl: "https://facebook.com/123_999",
+      }),
+    ]);
+    expect(publishedHtml).toContain('href="/comments?postJobId=job-pub-99"');
+    expect(publishedHtml).toContain("Xem bình luận");
+
+    const failedHtml = render([entry({ status: "failed", publishedPostId: null })]);
+    expect(failedHtml).not.toContain("Xem bình luận");
+  });
 });

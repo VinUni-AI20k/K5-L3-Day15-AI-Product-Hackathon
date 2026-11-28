@@ -97,7 +97,7 @@ export function MediaThumb({
       {note ? (
         <span
           className={cn(
-            "absolute inset-0 flex items-center justify-center px-2 text-center font-mono text-[0.6875rem] leading-tight",
+            "absolute inset-0 flex items-center justify-center px-2 text-center font-mono text-xs leading-tight",
             note.tone === "pending"
               ? "text-foreground-subtle motion-safe:animate-pulse"
               : "text-warning-foreground",

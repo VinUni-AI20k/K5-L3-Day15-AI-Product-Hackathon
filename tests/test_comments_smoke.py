@@ -29,7 +29,8 @@ class StubVpostServer:
         draft_status: str = "draft",
         draft_text: str = "Dạ Đầm Voan Hoa G1 giá 890.000đ còn màu đen size M bạn nhé!",
         counts_override: Optional[dict[str, int]] = None,
-        duplicate_reply_status: int = 409,
+        duplicate_reply_status: int = 200,
+        idempotent_reply: bool = True,
         enforce_tenant_cookie: bool = True,
         empty_reply_status: int = 400,
         unknown_id_status: int = 404,
@@ -119,10 +120,14 @@ class StubVpostServer:
         self.draft_text = draft_text
         self.counts_override = counts_override
         self.duplicate_reply_status = duplicate_reply_status
+        self.idempotent_reply = idempotent_reply
         self.enforce_tenant_cookie = enforce_tenant_cookie
         self.empty_reply_status = empty_reply_status
         self.unknown_id_status = unknown_id_status
         self.reply_calls: list[tuple[str, str]] = []
+        self.thread_reply_requests: list[tuple[str, str, str]] = []
+        self.thread_reply_by_client_id: dict[str, dict[str, Any]] = {}
+        self.fb_send_count: int = 0
         self.hide_calls: list[tuple[str, bool]] = []
 
     def transport(self) -> httpx.MockTransport:
@@ -182,6 +187,65 @@ class StubVpostServer:
                     "counts": self._counts(),
                 },
             )
+
+        if path.startswith("/api/comments/threads/"):
+            parts = path[len("/api/comments/threads/") :].split("/")
+            if len(parts) == 2 and parts[1] == "reply" and method == "POST":
+                tid = parts[0]
+                body = self._json_body(request)
+                text = str(body.get("text") or "").strip()
+                client_id = str(body.get("clientId") or "").strip()
+                if not text:
+                    return httpx.Response(
+                        self.empty_reply_status,
+                        json={"code": "INVALID_INPUT", "message": "nội dung không được để trống"},
+                    )
+                try:
+                    uuid.UUID(client_id)
+                except ValueError:
+                    return httpx.Response(400, json={"code": "INVALID_INPUT", "message": "clientId phải là UUID hợp lệ"})
+                c = self.comments.get(tid)
+                if not c:
+                    return httpx.Response(self.unknown_id_status, json={"code": "NOT_FOUND", "message": "Không tìm thấy"})
+                self.thread_reply_requests.append((tid, text, client_id))
+                self.reply_calls.append((tid, text))
+                if client_id in self.thread_reply_by_client_id:
+                    if self.duplicate_reply_status != 200:
+                        return httpx.Response(
+                            self.duplicate_reply_status,
+                            json={"code": "CONFLICT", "message": "duplicate error"},
+                        )
+                    if self.idempotent_reply:
+                        stored_msg = self.thread_reply_by_client_id[client_id]
+                        return httpx.Response(
+                            200,
+                            json={"tenantId": TENANT_ID, "thread": {"id": tid, "postUrl": c.get("postUrl")}, "message": stored_msg},
+                        )
+                self.fb_send_count += 1
+                msg = {
+                    "id": f"fb_reply_{self.fb_send_count}",
+                    "threadId": tid,
+                    "fromPage": True,
+                    "fromId": c["pageId"],
+                    "fromName": c["channelName"],
+                    "text": text,
+                    "createdAt": "2026-11-27T10:05:00.000Z",
+                    "permalinkUrl": c.get("permalinkUrl"),
+                    "isHidden": False,
+                    "canComment": True,
+                    "likedByPage": False,
+                    "delivery": "sent",
+                    "errorCode": None,
+                    "userMessage": None,
+                    "clientId": client_id,
+                    "moderation": None,
+                }
+                self.thread_reply_by_client_id[client_id] = msg
+                c["status"] = "replied"
+                return httpx.Response(
+                    200,
+                    json={"tenantId": TENANT_ID, "thread": {"id": tid, "postUrl": c.get("postUrl")}, "message": msg},
+                )
 
         if path.startswith("/api/comments/"):
             parts = path[len("/api/comments/") :].split("/")
@@ -330,7 +394,7 @@ def test_safe_mode_passes_without_facebook_writes_and_hides_author_name():
     assert "decision=reply, status=draft, không có SĐT/email" in output
     assert "[PASS] e. PATCH /api/comments/c_unrep_1/draft" in output
     assert "check.block=[] (0)" in output and "check.warn=" in output
-    assert "[SKIP] f. POST /api/comments/c_unrep_1/reply" in output
+    assert "[SKIP] f. POST /api/comments/threads/c_unrep_1/reply" in output
     assert "[SKIP] g. POST /api/comments/c_unrep_1/hide" in output
     assert "[PASS] h1." in output and "404" in output
     assert "[PASS] h2." in output and "400" in output
@@ -354,9 +418,9 @@ def test_safe_mode_passes_without_facebook_writes_and_hides_author_name():
     assert uuid.UUID(cookie_val) and cookie_val != TENANT_ID
 
 
-# ---------------- 3. Write mode (--send + --hide): reply + 409 duplicate + hide toggle ----------------
+# ---------------- 3. Write mode (--send + --hide): idempotent thread reply + hide toggle ----------------
 
-def test_send_and_hide_mode_checks_409_duplicate_and_hide_toggle():
+def test_send_and_hide_mode_checks_idempotent_client_id_and_hide_toggle():
     stub = StubVpostServer()
     buf = io.StringIO()
     code = smoke.main(
@@ -367,18 +431,23 @@ def test_send_and_hide_mode_checks_409_duplicate_and_hide_toggle():
     output = buf.getvalue()
 
     assert code == 0, output
-    assert "[PASS] f. POST /api/comments/c_unrep_1/reply" in output
-    assert "409 CONFLICT" in output
+    assert "[PASS] f. POST /api/comments/threads/c_unrep_1/reply" in output
+    assert "message.id=fb_reply_1" in output
+    assert "không gửi trùng" in output
     assert "https://www.facebook.com/123456_1001?comment_id=c_unrep_1" in output
     assert "[PASS] g. POST /api/comments/c_unrep_1/hide" in output
     assert "hide(true)->200 isHidden=True, hide(false)->200 isHidden=False" in output
-    assert len(stub.reply_calls) == 2
-    assert stub.reply_calls[0] == stub.reply_calls[1]
+    assert len(stub.thread_reply_requests) == 2
+    # Cả 2 lần gửi phải dùng cùng thread_id, cùng nội dung, và cùng clientId (UUID hợp lệ)
+    assert stub.thread_reply_requests[0] == stub.thread_reply_requests[1]
+    assert uuid.UUID(stub.thread_reply_requests[0][2])
+    # Chỉ gửi thật lên Facebook đúng 1 lần (không bao giờ gửi trùng)
+    assert stub.fb_send_count == 1
     assert stub.hide_calls == [("c_unrep_1", True), ("c_unrep_1", False)]
 
 
-def test_send_mode_fails_if_duplicate_reply_does_not_return_409():
-    stub = StubVpostServer(duplicate_reply_status=200)
+def test_send_mode_fails_if_duplicate_client_id_creates_second_reply():
+    stub = StubVpostServer(idempotent_reply=False)
     buf = io.StringIO()
     code = smoke.main(
         ["--base-url", "http://127.0.0.1:8020", "--send"],
@@ -388,10 +457,26 @@ def test_send_mode_fails_if_duplicate_reply_does_not_return_409():
     output = buf.getvalue()
 
     assert code == 1, output
-    assert "[FAIL] f. POST /api/comments/c_unrep_1/reply" in output
-    assert "kỳ vọng 409" in output
+    assert "[FAIL] f. POST /api/comments/threads/c_unrep_1/reply" in output
+    assert "nguy cơ gửi trùng" in output
     assert "Tổng kết (KHÔNG ĐẠT):" in output
     # Không gọi hide vì không truyền --hide
+    assert stub.hide_calls == []
+
+
+def test_send_mode_fails_if_repeat_client_id_returns_non_200():
+    stub = StubVpostServer(duplicate_reply_status=409)
+    buf = io.StringIO()
+    code = smoke.main(
+        ["--base-url", "http://127.0.0.1:8020", "--send"],
+        transport=stub.transport(),
+        stream=buf,
+    )
+    output = buf.getvalue()
+
+    assert code == 1, output
+    assert "[FAIL] f. POST /api/comments/threads/c_unrep_1/reply" in output
+    assert "kỳ vọng 200 idempotent" in output
     assert stub.hide_calls == []
 
 
@@ -605,4 +690,147 @@ def test_list_comments_follows_cursor_pagination():
     assert [c["id"] for c in unreplied] == ["c1", "c2"]
     assert tenant == TENANT_ID
     assert ("unreplied", None) in pages_seen and ("unreplied", "1") in pages_seen
+
+
+def test_send_mode_resolves_nested_reply_to_root_thread():
+    """Review-2 #3: --send resolves a level-2 child comment to its root threadId before POST /threads/{id}/reply."""
+    root_comment = {
+        "id": "t_root_1",
+        "channelId": "fb-123456",
+        "channelName": "WorkHardToday",
+        "pageId": "123456",
+        "postJobId": "job-1",
+        "productCode": "G1",
+        "postCaption": "Đầm Voan Hoa G1",
+        "postUrl": "https://www.facebook.com/123456_1001",
+        "fromName": "Trần Minh Thư",
+        "message": "Mẫu này giá sao shop?",
+        "createdAt": "2026-11-27T09:00:00.000Z",
+        "permalinkUrl": "https://www.facebook.com/123456_1001?comment_id=t_root_1",
+        "isHidden": False,
+        "canComment": True,
+        "status": "replied",
+        "pageReplies": [{"id": "p1", "message": "Dạ 890k ạ", "createdAt": "2026-11-27T09:05:00.000Z"}],
+        "draft": None,
+    }
+    child_older = {
+        "id": "c_child_1",
+        "channelId": "fb-123456",
+        "channelName": "WorkHardToday",
+        "pageId": "123456",
+        "postJobId": "job-1",
+        "productCode": "G1",
+        "postCaption": "Đầm Voan Hoa G1",
+        "postUrl": "https://www.facebook.com/123456_1001",
+        "fromName": FULL_AUTHOR,
+        "message": "Có màu đen không?",
+        "createdAt": "2026-11-27T09:30:00.000Z",
+        "permalinkUrl": "https://www.facebook.com/123456_1001?comment_id=c_child_1",
+        "isHidden": False,
+        "canComment": True,
+        "status": "unreplied",
+        "pageReplies": [],
+        "draft": None,
+    }
+    child_newest = {
+        "id": "c_child_2",
+        "channelId": "fb-123456",
+        "channelName": "WorkHardToday",
+        "pageId": "123456",
+        "postJobId": "job-1",
+        "productCode": "G1",
+        "postCaption": "Đầm Voan Hoa G1",
+        "postUrl": "https://www.facebook.com/123456_1001",
+        "fromName": FULL_AUTHOR,
+        "message": "Còn size M không shop?",
+        "createdAt": "2026-11-27T10:00:00.000Z",
+        "permalinkUrl": "https://www.facebook.com/123456_1001?comment_id=c_child_2",
+        "isHidden": False,
+        "canComment": True,
+        "status": "unreplied",
+        "pageReplies": [],
+        "draft": None,
+    }
+
+    # Newest unreplied comment is child_newest (a level-2 reply); non-root /threads/{id}/reply returns 404 like real backend
+    stub = StubVpostServer(comments=[child_newest, child_older, root_comment])
+    root_ids = {"t_root_1"}
+
+    def handle_with_threads(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        method = request.method.upper()
+        if method == "GET" and path == "/api/comments/threads":
+            return httpx.Response(
+                200,
+                json={
+                    "tenantId": TENANT_ID,
+                    "items": [
+                        {
+                            "id": "t_root_1",
+                            "channelId": "fb-123456",
+                            "postJobId": "job-1",
+                            "lastMessage": {"id": "c_child_2", "fromPage": False, "text": child_newest["message"]},
+                            "messageCount": 4,
+                            "needsReply": True,
+                        }
+                    ],
+                    "nextCursor": None,
+                    "limit": 100,
+                    "counts": {"needsReply": 1, "unread": 1, "all": 1, "hidden": 0, "ignored": 0},
+                },
+            )
+        if method == "GET" and path.startswith("/api/comments/threads/"):
+            tid = path[len("/api/comments/threads/") :]
+            if tid not in root_ids:
+                return httpx.Response(404, json={"code": "NOT_FOUND", "message": "Không tìm thấy hội thoại này"})
+            return httpx.Response(
+                200,
+                json={
+                    "tenantId": TENANT_ID,
+                    "thread": {"id": tid, "postUrl": root_comment["postUrl"]},
+                    "messages": [
+                        {"id": "t_root_1", "threadId": tid},
+                        {"id": "p1", "threadId": tid},
+                        {"id": "c_child_1", "threadId": tid},
+                        {"id": "c_child_2", "threadId": tid},
+                    ],
+                    "olderCursor": None,
+                },
+            )
+        if method == "POST" and path.startswith("/api/comments/threads/") and path.endswith("/reply"):
+            tid = path[len("/api/comments/threads/") : -len("/reply")]
+            if tid not in root_ids:
+                return httpx.Response(404, json={"code": "NOT_FOUND", "message": "Không tìm thấy hội thoại này"})
+        return stub.handle(request)
+
+    # Case 1: auto-pick (newest unreplied is c_child_2)
+    buf1 = io.StringIO()
+    code1 = smoke.main(
+        ["--base-url", "http://127.0.0.1:8020", "--send"],
+        transport=httpx.MockTransport(handle_with_threads),
+        stream=buf1,
+    )
+    out1 = buf1.getvalue()
+    assert code1 == 0, out1
+    assert "[PASS] f. POST /api/comments/threads/t_root_1/reply" in out1
+    assert len(stub.thread_reply_requests) == 2
+    assert stub.thread_reply_requests[0][0] == "t_root_1"
+    assert stub.fb_send_count == 1
+
+    # Case 2: explicit --comment-id for older child c_child_1 (not lastMessage)
+    stub.thread_reply_requests.clear()
+    stub.thread_reply_by_client_id.clear()
+    stub.fb_send_count = 0
+    buf2 = io.StringIO()
+    code2 = smoke.main(
+        ["--base-url", "http://127.0.0.1:8020", "--comment-id", "c_child_1", "--send"],
+        transport=httpx.MockTransport(handle_with_threads),
+        stream=buf2,
+    )
+    out2 = buf2.getvalue()
+    assert code2 == 0, out2
+    assert "[PASS] f. POST /api/comments/threads/t_root_1/reply" in out2
+    assert len(stub.thread_reply_requests) == 2
+    assert stub.thread_reply_requests[0][0] == "t_root_1"
+    assert stub.fb_send_count == 1
 

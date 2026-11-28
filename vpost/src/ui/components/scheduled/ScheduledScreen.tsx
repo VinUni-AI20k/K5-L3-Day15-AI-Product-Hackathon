@@ -2,6 +2,7 @@
 
 import {
   DateInput,
+  Heading,
   SegmentedControl,
   SegmentedControlItem,
   type ISODateString,
@@ -244,16 +245,16 @@ export function ScheduledScreen() {
 
   return (
     <section className="space-y-6" aria-labelledby="scheduled-heading">
-      <header className="space-y-1">
+      <header className="space-y-1.5">
         {/* h2: since the wave-1 IA this screen is a TAB inside /posts, and the
             hub above it owns the page's h1 (core-accessibility §1). */}
-        <h2 id="scheduled-heading" className="text-2xl font-semibold tracking-tight">
+        <Heading level={2} id="scheduled-heading">
           Bài đã hẹn
-        </h2>
+        </Heading>
         {/* Two sentences (spec §3.4): what this screen is, and the one thing an
             operator has to know before reading a single hour on it. Everything
             else is a rule, and rules live one click away. */}
-        <p className="text-muted-foreground max-w-prose text-sm">
+        <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">
           Những bài đang chờ tới giờ đăng, sớm nhất lên trên. Giờ hiển thị theo múi giờ máy bạn (
           {timeZoneLabel()}).
         </p>
@@ -301,8 +302,8 @@ export function ScheduledScreen() {
           <SegmentedControlItem label="Lịch tháng" value="calendar" />
         </SegmentedControl>
 
-        <div className="min-w-0 basis-64 space-y-1.5">
-          <label htmlFor={channelFilterId} className="text-sm font-medium">
+        <div className="min-w-0 basis-full space-y-1.5 sm:basis-64">
+          <label htmlFor={channelFilterId} className="text-foreground text-sm font-medium">
             Lọc theo kênh
           </label>
           <Select
@@ -311,6 +312,7 @@ export function ScheduledScreen() {
             onChange={(event) =>
               pushUrl({ ...filter, channelId: event.target.value || null }, view)
             }
+            className="h-10 rounded-lg"
           >
             <option value="">Tất cả kênh</option>
             {channelOptions.map((option) => (
@@ -356,6 +358,7 @@ export function ScheduledScreen() {
             type="button"
             variant="ghost"
             onClick={() => pushUrl({ channelId: null, from: null, to: null }, view)}
+            className="min-h-10 px-3"
           >
             Bỏ bộ lọc
           </Button>
@@ -363,9 +366,10 @@ export function ScheduledScreen() {
 
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           onClick={() => void list.refetch()}
           disabled={list.isFetching}
+          className="min-h-10 px-4"
         >
           {list.isFetching ? "Đang tải…" : "Tải lại"}
         </Button>
@@ -389,7 +393,7 @@ export function ScheduledScreen() {
       {notice ? (
         <p
           role="status"
-          className="border-success/30 bg-success/10 text-success-foreground rounded-lg border px-3 py-2 text-sm"
+          className="border-success/30 bg-success/10 text-success-foreground rounded-xl border px-4 py-3 text-sm leading-relaxed"
         >
           {notice}
         </p>
@@ -398,10 +402,13 @@ export function ScheduledScreen() {
       {warning ? (
         <p
           role="alert"
-          className="border-warning/40 bg-warning/10 text-warning-foreground rounded-lg border px-3 py-2 text-sm"
+          className="border-warning/40 bg-warning/10 text-warning-foreground rounded-xl border px-4 py-3 text-sm leading-relaxed"
         >
           {warning}{" "}
-          <Link href="/posts?tab=log" className="underline underline-offset-4">
+          <Link
+            href="/posts?tab=log"
+            className="text-accent-foreground font-medium underline underline-offset-4"
+          >
             Mở nhật ký đăng
           </Link>
           .
@@ -434,8 +441,9 @@ export function ScheduledScreen() {
             action={
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 onClick={() => pushUrl({ channelId: null, from: null, to: null }, view)}
+                className="min-h-10 px-4"
               >
                 Bỏ bộ lọc
               </Button>
@@ -447,7 +455,7 @@ export function ScheduledScreen() {
             title="Chưa có bài nào được hẹn giờ"
             description="Khi soạn bài hoặc chạy hàng loạt, chọn “Hẹn giờ đăng” thay vì “Đăng ngay” — những bài đang chờ tới giờ sẽ hiện ở đây."
             action={
-              <Button asChild>
+              <Button asChild className="min-h-10 px-4">
                 <Link href="/compose">Soạn bài</Link>
               </Button>
             }
@@ -510,7 +518,7 @@ export function ScheduledScreen() {
                     owns the h1, the screen title above owns the h2, and a day
                     group sits one level under it. Two h2s would have read as
                     two sibling screens (core-accessibility §1). */}
-                <h3 id={headingId} className="text-base font-semibold">
+                <h3 id={headingId} className="text-foreground text-lg font-semibold">
                   {/* nowMs is 0 only on the server: the heading then shows the
                       full date, never a wrong "Hôm nay". */}
                   {formatDayHeading(group.dayKey, nowMs)}
@@ -551,9 +559,10 @@ export function ScheduledScreen() {
           {list.hasNextPage ? (
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={() => void list.fetchNextPage()}
               disabled={list.isFetchingNextPage}
+              className="min-h-10 px-4"
             >
               {list.isFetchingNextPage ? "Đang tải…" : "Tải thêm"}
             </Button>

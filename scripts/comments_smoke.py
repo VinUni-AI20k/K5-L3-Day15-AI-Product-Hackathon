@@ -550,6 +550,119 @@ def step_patch_draft(
     return StepResult("e", label, "PASS", f"đã sửa nháp; check.block={block_s}, check.warn={warn_s}")
 
 
+def resolve_thread_id(
+    client: httpx.Client,
+    comment_id: str,
+    *,
+    channel: Optional[str] = None,
+    post_job: Optional[str] = None,
+    comment_meta: Optional[dict[str, Any]] = None,
+) -> str:
+    """Ánh xạ comment_id (kể cả bình luận trả lời cấp 2) sang root threadId để gọi POST /threads/{id}/reply."""
+    cid = (comment_id or "").strip()
+    if not cid:
+        return ""
+
+    # 1. Đường nhanh: nếu chính cid là bình luận gốc thì GET /threads/{cid} trả 200 ngay.
+    try:
+        direct = client.get(f"/api/comments/threads/{cid}", params={"limit": 1})
+        if direct.status_code == 200:
+            body = _json_or_none(direct)
+            th = body.get("thread") if isinstance(body, dict) else None
+            if isinstance(th, dict) and str(th.get("id") or "").strip() == cid:
+                return cid
+    except httpx.HTTPError:
+        return cid
+
+    # 2. Quét danh sách hội thoại (filter=all) để tìm hội thoại chứa cid (ưu tiên khớp lastMessage).
+    base_params: dict[str, Any] = {"filter": "all", "limit": 100}
+    if channel:
+        base_params["channelId"] = channel
+    if post_job:
+        base_params["postJobId"] = post_job
+
+    cursor: Optional[str] = None
+    seen_cursors: set[str] = set()
+    threads: list[dict[str, Any]] = []
+    for _ in range(MAX_LIST_PAGES):
+        params = dict(base_params)
+        if cursor is not None:
+            params["cursor"] = cursor
+        try:
+            resp = client.get("/api/comments/threads", params=params)
+        except httpx.HTTPError:
+            return cid
+        if resp.status_code != 200:
+            return cid
+        body = _json_or_none(resp)
+        if not isinstance(body, dict) or not isinstance(body.get("items"), list):
+            return cid
+        for item in body["items"]:
+            if not isinstance(item, dict):
+                continue
+            tid = str(item.get("id") or "").strip()
+            if not tid:
+                continue
+            if tid == cid:
+                return tid
+            last_msg = item.get("lastMessage")
+            if isinstance(last_msg, dict) and str(last_msg.get("id") or "").strip() == cid:
+                return tid
+            threads.append(item)
+        nxt = body.get("nextCursor")
+        if not nxt:
+            break
+        nxt_s = str(nxt)
+        if nxt_s in seen_cursors:
+            break
+        seen_cursors.add(nxt_s)
+        cursor = nxt_s
+
+    # 3. Bình luận con cũ hơn (không phải lastMessage): quét chi tiết các hội thoại nhiều tin nhắn.
+    meta_job = str((comment_meta or {}).get("postJobId") or "").strip()
+    meta_ch = str((comment_meta or {}).get("channelId") or "").strip()
+    candidates = [
+        t for t in threads
+        if not isinstance(t.get("messageCount"), int) or int(t["messageCount"]) > 1
+    ]
+    candidates.sort(
+        key=lambda t: (
+            0 if (meta_job and str(t.get("postJobId") or "").strip() == meta_job) else 1,
+            0 if (meta_ch and str(t.get("channelId") or "").strip() == meta_ch) else 1,
+        )
+    )
+    for item in candidates:
+        tid = str(item["id"]).strip()
+        before: Optional[str] = None
+        seen_before: set[str] = set()
+        for _ in range(MAX_LIST_PAGES):
+            d_params: dict[str, Any] = {"limit": 200}
+            if before is not None:
+                d_params["before"] = before
+            try:
+                d_resp = client.get(f"/api/comments/threads/{tid}", params=d_params)
+            except httpx.HTTPError:
+                break
+            if d_resp.status_code != 200:
+                break
+            d_body = _json_or_none(d_resp)
+            msgs = d_body.get("messages") if isinstance(d_body, dict) else None
+            if isinstance(msgs, list) and any(
+                isinstance(m, dict) and str(m.get("id") or "").strip() == cid for m in msgs
+            ):
+                return tid
+            older = d_body.get("olderCursor") if isinstance(d_body, dict) else None
+            if not older:
+                break
+            older_s = str(older)
+            if older_s in seen_before:
+                break
+            seen_before.add(older_s)
+            before = older_s
+
+    return cid
+
+
 def step_send_reply(
     client: httpx.Client,
     comment_id: Optional[str],
@@ -557,17 +670,32 @@ def step_send_reply(
     *,
     enabled: bool,
     known_permalink: Optional[str] = None,
+    channel: Optional[str] = None,
+    post_job: Optional[str] = None,
+    comment_meta: Optional[dict[str, Any]] = None,
     secrets: Sequence[str] = (),
 ) -> StepResult:
-    """f. Chỉ chạy khi có --send: POST /reply với nội dung đã sửa, lặp lại kỳ vọng 409, in permalink Facebook."""
-    label = f"POST /api/comments/{comment_id or '{id}'}/reply"
+    """f. Chỉ chạy khi có --send: POST /threads/{id}/reply với clientId (UUID), lặp lại cùng clientId kỳ vọng 200 idempotent (cùng message.id, không gửi trùng)."""
+    label = f"POST /api/comments/threads/{comment_id or '{id}'}/reply"
     if not enabled:
         return StepResult("f", label, "SKIP", "bỏ qua (mặc định an toàn — truyền --send để gửi trả lời thật lên Facebook)")
     if not comment_id:
         return StepResult("f", label, "FAIL", "không thể gửi vì chưa chọn được bình luận ở bước d")
 
+    thread_id = resolve_thread_id(
+        client,
+        comment_id,
+        channel=channel,
+        post_job=post_job,
+        comment_meta=comment_meta,
+    )
+    label = f"POST /api/comments/threads/{thread_id}/reply"
+
+    client_id = str(uuid.uuid4())
+    payload = {"text": edited_text, "clientId": client_id}
+
     try:
-        resp1 = client.post(f"/api/comments/{comment_id}/reply", json={"text": edited_text})
+        resp1 = client.post(f"/api/comments/threads/{thread_id}/reply", json=payload)
     except httpx.HTTPError as e:
         return StepResult("f", label, "FAIL", f"lỗi kết nối ở lần gửi 1: {type(e).__name__}")
 
@@ -577,56 +705,81 @@ def step_send_reply(
         return StepResult("f", label, "FAIL", f"lần 1 trả HTTP {resp1.status_code} ({code or 'ERROR'}): {msg}.{hint}")
 
     body1 = _json_or_none(resp1)
-    comment1 = body1.get("comment") if isinstance(body1, dict) else None
+    msg1 = body1.get("message") if isinstance(body1, dict) else None
+    thread1 = body1.get("thread") if isinstance(body1, dict) else None
     permalink = (
-        (comment1.get("permalinkUrl") if isinstance(comment1, dict) else None)
-        or (comment1.get("postUrl") if isinstance(comment1, dict) else None)
+        (msg1.get("permalinkUrl") if isinstance(msg1, dict) else None)
+        or (thread1.get("postUrl") if isinstance(thread1, dict) else None)
         or known_permalink
         or "(không có permalink)"
     )
     permalink = redact(permalink, secrets)
 
-    if isinstance(comment1, dict):
-        if comment1.get("status") != "replied":
-            return StepResult(
-                "f",
-                label,
-                "FAIL",
-                f"lần 1 HTTP 200 nhưng status={comment1.get('status')} (kỳ vọng replied); permalink: {permalink}",
-            )
-        draft1 = comment1.get("draft")
-        if isinstance(draft1, dict) and draft1.get("status") != "sent":
-            return StepResult(
-                "f",
-                label,
-                "FAIL",
-                f"lần 1 HTTP 200 nhưng draft.status={draft1.get('status')} (kỳ vọng sent); permalink: {permalink}",
-            )
+    if not isinstance(msg1, dict) or not str(msg1.get("id") or "").strip():
+        return StepResult(
+            "f",
+            label,
+            "FAIL",
+            f"lần 1 HTTP 200 nhưng thiếu message.id hợp lệ; permalink: {permalink}",
+        )
+    msg1_id = str(msg1["id"]).strip()
+    if msg1.get("delivery") != "sent":
+        return StepResult(
+            "f",
+            label,
+            "FAIL",
+            f"lần 1 HTTP 200 nhưng message.delivery={msg1.get('delivery')} (kỳ vọng sent); permalink: {permalink}",
+        )
+    if msg1.get("clientId") and msg1.get("clientId") != client_id:
+        return StepResult(
+            "f",
+            label,
+            "FAIL",
+            f"lần 1 HTTP 200 nhưng message.clientId không khớp; permalink: {permalink}",
+        )
 
     try:
-        resp2 = client.post(f"/api/comments/{comment_id}/reply", json={"text": edited_text})
+        resp2 = client.post(f"/api/comments/threads/{thread_id}/reply", json=payload)
     except httpx.HTTPError as e:
         return StepResult(
             "f",
             label,
             "FAIL",
-            f"lần 1 thành công (200) nhưng lỗi kết nối khi kiểm tra gửi trùng: {type(e).__name__}; permalink: {permalink}",
+            f"lần 1 thành công (200) nhưng lỗi kết nối khi kiểm tra idempotent theo clientId: {type(e).__name__}; permalink: {permalink}",
         )
 
-    code2, msg2 = _error_summary(resp2, secrets)
-    if resp2.status_code != 409:
+    if resp2.status_code != 200:
+        code2, msg2 = _error_summary(resp2, secrets)
         return StepResult(
             "f",
             label,
             "FAIL",
-            f"lần 1 thành công (200) nhưng gửi lặp trả HTTP {resp2.status_code} ({code2 or 'ERROR'}, kỳ vọng 409); permalink: {permalink}",
+            f"lần 1 thành công (200) nhưng gửi lặp cùng clientId trả HTTP {resp2.status_code} ({code2 or 'ERROR'}, kỳ vọng 200 idempotent); permalink: {permalink}",
+        )
+
+    body2 = _json_or_none(resp2)
+    msg2 = body2.get("message") if isinstance(body2, dict) else None
+    msg2_id = str(msg2.get("id") or "").strip() if isinstance(msg2, dict) else ""
+    if not msg2_id or msg2_id != msg1_id:
+        return StepResult(
+            "f",
+            label,
+            "FAIL",
+            f"lần 1 thành công (message.id={msg1_id}) nhưng gửi lặp cùng clientId trả message.id={msg2_id or '(rỗng)'} (khác lần 1 — nguy cơ gửi trùng); permalink: {permalink}",
+        )
+    if msg2.get("delivery") != "sent":
+        return StepResult(
+            "f",
+            label,
+            "FAIL",
+            f"gửi lặp cùng clientId trả message.delivery={msg2.get('delivery')} (kỳ vọng sent); permalink: {permalink}",
         )
 
     return StepResult(
         "f",
         label,
         "PASS",
-        f"đã gửi (200) và chặn gửi trùng (409 {code2 or 'CONFLICT'}); kiểm tra thủ công: {permalink}",
+        f"đã gửi (200, message.id={msg1_id}) và gửi lặp cùng clientId trả lại đúng kết quả (200, không gửi trùng); kiểm tra thủ công: {permalink}",
     )
 
 
@@ -776,7 +929,7 @@ def format_dry_run(
         "  c. GET /api/comments?status=unreplied|replied|ignored — kiểm tra counts nhất quán với items.",
         f"  d. POST /api/comments/<id>/draft ({cid_desc}) — in decision/status và kiểm tra bản nháp không chứa SĐT/email.",
         "  e. PATCH /api/comments/<id>/draft — sửa nội dung nháp, in check.block và check.warn.",
-        f"  f. POST /api/comments/<id>/reply — {'SẼ CHẠY (--send): gửi thật rồi lặp lại kỳ vọng 409 + in permalink.' if send else 'BỎ QUA (truyền --send để gửi thật lên Facebook).'}",
+        f"  f. POST /api/comments/threads/<id>/reply — {'SẼ CHẠY (--send): gửi thật với clientId (UUID) rồi lặp lại cùng clientId để xác nhận idempotent (200, cùng message.id, không gửi trùng) + in permalink.' if send else 'BỎ QUA (truyền --send để gửi thật lên Facebook).'}",
         f"  g. POST /api/comments/<id>/hide — {'SẼ CHẠY (--hide): ẩn (true) rồi hiện lại (false).' if hide else 'BỎ QUA (truyền --hide để thử ẩn/hiện thật trên Facebook).'}",
         "  h1. POST /api/comments/<unknown>/draft — kiểm tra âm tính ID không tồn tại -> 404.",
         "  h2. POST /api/comments/<id>/reply (text rỗng) — kiểm tra âm tính nội dung rỗng -> 400/422 (không ghi lên Facebook).",
@@ -829,7 +982,7 @@ def run_smoke(
     res_e = step_patch_draft(client, picked_id, edited, secrets=secrets)
     record(res_e)
 
-    # f. POST /reply (+ lặp 409) — chỉ khi có --send
+    # f. POST /threads/{id}/reply (+ lặp cùng clientId kiểm tra idempotent) — chỉ khi có --send
     known_permalink = (
         comment_obj.get("permalinkUrl")
         or comment_obj.get("postUrl")
@@ -842,6 +995,9 @@ def run_smoke(
         edited,
         enabled=send,
         known_permalink=known_permalink,
+        channel=channel,
+        post_job=post_job,
+        comment_meta=comment_obj or picked_meta,
         secrets=secrets,
     )
     record(res_f)
@@ -882,7 +1038,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--lookback-days", type=int, default=None, help="Số ngày nhìn lại khi sync (1–30)")
     ap.add_argument("--comment-id", default=None, help="ID bình luận cụ thể để chạy bước draft/patch/reply/hide")
     ap.add_argument("--edit-text", default=None, help="Nội dung sửa thử cho PATCH /draft (và POST /reply nếu bật --send)")
-    ap.add_argument("--send", action="store_true", help="Cho phép gửi trả lời thật lên Facebook và kiểm tra chặn gửi trùng 409")
+    ap.add_argument("--send", action="store_true", help="Cho phép gửi trả lời thật lên Facebook qua /threads/{id}/reply và kiểm tra idempotent theo clientId")
     ap.add_argument("--hide", action="store_true", help="Cho phép ẩn (true) rồi hiện lại (false) bình luận thật trên Facebook")
     ap.add_argument("--dry-run", action="store_true", help="Liệt kê các bước sẽ chạy rồi thoát mà không gọi mạng")
     ap.add_argument("--timeout", type=float, default=30.0, help="Thời gian chờ mỗi yêu cầu HTTP tính bằng giây (mặc định 30)")

@@ -25,8 +25,9 @@ import { RotateCcw, Save, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
-import { EmptyState } from "@/ui/components/feedback/EmptyState";
 import { ReadOnlyNotice } from "@/ui/components/feedback/ReadOnlyNotice";
+import { InboxEmptyState } from "@/ui/components/inbox/InboxEmptyState";
+import "@/ui/components/inbox/inbox-surface.css";
 import { useDelayedFlag } from "@/ui/hooks/useDelayedFlag";
 import {
   useModerationSettings,
@@ -67,7 +68,7 @@ export function ModerationSettingsSkeleton() {
   return (
     <Stack direction="vertical" gap={4} aria-hidden="true">
       {[0, 1].map((idx) => (
-        <Card key={idx} padding={4}>
+        <Card key={idx} padding={5}>
           <Stack direction="vertical" gap={3}>
             <HStack gap={3} align="center" justify="between">
               <Skeleton width={200} height={22} index={idx} />
@@ -144,7 +145,7 @@ function PageModerationSettingCard({
   }
 
   return (
-    <Card padding={4} data-moderation-page={setting.pageId}>
+    <Card padding={5} data-moderation-page={setting.pageId}>
       <Stack direction="vertical" gap={4}>
         {/* Page heading & active status */}
         <HStack gap={3} align="start" justify="between" wrap="wrap">
@@ -154,7 +155,12 @@ function PageModerationSettingCard({
                 <Heading level={3}>{pageLabel}</Heading>
                 <Badge variant={statusBadge.variant} label={statusBadge.label} />
               </HStack>
-              <Text type="supporting" color="secondary">
+              <Text
+                type="supporting"
+                size="xsm"
+                color="inherit"
+                className="inbox-meta-text"
+              >
                 Page ID: {setting.pageId}
                 {setting.updatedAt
                   ? ` · Cập nhật lúc ${formatCommentAbsoluteTime(setting.updatedAt)}`
@@ -317,8 +323,9 @@ function PageModerationSettingCard({
           <Button
             type="button"
             variant="primary"
-            size="sm"
-            icon={<Save aria-hidden="true" />}
+            size="md"
+            className="inbox-touch-target"
+            icon={<Save className="size-4" aria-hidden="true" />}
             label={isSaving ? "Đang lưu cài đặt…" : "Lưu cài đặt"}
             isLoading={isSaving}
             isDisabled={!gate.canSave}
@@ -329,13 +336,25 @@ function PageModerationSettingCard({
           <Button
             type="button"
             variant="ghost"
-            size="sm"
-            icon={<RotateCcw aria-hidden="true" />}
+            size="md"
+            className="inbox-touch-target"
+            icon={<RotateCcw className="size-4" aria-hidden="true" />}
             label="Đặt lại"
             isDisabled={!gate.canReset}
             tooltip={readOnlyReason ?? undefined}
             onClick={handleReset}
           />
+
+          {!isDirty && !isSaving && readOnlyReason === null ? (
+            <Text
+              type="supporting"
+              size="xsm"
+              color="inherit"
+              className="inbox-meta-text"
+            >
+              Chưa có thay đổi nào cần lưu.
+            </Text>
+          ) : null}
         </HStack>
       </Stack>
     </Card>
@@ -376,10 +395,13 @@ export function ModerationSettingsView({
   onDismissSaved,
 }: ModerationSettingsViewProps) {
   return (
-    <Stack direction="vertical" gap={4} data-moderation="settings-panel">
+    <Stack direction="vertical" gap={5} data-moderation="settings-panel">
       <Stack direction="vertical" gap={1}>
         <HStack gap={2} align="center">
-          <ShieldCheck aria-hidden="true" />
+          <ShieldCheck
+            className="size-5 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
           <Heading level={2}>Cài đặt tự kiểm duyệt theo Fanpage</Heading>
         </HStack>
         <Text type="supporting" color="secondary">
@@ -397,7 +419,7 @@ export function ModerationSettingsView({
       ) : isError && items.length === 0 ? (
         <ApiErrorNotice error={error} onRetry={onRetry} />
       ) : items.length === 0 ? (
-        <EmptyState
+        <InboxEmptyState
           kind="first-run"
           title="Chưa có Fanpage Facebook nào được kết nối"
           description="Kết nối ít nhất một Fanpage Facebook ở mục Kênh để cấu hình quy tắc tự kiểm duyệt bình luận."

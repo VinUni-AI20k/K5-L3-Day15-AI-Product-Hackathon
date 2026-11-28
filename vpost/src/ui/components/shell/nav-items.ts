@@ -71,6 +71,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Cài đặt",
     items: [
       { href: "/channels", label: "Kênh" },
+      { href: "/writing-style", label: "Phong cách viết" },
       { href: "/prompts", label: "Mẫu prompt" },
       { href: "/members", label: "Thành viên" },
     ],

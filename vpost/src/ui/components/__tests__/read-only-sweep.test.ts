@@ -54,6 +54,14 @@ const GATED_SURFACES = [
     file: "onboarding/DataMappingScreen.tsx",
     writes: "lưu ánh xạ cột + chế độ kiểm tồn (bảng nhận qua prop)",
   },
+  // Writing style: saving company/Page style overrides, deleting a Page override,
+  // and running an LLM preview all mutate config or bill AI usage; support mode
+  // stays strictly view-only and hands the reason down to the scope/form/preview panels.
+  {
+    screen: "Phong cách viết",
+    file: "writing-style/WritingStyleScreen.tsx",
+    writes: "lưu phong cách viết, xoá thiết lập riêng Page, viết thử AI (các khung nhận qua prop)",
+  },
 ] as const;
 
 /**
@@ -77,6 +85,21 @@ const PROP_FED_TABLES = [
   {
     component: "FieldMapForm",
     file: "onboarding/FieldMapForm.tsx",
+    token: "readOnlyReason",
+  },
+  {
+    component: "ScopeSelector",
+    file: "writing-style/ScopeSelector.tsx",
+    token: "readOnlyReason",
+  },
+  {
+    component: "WritingStyleForm",
+    file: "writing-style/WritingStyleForm.tsx",
+    token: "readOnlyReason",
+  },
+  {
+    component: "PreviewPanel",
+    file: "writing-style/PreviewPanel.tsx",
     token: "readOnlyReason",
   },
 ] as const;
@@ -107,8 +130,8 @@ describe("support mode: every write surface consults the read-only reason", () =
 });
 
 describe("the sweep's scope is written down", () => {
-  it("covers the six screens of the ticket, the two already done, and onboarding", () => {
-    expect(GATED_SURFACES).toHaveLength(9);
+  it("covers the six screens of the ticket, the two already done, onboarding, and writing style", () => {
+    expect(GATED_SURFACES).toHaveLength(10);
     // Soạn bài is deliberately absent: another agent is rebuilding
     // `components/compose/**` and this sweep must not touch it.
     expect(GATED_SURFACES.map((surface) => surface.file).join(" ")).not.toContain("compose/");

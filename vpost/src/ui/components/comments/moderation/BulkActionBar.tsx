@@ -12,11 +12,12 @@ import {
   Text,
   Token,
 } from "@astryxdesign/core";
-import { Eye, EyeOff, Slash, Trash2, X } from "lucide-react";
+import { Ban, Eye, EyeOff, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
 import { ReadOnlyNotice } from "@/ui/components/feedback/ReadOnlyNotice";
+import "@/ui/components/inbox/inbox-surface.css";
 import { useBulkCommentsAction } from "@/ui/hooks/useModeration";
 import { useReadOnlyReason } from "@/ui/hooks/useReadOnlyReason";
 import {
@@ -113,8 +114,8 @@ export function BulkActionBarView({
   return (
     <Stack direction="vertical" gap={2} data-moderation="bulk-action-bar">
       {showToolbar ? (
-        <Card elevation={selectedCount > 0 ? "med" : "none"} padding={3}>
-          <Stack direction="vertical" gap={2}>
+        <Card elevation={selectedCount > 0 ? "low" : "none"} padding={4}>
+          <Stack direction="vertical" gap={3}>
             <HStack gap={3} align="center" justify="between" wrap="wrap">
               <HStack gap={3} align="center" wrap="wrap">
                 {pageSelection ? (
@@ -138,11 +139,16 @@ export function BulkActionBarView({
                   <HStack gap={2} align="center" wrap="wrap">
                     <Token
                       label={`Đã chọn ${selectedCount} bình luận`}
-                      color="blue"
+                      color="purple"
                       size="sm"
                     />
                     {cappedAtMax || selectedCount >= maxSelection ? (
-                      <Text type="supporting" color="secondary">
+                      <Text
+                        type="supporting"
+                        size="xsm"
+                        color="inherit"
+                        className="inbox-meta-text"
+                      >
                         Tối đa {maxSelection} bình luận mỗi lượt.
                       </Text>
                     ) : null}
@@ -160,7 +166,8 @@ export function BulkActionBarView({
                     type="button"
                     variant="secondary"
                     size="sm"
-                    icon={<EyeOff aria-hidden="true" />}
+                    className="inbox-touch-target"
+                    icon={<EyeOff className="size-4" aria-hidden="true" />}
                     label={
                       isPending && activeAction === "hide" ? "Đang ẩn…" : "Ẩn"
                     }
@@ -174,7 +181,8 @@ export function BulkActionBarView({
                     type="button"
                     variant="secondary"
                     size="sm"
-                    icon={<Eye aria-hidden="true" />}
+                    className="inbox-touch-target"
+                    icon={<Eye className="size-4" aria-hidden="true" />}
                     label={
                       isPending && activeAction === "unhide"
                         ? "Đang hiện lại…"
@@ -190,7 +198,8 @@ export function BulkActionBarView({
                     type="button"
                     variant="secondary"
                     size="sm"
-                    icon={<Slash aria-hidden="true" />}
+                    className="inbox-touch-target"
+                    icon={<Ban className="size-4" aria-hidden="true" />}
                     label={
                       isPending && activeAction === "ignore"
                         ? "Đang bỏ qua…"
@@ -206,7 +215,8 @@ export function BulkActionBarView({
                     type="button"
                     variant="destructive"
                     size="sm"
-                    icon={<Trash2 aria-hidden="true" />}
+                    className="inbox-touch-target"
+                    icon={<Trash2 className="size-4" aria-hidden="true" />}
                     label={
                       isPending && activeAction === "delete" ? "Đang xoá…" : "Xoá"
                     }
@@ -220,7 +230,8 @@ export function BulkActionBarView({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    icon={<X aria-hidden="true" />}
+                    className="inbox-touch-target"
+                    icon={<X className="size-4" aria-hidden="true" />}
                     label="Bỏ chọn"
                     isDisabled={isPending}
                     onClick={onClearSelection}

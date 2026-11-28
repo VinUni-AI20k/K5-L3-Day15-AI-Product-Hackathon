@@ -247,3 +247,13 @@ def delete_fb_comment(channel_id: str, comment_id: str) -> bool:
     import facebook
     token = _resolve_fb_token(channel_id)
     return facebook.delete_comment(comment_id, token)
+
+
+@tool
+def like_fb_comment(comment_id: str, liked: bool, channel_id: str) -> bool:
+    """like_fb_comment · input: comment_id + liked (True=thích, False=bỏ thích) + channel_id
+    · output: True nếu Facebook cập nhật thành công
+    · CÓ tác động ra ngoài: thích hoặc bỏ thích bình luận với tư cách Facebook Page. Chỉ gọi từ POST /api/comments/{id}/like."""
+    import facebook
+    token = _resolve_fb_token(channel_id)
+    return facebook.like_comment(comment_id, liked, token)

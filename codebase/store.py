@@ -16,8 +16,9 @@ import json
 import os
 import re
 import threading
+import uuid
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import psycopg
 from psycopg import sql
@@ -37,6 +38,38 @@ OperationalError = psycopg.OperationalError
 
 JSON_COLS = ("data", "reasons", "warnings", "colors", "sizes")
 INT_BOOL_COMMENT_COLS = frozenset(("is_from_page", "is_hidden", "can_comment"))
+STALE_SENDING_TIMEOUT_SECONDS = 120
+STALE_SENDING_ERROR_CODE = "SEND_TIMEOUT"
+STALE_SENDING_USER_MESSAGE = (
+    "Lượt gửi trước bị gián đoạn (quá thời gian chờ) — vui lòng kiểm tra trên Facebook trước khi thử lại."
+)
+
+_ACTIVE_ATTEMPTS_LOCK = threading.Lock()
+_ACTIVE_ATTEMPTS: set[str] = set()
+
+
+@contextmanager
+def active_send_attempt(attempt_token):
+    """Đánh dấu một lượt gửi đang chạy sống trong tiến trình hiện tại để không bị thu hồi nhầm do timeout."""
+    tok = (attempt_token or "").strip()
+    if not tok:
+        yield
+        return
+    with _ACTIVE_ATTEMPTS_LOCK:
+        _ACTIVE_ATTEMPTS.add(tok)
+    try:
+        yield
+    finally:
+        with _ACTIVE_ATTEMPTS_LOCK:
+            _ACTIVE_ATTEMPTS.discard(tok)
+
+
+def is_active_send_attempt(attempt_token):
+    tok = (attempt_token or "").strip()
+    if not tok:
+        return False
+    with _ACTIVE_ATTEMPTS_LOCK:
+        return tok in _ACTIVE_ATTEMPTS
 
 
 def _load_dotenv(path=os.path.join(ROOT, ".env")):
@@ -167,6 +200,8 @@ SCHEMA_STATEMENTS = (
     """,
     """
     create table if not exists fb_comment(
+      seq bigint generated always as identity,
+      feed_seq bigint not null default 0,
       id text not null,
       tenant_id text not null,
       channel_id text default '',
@@ -200,9 +235,11 @@ SCHEMA_STATEMENTS = (
     """
     create table if not exists comment_draft(
       seq bigint generated always as identity,
+      feed_seq bigint not null default 0,
       id text primary key,
       tenant_id text not null,
       comment_id text not null,
+      target_comment_id text default '',
       status text default 'draft',
       ai_text text default '',
       edited_text text default '',
@@ -212,6 +249,8 @@ SCHEMA_STATEMENTS = (
       tokens_in integer default 0,
       tokens_out integer default 0,
       fb_reply_id text default '',
+      client_id text default '',
+      attempt_token text default '',
       error_code text default '',
       user_message text default '',
       created_at text default '',
@@ -220,13 +259,27 @@ SCHEMA_STATEMENTS = (
     )
     """,
     """
+    create table if not exists comment_updates_seq(
+      name text primary key,
+      val bigint not null default 0
+    )
+    """,
+    """
     create index if not exists comment_draft_comment
       on comment_draft(tenant_id, comment_id, created_at desc, seq desc)
     """,
     """
-    create unique index if not exists comment_draft_one_active
-      on comment_draft(tenant_id, comment_id)
-      where status in ('sending', 'sent')
+    create index if not exists comment_draft_created
+      on comment_draft(tenant_id, created_at, seq)
+    """,
+    """
+    create table if not exists comment_thread_read(
+      tenant_id text not null,
+      thread_id text not null,
+      last_read_at text not null default '',
+      updated_at text not null default '',
+      primary key (tenant_id, thread_id)
+    )
     """,
     """
     create table if not exists comment_sync(
@@ -290,6 +343,110 @@ def init():
         c.execute(sql.SQL("set local search_path to {}").format(sql.Identifier(schema)))
         for stmt in SCHEMA_STATEMENTS:
             c.execute(stmt)
+        # Di trú idempotent cho schema đã tạo trước khi có seq/feed_seq/client_id/target_comment_id.
+        has_fb_seq = c.execute(
+            "select 1 from information_schema.columns "
+            "where table_schema = current_schema() and table_name = 'fb_comment' and column_name = 'seq'"
+        ).fetchone()
+        if not has_fb_seq:
+            c.execute("alter table fb_comment add column seq bigint generated always as identity")
+        c.execute("create index if not exists fb_comment_seq on fb_comment(tenant_id, seq)")
+
+        has_fb_feed_seq = c.execute(
+            "select 1 from information_schema.columns "
+            "where table_schema = current_schema() and table_name = 'fb_comment' and column_name = 'feed_seq'"
+        ).fetchone()
+        if not has_fb_feed_seq:
+            c.execute("alter table fb_comment add column feed_seq bigint not null default 0")
+            c.execute(
+                """update fb_comment set feed_seq = seq
+                   where feed_seq = 0
+                     and is_from_page = 0
+                     and status != 'deleted'
+                     and coalesce(to_jsonb(fb_comment)->>'moderation_action', '') != 'auto_hidden'"""
+            )
+        c.execute(
+            "create index if not exists fb_comment_feed_seq "
+            "on fb_comment(tenant_id, feed_seq) where feed_seq > 0"
+        )
+
+        has_draft_feed_seq = c.execute(
+            "select 1 from information_schema.columns "
+            "where table_schema = current_schema() and table_name = 'comment_draft' and column_name = 'feed_seq'"
+        ).fetchone()
+        if not has_draft_feed_seq:
+            c.execute("alter table comment_draft add column feed_seq bigint not null default 0")
+            c.execute(
+                "update comment_draft set feed_seq = seq "
+                "where feed_seq = 0 and status = 'draft' and ai_text != ''"
+            )
+        c.execute(
+            "create index if not exists comment_draft_feed_seq "
+            "on comment_draft(tenant_id, feed_seq) where feed_seq > 0"
+        )
+
+        c.execute(
+            """insert into comment_updates_seq(name, val)
+               values (
+                 'comment',
+                 greatest(
+                   coalesce((select max(feed_seq) from fb_comment), 0),
+                   coalesce((select max(seq) from fb_comment), 0),
+                   coalesce((
+                     select s.last_value
+                     from pg_sequences s
+                     where s.schemaname = current_schema()
+                       and s.sequencename = (
+                         select c2.relname
+                         from pg_class c2
+                         where c2.oid = pg_get_serial_sequence(format('%I.fb_comment', current_schema()), 'seq')::regclass
+                       )
+                   ), 0)
+                 )
+               )
+               on conflict (name) do update
+                 set val = greatest(comment_updates_seq.val, excluded.val)"""
+        )
+        c.execute(
+            """insert into comment_updates_seq(name, val)
+               values (
+                 'draft',
+                 greatest(
+                   coalesce((select max(feed_seq) from comment_draft), 0),
+                   coalesce((select max(seq) from comment_draft), 0),
+                   coalesce((
+                     select s.last_value
+                     from pg_sequences s
+                     where s.schemaname = current_schema()
+                       and s.sequencename = (
+                         select c2.relname
+                         from pg_class c2
+                         where c2.oid = pg_get_serial_sequence(format('%I.comment_draft', current_schema()), 'seq')::regclass
+                       )
+                   ), 0)
+                 )
+               )
+               on conflict (name) do update
+                 set val = greatest(comment_updates_seq.val, excluded.val)"""
+        )
+
+        c.execute("alter table comment_draft add column if not exists client_id text default ''")
+        c.execute("alter table comment_draft add column if not exists attempt_token text default ''")
+        c.execute("alter table comment_draft add column if not exists target_comment_id text default ''")
+        c.execute(
+            "create unique index if not exists comment_draft_client_id "
+            "on comment_draft(tenant_id, client_id) where client_id != ''"
+        )
+        idx_row = c.execute(
+            "select indexdef from pg_indexes "
+            "where schemaname = current_schema() and indexname = 'comment_draft_one_active'"
+        ).fetchone()
+        if idx_row and "'sent'" in (idx_row.get("indexdef") or ""):
+            c.execute("drop index if exists comment_draft_one_active")
+        c.execute(
+            "create unique index if not exists comment_draft_one_active "
+            "on comment_draft(tenant_id, comment_id) where status = 'sending'"
+        )
 
 
 def _row(r):
@@ -543,9 +700,118 @@ def set_channel_status(channel_id, status):
 def _draft(r):
     d = dict(r)
     d.pop("seq", None)
+    d.pop("feed_seq", None)
     for k in ("reasons", "warnings"):
         d[k] = json.loads(d.get(k) or "[]")
     return d
+
+
+def _parse_utc_ts(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    s = str(value).strip()
+    if not s:
+        return None
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    elif len(s) >= 5 and s[-5] in ("+", "-") and s[-4:].isdigit():
+        s = s[:-2] + ":" + s[-2:]
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        return None
+    return dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _iso_utc(dt):
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + "%03dZ" % (dt.microsecond // 1000)
+
+
+def _ref_time(now_ts=None):
+    parsed = _parse_utc_ts(now_ts)
+    if parsed is not None:
+        return parsed, (now_ts if isinstance(now_ts, str) and now_ts.strip() else _iso_utc(parsed))
+    now_dt = datetime.now(timezone.utc)
+    return now_dt, _iso_utc(now_dt)
+
+
+def _is_stale_sending(row, ref_dt, timeout_seconds=STALE_SENDING_TIMEOUT_SECONDS):
+    if is_active_send_attempt(row.get("attempt_token")):
+        return False
+    ts_dt = _parse_utc_ts(row.get("updated_at") or row.get("created_at"))
+    if ts_dt is None:
+        return True
+    return (ref_dt - ts_dt) > timedelta(seconds=timeout_seconds)
+
+
+def _recover_stale_sending_in_tx(
+    c,
+    tenant_id,
+    comment_id=None,
+    *,
+    now_ts=None,
+    timeout_seconds=STALE_SENDING_TIMEOUT_SECONDS,
+):
+    """Chuyển các nháp 'sending' bị treo quá timeout sang 'failed' với mã lỗi và thông báo rõ ràng."""
+    ref_dt, ref_ts = _ref_time(now_ts)
+    if comment_id is not None:
+        rows = c.execute(
+            "select id, created_at, updated_at, attempt_token from comment_draft "
+            "where tenant_id=%s and comment_id=%s and status='sending'",
+            (tenant_id, comment_id),
+        ).fetchall()
+    else:
+        rows = c.execute(
+            "select id, created_at, updated_at, attempt_token from comment_draft "
+            "where tenant_id=%s and status='sending'",
+            (tenant_id,),
+        ).fetchall()
+    recovered = []
+    for r in rows:
+        if _is_stale_sending(r, ref_dt, timeout_seconds=timeout_seconds):
+            cur = c.execute(
+                "update comment_draft set status='failed', error_code=%s, user_message=%s, updated_at=%s "
+                "where id=%s and tenant_id=%s and status='sending' and attempt_token=%s",
+                (
+                    STALE_SENDING_ERROR_CODE,
+                    STALE_SENDING_USER_MESSAGE,
+                    ref_ts,
+                    r["id"],
+                    tenant_id,
+                    r.get("attempt_token") or "",
+                ),
+            )
+            if cur.rowcount:
+                recovered.append(r["id"])
+    return recovered
+
+
+def recover_stale_sending_drafts(
+    tenant_id,
+    comment_id,
+    *,
+    now_ts=None,
+    timeout_seconds=STALE_SENDING_TIMEOUT_SECONDS,
+):
+    """Phục hồi các nháp 'sending' bị treo cho một bình luận/hội thoại dưới khoá tư vấn."""
+    with tx_locked(_comment_lock_key(tenant_id, comment_id)) as c:
+        return _recover_stale_sending_in_tx(
+            c, tenant_id, comment_id, now_ts=now_ts, timeout_seconds=timeout_seconds
+        )
+
+
+def _reserve_update_seq(c, name, count=1):
+    """Cấp phát `count` số thứ tự liên tiếp dưới khoá dòng (giữ tới COMMIT) để cursor không bao giờ bỏ sót."""
+    n = max(1, int(count))
+    row = c.execute(
+        """insert into comment_updates_seq(name, val) values (%s, %s)
+           on conflict (name) do update set val = comment_updates_seq.val + excluded.val
+           returning val""",
+        (name, n),
+    ).fetchone()
+    return int(row["val"])
 
 
 def get_comment_sync(tenant_id, fb_post_id):
@@ -577,12 +843,15 @@ def set_comment_sync_error(tenant_id, fb_post_id, error_text):
 
 def _upsert_fb_comment_in_tx(c, tenant_id, item):
     row = dict(item, tenant_id=tenant_id)
+    publish = bool(row.get("publish_updates", True))
+    is_from_page = int(row["is_from_page"])
+    status = row.get("status") or "unreplied"
     r = c.execute(
         """insert into fb_comment(
              id, tenant_id, channel_id, page_id, post_job_id, fb_post_id, product_code,
              parent_id, from_id, from_name, is_from_page, message, permalink_url,
-             is_hidden, can_comment, created_time, status, synced_at, updated_at
-           ) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+             is_hidden, can_comment, created_time, status, synced_at, updated_at, feed_seq
+           ) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0)
            on conflict(tenant_id, id) do update set
              channel_id=excluded.channel_id,
              page_id=excluded.page_id,
@@ -603,18 +872,57 @@ def _upsert_fb_comment_in_tx(c, tenant_id, item):
            returning (xmax = 0) as inserted""",
         (
             row["id"], tenant_id, row["channel_id"], row["page_id"], row["post_job_id"], row["fb_post_id"],
-            row["product_code"], row["parent_id"], row["from_id"], row["from_name"], int(row["is_from_page"]),
+            row["product_code"], row["parent_id"], row["from_id"], row["from_name"], is_from_page,
             row["message"], row["permalink_url"], int(row["is_hidden"]), int(row["can_comment"]),
-            row["created_time"], row.get("status") or "unreplied", row["synced_at"], row["updated_at"],
+            row["created_time"], status, row["synced_at"], row["updated_at"],
         ),
     ).fetchone()
-    return bool(r["inserted"])
+    inserted = bool(r["inserted"])
+    if inserted and publish and not is_from_page and status != "deleted":
+        feed_seq = _reserve_update_seq(c, "comment", 1)
+        c.execute(
+            "update fb_comment set feed_seq=%s where tenant_id=%s and id=%s",
+            (feed_seq, tenant_id, row["id"]),
+        )
+    return inserted
 
 
 def upsert_fb_comment(tenant_id, item):
     """Thêm mới hoặc cập nhật bình luận theo tenant_id. Trả True nếu mới, False nếu đã có (cập nhật)."""
     with connect() as c:
         return _upsert_fb_comment_in_tx(c, tenant_id, item)
+
+
+def publish_comment_updates(tenant_id, comment_ids):
+    """Xuất bản các bình luận khách vừa đồng bộ (sau bước tự kiểm duyệt, bỏ auto_hidden) lên feed `/updates`."""
+    clean = list(dict.fromkeys(str(x).strip() for x in (comment_ids or ()) if str(x).strip()))
+    if not clean:
+        return 0
+    with connect() as c:
+        rows = c.execute(
+            """select id, created_time, seq from fb_comment
+               where tenant_id=%s
+                 and id = any(%s)
+                 and is_from_page=0
+                 and status!='deleted'
+                 and feed_seq=0
+                 and coalesce(to_jsonb(fb_comment)->>'moderation_action', '') != 'auto_hidden'
+               order by id asc
+               for update""",
+            (tenant_id, clean),
+        ).fetchall()
+        if not rows:
+            return 0
+        rows.sort(key=lambda r: (r.get("created_time") or "", int(r.get("seq") or 0), r["id"]))
+        count = len(rows)
+        end_seq = _reserve_update_seq(c, "comment", count)
+        start_seq = end_seq - count + 1
+        for offset, r in enumerate(rows):
+            c.execute(
+                "update fb_comment set feed_seq=%s where tenant_id=%s and id=%s",
+                (start_seq + offset, tenant_id, r["id"]),
+            )
+    return count
 
 
 def reconcile_replied_comments(tenant_id, fb_post_id, updated_at):
@@ -658,6 +966,13 @@ def reconcile_replied_comments(tenant_id, fb_post_id, updated_at):
         )
 
 
+def _comment_row(r):
+    d = dict(r)
+    d.pop("seq", None)
+    d.pop("feed_seq", None)
+    return d
+
+
 def get_comment(tenant_id, comment_id):
     """Đọc một bình luận theo (tenant_id, comment_id), gồm cả bình luận của Page (cho luồng kiểm duyệt)."""
     if not comment_id:
@@ -667,7 +982,7 @@ def get_comment(tenant_id, comment_id):
             "select * from fb_comment where tenant_id=%s and id=%s",
             (tenant_id, comment_id),
         ).fetchone()
-    return dict(r) if r else None
+    return _comment_row(r) if r else None
 
 
 def list_comments_by_ids(tenant_id, ids):
@@ -680,7 +995,7 @@ def list_comments_by_ids(tenant_id, ids):
             "select * from fb_comment where tenant_id=%s and id = any(%s)",
             (tenant_id, clean),
         ).fetchall()
-    by_id = {r["id"]: dict(r) for r in rows}
+    by_id = {r["id"]: _comment_row(r) for r in rows}
     return [by_id[cid] for cid in clean if cid in by_id]
 
 
@@ -690,7 +1005,7 @@ def get_fb_comment(tenant_id, comment_id, customer_only=True):
         sql_q += " and is_from_page=0"
     with connect() as c:
         r = c.execute(sql_q, (comment_id, tenant_id)).fetchone()
-    return dict(r) if r else None
+    return _comment_row(r) if r else None
 
 
 def list_fb_comments(tenant_id, channel_id=None, post_job_id=None, include_deleted=False):
@@ -709,7 +1024,80 @@ def list_fb_comments(tenant_id, channel_id=None, post_job_id=None, include_delet
             "select * from fb_comment where %s order by created_time desc, id desc" % " and ".join(where),
             tuple(params),
         ).fetchall()
-    return [dict(r) for r in rows]
+    return [_comment_row(r) for r in rows]
+
+
+def list_all_tenant_comments(tenant_id, channel_id=None, post_job_id=None, include_deleted=False):
+    """Toàn bộ bình luận (khách + Page) thuộc tenant_id, cũ→mới, dùng để dựng danh sách hội thoại (threads)."""
+    where, params = ["tenant_id=%s"], [tenant_id]
+    if not include_deleted:
+        where.append("status!='deleted'")
+    if channel_id:
+        where.append("channel_id=%s")
+        params.append(channel_id)
+    if post_job_id:
+        where.append("post_job_id=%s")
+        params.append(post_job_id)
+    with connect() as c:
+        rows = c.execute(
+            "select * from fb_comment where %s order by created_time asc, id asc" % " and ".join(where),
+            tuple(params),
+        ).fetchall()
+    return [_comment_row(r) for r in rows]
+
+
+def list_thread_comments(tenant_id, thread_id, include_deleted=False):
+    """Tất cả bình luận trong một hội thoại (gốc + trả lời dưới gốc), cũ→mới, lọc theo tenant_id."""
+    if not thread_id:
+        return []
+    where = "tenant_id=%s and (id=%s or parent_id=%s)"
+    if not include_deleted:
+        where += " and status!='deleted'"
+    with connect() as c:
+        rows = c.execute(
+            "select * from fb_comment where %s order by created_time asc, id asc" % where,
+            (tenant_id, thread_id, thread_id),
+        ).fetchall()
+    return [_comment_row(r) for r in rows]
+
+
+def get_thread_read_states(tenant_id, thread_ids=None):
+    """Trả dict thread_id → last_read_at cho tenant_id."""
+    with connect() as c:
+        if thread_ids is None:
+            rows = c.execute(
+                "select thread_id, last_read_at from comment_thread_read where tenant_id=%s",
+                (tenant_id,),
+            ).fetchall()
+        else:
+            ids = list(dict.fromkeys(x for x in thread_ids if x))
+            if not ids:
+                return {}
+            rows = c.execute(
+                "select thread_id, last_read_at from comment_thread_read "
+                "where tenant_id=%s and thread_id = any(%s)",
+                (tenant_id, ids),
+            ).fetchall()
+    return {r["thread_id"]: r["last_read_at"] for r in rows if r.get("last_read_at")}
+
+
+def mark_thread_read(tenant_id, thread_id, read_at, updated_at):
+    """Ghi mốc đã đọc cho hội thoại theo tenant_id (chỉ tiến tới, không lùi mốc cũ hơn)."""
+    with connect() as c:
+        r = c.execute(
+            """insert into comment_thread_read(tenant_id, thread_id, last_read_at, updated_at)
+               values(%s, %s, %s, %s)
+               on conflict(tenant_id, thread_id) do update set
+                 last_read_at = case
+                   when comment_thread_read.last_read_at > excluded.last_read_at
+                   then comment_thread_read.last_read_at
+                   else excluded.last_read_at
+                 end,
+                 updated_at = excluded.updated_at
+               returning last_read_at""",
+            (tenant_id, thread_id, read_at, updated_at),
+        ).fetchone()
+    return r["last_read_at"] if r else read_at
 
 
 def page_replies_for_threads(tenant_id, thread_ids):
@@ -725,7 +1113,7 @@ def page_replies_for_threads(tenant_id, thread_ids):
         ).fetchall()
     out = {}
     for r in rows:
-        d = dict(r)
+        d = _comment_row(r)
         out.setdefault(d["parent_id"], []).append(d)
     return out
 
@@ -799,19 +1187,24 @@ def create_comment_draft(tenant_id, draft):
     row = dict(draft, tenant_id=tenant_id)
     for k in ("reasons", "warnings"):
         row[k] = json.dumps(row.get(k) or [], ensure_ascii=False)
+    status = row.get("status") or "draft"
+    ai_text = row.get("ai_text") or ""
     with connect() as c:
+        feed_seq = _reserve_update_seq(c, "draft", 1) if (status == "draft" and ai_text) else 0
         c.execute(
             """insert into comment_draft(
-                 id, tenant_id, comment_id, status, ai_text, edited_text, reasons, warnings,
-                 model, tokens_in, tokens_out, fb_reply_id, error_code, user_message,
-                 created_at, updated_at, sent_at
-               ) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                 id, tenant_id, comment_id, target_comment_id, status, ai_text, edited_text, reasons, warnings,
+                 model, tokens_in, tokens_out, fb_reply_id, client_id, attempt_token, error_code, user_message,
+                 created_at, updated_at, sent_at, feed_seq
+               ) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             (
-                row["id"], tenant_id, row["comment_id"], row.get("status") or "draft",
-                row.get("ai_text") or "", row.get("edited_text") or "", row["reasons"], row["warnings"],
+                row["id"], tenant_id, row["comment_id"], row.get("target_comment_id") or "", status,
+                ai_text, row.get("edited_text") or "", row["reasons"], row["warnings"],
                 row.get("model") or "", int(row.get("tokens_in") or 0), int(row.get("tokens_out") or 0),
-                row.get("fb_reply_id") or "", row.get("error_code") or "", row.get("user_message") or "",
+                row.get("fb_reply_id") or "", row.get("client_id") or "", row.get("attempt_token") or "",
+                row.get("error_code") or "", row.get("user_message") or "",
                 row.get("created_at") or "", row.get("updated_at") or "", row.get("sent_at") or "",
+                feed_seq,
             ),
         )
 
@@ -820,53 +1213,78 @@ def _comment_lock_key(tenant_id, comment_id):
     return "comment:%s:%s" % (tenant_id, comment_id)
 
 
-def create_ai_comment_draft(tenant_id, comment_id, draft):
-    """Lưu nháp AI nguyên tử trong khoá tư vấn/giao dịch; trả (True, None) hoặc (False, 'NOT_FOUND'|'CONFLICT')."""
+def create_ai_comment_draft(tenant_id, comment_id, draft, *, allow_any_root=False):
+    """Lưu nháp AI nguyên tử trong khoá tư vấn/giao dịch; trả (True, None) hoặc (False, 'NOT_FOUND'|'CONFLICT').
+
+    Chỉ trả CONFLICT khi đang có lượt gửi in-flight (status='sending'); cho phép tạo nháp mới sau khi đã trả lời.
+    """
     row = dict(draft, tenant_id=tenant_id, comment_id=comment_id)
     for k in ("reasons", "warnings"):
         row[k] = json.dumps(row.get(k) or [], ensure_ascii=False)
+    status = row.get("status") or "draft"
+    ai_text = row.get("ai_text") or ""
+    now_ts = row.get("updated_at") or row.get("created_at")
     with tx_locked(_comment_lock_key(tenant_id, comment_id)) as c:
-        c_row = c.execute(
-            "select status from fb_comment where id=%s and tenant_id=%s and is_from_page=0",
-            (comment_id, tenant_id),
-        ).fetchone()
-        if not c_row or c_row["status"] == "deleted":
-            return False, "NOT_FOUND"
-        if c_row["status"] == "replied":
-            return False, "CONFLICT"
+        if allow_any_root:
+            c_row = c.execute(
+                "select status, parent_id from fb_comment where id=%s and tenant_id=%s",
+                (comment_id, tenant_id),
+            ).fetchone()
+            if not c_row or c_row["status"] == "deleted" or c_row["parent_id"]:
+                return False, "NOT_FOUND"
+        else:
+            c_row = c.execute(
+                "select status from fb_comment where id=%s and tenant_id=%s and is_from_page=0",
+                (comment_id, tenant_id),
+            ).fetchone()
+            if not c_row or c_row["status"] == "deleted":
+                return False, "NOT_FOUND"
+        _recover_stale_sending_in_tx(c, tenant_id, comment_id, now_ts=now_ts)
         busy = c.execute(
-            "select 1 from comment_draft where tenant_id=%s and comment_id=%s and status in ('sending','sent') limit 1",
+            "select 1 from comment_draft where tenant_id=%s and comment_id=%s and status='sending' limit 1",
             (tenant_id, comment_id),
         ).fetchone()
         if busy:
             return False, "CONFLICT"
+        feed_seq = _reserve_update_seq(c, "draft", 1) if (status == "draft" and ai_text) else 0
         c.execute(
             """insert into comment_draft(
-                 id, tenant_id, comment_id, status, ai_text, edited_text, reasons, warnings,
-                 model, tokens_in, tokens_out, fb_reply_id, error_code, user_message,
-                 created_at, updated_at, sent_at
-               ) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                 id, tenant_id, comment_id, target_comment_id, status, ai_text, edited_text, reasons, warnings,
+                 model, tokens_in, tokens_out, fb_reply_id, client_id, attempt_token, error_code, user_message,
+                 created_at, updated_at, sent_at, feed_seq
+               ) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             (
-                row["id"], tenant_id, comment_id, row.get("status") or "draft",
-                row.get("ai_text") or "", row.get("edited_text") or "", row["reasons"], row["warnings"],
+                row["id"], tenant_id, comment_id, row.get("target_comment_id") or "", status,
+                ai_text, row.get("edited_text") or "", row["reasons"], row["warnings"],
                 row.get("model") or "", int(row.get("tokens_in") or 0), int(row.get("tokens_out") or 0),
-                row.get("fb_reply_id") or "", row.get("error_code") or "", row.get("user_message") or "",
+                row.get("fb_reply_id") or "", row.get("client_id") or "", "",
+                row.get("error_code") or "", row.get("user_message") or "",
                 row.get("created_at") or "", row.get("updated_at") or "", row.get("sent_at") or "",
+                feed_seq,
             ),
         )
         return True, None
 
 
-def latest_comment_draft(tenant_id, comment_id):
+def latest_comment_draft(tenant_id, comment_id, *, now_ts=None):
     with connect() as c:
         r = c.execute(
             "select * from comment_draft where tenant_id=%s and comment_id=%s order by created_at desc, seq desc limit 1",
             (tenant_id, comment_id),
         ).fetchone()
+    if r and r["status"] == "sending":
+        ref_dt, _ = _ref_time(now_ts)
+        if _is_stale_sending(r, ref_dt):
+            recover_stale_sending_drafts(tenant_id, comment_id, now_ts=now_ts)
+            with connect() as c:
+                r = c.execute(
+                    "select * from comment_draft where tenant_id=%s and comment_id=%s order by created_at desc, seq desc limit 1",
+                    (tenant_id, comment_id),
+                ).fetchone()
     return _draft(r) if r else None
 
 
-def latest_comment_drafts(tenant_id, comment_ids):
+def latest_comment_drafts(tenant_id, comment_ids, *, now_ts=None):
     ids = list(dict.fromkeys(x for x in comment_ids if x))
     if not ids:
         return {}
@@ -877,20 +1295,135 @@ def latest_comment_drafts(tenant_id, comment_ids):
             (tenant_id, ids),
         ).fetchall()
     out = {}
+    stale_cids = []
+    ref_dt, _ = _ref_time(now_ts)
     for r in rows:
         d = _draft(r)
         if d["comment_id"] not in out:
             out[d["comment_id"]] = d
+            if d["status"] == "sending" and _is_stale_sending(d, ref_dt):
+                stale_cids.append(d["comment_id"])
+    for cid in stale_cids:
+        recover_stale_sending_drafts(tenant_id, cid, now_ts=now_ts)
+        refreshed = latest_comment_draft(tenant_id, cid, now_ts=now_ts)
+        if refreshed is not None:
+            out[cid] = refreshed
     return out
 
 
-def has_sending_or_sent_draft(tenant_id, comment_id):
+def active_thread_drafts(tenant_id, thread_ids):
+    """Nháp đang chờ (status in ('draft','flagged'), client_id='') mới nhất cho từng hội thoại (nếu mới hơn lần gửi gần nhất)."""
+    ids = list(dict.fromkeys(x for x in thread_ids if x))
+    if not ids:
+        return {}
+    with connect() as c:
+        rows = c.execute(
+            "select * from comment_draft where tenant_id=%s and comment_id = any(%s) "
+            "order by seq desc",
+            (tenant_id, ids),
+        ).fetchall()
+    by_thread = {}
+    for r in rows:
+        by_thread.setdefault(r["comment_id"], []).append(r)
+    out = {}
+    for tid, trows in by_thread.items():
+        sent_marker = None
+        for r in trows:
+            if r["status"] == "sent":
+                key = (r.get("sent_at") or r.get("updated_at") or r.get("created_at") or "", r["seq"])
+                if sent_marker is None or key > sent_marker:
+                    sent_marker = key
+        best = None
+        best_key = None
+        for r in trows:
+            if r["status"] in ("draft", "flagged") and not (r.get("client_id") or ""):
+                key = (r.get("created_at") or "", r["seq"])
+                if best_key is None or key > best_key:
+                    best = r
+                    best_key = key
+        if best is not None and (sent_marker is None or best_key > sent_marker):
+            out[tid] = _draft(best)
+    return out
+
+
+def thread_outgoing_drafts(tenant_id, thread_id, *, now_ts=None):
+    """Trả (pending_or_failed_list, fb_reply_id -> client_id) cho màn chi tiết hội thoại."""
+    with connect() as c:
+        rows = c.execute(
+            "select * from comment_draft where tenant_id=%s and comment_id=%s "
+            "and status in ('sending', 'failed', 'sent') order by created_at asc, seq asc",
+            (tenant_id, thread_id),
+        ).fetchall()
+    ref_dt, _ = _ref_time(now_ts)
+    if any(r["status"] == "sending" and _is_stale_sending(r, ref_dt) for r in rows):
+        recover_stale_sending_drafts(tenant_id, thread_id, now_ts=now_ts)
+        with connect() as c:
+            rows = c.execute(
+                "select * from comment_draft where tenant_id=%s and comment_id=%s "
+                "and status in ('sending', 'failed', 'sent') order by created_at asc, seq asc",
+                (tenant_id, thread_id),
+            ).fetchall()
+    pending_or_failed = []
+    client_by_reply = {}
+    for r in rows:
+        cid = r.get("client_id") or ""
+        if r["status"] in ("sending", "failed") and cid:
+            pending_or_failed.append(_draft(r))
+        elif r["status"] == "sent" and cid and (r.get("fb_reply_id") or ""):
+            client_by_reply[r["fb_reply_id"]] = cid
+    return pending_or_failed, client_by_reply
+
+
+def get_draft_by_client_id(tenant_id, client_id, *, now_ts=None):
+    if not client_id:
+        return None
     with connect() as c:
         r = c.execute(
-            "select 1 from comment_draft where tenant_id=%s and comment_id=%s and status in ('sending','sent') limit 1",
+            "select * from comment_draft where tenant_id=%s and client_id=%s",
+            (tenant_id, client_id),
+        ).fetchone()
+    if r and r["status"] == "sending":
+        ref_dt, _ = _ref_time(now_ts)
+        if _is_stale_sending(r, ref_dt):
+            recover_stale_sending_drafts(tenant_id, r["comment_id"], now_ts=now_ts)
+            with connect() as c:
+                r = c.execute(
+                    "select * from comment_draft where tenant_id=%s and client_id=%s",
+                    (tenant_id, client_id),
+                ).fetchone()
+    return _draft(r) if r else None
+
+
+def has_sending_draft(tenant_id, comment_id, *, now_ts=None):
+    with connect() as c:
+        rows = c.execute(
+            "select id, created_at, updated_at, attempt_token from comment_draft "
+            "where tenant_id=%s and comment_id=%s and status='sending'",
+            (tenant_id, comment_id),
+        ).fetchall()
+    if not rows:
+        return False
+    ref_dt, _ = _ref_time(now_ts)
+    if any(_is_stale_sending(r, ref_dt) for r in rows):
+        recover_stale_sending_drafts(tenant_id, comment_id, now_ts=now_ts)
+        with connect() as c:
+            rem = c.execute(
+                "select 1 from comment_draft where tenant_id=%s and comment_id=%s and status='sending' limit 1",
+                (tenant_id, comment_id),
+            ).fetchone()
+        return bool(rem)
+    return True
+
+
+def has_sending_or_sent_draft(tenant_id, comment_id, *, now_ts=None):
+    with connect() as c:
+        sent = c.execute(
+            "select 1 from comment_draft where tenant_id=%s and comment_id=%s and status='sent' limit 1",
             (tenant_id, comment_id),
         ).fetchone()
-    return bool(r)
+    if sent:
+        return True
+    return has_sending_draft(tenant_id, comment_id, now_ts=now_ts)
 
 
 def update_comment_draft(tenant_id, draft_id, **fields):
@@ -907,36 +1440,65 @@ def update_comment_draft(tenant_id, draft_id, **fields):
         )
 
 
-def patch_comment_draft(tenant_id, comment_id, new_draft_id, text, ts, *, valid_text=True, warnings=None):
-    """Lưu chỉnh sửa nháp nguyên tử dưới khoá tư vấn/giao dịch; không bao giờ ghi đè nháp 'sending'/'sent'."""
+def patch_comment_draft(
+    tenant_id,
+    comment_id,
+    new_draft_id,
+    text,
+    ts,
+    *,
+    valid_text=True,
+    warnings=None,
+    preserve_client_failed=False,
+    allow_any_root=False,
+    target_comment_id="",
+):
+    """Lưu chỉnh sửa nháp nguyên tử dưới khoá tư vấn/giao dịch; chỉ CONFLICT khi đang gửi ('sending')."""
     warn_json = json.dumps(list(warnings), ensure_ascii=False) if warnings is not None else None
     try:
         with tx_locked(_comment_lock_key(tenant_id, comment_id)) as c:
-            c_row = c.execute(
-                "select status from fb_comment where id=%s and tenant_id=%s and is_from_page=0",
-                (comment_id, tenant_id),
-            ).fetchone()
-            if not c_row or c_row["status"] == "deleted":
-                return None, "NOT_FOUND"
+            if allow_any_root:
+                c_row = c.execute(
+                    "select status, parent_id from fb_comment where id=%s and tenant_id=%s",
+                    (comment_id, tenant_id),
+                ).fetchone()
+                if not c_row or c_row["status"] == "deleted" or c_row["parent_id"]:
+                    return None, "NOT_FOUND"
+            else:
+                c_row = c.execute(
+                    "select status from fb_comment where id=%s and tenant_id=%s and is_from_page=0",
+                    (comment_id, tenant_id),
+                ).fetchone()
+                if not c_row or c_row["status"] == "deleted":
+                    return None, "NOT_FOUND"
+            _recover_stale_sending_in_tx(c, tenant_id, comment_id, now_ts=ts)
             busy = c.execute(
-                "select 1 from comment_draft where tenant_id=%s and comment_id=%s and status in ('sending','sent') limit 1",
+                "select 1 from comment_draft where tenant_id=%s and comment_id=%s and status='sending' limit 1",
                 (tenant_id, comment_id),
             ).fetchone()
             if busy:
                 return None, "CONFLICT"
             latest = c.execute(
-                "select id, status from comment_draft where tenant_id=%s and comment_id=%s "
+                "select id, status, client_id, target_comment_id from comment_draft where tenant_id=%s and comment_id=%s "
                 "order by created_at desc, seq desc limit 1",
                 (tenant_id, comment_id),
             ).fetchone()
-            if latest:
-                if latest["status"] in ("sending", "sent"):
-                    return None, "CONFLICT"
+            can_update_latest = (
+                latest is not None
+                and not (latest.get("client_id") or "")
+                and (
+                    latest["status"] in ("draft", "flagged")
+                    or (latest["status"] == "failed" and not preserve_client_failed)
+                )
+            )
+            if can_update_latest:
                 upd = {"edited_text": text, "updated_at": ts}
                 if warn_json is not None:
                     upd["warnings"] = warn_json
+                if target_comment_id:
+                    upd["target_comment_id"] = target_comment_id
                 if latest["status"] == "failed":
-                    upd.update(status="draft", reasons="[]", error_code="", user_message="")
+                    upd.update(status="draft", reasons="[]", error_code="", user_message="", attempt_token="")
                 elif latest["status"] == "flagged" and valid_text:
                     upd.update(status="draft", reasons="[]", error_code="", user_message="")
                 assignments = sql.SQL(", ").join(sql.SQL("{}=%s").format(sql.Identifier(k)) for k in upd)
@@ -951,19 +1513,23 @@ def patch_comment_draft(tenant_id, comment_id, new_draft_id, text, ts, *, valid_
                 return latest["id"], None
             c.execute(
                 """insert into comment_draft(
-                     id, tenant_id, comment_id, status, ai_text, edited_text, reasons, warnings,
-                     model, tokens_in, tokens_out, fb_reply_id, error_code, user_message,
-                     created_at, updated_at, sent_at
-                   ) values(%s,%s,%s,'draft','',%s,'[]',%s,'',0,0,'','','',%s,%s,'')""",
-                (new_draft_id, tenant_id, comment_id, text, warn_json or "[]", ts, ts),
+                     id, tenant_id, comment_id, target_comment_id, status, ai_text, edited_text, reasons, warnings,
+                     model, tokens_in, tokens_out, fb_reply_id, client_id, attempt_token, error_code, user_message,
+                     created_at, updated_at, sent_at, feed_seq
+                   ) values(%s,%s,%s,%s,'draft','',%s,'[]',%s,'',0,0,'','','','','',%s,%s,'',0)""",
+                (new_draft_id, tenant_id, comment_id, target_comment_id or "", text, warn_json or "[]", ts, ts),
             )
             return new_draft_id, None
     except psycopg.IntegrityError:
         return None, "CONFLICT"
 
 
-def claim_comment_reply(tenant_id, comment_id, new_draft_id, text, ts):
-    """Kiểm tra điều kiện gửi và chuyển nháp sang 'sending' nguyên tử trong khoá tư vấn/giao dịch. Trả (draft_id, error_code|None)."""
+def claim_comment_reply(tenant_id, comment_id, new_draft_id, text, ts, *, attempt_token=None):
+    """Kiểm tra điều kiện gửi và chuyển nháp sang 'sending' nguyên tử trong khoá tư vấn/giao dịch.
+
+    Chỉ chặn khi đang có lượt gửi in-flight (status='sending'); cho phép trả lời tiếp sau khi đã gửi.
+    """
+    tok = (attempt_token or "").strip() or str(uuid.uuid4())
     try:
         with tx_locked(_comment_lock_key(tenant_id, comment_id)) as c:
             c_row = c.execute(
@@ -974,54 +1540,271 @@ def claim_comment_reply(tenant_id, comment_id, new_draft_id, text, ts):
                 return None, "NOT_FOUND"
             if not c_row["can_comment"]:
                 return None, "CANNOT_COMMENT"
-            if c_row["status"] == "replied":
-                return None, "CONFLICT"
+            _recover_stale_sending_in_tx(c, tenant_id, comment_id, now_ts=ts)
             busy = c.execute(
-                "select 1 from comment_draft where tenant_id=%s and comment_id=%s and status in ('sending','sent') limit 1",
+                "select 1 from comment_draft where tenant_id=%s and comment_id=%s and status='sending' limit 1",
                 (tenant_id, comment_id),
             ).fetchone()
             if busy:
                 return None, "CONFLICT"
             latest = c.execute(
-                "select id from comment_draft where tenant_id=%s and comment_id=%s order by created_at desc, seq desc limit 1",
+                "select id, status, client_id from comment_draft where tenant_id=%s and comment_id=%s "
+                "order by created_at desc, seq desc limit 1",
                 (tenant_id, comment_id),
             ).fetchone()
-            if latest:
+            if latest and latest["status"] in ("draft", "flagged", "failed") and not (latest.get("client_id") or ""):
                 did = latest["id"]
                 cur = c.execute(
-                    "update comment_draft set status='sending', edited_text=%s, reasons='[]', "
+                    "update comment_draft set status='sending', edited_text=%s, attempt_token=%s, reasons='[]', "
                     "error_code='', user_message='', updated_at=%s "
                     "where id=%s and tenant_id=%s and status not in ('sending','sent')",
-                    (text, ts, did, tenant_id),
+                    (text, tok, ts, did, tenant_id),
                 )
                 if cur.rowcount == 0:
                     return None, "CONFLICT"
                 return did, None
             c.execute(
                 """insert into comment_draft(
-                     id, tenant_id, comment_id, status, ai_text, edited_text, reasons, warnings,
-                     model, tokens_in, tokens_out, fb_reply_id, error_code, user_message,
-                     created_at, updated_at, sent_at
-                   ) values(%s,%s,%s,'sending','',%s,'[]','[]','',0,0,'','','',%s,%s,'')""",
-                (new_draft_id, tenant_id, comment_id, text, ts, ts),
+                     id, tenant_id, comment_id, target_comment_id, status, ai_text, edited_text, reasons, warnings,
+                     model, tokens_in, tokens_out, fb_reply_id, client_id, attempt_token, error_code, user_message,
+                     created_at, updated_at, sent_at, feed_seq
+                   ) values(%s,%s,%s,'','sending','',%s,'[]','[]','',0,0,'','',%s,'','',%s,%s,'',0)""",
+                (new_draft_id, tenant_id, comment_id, text, tok, ts, ts),
             )
             return new_draft_id, None
     except psycopg.IntegrityError:
         return None, "CONFLICT"
 
 
-def complete_comment_reply(tenant_id, draft_id, comment_id, fb_reply_id, sent_ts, page_reply_item=None):
-    """Hoàn tất gửi trả lời trong một giao dịch duy nhất: nháp → 'sent', bình luận → 'replied', lưu trả lời của Page."""
+def claim_thread_reply(tenant_id, thread_id, new_draft_id, text, client_id, ts, *, attempt_token=None):
+    """Đặt chỗ gửi trả lời cho hội thoại kèm khoá chống gửi trùng client_id.
+
+    Trả (draft_id, error_code|None, existing_sent_draft|None):
+    - error_code == 'ALREADY_SENT': client_id đã gửi thành công trước đó → trả kết quả lưu, không gọi lại Facebook.
+    - error_code == 'CONFLICT': đang có lượt gửi in-flight cùng hội thoại (hoặc client_id dùng cho hội thoại khác).
+    - client_id đang ở trạng thái 'failed' (hoặc vừa phục hồi từ 'sending' treo): chuyển lại sang 'sending' để gửi lại.
+    """
+    tok = (attempt_token or "").strip() or str(uuid.uuid4())
+    try:
+        with tx_locked(_comment_lock_key(tenant_id, thread_id)) as c:
+            c_row = c.execute(
+                "select status, can_comment, parent_id from fb_comment where id=%s and tenant_id=%s",
+                (thread_id, tenant_id),
+            ).fetchone()
+            if not c_row or c_row["status"] == "deleted" or c_row["parent_id"]:
+                return None, "NOT_FOUND", None
+
+            _recover_stale_sending_in_tx(c, tenant_id, thread_id, now_ts=ts)
+
+            existing = c.execute(
+                "select * from comment_draft where tenant_id=%s and client_id=%s",
+                (tenant_id, client_id),
+            ).fetchone()
+            if existing:
+                if existing["comment_id"] != thread_id:
+                    return None, "CONFLICT", None
+                if existing["status"] == "sent":
+                    return existing["id"], "ALREADY_SENT", _draft(existing)
+                if existing["status"] == "sending":
+                    return None, "CONFLICT", None
+                if not c_row["can_comment"]:
+                    return None, "CANNOT_COMMENT", None
+                other_busy = c.execute(
+                    "select 1 from comment_draft where tenant_id=%s and comment_id=%s and status='sending' limit 1",
+                    (tenant_id, thread_id),
+                ).fetchone()
+                if other_busy:
+                    return None, "CONFLICT", None
+                cur = c.execute(
+                    "update comment_draft set status='sending', edited_text=%s, attempt_token=%s, reasons='[]', "
+                    "error_code='', user_message='', updated_at=%s "
+                    "where id=%s and tenant_id=%s and status='failed'",
+                    (text, tok, ts, existing["id"], tenant_id),
+                )
+                if cur.rowcount == 0:
+                    return None, "CONFLICT", None
+                return existing["id"], None, None
+
+            if not c_row["can_comment"]:
+                return None, "CANNOT_COMMENT", None
+            busy = c.execute(
+                "select 1 from comment_draft where tenant_id=%s and comment_id=%s and status='sending' limit 1",
+                (tenant_id, thread_id),
+            ).fetchone()
+            if busy:
+                return None, "CONFLICT", None
+
+            latest = c.execute(
+                "select id, status, client_id from comment_draft where tenant_id=%s and comment_id=%s "
+                "order by created_at desc, seq desc limit 1",
+                (tenant_id, thread_id),
+            ).fetchone()
+            if latest and latest["status"] in ("draft", "flagged") and not (latest.get("client_id") or ""):
+                did = latest["id"]
+                cur = c.execute(
+                    "update comment_draft set status='sending', edited_text=%s, client_id=%s, attempt_token=%s, reasons='[]', "
+                    "error_code='', user_message='', created_at=%s, updated_at=%s "
+                    "where id=%s and tenant_id=%s and status in ('draft','flagged')",
+                    (text, client_id, tok, ts, ts, did, tenant_id),
+                )
+                if cur.rowcount == 0:
+                    return None, "CONFLICT", None
+                return did, None, None
+
+            c.execute(
+                """insert into comment_draft(
+                     id, tenant_id, comment_id, target_comment_id, status, ai_text, edited_text, reasons, warnings,
+                     model, tokens_in, tokens_out, fb_reply_id, client_id, attempt_token, error_code, user_message,
+                     created_at, updated_at, sent_at, feed_seq
+                   ) values(%s,%s,%s,'','sending','',%s,'[]','[]','',0,0,'',%s,%s,'','',%s,%s,'',0)""",
+                (new_draft_id, tenant_id, thread_id, text, client_id, tok, ts, ts),
+            )
+            return new_draft_id, None, None
+    except psycopg.IntegrityError:
+        dup = get_draft_by_client_id(tenant_id, client_id, now_ts=ts)
+        if dup and dup["comment_id"] == thread_id and dup["status"] == "sent":
+            return dup["id"], "ALREADY_SENT", dup
+        return None, "CONFLICT", None
+
+
+def fail_comment_reply(
+    tenant_id,
+    draft_id,
+    comment_id,
+    *,
+    error_code,
+    user_message,
+    updated_at,
+    attempt_token=None,
+):
+    """Đánh dấu lượt gửi thất bại có rào chắn status='sending' + attempt_token (không ghi đè 'sent' hay lượt mới)."""
     with tx_locked(_comment_lock_key(tenant_id, comment_id)) as c:
-        c.execute(
-            "update comment_draft set status='sent', fb_reply_id=%s, error_code='', "
-            "user_message='Đã gửi trả lời lên Facebook', sent_at=%s, updated_at=%s "
-            "where id=%s and tenant_id=%s",
-            (fb_reply_id or "", sent_ts, sent_ts, draft_id, tenant_id),
-        )
+        if attempt_token is not None:
+            cur = c.execute(
+                "update comment_draft set status='failed', error_code=%s, user_message=%s, updated_at=%s "
+                "where id=%s and tenant_id=%s and status='sending' and attempt_token=%s",
+                (error_code or "", user_message or "", updated_at, draft_id, tenant_id, attempt_token),
+            )
+        else:
+            cur = c.execute(
+                "update comment_draft set status='failed', error_code=%s, user_message=%s, updated_at=%s "
+                "where id=%s and tenant_id=%s and status='sending'",
+                (error_code or "", user_message or "", updated_at, draft_id, tenant_id),
+            )
+        return cur.rowcount > 0
+
+
+def complete_comment_reply(
+    tenant_id,
+    draft_id,
+    comment_id,
+    fb_reply_id,
+    sent_ts,
+    page_reply_item=None,
+    *,
+    attempt_token=None,
+):
+    """Hoàn tất gửi trả lời trong một giao dịch duy nhất, có rào chắn attempt_token để lượt cũ không ghi đè lượt mới."""
+    with tx_locked(_comment_lock_key(tenant_id, comment_id)) as c:
+        if attempt_token is not None:
+            cur = c.execute(
+                "update comment_draft set status='sent', fb_reply_id=%s, error_code='', "
+                "user_message='Đã gửi trả lời lên Facebook', sent_at=%s, updated_at=%s "
+                "where id=%s and tenant_id=%s and attempt_token=%s "
+                "and (status='sending' or (status='failed' and error_code=%s))",
+                (
+                    fb_reply_id or "",
+                    sent_ts,
+                    sent_ts,
+                    draft_id,
+                    tenant_id,
+                    attempt_token,
+                    STALE_SENDING_ERROR_CODE,
+                ),
+            )
+        else:
+            cur = c.execute(
+                "update comment_draft set status='sent', fb_reply_id=%s, error_code='', "
+                "user_message='Đã gửi trả lời lên Facebook', sent_at=%s, updated_at=%s "
+                "where id=%s and tenant_id=%s and status='sending'",
+                (fb_reply_id or "", sent_ts, sent_ts, draft_id, tenant_id),
+            )
+        if cur.rowcount == 0:
+            return False
         c.execute(
             "update fb_comment set status='replied', updated_at=%s where id=%s and tenant_id=%s",
             (sent_ts, comment_id, tenant_id),
         )
         if page_reply_item:
             _upsert_fb_comment_in_tx(c, tenant_id, page_reply_item)
+        return True
+
+
+def comment_updates_watermark(tenant_id):
+    """Trả (max_comment_feed_seq, max_draft_feed_seq) trong một snapshot REPEATABLE READ để làm mốc khởi đầu."""
+    with connect() as c:
+        c.execute("set transaction isolation level repeatable read")
+        c_row = c.execute(
+            "select coalesce(max(feed_seq), 0) as m from fb_comment where tenant_id=%s and feed_seq > 0",
+            (tenant_id,),
+        ).fetchone()
+        d_row = c.execute(
+            "select coalesce(max(feed_seq), 0) as m from comment_draft where tenant_id=%s and feed_seq > 0",
+            (tenant_id,),
+        ).fetchone()
+    return int(c_row["m"] or 0), int(d_row["m"] or 0)
+
+
+def list_comment_updates_since(tenant_id, comment_seq, draft_seq, limit=50):
+    """Lấy tin nhắn khách mới (bỏ Page & auto_hidden) và threadId có nháp AI mới sau mốc (comment_seq, draft_seq).
+
+    Chạy trong giao dịch REPEATABLE READ trên chuỗi `feed_seq` commit-safe nên không thể bỏ sót dòng ghi đồng thời.
+    """
+    c_since = max(0, int(comment_seq))
+    d_since = max(0, int(draft_seq))
+    lim = max(1, int(limit))
+    with connect() as c:
+        c.execute("set transaction isolation level repeatable read")
+        rows = c.execute(
+            """select * from fb_comment
+               where tenant_id=%s
+                 and feed_seq > %s
+                 and is_from_page=0
+                 and status!='deleted'
+                 and coalesce(to_jsonb(fb_comment)->>'moderation_action', '') != 'auto_hidden'
+               order by feed_seq asc
+               limit %s""",
+            (tenant_id, c_since, lim + 1),
+        ).fetchall()
+        if len(rows) > lim:
+            page_rows = rows[:lim]
+            new_comment_seq = int(page_rows[-1]["feed_seq"])
+        else:
+            page_rows = rows
+            max_c = c.execute(
+                "select coalesce(max(feed_seq), 0) as m from fb_comment where tenant_id=%s and feed_seq > %s",
+                (tenant_id, c_since),
+            ).fetchone()["m"]
+            new_comment_seq = max(c_since, int(max_c or 0))
+
+        draft_rows = c.execute(
+            """select d.feed_seq, d.comment_id, c.parent_id
+               from comment_draft d
+               join fb_comment c on c.tenant_id = d.tenant_id and c.id = d.comment_id
+               where d.tenant_id=%s
+                 and d.feed_seq > %s
+                 and d.status='draft'
+                 and d.ai_text != ''
+                 and c.status != 'deleted'
+               order by d.feed_seq asc""",
+            (tenant_id, d_since),
+        ).fetchall()
+        max_d = c.execute(
+            "select coalesce(max(feed_seq), 0) as m from comment_draft where tenant_id=%s and feed_seq > %s",
+            (tenant_id, d_since),
+        ).fetchone()["m"]
+        new_draft_seq = max(d_since, int(max_d or 0))
+
+    items = [_comment_row(r) for r in page_rows]
+    drafts_ready = list(dict.fromkeys((r["parent_id"] or r["comment_id"]) for r in draft_rows))
+    return items, drafts_ready, new_comment_seq, new_draft_seq

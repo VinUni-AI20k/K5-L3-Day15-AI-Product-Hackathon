@@ -279,56 +279,59 @@ export function ScheduledCalendar({
         />
       ) : null}
 
-      <VStack
-        gap={1}
-        ref={gridRef}
-        role="grid"
-        aria-label={`Lịch ${formatMonthHeading(monthKey)}`}
-        onKeyDown={handleKeyDown}
-        onFocus={trackFocus}
-      >
-        <HStack role="row" gap={1}>
-          {CALENDAR_WEEKDAYS.map((weekday) => (
-            // `basis-0` makes the seven columns exactly equal. `size="fill"`
-            // alone only shares the LEFTOVER space, so a busy day would widen
-            // its own column and the grid would stop lining up.
-            <StackItem
-              key={weekday.short}
-              size="fill"
-              role="columnheader"
-              aria-label={weekday.full}
-              className="basis-0 text-center"
-            >
-              <Text type="label" color="secondary">
-                {weekday.short}
-              </Text>
-            </StackItem>
-          ))}
-        </HStack>
-
-        {month.weeks.map((week) => (
-          <HStack role="row" gap={1} key={week.key}>
-            {week.days.map((day) => (
+      <div className="overflow-x-auto pb-1">
+        <VStack
+          gap={1}
+          ref={gridRef}
+          role="grid"
+          aria-label={`Lịch ${formatMonthHeading(monthKey)}`}
+          onKeyDown={handleKeyDown}
+          onFocus={trackFocus}
+          className="min-w-160"
+        >
+          <HStack role="row" gap={1}>
+            {CALENDAR_WEEKDAYS.map((weekday) => (
+              // `basis-0` makes the seven columns exactly equal. `size="fill"`
+              // alone only shares the LEFTOVER space, so a busy day would widen
+              // its own column and the grid would stop lining up.
               <StackItem
-                key={day.dayKey}
+                key={weekday.short}
                 size="fill"
-                role="gridcell"
-                data-day={day.dayKey}
-                aria-selected={day.dayKey === selectedDayKey}
-                className="basis-0"
+                role="columnheader"
+                aria-label={weekday.full}
+                className="basis-0 text-center"
               >
-                <DayCell
-                  day={day}
-                  nowMs={nowMs}
-                  isSelected={day.dayKey === selectedDayKey}
-                  onSelect={() => onDaySelect(day.dayKey)}
-                  channelLabels={channelLabels}
-                />
+                <Text type="label" color="secondary">
+                  {weekday.short}
+                </Text>
               </StackItem>
             ))}
           </HStack>
-        ))}
-      </VStack>
+
+          {month.weeks.map((week) => (
+            <HStack role="row" gap={1} key={week.key}>
+              {week.days.map((day) => (
+                <StackItem
+                  key={day.dayKey}
+                  size="fill"
+                  role="gridcell"
+                  data-day={day.dayKey}
+                  aria-selected={day.dayKey === selectedDayKey}
+                  className="basis-0"
+                >
+                  <DayCell
+                    day={day}
+                    nowMs={nowMs}
+                    isSelected={day.dayKey === selectedDayKey}
+                    onSelect={() => onDaySelect(day.dayKey)}
+                    channelLabels={channelLabels}
+                  />
+                </StackItem>
+              ))}
+            </HStack>
+          ))}
+        </VStack>
+      </div>
 
       {selectedDayKey ? (
         <Stack as="section" direction="vertical" gap={2} aria-labelledby="scheduled-day-panel">
@@ -398,7 +401,7 @@ function DayCell({
       // cell also prints its month, and today carries a "Hôm nay" chip.
       variant={!day.inMonth ? "transparent" : day.isPast ? "muted" : "default"}
       elevation={isSelected ? "low" : "none"}
-      className="h-full min-h-28"
+      className={isSelected ? "ring-ring h-full min-h-28 ring-2" : "h-full min-h-28"}
     >
       <VStack gap={1}>
         <HStack gap={1} vAlign="center" wrap="wrap">

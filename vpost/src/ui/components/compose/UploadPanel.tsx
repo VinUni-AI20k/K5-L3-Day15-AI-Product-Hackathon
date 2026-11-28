@@ -162,10 +162,10 @@ export function UploadPanel(props: UploadPanelProps) {
   return (
     <section className="space-y-4" aria-labelledby={`${inputId}-heading`}>
       <div className="space-y-1">
-        <h3 id={`${inputId}-heading`} className="text-sm font-medium">
+        <h3 id={`${inputId}-heading`} className="text-foreground text-base font-semibold">
           File của bài này
         </h3>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground text-sm leading-relaxed">
           Kéo file vào ô bên dưới hoặc bấm để chọn. Kéo từng dòng để đổi thứ tự — file đầu tiên là
           ảnh bìa. Tối đa {MAX_UPLOAD_FILES} file, mỗi file {formatBytes(MAX_UPLOAD_FILE_BYTES)}.
         </p>
@@ -184,9 +184,9 @@ export function UploadPanel(props: UploadPanelProps) {
           setIsOver(false);
           if (!disabled) addFiles(event.dataTransfer.files);
         }}
-        className={`rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-          isOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
-        } ${disabled ? "opacity-60" : ""}`}
+        className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors duration-150 ${
+          isOver ? "border-ring bg-accent/40" : "border-border bg-[var(--bg-subtle)]"
+        } ${disabled ? "opacity-40" : ""}`}
       >
         <input
           id={inputId}
@@ -203,7 +203,7 @@ export function UploadPanel(props: UploadPanelProps) {
         />
         <label
           htmlFor={inputId}
-          className="text-primary cursor-pointer text-sm font-medium underline underline-offset-4"
+          className="text-accent-foreground inline-flex min-h-10 cursor-pointer items-center text-sm font-medium underline underline-offset-4"
         >
           Chọn file từ máy
         </label>
@@ -221,7 +221,7 @@ export function UploadPanel(props: UploadPanelProps) {
       ) : null}
 
       {props.rejected.length > 0 ? (
-        <div className="border-destructive/30 bg-destructive/5 space-y-1 rounded-lg border p-3">
+        <div className="border-destructive/30 bg-destructive/10 space-y-1 rounded-xl border p-4">
           <p className="text-destructive text-sm font-medium">Máy chủ từ chối một số file:</p>
           <ul className="text-destructive space-y-1 text-sm">
             {props.rejected.map((item) => (
@@ -236,7 +236,7 @@ export function UploadPanel(props: UploadPanelProps) {
           this component does not own; this is the only place these notes can
           land for the operator. */}
       {props.warnings.length > 0 ? (
-        <div className="border-warning/40 bg-warning/10 space-y-1 rounded-lg border p-3" role="alert">
+        <div className="border-warning/40 bg-warning/10 space-y-1 rounded-xl border p-4" role="alert">
           <p className="text-warning-foreground text-sm font-medium">Lưu ý khi lưu file:</p>
           <ul className="text-warning-foreground space-y-1 text-sm">
             {props.warnings.map((message) => (
@@ -321,14 +321,25 @@ export function UploadPanel(props: UploadPanelProps) {
       {/* The confirmation lives OUTSIDE the queue check on purpose: a successful
           upload empties the queue, and hiding the receipt with it would leave
           the operator with no sign anything happened. */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         {queue.length > 0 && !props.isUploading ? (
-          <Button type="button" onClick={props.onUpload} disabled={disabled}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={props.onUpload}
+            disabled={disabled}
+            className="min-h-10 px-4"
+          >
             {`Tải ${queue.length} file lên`}
           </Button>
         ) : null}
         {props.isUploading ? (
-          <Button type="button" variant="outline" onClick={props.onCancel}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={props.onCancel}
+            className="min-h-10 px-4"
+          >
             Huỷ tải lên
           </Button>
         ) : null}

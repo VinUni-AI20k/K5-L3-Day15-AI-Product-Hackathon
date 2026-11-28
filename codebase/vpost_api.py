@@ -6,6 +6,8 @@ Giao diện Next.js chuyển mọi /api/* sang đây (vpost/next.config.ts, bi�
   POST /api/posts/batches   người đã duyệt → lên lịch (kiểm tồn lần 2, khoá trùng, mỗi kênh một post_job)
 Giờ luôn trả dạng ...Z (zod z.iso.datetime() không nhận +00:00). Lỗi luôn trả {code, message}.
 """
+import base64
+import json
 import logging
 import os
 import re
@@ -21,12 +23,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 import agent
 import facebook
+import inbox_store
 import moderation_api
 import moderation_store
 import rules
 import schedule
 import store
 import tools
+import writing_style
 from ai import MODEL_NAME, MODEL_PROVIDER, call_model
 
 # Một shop = một tenant. Phiên + tenant do Next (Postgres) giữ; VPOST_TENANT_ID = id tenant đó.
@@ -253,6 +257,7 @@ class CaptionsIn(BaseModel):
     product: ProductIn
     channels: list[str] = Field(min_length=1)
     tone: Optional[str] = None
+    channelId: Optional[str] = None
 
 
 def find_row(name):
@@ -276,7 +281,14 @@ def captions(body: CaptionsIn):
         raise ApiError(404, "PRODUCT_NOT_FOUND", "Không tìm thấy sản phẩm '%s' trong file đã tải" % body.product.name)
     if body.tone:
         row = dict(row, prompt=((row.get("prompt") or "") + ". Giọng: " + TONES[body.tone]).strip(". "))
-    page, _ = tools.page_for(row)
+    ch_id = (body.channelId or "").strip() or (
+        body.channels[0] if len(body.channels) == 1 and body.channels[0] in _channel_map() else None
+    )
+    if ch_id and ch_id in tools.PAGES:
+        page = tools.PAGES[ch_id]
+    else:
+        page, _ = tools.page_for(row)
+    page = writing_style.apply(page, TENANT_ID, ch_id)
     res = agent.process_row(row, page, model=MODEL)
     if res["decision"] != "write":
         reason = "; ".join("%s: %s" % (rules.LABEL.get(f, f), m) for f, m in res["reasons"])
@@ -356,13 +368,15 @@ def create_batch(body: BatchIn):
     if oos:
         raise ApiError(409, "OUT_OF_STOCK", "; ".join(oos))
     images = [m.driveFileId for m in body.media]
-    allowed = rules.allowed_facts(row, s, page, tools.GLOB)
     warnings = []
     batch_id, ts = str(uuid.uuid4()), z(now())
     jobs = []
     for i, ch in enumerate(body.channelIds):
+        ch_base_page = tools.PAGES[ch] if ch in tools.PAGES else page
+        ch_page = writing_style.apply(ch_base_page, TENANT_ID, ch)
+        ch_allowed = rules.allowed_facts(row, s, ch_page, agent._effective_glob(ch_page))
         text = body.captionByChannel[ch].strip()
-        v = rules.verify_post(text, allowed)
+        v = rules.verify_post(text, ch_allowed)
         warnings += ["%s: %s" % (chans[ch]["name"], b) for b in v["block"]]
         dup = store.post_jobs(
             "product_code=%s and color=%s and channel_id=%s and format=%s and status = any(%s)",
@@ -677,7 +691,9 @@ def channel_remove(channel_id: str):
 log = logging.getLogger("vpost.comments")
 COMMENT_STATUSES = ("unreplied", "replied", "ignored")
 MODERATION_FILTERS = ("auto_hidden", "would_hide", "flagged")
+THREAD_FILTERS = ("needs_reply", "unread", "all", "hidden", "ignored", "has_phone")
 OOS_CLAIMS = ("còn hàng", "sẵn hàng", "còn nhiều", "đủ size", "full size", "sẵn nhiều")
+_EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
 class EmptyIn(BaseModel):
@@ -716,6 +732,31 @@ class CommentTextIn(BaseModel):
         return t
 
 
+class ThreadReplyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    text: str
+    clientId: str
+
+    @field_validator("text")
+    @classmethod
+    def _validate_text(cls, v: str) -> str:
+        t = v.strip()
+        if not t:
+            raise ValueError("nội dung không được để trống")
+        if len(t) > 2000:
+            raise ValueError("nội dung tối đa 2000 ký tự")
+        return t
+
+    @field_validator("clientId")
+    @classmethod
+    def _validate_client_id(cls, v: str) -> str:
+        t = v.strip()
+        try:
+            return str(uuid.UUID(t))
+        except ValueError:
+            raise ValueError("clientId phải là UUID hợp lệ")
+
+
 class HideCommentIn(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     hidden: bool
@@ -725,6 +766,91 @@ def _fb_http_status(code: str) -> int:
     if code in ("RATE_LIMITED", "POSTING_TOO_FAST"):
         return 429
     return 502
+
+
+def _dt_utc(value) -> datetime:
+    parsed = facebook.parse_time(value)
+    return parsed if parsed is not None else _EPOCH_UTC
+
+
+def _encode_cursor(payload: dict) -> str:
+    raw = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _decode_cursor(token: str) -> dict:
+    s = (token or "").strip()
+    if not s:
+        raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
+    try:
+        padded = s + ("=" * (-len(s) % 4))
+        raw = base64.urlsafe_b64decode(padded.encode("ascii"))
+        obj = json.loads(raw.decode("utf-8"))
+    except Exception:
+        raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
+    if not isinstance(obj, dict):
+        raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
+    return obj
+
+
+def _parse_thread_cursor(token: str):
+    obj = _decode_cursor(token)
+    t_raw = obj.get("t")
+    tid = obj.get("id")
+    if not isinstance(t_raw, str) or not isinstance(tid, str) or not tid:
+        raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
+    dt = facebook.parse_time(t_raw)
+    if dt is None:
+        raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
+    return dt, tid
+
+
+def _parse_before_cursor(token: str):
+    obj = _decode_cursor(token)
+    t_raw = obj.get("t")
+    mid = obj.get("id")
+    r_val = obj.get("r", 1)
+    if not isinstance(t_raw, str) or not isinstance(mid, str) or not mid:
+        raise ApiError(400, "INVALID_INPUT", "before cursor không hợp lệ")
+    if isinstance(r_val, bool) or r_val not in (0, 1):
+        raise ApiError(400, "INVALID_INPUT", "before cursor không hợp lệ")
+    dt = facebook.parse_time(t_raw)
+    if dt is None:
+        raise ApiError(400, "INVALID_INPUT", "before cursor không hợp lệ")
+    return dt, int(r_val), mid
+
+
+def _parse_updates_cursor(token: str):
+    obj = _decode_cursor(token)
+    cs = obj.get("cs")
+    ds = obj.get("ds")
+    if isinstance(cs, bool) or isinstance(ds, bool) or not isinstance(cs, int) or not isinstance(ds, int):
+        raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
+    if cs < 0 or ds < 0:
+        raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
+    return cs, ds
+
+
+def _truncate_update_text(text: str, max_len: int = 120) -> str:
+    clean = re.sub(r"\s+", " ", str(text or "")).strip()
+    if len(clean) <= max_len:
+        return clean
+    return clean[: max_len - 1].rstrip() + "…"
+
+
+def _post_image_url(job, catalog_by_code, product_code) -> Optional[str]:
+    media = job.get("media") if isinstance(job, dict) else None
+    if isinstance(media, list):
+        for item in media:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+    if product_code and catalog_by_code:
+        row = catalog_by_code.get(product_code)
+        if row:
+            imgs = rules.parse_images(row.get("anh"))
+            if imgs:
+                return imgs[0]
+    return None
 
 
 def _comment_or_404(comment_id: str):
@@ -743,10 +869,12 @@ def _comment_context(c):
         page = tools.PAGES[c["channel_id"]]
     else:
         page = tools.PAGES[tools.DEFAULT_PAGE]
+    page = writing_style.apply(page, TENANT_ID, c.get("channel_id"))
     return post, row, page
 
 
 def _allowed_for_comment(row, stock, page):
+    eff_glob = agent._effective_glob(page)
     if not row:
         return {
             "prices": [], "colors": [], "sizes": [],
@@ -754,15 +882,15 @@ def _allowed_for_comment(row, stock, page):
             "materials": set(), "has_material": False, "has_color": False,
             "low": False, "fact_text": "",
             "max_emoji": (page or {}).get("max_emoji", 3),
-            "banned": tools.GLOB["banned"] + tools.GLOB["brands"],
-            "conditional": tools.GLOB["conditional"],
+            "banned": eff_glob["banned"] + eff_glob["brands"],
+            "conditional": eff_glob["conditional"],
         }
     s = dict(stock)
     if s.get("hard"):
         s["dropped_colors"] = list(dict.fromkeys(list(s.get("dropped_colors") or []) + list(s.get("colors") or [])))
         s["dropped_sizes"] = list(dict.fromkeys(list(s.get("dropped_sizes") or []) + list(s.get("sizes") or [])))
         s["colors"], s["sizes"] = [], []
-    return rules.allowed_facts(row, s, page, tools.GLOB)
+    return rules.allowed_facts(row, s, page, eff_glob)
 
 
 def _check_reply_text(text, row, page):
@@ -790,6 +918,311 @@ def _draft_view(d):
         "userMessage": d["user_message"] or None,
         "updatedAt": z(d["updated_at"]),
     }
+
+
+def _build_thread_records(rows, read_states):
+    """Nhóm các dòng fb_comment thành hội thoại theo bình luận gốc (parent_id rỗng), sắp mới nhất trước."""
+    roots = {}
+    replies_by_root = {}
+    for r in rows:
+        pid = (r.get("parent_id") or "").strip()
+        if not pid:
+            roots[r["id"]] = r
+        else:
+            replies_by_root.setdefault(pid, []).append(r)
+
+    records = []
+    for root_id, root in roots.items():
+        fb_msgs = [root] + list(replies_by_root.get(root_id) or [])
+        fb_msgs.sort(key=lambda m: (_dt_utc(m["created_time"]), 0 if m["id"] == root_id else 1, m["id"]))
+        if root["is_from_page"] and not any(not m["is_from_page"] for m in fb_msgs):
+            continue
+
+        cust_msg = root if not root["is_from_page"] else next(m for m in fb_msgs if not m["is_from_page"])
+        customer_id = cust_msg.get("from_id") or ""
+        customer_name = (cust_msg.get("from_name") or "").strip() or None
+        status = "ignored" if root["status"] == "ignored" else "open"
+        is_hidden = bool(root["is_hidden"])
+        last_msg = fb_msgs[-1]
+        updated_dt = _dt_utc(last_msg["created_time"])
+        updated_at = z(last_msg["created_time"])
+
+        non_hidden = [m for m in fb_msgs if not m["is_hidden"]]
+        needs_reply = (status != "ignored") and bool(non_hidden) and (not bool(non_hidden[-1]["is_from_page"]))
+
+        last_read_raw = read_states.get(root_id)
+        last_read_dt = facebook.parse_time(last_read_raw) if last_read_raw else None
+        if status == "ignored":
+            unread_count = 0
+        else:
+            unread_count = sum(
+                1
+                for m in fb_msgs
+                if not m["is_from_page"]
+                and not m["is_hidden"]
+                and (last_read_dt is None or _dt_utc(m["created_time"]) > last_read_dt)
+            )
+        has_phone = any(bool(rules.find_phones(m["message"])) for m in fb_msgs if not m["is_from_page"])
+        last_customer_msg = next((m for m in reversed(non_hidden) if not m["is_from_page"]), None)
+
+        records.append({
+            "id": root_id,
+            "root": root,
+            "fb_msgs": fb_msgs,
+            "customer_id": customer_id,
+            "customer_name": customer_name,
+            "status": status,
+            "is_hidden": is_hidden,
+            "last_msg": last_msg,
+            "updated_dt": updated_dt,
+            "updated_at": updated_at,
+            "needs_reply": needs_reply,
+            "unread": unread_count > 0,
+            "unread_count": unread_count,
+            "has_phone": has_phone,
+            "message_count": len(fb_msgs),
+            "last_customer_msg": last_customer_msg,
+        })
+
+    records.sort(key=lambda rec: (rec["updated_dt"], rec["id"]), reverse=True)
+    return records
+
+
+def _serialize_thread(rec, *, chans, jobs_by_id, catalog_by_code, active_drafts, tags_by_from):
+    root = rec["root"]
+    ch_info = chans.get(root["channel_id"]) or {}
+    job = jobs_by_id.get(root["post_job_id"]) if root.get("post_job_id") else None
+    post_url = (job.get("published_url") if job else None) or (
+        "https://www.facebook.com/%s" % root["fb_post_id"] if root.get("fb_post_id") else None
+    )
+    post_image_url = _post_image_url(job, catalog_by_code, root.get("product_code"))
+    last_msg = rec["last_msg"]
+    customer_id = rec["customer_id"]
+    tags = list(tags_by_from.get(customer_id) or []) if customer_id else []
+    return {
+        "id": rec["id"],
+        "channelId": root["channel_id"],
+        "channelName": ch_info.get("name") or root["channel_id"],
+        "pageId": root["page_id"],
+        "postJobId": root["post_job_id"],
+        "productCode": root["product_code"],
+        "postCaption": (job.get("caption") or "") if job else "",
+        "postUrl": post_url,
+        "postImageUrl": post_image_url,
+        "customer": {
+            "id": customer_id,
+            "name": rec["customer_name"],
+            "tags": tags,
+        },
+        "lastMessage": {
+            "id": last_msg["id"],
+            "fromPage": bool(last_msg["is_from_page"]),
+            "text": last_msg["message"],
+            "createdAt": z(last_msg["created_time"]),
+        },
+        "needsReply": rec["needs_reply"],
+        "unread": rec["unread"],
+        "unreadCount": rec["unread_count"],
+        "status": rec["status"],
+        "isHidden": rec["is_hidden"],
+        "messageCount": rec["message_count"],
+        "hasPhone": rec["has_phone"],
+        "draft": _draft_view(active_drafts.get(rec["id"])),
+        "moderation": moderation_store.format_comment_moderation(root),
+        "updatedAt": rec["updated_at"],
+    }
+
+
+def _message_view(m, *, thread_id, liked_set, client_by_reply):
+    return {
+        "id": m["id"],
+        "threadId": thread_id,
+        "fromPage": bool(m["is_from_page"]),
+        "fromId": m["from_id"] or "",
+        "fromName": (m["from_name"] or "").strip() or None,
+        "text": m["message"],
+        "createdAt": z(m["created_time"]),
+        "permalinkUrl": m["permalink_url"] or None,
+        "isHidden": bool(m["is_hidden"]),
+        "canComment": bool(m["can_comment"]),
+        "likedByPage": m["id"] in liked_set,
+        "delivery": "sent",
+        "errorCode": None,
+        "userMessage": None,
+        "clientId": client_by_reply.get(m["id"]),
+        "moderation": moderation_store.format_comment_moderation(m),
+    }
+
+
+def _outgoing_draft_message_view(d, *, root, channel_name):
+    return {
+        "id": d["id"],
+        "threadId": root["id"],
+        "fromPage": True,
+        "fromId": root["page_id"] or "",
+        "fromName": channel_name or None,
+        "text": d["edited_text"] if d["edited_text"] else d["ai_text"],
+        "createdAt": z(d["created_at"] or d["updated_at"]),
+        "permalinkUrl": None,
+        "isHidden": False,
+        "canComment": False,
+        "likedByPage": False,
+        "delivery": d["status"],
+        "errorCode": d["error_code"] or None,
+        "userMessage": d["user_message"] or None,
+        "clientId": d["client_id"] or None,
+        "moderation": None,
+    }
+
+
+def _load_thread_record(thread_id: str):
+    rows = store.list_thread_comments(TENANT_ID, thread_id)
+    read_states = store.get_thread_read_states(TENANT_ID, [thread_id])
+    recs = _build_thread_records(rows, read_states)
+    rec = next((r for r in recs if r["id"] == thread_id), None)
+    if rec is None:
+        raise ApiError(404, "NOT_FOUND", "Không tìm thấy hội thoại này")
+    return rec
+
+
+def _thread_view(thread_id: str, *, rec=None, chans=None):
+    rec = rec if rec is not None else _load_thread_record(thread_id)
+    chans = chans if chans is not None else _channel_map()
+    root = rec["root"]
+    job = store.post_job(root["post_job_id"]) if root.get("post_job_id") else None
+    jobs_by_id = {root["post_job_id"]: job} if job else {}
+    catalog_by_code = {}
+    if root.get("product_code") and not _post_image_url(job, None, None):
+        row = store.catalog_row(root["product_code"])
+        if row:
+            catalog_by_code[root["product_code"]] = row
+    active_drafts = store.active_thread_drafts(TENANT_ID, [thread_id])
+    tags_by_from = inbox_store.tags_for(TENANT_ID, [rec["customer_id"]]) if rec["customer_id"] else {}
+    return _serialize_thread(
+        rec,
+        chans=chans,
+        jobs_by_id=jobs_by_id,
+        catalog_by_code=catalog_by_code,
+        active_drafts=active_drafts,
+        tags_by_from=tags_by_from,
+    )
+
+
+def _message_for_sent_draft(thread_id: str, draft: dict, *, root: dict, chans: dict):
+    fb_reply_id = draft.get("fb_reply_id") or ""
+    saved = store.get_comment(TENANT_ID, fb_reply_id) if fb_reply_id else None
+    if saved:
+        liked = set(inbox_store.liked_ids(TENANT_ID, [saved["id"]]))
+        client_map = {saved["id"]: draft["client_id"]} if draft.get("client_id") else {}
+        return _message_view(saved, thread_id=thread_id, liked_set=liked, client_by_reply=client_map)
+    ch_name = (chans.get(root["channel_id"]) or {}).get("name") or root["channel_id"]
+    return {
+        "id": fb_reply_id or draft["id"],
+        "threadId": thread_id,
+        "fromPage": True,
+        "fromId": root["page_id"] or "",
+        "fromName": ch_name or None,
+        "text": draft["edited_text"] if draft["edited_text"] else draft["ai_text"],
+        "createdAt": z(draft.get("sent_at") or draft.get("updated_at") or draft.get("created_at")),
+        "permalinkUrl": None,
+        "isHidden": False,
+        "canComment": True,
+        "likedByPage": False,
+        "delivery": "sent",
+        "errorCode": None,
+        "userMessage": None,
+        "clientId": draft.get("client_id") or None,
+        "moderation": None,
+    }
+
+
+def generate_thread_draft(thread_id: str):
+    """Soạn và lưu nháp AI cho một hội thoại dựa trên lịch sử không bị ẩn cũ→mới (không gọi Facebook).
+
+    Trả (draft_status, error_code|None). Dùng chung cho API `POST /threads/{id}/draft` và `comment_poller`.
+    """
+    rec = _load_thread_record(thread_id)
+    now_ts = z(now())
+    if store.has_sending_draft(TENANT_ID, thread_id, now_ts=now_ts):
+        return None, "CONFLICT"
+    root = rec["root"]
+    post, row, page = _comment_context(root)
+    visible_history = [m for m in rec["fb_msgs"] if not m["is_hidden"]]
+    history = visible_history if visible_history else [root]
+    target_comment = rec["last_customer_msg"] or root
+    res = agent.draft_comment_reply(target_comment, post, row, page, model=MODEL, history=history)
+    ts = z(now())
+    draft_status = "draft" if res["decision"] == "reply" else "flagged"
+    ok, err = store.create_ai_comment_draft(
+        TENANT_ID,
+        thread_id,
+        {
+            "id": str(uuid.uuid4()),
+            "comment_id": thread_id,
+            "target_comment_id": target_comment["id"],
+            "status": draft_status,
+            "ai_text": res["reply"],
+            "edited_text": "",
+            "reasons": res["reasons"],
+            "warnings": res["warnings"],
+            "model": res["model"],
+            "tokens_in": res["tokens_in"],
+            "tokens_out": res["tokens_out"],
+            "fb_reply_id": "",
+            "client_id": "",
+            "error_code": "",
+            "user_message": "",
+            "created_at": ts,
+            "updated_at": ts,
+            "sent_at": "",
+        },
+        allow_any_root=True,
+    )
+    if not ok:
+        return None, err
+    log.info(
+        "comment_thread_draft_created tenant=%s thread_id=%s status=%s",
+        TENANT_ID,
+        thread_id,
+        draft_status,
+    )
+    return draft_status, None
+
+
+def threads_needing_auto_draft(limit: int) -> list[str]:
+    """Danh sách tối đa `limit` threadId cần trả lời và chưa có nháp phủ tới tin nhắn khách gần nhất."""
+    if limit <= 0:
+        return []
+    rows = store.list_all_tenant_comments(TENANT_ID)
+    if not rows:
+        return []
+    recs = _build_thread_records(rows, {})
+    need_recs = [r for r in recs if r["needs_reply"] and r["last_customer_msg"] is not None]
+    if not need_recs:
+        return []
+    active_drafts = store.active_thread_drafts(TENANT_ID, [r["id"] for r in need_recs])
+    now_ts = z(now())
+    out = []
+    for rec in need_recs:
+        tid = rec["id"]
+        if store.has_sending_draft(TENANT_ID, tid, now_ts=now_ts):
+            continue
+        draft = active_drafts.get(tid)
+        last_cust = rec["last_customer_msg"]
+        if draft is not None:
+            covered_id = (draft.get("target_comment_id") or "").strip()
+            if covered_id:
+                if covered_id == last_cust["id"]:
+                    continue
+            else:
+                last_cust_dt = _dt_utc(last_cust["created_time"])
+                draft_dt = facebook.parse_time(draft.get("created_at") or draft.get("updated_at"))
+                if draft_dt is not None and draft_dt >= last_cust_dt:
+                    continue
+        out.append(tid)
+        if len(out) >= limit:
+            break
+    return out
 
 
 def _page_replies_for(c, replies_by_thread, draft, reply_owners=None):
@@ -821,7 +1254,7 @@ def _comment_view(c, *, chans=None, jobs_by_id=None, replies_by_thread=None, dra
         all_reply_ids = [p["id"] for reps in replies_by_thread.values() for p in reps]
         reply_owners = store.sent_reply_owners(TENANT_ID, all_reply_ids)
     if drafts_by_comment is None:
-        draft = store.latest_comment_draft(TENANT_ID, c["id"])
+        draft = store.latest_comment_draft(TENANT_ID, c["id"], now_ts=z(now()))
     else:
         draft = drafts_by_comment.get(c["id"])
     ch_info = chans.get(c["channel_id"]) or {}
@@ -850,19 +1283,23 @@ def _comment_view(c, *, chans=None, jobs_by_id=None, replies_by_thread=None, dra
     }
 
 
-@router.post("/comments/sync")
-def sync_comments(body: Optional[SyncCommentsIn] = None):
-    req = body or SyncCommentsIn()
-    days = req.lookbackDays if req.lookbackDays is not None else 14
-    cutoff = now() - timedelta(days=days)
+def run_comment_sync(
+    *,
+    channel_id: Optional[str] = None,
+    post_job_id: Optional[str] = None,
+    lookback_days: int = 14,
+    include_meta: bool = False,
+):
+    """Đồng bộ bình luận từ Facebook và chạy tự kiểm duyệt (dùng chung cho API và poller nền)."""
+    cutoff = now() - timedelta(days=lookback_days)
 
     where, params = ["status='published'", "fb_post_id is not null", "trim(fb_post_id)!=''"], []
-    if req.channelId:
+    if channel_id:
         where.append("channel_id=%s")
-        params.append(req.channelId)
-    if req.postJobId:
+        params.append(channel_id)
+    if post_job_id:
         where.append("id=%s")
-        params.append(req.postJobId)
+        params.append(post_job_id)
     jobs = store.post_jobs(" and ".join(where), tuple(params), order="published_at desc nulls last, created_at desc, id desc")
 
     eligible = []
@@ -876,6 +1313,7 @@ def sync_comments(body: Optional[SyncCommentsIn] = None):
     updated_comments = 0
     errors = []
     new_customer_comment_ids = []
+    rate_limited = False
 
     for job in eligible:
         fb_post_id = (job.get("fb_post_id") or "").strip()
@@ -934,6 +1372,7 @@ def sync_comments(body: Optional[SyncCommentsIn] = None):
                         "status": "replied" if is_from_page else "unreplied",
                         "synced_at": sync_ts,
                         "updated_at": sync_ts,
+                        "publish_updates": False,
                     },
                 )
                 if created:
@@ -956,6 +1395,8 @@ def sync_comments(body: Optional[SyncCommentsIn] = None):
                 store.set_comment_sync_ok(TENANT_ID, fb_post_id, watermark_ts)
             synced_posts += 1
         except facebook.FacebookError as e:
+            if e.code == "RATE_LIMITED":
+                rate_limited = True
             store.set_comment_sync_error(TENANT_ID, fb_post_id, "%s: %s" % (e.code, e.user_message))
             log.warning("comment_sync_error tenant=%s post_job_id=%s comment_id=%s code=%s",
                         TENANT_ID, job["id"], "", e.code)
@@ -975,6 +1416,8 @@ def sync_comments(body: Optional[SyncCommentsIn] = None):
     moderation_summary = {"autoHidden": 0, "wouldHide": 0, "flagged": 0, "skipped": 0}
     try:
         mod_res = moderation_api.run_auto_moderation(TENANT_ID, new_customer_comment_ids, model=MODEL)
+        if mod_res.get("stoppedByRateLimit"):
+            rate_limited = True
         moderation_summary = {
             "autoHidden": int(mod_res.get("autoHidden", 0)),
             "wouldHide": int(mod_res.get("wouldHide", 0)),
@@ -990,7 +1433,7 @@ def sync_comments(body: Optional[SyncCommentsIn] = None):
                 len(new_customer_comment_ids), failed_n, "MODERATION_FAILED",
             )
             errors.append({
-                "postJobId": req.postJobId or "auto-moderation",
+                "postJobId": post_job_id or "auto-moderation",
                 "code": "MODERATION_FAILED",
                 "message": "Tự kiểm duyệt gặp lỗi ở %d bình luận — các bình luận lỗi đã được gắn cờ để kiểm tra thủ công." % failed_n,
             })
@@ -1002,12 +1445,21 @@ def sync_comments(body: Optional[SyncCommentsIn] = None):
             len(new_customer_comment_ids), "MODERATION_FAILED", type(e).__name__,
         )
         errors.append({
-            "postJobId": req.postJobId or "auto-moderation",
+            "postJobId": post_job_id or "auto-moderation",
             "code": "MODERATION_FAILED",
             "message": "Tự kiểm duyệt bình luận gặp lỗi: %s" % type(e).__name__,
         })
+    finally:
+        if new_customer_comment_ids:
+            try:
+                store.publish_comment_updates(TENANT_ID, new_customer_comment_ids)
+            except Exception as e:
+                log.warning(
+                    "comment_sync_publish_updates_error tenant=%s count=%d err=%s",
+                    TENANT_ID, len(new_customer_comment_ids), type(e).__name__,
+                )
 
-    return {
+    result = {
         "tenantId": TENANT_ID,
         "syncedPosts": synced_posts,
         "newComments": new_comments,
@@ -1015,6 +1467,442 @@ def sync_comments(body: Optional[SyncCommentsIn] = None):
         "errors": errors,
         "moderation": moderation_summary,
     }
+    if include_meta:
+        return result, rate_limited
+    return result
+
+
+@router.post("/comments/sync")
+def sync_comments(body: Optional[SyncCommentsIn] = None):
+    req = body or SyncCommentsIn()
+    return run_comment_sync(
+        channel_id=req.channelId,
+        post_job_id=req.postJobId,
+        lookback_days=req.lookbackDays if req.lookbackDays is not None else 14,
+    )
+
+
+# ---------------- Hội thoại bình luận (/api/comments/threads) & luồng cập nhật (/api/comments/updates) ----------------
+# Đặt TRƯỚC mọi đường dẫn động `/comments/{comment_id}/...` để không bao giờ bị che khuất.
+
+@router.get("/comments/updates")
+def comment_updates(since: Optional[str] = None):
+    since_f = (since or "").strip() or None
+    if not since_f:
+        cs, ds = store.comment_updates_watermark(TENANT_ID)
+        return {
+            "tenantId": TENANT_ID,
+            "cursor": _encode_cursor({"cs": cs, "ds": ds}),
+            "items": [],
+            "draftsReady": [],
+        }
+
+    cs, ds = _parse_updates_cursor(since_f)
+    rows, drafts_ready, new_cs, new_ds = store.list_comment_updates_since(TENANT_ID, cs, ds, limit=50)
+    chans = _channel_map() if rows else {}
+    items = [
+        {
+            "threadId": r["parent_id"] or r["id"],
+            "messageId": r["id"],
+            "customerName": (r["from_name"] or "").strip() or None,
+            "text": _truncate_update_text(r["message"], 120),
+            "createdAt": z(r["created_time"]),
+            "channelName": (chans.get(r["channel_id"]) or {}).get("name") or r["channel_id"],
+        }
+        for r in rows
+    ]
+    return {
+        "tenantId": TENANT_ID,
+        "cursor": _encode_cursor({"cs": new_cs, "ds": new_ds}),
+        "items": items,
+        "draftsReady": drafts_ready,
+    }
+
+
+@router.get("/comments/threads")
+def list_comment_threads(
+    filter: Optional[str] = None,
+    channelId: Optional[str] = None,
+    postJobId: Optional[str] = None,
+    q: Optional[str] = None,
+    cursor: Optional[str] = None,
+    limit: int = Query(30, ge=1, le=100),
+):
+    filter_f = (filter or "").strip() or "needs_reply"
+    if filter_f not in THREAD_FILTERS:
+        raise ApiError(
+            400,
+            "INVALID_INPUT",
+            "filter chỉ nhận needs_reply, unread, all, hidden, ignored hoặc has_phone",
+        )
+    channel_f = (channelId or "").strip() or None
+    job_f = (postJobId or "").strip() or None
+    q_f = (q or "").strip().lower() or None
+    cursor_f = (cursor or "").strip() or None
+    cur_key = _parse_thread_cursor(cursor_f) if cursor_f else None
+
+    rows = store.list_all_tenant_comments(TENANT_ID, channel_id=channel_f, post_job_id=job_f)
+    read_states = store.get_thread_read_states(TENANT_ID) if rows else {}
+    records = _build_thread_records(rows, read_states)
+    jobs_by_id = {j["id"]: j for j in store.post_jobs()} if records else {}
+
+    if q_f:
+        matched = []
+        for rec in records:
+            root = rec["root"]
+            caption = (jobs_by_id.get(root["post_job_id"]) or {}).get("caption") or ""
+            parts = [rec["customer_name"] or "", root["product_code"] or "", caption]
+            parts.extend(m["message"] or "" for m in rec["fb_msgs"])
+            if q_f in " ".join(parts).lower():
+                matched.append(rec)
+        records = matched
+
+    counts = {
+        "needsReply": sum(1 for r in records if r["needs_reply"]),
+        "unread": sum(1 for r in records if r["unread"]),
+        "all": len(records),
+        "hidden": sum(1 for r in records if r["is_hidden"]),
+        "ignored": sum(1 for r in records if r["status"] == "ignored"),
+    }
+
+    if filter_f == "needs_reply":
+        filtered = [r for r in records if r["needs_reply"]]
+    elif filter_f == "unread":
+        filtered = [r for r in records if r["unread"]]
+    elif filter_f == "hidden":
+        filtered = [r for r in records if r["is_hidden"]]
+    elif filter_f == "ignored":
+        filtered = [r for r in records if r["status"] == "ignored"]
+    elif filter_f == "has_phone":
+        filtered = [r for r in records if r["has_phone"]]
+    else:
+        filtered = records
+
+    if cur_key is not None:
+        cur_dt, cur_id = cur_key
+        filtered = [r for r in filtered if (r["updated_dt"], r["id"]) < (cur_dt, cur_id)]
+
+    page_recs = filtered[:limit]
+    has_more = len(filtered) > limit
+    next_cursor = (
+        _encode_cursor({"t": page_recs[-1]["updated_at"], "id": page_recs[-1]["id"]})
+        if (has_more and page_recs)
+        else None
+    )
+
+    chans = _channel_map() if page_recs else {}
+    catalog_by_code = {r["ma_sp"]: r for r in store.catalog_rows()} if page_recs else {}
+    active_drafts = store.active_thread_drafts(TENANT_ID, [r["id"] for r in page_recs]) if page_recs else {}
+    from_ids = list(dict.fromkeys(r["customer_id"] for r in page_recs if r["customer_id"]))
+    tags_by_from = inbox_store.tags_for(TENANT_ID, from_ids) if from_ids else {}
+
+    items = [
+        _serialize_thread(
+            rec,
+            chans=chans,
+            jobs_by_id=jobs_by_id,
+            catalog_by_code=catalog_by_code,
+            active_drafts=active_drafts,
+            tags_by_from=tags_by_from,
+        )
+        for rec in page_recs
+    ]
+    return {
+        "tenantId": TENANT_ID,
+        "items": items,
+        "nextCursor": next_cursor,
+        "limit": limit,
+        "counts": counts,
+    }
+
+
+@router.get("/comments/threads/{thread_id}")
+def get_comment_thread(
+    thread_id: str,
+    before: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=200),
+):
+    before_f = (before or "").strip() or None
+    before_key = _parse_before_cursor(before_f) if before_f else None
+    rec = _load_thread_record(thread_id)
+    root = rec["root"]
+
+    pending_or_failed, client_by_reply = store.thread_outgoing_drafts(TENANT_ID, thread_id, now_ts=z(now()))
+    entries = []
+    for m in rec["fb_msgs"]:
+        is_root = m["id"] == thread_id
+        dt = _dt_utc(m["created_time"])
+        r_flag = 0 if is_root else 1
+        entries.append({
+            "kind": "fb",
+            "id": m["id"],
+            "created_at": z(m["created_time"]),
+            "r": r_flag,
+            "sort_key": (dt, r_flag, m["id"]),
+            "row": m,
+        })
+    for d in pending_or_failed:
+        ts_val = d.get("created_at") or d.get("updated_at") or ""
+        dt = _dt_utc(ts_val)
+        entries.append({
+            "kind": "draft",
+            "id": d["id"],
+            "created_at": z(ts_val),
+            "r": 1,
+            "sort_key": (dt, 1, d["id"]),
+            "row": d,
+        })
+    entries.sort(key=lambda e: e["sort_key"])
+
+    if before_key is not None:
+        entries = [e for e in entries if e["sort_key"] < before_key]
+
+    if len(entries) > limit:
+        page_entries = entries[-limit:]
+        first = page_entries[0]
+        older_cursor = _encode_cursor({"t": first["created_at"], "id": first["id"], "r": first["r"]})
+    else:
+        page_entries = entries
+        older_cursor = None
+
+    chans = _channel_map()
+    channel_name = (chans.get(root["channel_id"]) or {}).get("name") or root["channel_id"]
+    real_ids = [e["id"] for e in page_entries if e["kind"] == "fb"]
+    liked_set = set(inbox_store.liked_ids(TENANT_ID, real_ids)) if real_ids else set()
+
+    messages = [
+        _message_view(e["row"], thread_id=thread_id, liked_set=liked_set, client_by_reply=client_by_reply)
+        if e["kind"] == "fb"
+        else _outgoing_draft_message_view(e["row"], root=root, channel_name=channel_name)
+        for e in page_entries
+    ]
+    thread = _thread_view(thread_id, rec=rec, chans=chans)
+    return {
+        "tenantId": TENANT_ID,
+        "thread": thread,
+        "messages": messages,
+        "olderCursor": older_cursor,
+    }
+
+
+@router.post("/comments/threads/{thread_id}/read")
+def mark_comment_thread_read(thread_id: str, body: Optional[EmptyIn] = None):
+    rec = _load_thread_record(thread_id)
+    now_dt = now()
+    cust_dts = [
+        _dt_utc(m["created_time"])
+        for m in rec["fb_msgs"]
+        if not m["is_from_page"] and not m["is_hidden"]
+    ]
+    if cust_dts:
+        store.mark_thread_read(TENANT_ID, thread_id, z(max(cust_dts)), z(now_dt))
+    return {"tenantId": TENANT_ID, "thread": _thread_view(thread_id)}
+
+
+@router.post("/comments/threads/{thread_id}/draft")
+def draft_comment_thread(thread_id: str, body: Optional[EmptyIn] = None):
+    _, err = generate_thread_draft(thread_id)
+    if err == "NOT_FOUND":
+        raise ApiError(404, "NOT_FOUND", "Không tìm thấy hội thoại này")
+    if err == "CONFLICT":
+        raise ApiError(409, "CONFLICT", "Đang gửi trả lời cho hội thoại này")
+    return {"tenantId": TENANT_ID, "thread": _thread_view(thread_id)}
+
+
+@router.patch("/comments/threads/{thread_id}/draft")
+def patch_comment_thread_draft(thread_id: str, body: CommentTextIn):
+    rec = _load_thread_record(thread_id)
+    _, row, page = _comment_context(rec["root"])
+    check = _check_reply_text(body.text, row, page)
+    ts = z(now())
+    target_comment = rec["last_customer_msg"] or rec["root"]
+    _, err = store.patch_comment_draft(
+        TENANT_ID,
+        thread_id,
+        str(uuid.uuid4()),
+        body.text,
+        ts,
+        valid_text=not check["block"],
+        warnings=check["warn"],
+        preserve_client_failed=True,
+        allow_any_root=True,
+        target_comment_id=target_comment["id"],
+    )
+    if err == "NOT_FOUND":
+        raise ApiError(404, "NOT_FOUND", "Không tìm thấy hội thoại này")
+    if err == "CONFLICT":
+        raise ApiError(409, "CONFLICT", "Đang gửi trả lời cho hội thoại này, không thể chỉnh sửa nháp")
+    return {"tenantId": TENANT_ID, "thread": _thread_view(thread_id), "check": check}
+
+
+@router.post("/comments/threads/{thread_id}/reply")
+def reply_comment_thread(thread_id: str, body: ThreadReplyIn):
+    rec = _load_thread_record(thread_id)
+    root = rec["root"]
+
+    now_ts = z(now())
+    existing = store.get_draft_by_client_id(TENANT_ID, body.clientId, now_ts=now_ts)
+    if existing:
+        if existing["comment_id"] != thread_id:
+            raise ApiError(409, "CONFLICT", "clientId đã được dùng cho hội thoại khác")
+        if existing["status"] == "sent":
+            chans = _channel_map()
+            return {
+                "tenantId": TENANT_ID,
+                "thread": _thread_view(thread_id, rec=rec, chans=chans),
+                "message": _message_for_sent_draft(thread_id, existing, root=root, chans=chans),
+            }
+        if existing["status"] == "sending":
+            raise ApiError(409, "CONFLICT", "Đang gửi trả lời cho hội thoại này")
+
+    if not root["can_comment"]:
+        raise ApiError(409, "CONFLICT", "Facebook không cho phép trả lời bình luận này")
+
+    _, row, page = _comment_context(root)
+    check = _check_reply_text(body.text, row, page)
+    if check["block"]:
+        raise ApiError(422, "BLOCKED", "; ".join(check["block"]), reasons=list(check["block"]))
+
+    creds = page_credentials(root["channel_id"])
+    if not creds:
+        raise ApiError(409, "CHANNEL_NOT_CONFIGURED", "Kênh chưa nối Fanpage Facebook thật — kết nối lại ở mục Kênh.")
+
+    ts = z(now())
+    attempt_token = str(uuid.uuid4())
+    with store.active_send_attempt(attempt_token):
+        draft_id, claim_err, existing_sent = store.claim_thread_reply(
+            TENANT_ID,
+            thread_id,
+            str(uuid.uuid4()),
+            body.text,
+            body.clientId,
+            ts,
+            attempt_token=attempt_token,
+        )
+        if claim_err == "ALREADY_SENT" and existing_sent:
+            chans = _channel_map()
+            return {
+                "tenantId": TENANT_ID,
+                "thread": _thread_view(thread_id, chans=chans),
+                "message": _message_for_sent_draft(thread_id, existing_sent, root=root, chans=chans),
+            }
+        if claim_err == "NOT_FOUND":
+            raise ApiError(404, "NOT_FOUND", "Không tìm thấy hội thoại này")
+        if claim_err == "CANNOT_COMMENT":
+            raise ApiError(409, "CONFLICT", "Facebook không cho phép trả lời bình luận này")
+        if claim_err == "CONFLICT":
+            raise ApiError(409, "CONFLICT", "Đang gửi trả lời cho hội thoại này")
+
+        try:
+            fb_reply_id = tools.reply_fb_comment(thread_id, body.text, root["channel_id"])
+        except facebook.FacebookError as e:
+            fail_ts = z(now())
+            store.fail_comment_reply(
+                TENANT_ID,
+                draft_id,
+                thread_id,
+                error_code=e.code,
+                user_message=e.user_message,
+                updated_at=fail_ts,
+                attempt_token=attempt_token,
+            )
+            log.warning("comment_thread_reply_error tenant=%s post_job_id=%s thread_id=%s code=%s",
+                        TENANT_ID, root["post_job_id"], thread_id, e.code)
+            raise ApiError(_fb_http_status(e.code), e.code, e.user_message)
+        except Exception as e:
+            fail_ts = z(now())
+            msg = "Gửi trả lời lên Facebook thất bại: %s" % type(e).__name__
+            store.fail_comment_reply(
+                TENANT_ID,
+                draft_id,
+                thread_id,
+                error_code="UPSTREAM_ERROR",
+                user_message=msg,
+                updated_at=fail_ts,
+                attempt_token=attempt_token,
+            )
+            log.warning("comment_thread_reply_error tenant=%s post_job_id=%s thread_id=%s code=%s",
+                        TENANT_ID, root["post_job_id"], thread_id, "UPSTREAM_ERROR")
+            raise ApiError(502, "UPSTREAM_ERROR", msg)
+
+        sent_ts = z(now())
+        chans = _channel_map()
+        ch_name = (chans.get(root["channel_id"]) or {}).get("name") or ""
+        msg_id = fb_reply_id or ("reply-" + draft_id)
+        page_reply_item = {
+            "id": msg_id,
+            "channel_id": root["channel_id"],
+            "page_id": root["page_id"],
+            "post_job_id": root["post_job_id"],
+            "fb_post_id": root["fb_post_id"],
+            "product_code": root["product_code"],
+            "parent_id": thread_id,
+            "from_id": root["page_id"],
+            "from_name": ch_name,
+            "is_from_page": 1,
+            "message": body.text,
+            "permalink_url": "",
+            "is_hidden": 0,
+            "can_comment": 1,
+            "created_time": sent_ts,
+            "status": "replied",
+            "synced_at": sent_ts,
+            "updated_at": sent_ts,
+        }
+        completed = store.complete_comment_reply(
+            TENANT_ID,
+            draft_id,
+            thread_id,
+            msg_id,
+            sent_ts,
+            page_reply_item=page_reply_item,
+            attempt_token=attempt_token,
+        )
+    if not completed:
+        current = store.get_draft_by_client_id(TENANT_ID, body.clientId, now_ts=sent_ts)
+        if current and current["comment_id"] == thread_id and current["status"] == "sent":
+            return {
+                "tenantId": TENANT_ID,
+                "thread": _thread_view(thread_id, chans=chans),
+                "message": _message_for_sent_draft(thread_id, current, root=root, chans=chans),
+            }
+        raise ApiError(409, "CONFLICT", "Lượt gửi này đã được thay thế bởi lượt thử lại mới hơn")
+    log.info(
+        "comment_thread_reply_sent tenant=%s post_job_id=%s thread_id=%s reply_id=%s",
+        TENANT_ID,
+        root["post_job_id"],
+        thread_id,
+        msg_id,
+    )
+    saved_reply = store.get_comment(TENANT_ID, msg_id) or page_reply_item
+    liked = set(inbox_store.liked_ids(TENANT_ID, [saved_reply["id"]]))
+    msg_view = _message_view(
+        saved_reply,
+        thread_id=thread_id,
+        liked_set=liked,
+        client_by_reply={saved_reply["id"]: body.clientId},
+    )
+    return {
+        "tenantId": TENANT_ID,
+        "thread": _thread_view(thread_id, chans=chans),
+        "message": msg_view,
+    }
+
+
+@router.post("/comments/threads/{thread_id}/ignore")
+def ignore_comment_thread(thread_id: str, body: Optional[EmptyIn] = None):
+    _load_thread_record(thread_id)
+    store.update_fb_comment(TENANT_ID, thread_id, status="ignored", updated_at=z(now()))
+    return {"tenantId": TENANT_ID, "thread": _thread_view(thread_id)}
+
+
+@router.post("/comments/threads/{thread_id}/unignore")
+def unignore_comment_thread(thread_id: str, body: Optional[EmptyIn] = None):
+    rec = _load_thread_record(thread_id)
+    root = rec["root"]
+    restored = "replied" if store.has_page_reply_or_sent_draft(TENANT_ID, root) else "unreplied"
+    store.update_fb_comment(TENANT_ID, thread_id, status=restored, updated_at=z(now()))
+    return {"tenantId": TENANT_ID, "thread": _thread_view(thread_id)}
 
 
 @router.get("/comments")
@@ -1073,7 +1961,7 @@ def list_comments(
     replies_by_thread = store.page_replies_for_threads(TENANT_ID, thread_ids)
     all_reply_ids = [p["id"] for reps in replies_by_thread.values() for p in reps]
     reply_owners = store.sent_reply_owners(TENANT_ID, all_reply_ids)
-    drafts_by_comment = store.latest_comment_drafts(TENANT_ID, [c["id"] for c in page_rows])
+    drafts_by_comment = store.latest_comment_drafts(TENANT_ID, [c["id"] for c in page_rows], now_ts=z(now()))
     items = [
         _comment_view(
             c,
@@ -1091,8 +1979,8 @@ def list_comments(
 @router.post("/comments/{comment_id}/draft")
 def draft_comment(comment_id: str, body: Optional[EmptyIn] = None):
     c = _comment_or_404(comment_id)
-    if c["status"] == "replied" or store.has_sending_or_sent_draft(TENANT_ID, comment_id):
-        raise ApiError(409, "CONFLICT", "Bình luận này đã được trả lời hoặc đang gửi")
+    if store.has_sending_draft(TENANT_ID, comment_id, now_ts=z(now())):
+        raise ApiError(409, "CONFLICT", "Bình luận này đang gửi trả lời")
     post, row, page = _comment_context(c)
     res = agent.draft_comment_reply(c, post, row, page, model=MODEL)
     ts = z(now())
@@ -1102,6 +1990,7 @@ def draft_comment(comment_id: str, body: Optional[EmptyIn] = None):
         {
             "id": str(uuid.uuid4()),
             "comment_id": comment_id,
+            "target_comment_id": comment_id,
             "status": "draft" if res["decision"] == "reply" else "flagged",
             "ai_text": res["reply"],
             "edited_text": "",
@@ -1111,6 +2000,7 @@ def draft_comment(comment_id: str, body: Optional[EmptyIn] = None):
             "tokens_in": res["tokens_in"],
             "tokens_out": res["tokens_out"],
             "fb_reply_id": "",
+            "client_id": "",
             "error_code": "",
             "user_message": "",
             "created_at": ts,
@@ -1121,7 +2011,7 @@ def draft_comment(comment_id: str, body: Optional[EmptyIn] = None):
     if not ok:
         if err == "NOT_FOUND":
             raise ApiError(404, "NOT_FOUND", "Không tìm thấy bình luận này")
-        raise ApiError(409, "CONFLICT", "Bình luận này đã được trả lời hoặc đang gửi")
+        raise ApiError(409, "CONFLICT", "Bình luận này đang gửi trả lời")
     return {"tenantId": TENANT_ID, "comment": _comment_view(store.get_fb_comment(TENANT_ID, comment_id))}
 
 
@@ -1143,7 +2033,7 @@ def patch_comment_draft(comment_id: str, body: CommentTextIn):
     if err == "NOT_FOUND":
         raise ApiError(404, "NOT_FOUND", "Không tìm thấy bình luận này")
     if err == "CONFLICT":
-        raise ApiError(409, "CONFLICT", "Bản nháp đang gửi hoặc đã gửi, không thể chỉnh sửa")
+        raise ApiError(409, "CONFLICT", "Bản nháp đang gửi, không thể chỉnh sửa")
     return {"tenantId": TENANT_ID, "comment": _comment_view(store.get_fb_comment(TENANT_ID, comment_id)), "check": check}
 
 
@@ -1152,8 +2042,8 @@ def reply_comment(comment_id: str, body: CommentTextIn):
     c = _comment_or_404(comment_id)
     if not c["can_comment"]:
         raise ApiError(409, "CONFLICT", "Facebook không cho phép trả lời bình luận này")
-    if c["status"] == "replied" or store.has_sending_or_sent_draft(TENANT_ID, comment_id):
-        raise ApiError(409, "CONFLICT", "Bình luận này đã được trả lời hoặc đang gửi")
+    if store.has_sending_draft(TENANT_ID, comment_id, now_ts=z(now())):
+        raise ApiError(409, "CONFLICT", "Bình luận này đang gửi trả lời")
 
     _, row, page = _comment_context(c)
     check = _check_reply_text(body.text, row, page)
@@ -1165,67 +2055,88 @@ def reply_comment(comment_id: str, body: CommentTextIn):
         raise ApiError(409, "CHANNEL_NOT_CONFIGURED", "Kênh chưa nối Fanpage Facebook thật — kết nối lại ở mục Kênh.")
 
     ts = z(now())
-    draft_id, claim_err = store.claim_comment_reply(TENANT_ID, comment_id, str(uuid.uuid4()), body.text, ts)
-    if claim_err == "NOT_FOUND":
-        raise ApiError(404, "NOT_FOUND", "Không tìm thấy bình luận này")
-    if claim_err == "CANNOT_COMMENT":
-        raise ApiError(409, "CONFLICT", "Facebook không cho phép trả lời bình luận này")
-    if claim_err == "CONFLICT":
-        raise ApiError(409, "CONFLICT", "Bình luận này đã được trả lời hoặc đang gửi")
-
-    target_id = c["parent_id"] or c["id"]
-    try:
-        fb_reply_id = tools.reply_fb_comment(target_id, body.text, c["channel_id"])
-    except facebook.FacebookError as e:
-        fail_ts = z(now())
-        store.update_comment_draft(
-            TENANT_ID, draft_id, status="failed", error_code=e.code, user_message=e.user_message, updated_at=fail_ts
+    attempt_token = str(uuid.uuid4())
+    with store.active_send_attempt(attempt_token):
+        draft_id, claim_err = store.claim_comment_reply(
+            TENANT_ID, comment_id, str(uuid.uuid4()), body.text, ts, attempt_token=attempt_token
         )
-        log.warning("comment_reply_error tenant=%s post_job_id=%s comment_id=%s code=%s",
-                    TENANT_ID, c["post_job_id"], comment_id, e.code)
-        raise ApiError(_fb_http_status(e.code), e.code, e.user_message)
-    except Exception as e:
-        fail_ts = z(now())
-        msg = "Gửi trả lời lên Facebook thất bại: %s" % type(e).__name__
-        store.update_comment_draft(
-            TENANT_ID, draft_id, status="failed", error_code="UPSTREAM_ERROR", user_message=msg, updated_at=fail_ts
-        )
-        log.warning("comment_reply_error tenant=%s post_job_id=%s comment_id=%s code=%s",
-                    TENANT_ID, c["post_job_id"], comment_id, "UPSTREAM_ERROR")
-        raise ApiError(502, "UPSTREAM_ERROR", msg)
+        if claim_err == "NOT_FOUND":
+            raise ApiError(404, "NOT_FOUND", "Không tìm thấy bình luận này")
+        if claim_err == "CANNOT_COMMENT":
+            raise ApiError(409, "CONFLICT", "Facebook không cho phép trả lời bình luận này")
+        if claim_err == "CONFLICT":
+            raise ApiError(409, "CONFLICT", "Bình luận này đang gửi trả lời")
 
-    sent_ts = z(now())
-    page_reply_item = None
-    if fb_reply_id:
-        ch_name = (_channel_map().get(c["channel_id"]) or {}).get("name") or ""
-        page_reply_item = {
-            "id": fb_reply_id,
-            "channel_id": c["channel_id"],
-            "page_id": c["page_id"],
-            "post_job_id": c["post_job_id"],
-            "fb_post_id": c["fb_post_id"],
-            "product_code": c["product_code"],
-            "parent_id": target_id,
-            "from_id": c["page_id"],
-            "from_name": ch_name,
-            "is_from_page": 1,
-            "message": body.text,
-            "permalink_url": "",
-            "is_hidden": 0,
-            "can_comment": 1,
-            "created_time": sent_ts,
-            "status": "replied",
-            "synced_at": sent_ts,
-            "updated_at": sent_ts,
-        }
-    store.complete_comment_reply(
-        TENANT_ID,
-        draft_id,
-        comment_id,
-        fb_reply_id,
-        sent_ts,
-        page_reply_item=page_reply_item,
-    )
+        target_id = c["parent_id"] or c["id"]
+        try:
+            fb_reply_id = tools.reply_fb_comment(target_id, body.text, c["channel_id"])
+        except facebook.FacebookError as e:
+            fail_ts = z(now())
+            store.fail_comment_reply(
+                TENANT_ID,
+                draft_id,
+                comment_id,
+                error_code=e.code,
+                user_message=e.user_message,
+                updated_at=fail_ts,
+                attempt_token=attempt_token,
+            )
+            log.warning("comment_reply_error tenant=%s post_job_id=%s comment_id=%s code=%s",
+                        TENANT_ID, c["post_job_id"], comment_id, e.code)
+            raise ApiError(_fb_http_status(e.code), e.code, e.user_message)
+        except Exception as e:
+            fail_ts = z(now())
+            msg = "Gửi trả lời lên Facebook thất bại: %s" % type(e).__name__
+            store.fail_comment_reply(
+                TENANT_ID,
+                draft_id,
+                comment_id,
+                error_code="UPSTREAM_ERROR",
+                user_message=msg,
+                updated_at=fail_ts,
+                attempt_token=attempt_token,
+            )
+            log.warning("comment_reply_error tenant=%s post_job_id=%s comment_id=%s code=%s",
+                        TENANT_ID, c["post_job_id"], comment_id, "UPSTREAM_ERROR")
+            raise ApiError(502, "UPSTREAM_ERROR", msg)
+
+        sent_ts = z(now())
+        page_reply_item = None
+        if fb_reply_id:
+            ch_name = (_channel_map().get(c["channel_id"]) or {}).get("name") or ""
+            page_reply_item = {
+                "id": fb_reply_id,
+                "channel_id": c["channel_id"],
+                "page_id": c["page_id"],
+                "post_job_id": c["post_job_id"],
+                "fb_post_id": c["fb_post_id"],
+                "product_code": c["product_code"],
+                "parent_id": target_id,
+                "from_id": c["page_id"],
+                "from_name": ch_name,
+                "is_from_page": 1,
+                "message": body.text,
+                "permalink_url": "",
+                "is_hidden": 0,
+                "can_comment": 1,
+                "created_time": sent_ts,
+                "status": "replied",
+                "synced_at": sent_ts,
+                "updated_at": sent_ts,
+            }
+        completed = store.complete_comment_reply(
+            TENANT_ID,
+            draft_id,
+            comment_id,
+            fb_reply_id,
+            sent_ts,
+            page_reply_item=page_reply_item,
+            attempt_token=attempt_token,
+        )
+    if not completed:
+        latest = store.latest_comment_draft(TENANT_ID, comment_id, now_ts=sent_ts)
+        if not (latest and latest["status"] == "sent"):
+            raise ApiError(409, "CONFLICT", "Lượt gửi này đã được thay thế bởi lượt thử lại mới hơn")
     return {"tenantId": TENANT_ID, "comment": _comment_view(store.get_fb_comment(TENANT_ID, comment_id))}
 
 
