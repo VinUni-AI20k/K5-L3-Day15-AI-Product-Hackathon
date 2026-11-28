@@ -2494,22 +2494,34 @@ def count_auto_replies_since(tenant_id, page_id, since_dt):
     return total
 
 
-def has_recent_auto_reply_for_customer(tenant_id, page_id, from_id, since_dt):
-    """True nếu khách `from_id` trên Page `page_id` đã được tự trả lời (`action='sent'`) kể từ `since_dt`."""
+def has_recent_auto_reply_for_customer(tenant_id, page_id, from_id, since_dt, intents=None):
+    """True nếu khách `from_id` trên Page `page_id` đã được tự trả lời (`action='sent'`) kể từ `since_dt`.
+
+    `intents` (danh sách): chỉ tính các lần trả lời cùng đúng loại câu hỏi — khách hỏi câu khác vẫn được trả lời.
+    """
     if not from_id or not page_id:
         return False
     since_utc = _parse_utc_ts(since_dt) or datetime.now(timezone.utc)
+    wanted = sorted(set(intents)) if intents is not None else None
     with connect() as c:
         rows = c.execute(
-            "select created_at from auto_reply_log "
+            "select created_at, intents from auto_reply_log "
             "where tenant_id=%s and page_id=%s and from_id=%s and action='sent' "
             "order by created_at desc, seq desc limit 20",
             (tenant_id, str(page_id), str(from_id)),
         ).fetchall()
     for r in rows:
         dt = _parse_utc_ts(r["created_at"])
-        if dt is not None and dt >= since_utc:
-            return True
+        if dt is None or dt < since_utc:
+            continue
+        if wanted is not None:
+            try:
+                prev = sorted(set(json.loads(r["intents"] or "[]")))
+            except (TypeError, ValueError):
+                prev = None
+            if prev != wanted:
+                continue
+        return True
     return False
 
 

@@ -490,10 +490,10 @@ def test_customer_ten_minute_cooldown(monkeypatch):
     r1 = auto_reply.process_comment(vpost_api.TENANT_ID, c1, now_dt=t0)
     assert r1["action"] == "sent" and len(fb_calls) == 1
 
-    # 5 minutes later, same customer -> blocked by 10-minute cooldown -> can_ban
+    # 5 minutes later, same customer asks the SAME kind of question again -> blocked by 10-minute cooldown
     t1 = t0 + timedelta(minutes=5)
     clock[0] = t1
-    c2 = seed_comment("c_cd_2", from_id="u_cool", message="Còn size nào ạ?", created_time="2026-11-28T10:05:00.000Z")
+    c2 = seed_comment("c_cd_2", from_id="u_cool", message="Giá sao vậy shop", created_time="2026-11-28T10:05:00.000Z")
     r2 = auto_reply.process_comment(vpost_api.TENANT_ID, c2, now_dt=t1)
     assert r2["action"] == "skipped" and r2["tagged"] is True
     assert "10 phút" in r2["reason"]
@@ -502,7 +502,7 @@ def test_customer_ten_minute_cooldown(monkeypatch):
     # 11 minutes later -> allowed again
     t2 = t0 + timedelta(minutes=11)
     clock[0] = t2
-    c3 = seed_comment("c_cd_3", from_id="u_cool", message="Còn màu nào ạ?", created_time="2026-11-28T10:11:00.000Z")
+    c3 = seed_comment("c_cd_3", from_id="u_cool", message="Giá bao nhiêu vậy ạ?", created_time="2026-11-28T10:11:00.000Z")
     r3 = auto_reply.process_comment(vpost_api.TENANT_ID, c3, now_dt=t2)
     assert r3["action"] == "sent" and len(fb_calls) == 2
 
@@ -1176,7 +1176,7 @@ def test_finding07_serializes_caps_and_cooldown_per_page_and_conflict_skips_with
     enable_page(mode="live", hourly_cap=30, daily_cap=200)
     fb_calls.clear()
     c3 = seed_comment("c_f7_cd1", from_id="u_same_race", message="Giá bao nhiêu ạ?")
-    c4 = seed_comment("c_f7_cd2", from_id="u_same_race", message="Còn size nào ạ?")
+    c4 = seed_comment("c_f7_cd2", from_id="u_same_race", message="Giá sao vậy shop")
     results_cd = []
     barrier2 = threading.Barrier(2)
 
@@ -1450,7 +1450,7 @@ def test_per_customer_rules_remain_extra_layer_when_from_id_exists(monkeypatch):
         post_job_id="job-cust2",
         fb_post_id="123_cust2",
         from_id="u_repeat",
-        message="Còn size nào ạ?",
+        message="Giá sao vậy shop",
         created_time="2026-11-28T10:03:00.000Z",
     )
     r2 = auto_reply.process_comment(vpost_api.TENANT_ID, c2, now_dt=t1)
@@ -2515,3 +2515,30 @@ def test_quantity_over_stock_or_bulk_is_tagged_can_ban():
     rb = auto_reply.process_comment(vpost_api.TENANT_ID, c_bulk)
     assert rb["action"] == "skipped" and rb["tagged"] is True
     assert "số lượng lớn" in rb["reason"]
+
+
+# ---------------- Follow-up questions from the same customer ----------------
+
+def test_same_customer_different_questions_are_all_answered_but_repeat_is_not():
+    enable_page(mode="dry_run")
+    # dry_run does not count as "sent", so seed a sent price reply for this customer first
+    enable_page(mode="live")
+    facebook.reply_comment = lambda *a, **kw: "fb_reply_%d" % len(a)
+    c1 = seed_comment("c_fu1", from_id="u_fu", message="Giá bao nhiêu ạ?")
+    r1 = auto_reply.process_comment(vpost_api.TENANT_ID, c1)
+    assert r1["action"] == "sent", r1
+
+    # Different topics from the same customer right after -> still answered
+    for cid, msg in (("c_fu2", "Có màu gì ạ?"), ("c_fu3", "size M còn không"), ("c_fu4", "giá 2 bộ bao nhiêu")):
+        r = auto_reply.process_comment(vpost_api.TENANT_ID, seed_comment(cid, from_id="u_fu", message=msg))
+        assert r["action"] == "sent", (msg, r)
+
+    # Asking the very same kind of question again within the window -> not repeated
+    r5 = auto_reply.process_comment(vpost_api.TENANT_ID, seed_comment("c_fu5", from_id="u_fu", message="Có màu gì vậy shop"))
+    assert r5["action"] == "skipped"
+
+
+@pytest.mark.parametrize("text, qty", [("gia 2 cai bao nhieu", 2), ("giá 3 bộ bao nhiêu tiền", 3), ("giá 2 cái thì bao nhiêu", 2)])
+def test_quantity_inside_price_question(text, qty):
+    r = auto_reply.classify_intent_rules(text)
+    assert r["ok"] is True and r["intents"] == {"price"} and r["asked_qty"] == qty
