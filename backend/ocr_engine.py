@@ -72,7 +72,11 @@ SessionLock = threading.Lock()
 CachedDetectionSession = None
 CachedRecognitionSession = None
 
-# Regex phân tích hoá đơn tiếng Việt (tách riêng tiền chuẩn chấm/phẩy/nguyên, không nối hai số cách nhau)
+# Regex phân tích hoá đơn tiếng Việt (tách riêng tiền chuẩn chấm/phẩy/nguyên và tiền có đơn vị triệu/nghìn/tỷ)
+ScaledPricePattern = re.compile(
+    r"(?<!\d)(\d+(?:[.,]\d+)?)\s*(tỷ|ty|triệu|trieu|tr|nghìn|nghin|ngàn|ngan)\b(?:\s*(?:vnđ|vnd|đồng|dong|đ|d))?",
+    re.IGNORECASE,
+)
 FormattedPricePattern = re.compile(
     r"(?<!\d)(\d{1,3}(?:\.\d{3})+|\d{1,3}(?:,\d{3})+|\d{4,7})(?!\d)"
 )
@@ -81,8 +85,17 @@ DateValuePattern = re.compile(r"(?<!\d)(\d{2}[/.\-]\d{2}[/.\-]\d{4}|\d{4}-\d{2}-
 MonthYearValuePattern = re.compile(r"(?<!\d)(0?[1-9]|1[0-2])/((?:19|20)\d{2})(?!\d)")
 TimeTokenPattern = re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\b")
 UrlDomainPattern = re.compile(r"(?:https?://|www\.|ww\.)\S+|\b[a-z0-9\-]+\.(?:com|vn|net|org|info)\b\S*", re.IGNORECASE)
-LongCodeOrPhonePattern = re.compile(r"\b0\d{8,10}\b|\b[A-Za-z]*\d{8,}[A-Za-z0-9]*\b|\b(?:1800|1900)\s*\d{4}\b")
+EmailAddressPattern = re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b")
+LongCodeOrPhonePattern = re.compile(
+    r"(?:\+84|84)[\s.\-]?\d{2,3}[\s.\-]?\d{3}[\s.\-]?\d{3,4}"
+    r"|\b0\d{8,10}\b|\b[A-Za-z]*\d{8,}[A-Za-z0-9]*\b|\b(?:1800|1900)\s*\d{4}\b"
+)
 UnitQuantityPattern = re.compile(r"\b\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|m|cm|mm|kwh)\b", re.IGNORECASE)
+LeadingQuantityPattern = re.compile(r"^\s*(\d+(?:[.,]\d+)?)\s+")
+GenericDocTitleSuffixPattern = re.compile(
+    r"\b(?:hoa\s*don\s*ban\s*hang|hoa\s*don|phieu\s*thanh\s*toan|bien\s*lai)\b",
+    re.IGNORECASE,
+)
 
 HighPriorityTotalPattern = re.compile(
     r"(phai\s*thanh\s*toan|tong\s*cong|tong\s*so\s*thanh\s*toan|tong\s*tien\s*phai\s*t\.?\s*toan|"
@@ -90,7 +103,7 @@ HighPriorityTotalPattern = re.compile(
     re.IGNORECASE,
 )
 MediumPriorityTotalPattern = re.compile(
-    r"(cong\s*tien\s*hang|cong\s*tien|thanh\s*toan)",
+    r"(cong\s*tien\s*hang|cong\s*tien|thanh\s*toan(?!\s*cho\b))",
     re.IGNORECASE,
 )
 LowPriorityTotalPattern = re.compile(r"(tong\s*tien\s*hang)", re.IGNORECASE)
@@ -105,12 +118,15 @@ ElectricTierLinePattern = re.compile(r"(shbt\s*kt|shbt)", re.IGNORECASE)
 DiscountLinePattern = re.compile(r"(chiet\s*khau|giam\s*gia|khuyen\s*mai|diem\s*su\s*dung)", re.IGNORECASE)
 NegativeDiscountPattern = re.compile(r"(chiet\s*khau|giam\s*gia|khuyen\s*mai)", re.IGNORECASE)
 TableHeaderPattern = re.compile(
-    r"(don\s*gia|thanh\s*tien|ten\s*hang|gia\s*ban|sl\s*dvt|^sl\b|^khau$|^chiet\s*khau$)",
+    r"(don\s*gia|thanh\s*tien|ten\s*hang|gia\s*ban|mo\s*ta\s+so\s*luong|sl\s*dvt|^sl\b|^khau$|^chiet\s*khau$)",
     re.IGNORECASE,
 )
 IgnoreLinePattern = re.compile(
-    r"(tien\s*khach|tien\s*dua|tien\s*thua|tien\s*mat|tra\s*lai|change|cash|cam\s*on|xin\s*cam\s*on|"
+    r"(tien\s*khach|tien\s*dua|tien\s*thua|tien\s*mat|tien\s*ca\s*the|\bca\s*the\b|quet\s*the|"
+    r"chuyen\s*khoan|thanh\s*toan\s*the|vi\s*dien\s*tu|\bmomo\b|zalopay|vnpay|da\s*lam\s*tron|"
+    r"tra\s*lai|change|cash|cam\s*on|xin\s*cam\s*on|vui\s*long\s*email|neu\s*ban\s*co\s*cau\s*hoi|"
     r"hen\s*gap|wifi|mat\s*khau|hotline|dia\s*chi|sdt|dien\s*thoai|tai\s*quay|nhan\s*vien|"
+    r"so\s*ct\s*:|ngay\s*ct\s*:|hoa\s*don\s*cho\s*:|thanh\s*toan\s*cho\s*:|"
     r"tong\s*da[il]?|gop\s*y|khieu\s*nai|doanh\s*so\s*tich|ma\s*tra\s*cuu|hoa\s*don\s*tich\s*diem|"
     r"hd\s*vat|chinh\s*sach\s*xu|khach\s*hang|csm|csc|pmax|dien\s*nang\s*tieu\s*thu|"
     r"quy\s*khach|luu\s*y|^[-=*_.]{3,}$)",
@@ -119,10 +135,10 @@ IgnoreLinePattern = re.compile(
 
 CategoryKeywordMap = {
     "Ăn uống": (
-        "ca phe", "cafe", "coffee", "tra", "tra sua", "banh", "banh gio", "banh mi",
-        "com", "bun", "pho", "lau", "nuong", "quan an", "an uong", "nha hang", "bep",
-        "highlands", "phuc long", "bach hoa xanh", "heo", "thit", "cam sanh",
-        "cai be", "bi xanh", "bap cai", "chanh", "muoi hat", "gia song",
+        "ca phe", "cafe", "coffee", "tra sua", "tra dao", "tra chanh", "tra vai", "hong tra", "luc tra", "tra da",
+        "banh", "banh gio", "banh mi", "com", "bun", "pho", "lau", "nuong", "quan an", "an uong", "nha hang", "bep",
+        "highlands", "phuc long", "bach hoa xanh", "heo", "thit", "cam sanh", "trung vit", "dui toi ga",
+        "cai be", "bi xanh", "bap cai", "chanh", "muoi hat", "gia song", "xa lach", "kho qua", "bau sao",
     ),
     "Di chuyển": ("grab", "be", "xanh sm", "taxi", "xang", "gui xe", "ve xe", "bus", "metro", "cuoc xe"),
     "Mua sắm": (
@@ -134,7 +150,10 @@ CategoryKeywordMap = {
         "dien luc", "evn", "tien dien", "tien thue", "hoa don dien", "tien nuoc",
         "tien tro", "tien phong", "internet", "wifi", "vien thong", "chung cu",
     ),
-    "Giải trí": ("rap", "phim", "cinema", "cgv", "lotte", "ve xem", "game", "du lich", "karaoke"),
+    "Giải trí": (
+        "rap", "phim", "cinema", "cgv", "lotte", "ve xem", "game", "du lich", "karaoke",
+        "khach san", "hotel", "resort", "homestay",
+    ),
     "Sức khỏe": ("thuoc", "nha thuoc", "benh vien", "phong kham", "kham", "y te", "vitamin", "nha khoa"),
 }
 
@@ -442,6 +461,50 @@ def DecodeCtcGreedy(LogitsArray) -> tuple:
     return NormalizedText, float(NumpyLib.clip(MeanConfidence, 0.0, 1.0))
 
 
+def EstimateReceiptSkewAngle(ProbabilityMap) -> float:
+    """Ước lượng góc nghiêng (độ) của dòng chữ trên hoá đơn từ bản đồ xác suất DBNet."""
+    ProbArray = NumpyLib.asarray(ProbabilityMap, dtype=NumpyLib.float32)
+    while ProbArray.ndim > 2:
+        ProbArray = ProbArray[0]
+    BinaryMap = (ProbArray > DetectionBinaryThreshold).astype(NumpyLib.uint8)
+    ContourList, UnusedHierarchy = OpenCvLib.findContours(BinaryMap, OpenCvLib.RETR_LIST, OpenCvLib.CHAIN_APPROX_SIMPLE)
+
+    MeasuredAngles = []
+    for ContourItem in ContourList:
+        if len(ContourItem) < 5:
+            continue
+        UnusedX, UnusedY, BoxWidth, BoxHeight = OpenCvLib.boundingRect(ContourItem)
+        if BoxWidth < 40 or float(BoxWidth) / max(1.0, float(BoxHeight)) < 3.0:
+            continue
+        FittedLine = OpenCvLib.fitLine(ContourItem, OpenCvLib.DIST_L2, 0, 0.01, 0.01)
+        VectorX = float(FittedLine[0][0])
+        VectorY = float(FittedLine[1][0])
+        if VectorX < 0.0:
+            VectorX = -VectorX
+            VectorY = -VectorY
+        AngleDegrees = math.degrees(math.atan2(VectorY, VectorX))
+        if abs(AngleDegrees) <= 15.0:
+            MeasuredAngles.append(AngleDegrees)
+
+    if len(MeasuredAngles) < 3:
+        return 0.0
+    return float(NumpyLib.median(MeasuredAngles))
+
+
+def DeskewReceiptImage(RgbImageArray, SkewAngleDegrees: float):
+    """Xoay nhẹ ảnh hoá đơn về phương ngang để không bị lệch hàng tên món - giá tiền."""
+    ImageHeight, ImageWidth = RgbImageArray.shape[:2]
+    CenterPoint = (ImageWidth * 0.5, ImageHeight * 0.5)
+    RotationMatrix = OpenCvLib.getRotationMatrix2D(CenterPoint, SkewAngleDegrees, 1.0)
+    return OpenCvLib.warpAffine(
+        RgbImageArray,
+        RotationMatrix,
+        (ImageWidth, ImageHeight),
+        flags=OpenCvLib.INTER_LINEAR,
+        borderMode=OpenCvLib.BORDER_REPLICATE,
+    )
+
+
 def ExtractOcrLinesFromBytes(ImageBytes: bytes) -> dict:
     """Chạy thật PP-OCRv3 DBNet + VieSVTR v7 trên ảnh hoá đơn và trả về danh sách dòng."""
     if not OcrDependenciesAvailable:
@@ -463,6 +526,14 @@ def ExtractOcrLinesFromBytes(ImageBytes: bytes) -> dict:
         DetectionInputName = DetectionSession.get_inputs()[0].name
         DetectionOutputs = DetectionSession.run(None, {DetectionInputName: DetectionBlob})
         ProbabilityMap = DetectionOutputs[0]
+
+        SkewAngleDegrees = EstimateReceiptSkewAngle(ProbabilityMap)
+        if 1.5 <= abs(SkewAngleDegrees) <= 15.0:
+            RgbOriginal = DeskewReceiptImage(RgbOriginal, SkewAngleDegrees)
+            DetectionBlob, ScaleX, ScaleY = PreprocessDetectionImage(RgbOriginal)
+            DetectionOutputs = DetectionSession.run(None, {DetectionInputName: DetectionBlob})
+            ProbabilityMap = DetectionOutputs[0]
+
         DetectedBoxes = PostprocessDetectionBoxes(
             NumpyLib.asarray(ProbabilityMap), ScaleX, ScaleY, OriginalWidth, OriginalHeight
         )
@@ -559,9 +630,27 @@ def _ParseVietnameseMoneyToken(RawDigits: str) -> int:
     return int(DigitsOnly) if DigitsOnly else 0
 
 
+def _ParseScaledMoneyToken(NumberPart: str, UnitPart: str) -> int:
+    """Chuyển chuỗi tiền có đơn vị (70 triệu VNĐ, 2.5 tr, 50 nghìn) thành số nguyên VND."""
+    try:
+        BaseFloat = float(str(NumberPart or "0").replace(",", "."))
+    except ValueError:
+        return 0
+    NormalizedUnit = _StripVietnameseAccents(UnitPart).strip()
+    MultiplierValue = 1
+    if NormalizedUnit in ("ty",):
+        MultiplierValue = 1_000_000_000
+    elif NormalizedUnit in ("trieu", "tr"):
+        MultiplierValue = 1_000_000
+    elif NormalizedUnit in ("nghin", "ngan"):
+        MultiplierValue = 1_000
+    return int(round(BaseFloat * MultiplierValue))
+
+
 def _SanitizeTextForPriceExtraction(SourceText: str) -> str:
-    """Loại bỏ ngày, giờ, URL, SĐT, mã hoá đơn dài và đơn vị đo trước khi tách số tiền."""
-    CleanedText = UrlDomainPattern.sub(" ", str(SourceText or ""))
+    """Loại bỏ ngày, giờ, email, URL, SĐT, mã hoá đơn dài và đơn vị đo trước khi tách số tiền."""
+    CleanedText = EmailAddressPattern.sub(" ", str(SourceText or ""))
+    CleanedText = UrlDomainPattern.sub(" ", CleanedText)
     CleanedText = DateValuePattern.sub(" ", CleanedText)
     CleanedText = MonthYearValuePattern.sub(" ", CleanedText)
     CleanedText = TimeTokenPattern.sub(" ", CleanedText)
@@ -570,21 +659,77 @@ def _SanitizeTextForPriceExtraction(SourceText: str) -> str:
     return CleanedText
 
 
-def _ExtractPriceMatchesFromRow(RowText: str, AllowSpaceSeparated: bool = False) -> list:
-    """Trích danh sách các đối tượng match giá tiền hợp lệ từ một dòng đã làm sạch."""
+def _ExtractPriceEntriesFromRow(RowText: str, AllowSpaceSeparated: bool = False) -> list:
+    """Trích danh sách giá tiền (gồm cả dạng triệu/nghìn/tỷ và dạng số chuẩn) kèm vị trí trên dòng."""
     CleanedText = _SanitizeTextForPriceExtraction(RowText)
-    Matches = list(FormattedPricePattern.finditer(CleanedText))
-    if not Matches and AllowSpaceSeparated:
-        Matches = list(SpaceSeparatedPricePattern.finditer(CleanedText))
-    return Matches
+    PriceEntries = []
+    MaskedChars = list(CleanedText)
+
+    for ScaledMatch in ScaledPricePattern.finditer(CleanedText):
+        ScaledAmount = _ParseScaledMoneyToken(ScaledMatch.group(1), ScaledMatch.group(2))
+        if ScaledAmount >= 1000:
+            PriceEntries.append(
+                {
+                    "amount": ScaledAmount,
+                    "start": ScaledMatch.start(),
+                    "end": ScaledMatch.end(),
+                }
+            )
+            for CharPos in range(ScaledMatch.start(), ScaledMatch.end()):
+                MaskedChars[CharPos] = " "
+
+    RemainingText = "".join(MaskedChars)
+    FormattedMatches = list(FormattedPricePattern.finditer(RemainingText))
+    if not FormattedMatches and not PriceEntries and AllowSpaceSeparated:
+        FormattedMatches = list(SpaceSeparatedPricePattern.finditer(RemainingText))
+
+    for NumberMatch in FormattedMatches:
+        ParsedAmount = _ParseVietnameseMoneyToken(NumberMatch.group(1))
+        if ParsedAmount >= 1000:
+            PriceEntries.append(
+                {
+                    "amount": ParsedAmount,
+                    "start": NumberMatch.start(),
+                    "end": NumberMatch.end(),
+                }
+            )
+
+    PriceEntries.sort(key=lambda EntryObj: EntryObj["start"])
+    return PriceEntries
 
 
-def _InferCategoryFromText(MerchantText: str, ItemsText: str) -> str:
+def _CleanMerchantName(RawMerchant: str) -> str:
+    """Làm sạch tên cửa hàng: bỏ từ khoá tiêu đề hoá đơn và ký tự logo nhiễu ở đầu."""
+    CandidateText = str(RawMerchant or "").strip(" .:-–|")
+    if not CandidateText:
+        return ""
+    StrippedWords = []
+    Tokens = CandidateText.split()
+    IndexCursor = 0
+    while IndexCursor < len(Tokens):
+        WindowThree = " ".join(Tokens[IndexCursor : IndexCursor + 4])
+        WindowTwo = " ".join(Tokens[IndexCursor : IndexCursor + 2])
+        if _StripVietnameseAccents(WindowThree) in ("hoa don ban hang", "phieu thanh toan"):
+            IndexCursor += 4
+            continue
+        if _StripVietnameseAccents(WindowTwo) in ("hoa don", "bien lai"):
+            IndexCursor += 2
+            continue
+        StrippedWords.append(Tokens[IndexCursor])
+        IndexCursor += 1
+    CleanedText = " ".join(StrippedWords).strip(" .:-–|")
+    CleanedText = re.sub(r"^(?:[A-Z][a-z]|[^A-Za-zÀ-ỹĐđ0-9]+)\s+(?=[A-ZÀ-ỸĐ]{2,})", "", CleanedText)
+    return CleanedText.strip(" .:-–|")
+
+
+def _InferCategoryFromText(MerchantText: str, ItemsText: str, FullReceiptText: str = "") -> str:
     """Chấm điểm từ khoá theo ranh giới từ (trọng số nơi mua x2) để xếp nhóm chi chuẩn xác."""
-    CleanedMerchant = UrlDomainPattern.sub(" ", str(MerchantText or ""))
-    CleanedItems = UrlDomainPattern.sub(" ", str(ItemsText or ""))
+    CleanedMerchant = EmailAddressPattern.sub(" ", UrlDomainPattern.sub(" ", str(MerchantText or "")))
+    CleanedItems = EmailAddressPattern.sub(" ", UrlDomainPattern.sub(" ", str(ItemsText or "")))
+    CleanedFull = EmailAddressPattern.sub(" ", UrlDomainPattern.sub(" ", str(FullReceiptText or "")))
     NormMerchant = _StripVietnameseAccents(CleanedMerchant)
     NormItems = _StripVietnameseAccents(CleanedItems)
+    NormFull = _StripVietnameseAccents(CleanedFull)
 
     BestCategory = "Chưa phân loại"
     BestScore = 0
@@ -593,8 +738,10 @@ def _InferCategoryFromText(MerchantText: str, ItemsText: str) -> str:
         for KeywordItem in KeywordTuple:
             WordBoundaryRegex = r"(?<!\w)" + re.escape(KeywordItem) + r"(?!\w)"
             if re.search(WordBoundaryRegex, NormMerchant):
-                ScoreValue += 2
+                ScoreValue += 3
             if re.search(WordBoundaryRegex, NormItems):
+                ScoreValue += 2
+            elif NormFull and re.search(WordBoundaryRegex, NormFull):
                 ScoreValue += 1
         if ScoreValue > BestScore:
             BestScore = ScoreValue
@@ -677,10 +824,12 @@ def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: 
             continue
 
         TotalPriority = _DetectTotalPriority(NormalizedRowText)
-        PriceMatches = _ExtractPriceMatchesFromRow(RowText, AllowSpaceSeparated=(TotalPriority > 0 or ExpectNextRowTotalPriority > 0))
+        PriceEntries = _ExtractPriceEntriesFromRow(
+            RowText, AllowSpaceSeparated=(TotalPriority > 0 or ExpectNextRowTotalPriority > 0)
+        )
 
-        if ExpectNextRowTotalPriority > 0 and PriceMatches:
-            NextCandidate = _ParseVietnameseMoneyToken(PriceMatches[-1].group(1))
+        if ExpectNextRowTotalPriority > 0 and PriceEntries:
+            NextCandidate = PriceEntries[-1]["amount"]
             if NextCandidate >= 1000 and ExpectNextRowTotalPriority >= BestTotalPriority:
                 BestTotalPriority = ExpectNextRowTotalPriority
                 BestTotalAmount = NextCandidate
@@ -697,8 +846,8 @@ def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: 
                 or re.search(r"(?:\d+\s*%|[-–]\s*)\d{1,3}(?:[.,]\d{3})+", RowText)
             )
             PendingDiscountRow = False
-            if PriceMatches and not HasNegativeDiscount:
-                CandidateTotal = _ParseVietnameseMoneyToken(PriceMatches[-1].group(1))
+            if PriceEntries and not HasNegativeDiscount:
+                CandidateTotal = PriceEntries[-1]["amount"]
                 if CandidateTotal >= 1000 and TotalPriority >= BestTotalPriority:
                     BestTotalPriority = TotalPriority
                     BestTotalAmount = CandidateTotal
@@ -708,38 +857,41 @@ def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: 
 
         if DiscountLinePattern.search(NormalizedRowText):
             PendingItemName = ""
-            PendingDiscountRow = bool(NegativeDiscountPattern.search(NormalizedRowText) and not PriceMatches)
+            PendingDiscountRow = bool(NegativeDiscountPattern.search(NormalizedRowText) and not PriceEntries)
             continue
         PendingDiscountRow = False
 
         if IsElectricBill:
-            if ElectricEnergyAmountPattern.search(NormalizedRowText) and PriceMatches:
-                ElectricEnergyCost = max(_ParseVietnameseMoneyToken(MatchObj.group(1)) for MatchObj in PriceMatches)
+            if ElectricEnergyAmountPattern.search(NormalizedRowText) and PriceEntries:
+                ElectricEnergyCost = max(EntryObj["amount"] for EntryObj in PriceEntries)
                 continue
-            if ElectricTaxAmountPattern.search(NormalizedRowText) and PriceMatches:
-                ElectricTaxCost = max(_ParseVietnameseMoneyToken(MatchObj.group(1)) for MatchObj in PriceMatches)
+            if ElectricTaxAmountPattern.search(NormalizedRowText) and PriceEntries:
+                ElectricTaxCost = max(EntryObj["amount"] for EntryObj in PriceEntries)
                 continue
             if ElectricTierLinePattern.search(NormalizedRowText):
                 continue
 
-        if not PriceMatches:
+        if not PriceEntries:
             CleanedCandidate = _SanitizeTextForPriceExtraction(RowText).strip(" .:-–")
             HasAlphabetic = bool(re.search(r"[A-Za-zÀ-ỹĐđ]{2,}", CleanedCandidate))
-            IsGenericTitle = bool(re.search(r"^(hoa\s*don\s*ban\s*hang|phieu\s*thanh\s*toan)$", NormalizedRowText))
+            IsGenericTitle = bool(re.search(r"^(hoa\s*don\s*ban\s*hang|phieu\s*thanh\s*toan|hoa\s*don)$", NormalizedRowText))
             if "bach hoa xanh" in NormalizedRowText:
                 MerchantName = "Bách Hóa Xanh"
                 MerchantFromUrl = False
             elif RowIndex <= 3 and (not MerchantName or MerchantFromUrl) and HasAlphabetic and not IsGenericTitle and not re.search(r"\b(ban|ngay|gio)\s*:", NormalizedRowText):
-                MerchantName = CleanedCandidate or RowText
-                MerchantFromUrl = False
+                CleanedBrand = _CleanMerchantName(CleanedCandidate or RowText)
+                if CleanedBrand:
+                    MerchantName = CleanedBrand
+                    MerchantFromUrl = False
             elif HasAlphabetic and not IsGenericTitle and not re.search(r"\b(ban|ngay|gio)\s*:", NormalizedRowText):
                 PendingItemName = CleanedCandidate
             continue
 
-        LastMatch = PriceMatches[-1]
-        ItemPrice = _ParseVietnameseMoneyToken(LastMatch.group(1))
+        FirstEntry = PriceEntries[0]
+        LastEntry = PriceEntries[-1]
+        ItemPrice = LastEntry["amount"]
         SanitizedRow = _SanitizeTextForPriceExtraction(RowText)
-        RawPrefix = SanitizedRow[: LastMatch.start()]
+        RawPrefix = SanitizedRow[: FirstEntry["start"]]
         CleanedLabel = re.sub(r"^\d+[.)]\s*", "", RawPrefix)
         CleanedLabel = re.sub(r"\b\d+(?:[.,]\d+)?\b", " ", CleanedLabel)
         CleanedLabel = re.sub(r"\s+", " ", CleanedLabel).strip(" .:-–,/")
@@ -750,7 +902,18 @@ def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: 
                 ParsedItems.append({"name": CleanedLabel, "price": ItemPrice})
                 PendingItemName = ""
             elif PendingItemName:
-                ParsedItems.append({"name": PendingItemName, "price": ItemPrice})
+                ResolvedLinePrice = ItemPrice
+                if len(PriceEntries) == 1:
+                    PrefixBeforePrice = SanitizedRow[: FirstEntry["start"]]
+                    QuantityMatch = re.fullmatch(r"\s*(\d+(?:[.,]\d+)?)\s*", PrefixBeforePrice)
+                    if QuantityMatch:
+                        try:
+                            ParsedQuantity = float(QuantityMatch.group(1).replace(",", "."))
+                            if 0.0 < ParsedQuantity <= 99.0 and ParsedQuantity != 1.0:
+                                ResolvedLinePrice = int(round(ParsedQuantity * ItemPrice))
+                        except ValueError:
+                            pass
+                ParsedItems.append({"name": PendingItemName, "price": ResolvedLinePrice})
                 PendingItemName = ""
 
     if IsElectricBill:
@@ -765,6 +928,7 @@ def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: 
     PrintedTotalVnd = BestTotalAmount
     ItemsSumVnd = sum(int(ItemObj["price"]) for ItemObj in ParsedItems)
     ActualPaidVnd = PrintedTotalVnd if PrintedTotalVnd > 0 else ItemsSumVnd
+    MissingPrintedTotal = bool(PrintedTotalVnd <= 0)
 
     QualityStatus = QualityReport.get("quality_status", "unknown")
     MeanConfidence = (
@@ -775,8 +939,15 @@ def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: 
 
     HasNoReadableTotal = ActualPaidVnd <= 0
     HasLowQualityOrConf = bool(QualityStatus == "fail" or len(LogicalRows) == 0 or MeanConfidence < 0.45)
-    NeedsReread = bool(HasNoReadableTotal or HasLowQualityOrConf)
+    NeedsReread = bool(HasNoReadableTotal or HasLowQualityOrConf or MissingPrintedTotal)
     ReviewStatus = "Cần đọc lại" if NeedsReread else "Sẵn sàng Chốt"
+    ReviewNote = ""
+    if MissingPrintedTotal and ItemsSumVnd > 0:
+        ReviewNote = "Không thấy dòng tổng cộng trên ảnh (có thể bị cắt phần cuối) — đang tạm tính từ tổng các món đọc được."
+    elif HasNoReadableTotal:
+        ReviewNote = "Chưa đọc được số tiền thanh toán — vui lòng chụp lại rõ nét hơn hoặc nhập tay."
+    elif HasLowQualityOrConf:
+        ReviewNote = "Chất lượng ảnh hoặc độ tin cậy OCR thấp — cần kiểm tra lại trước khi chốt."
 
     if not MerchantName:
         MerchantName = "không rõ" if NeedsReread else "Cửa hàng trên hoá đơn"
@@ -788,7 +959,7 @@ def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: 
             ParsedItems = [{"name": "không rõ (cần bạn nhập hoặc chụp lại rõ nét hơn)", "price": ActualPaidVnd}]
 
     ItemsCombinedText = " ".join(ItemObj["name"] for ItemObj in ParsedItems)
-    SuggestedCategory = _InferCategoryFromText(MerchantName, ItemsCombinedText)
+    SuggestedCategory = _InferCategoryFromText(MerchantName, ItemsCombinedText, FullNormalizedText)
     ResolvedDate = FallbackDate or ExtractedDate or ExtractedMonthYear
     DateSourceNote = (
         "Ngày chụp/tải lên"
@@ -805,6 +976,8 @@ def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: 
         "items": ParsedItems,
         "printed_total": PrintedTotalVnd,
         "actual_paid_vnd": ActualPaidVnd,
+        "missing_printed_total": MissingPrintedTotal,
+        "review_note": ReviewNote,
         "logical_rows": LogicalRows,
         "mean_confidence": round(MeanConfidence, 4),
         "is_uncertain": NeedsReread,
