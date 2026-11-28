@@ -1,0 +1,1 @@
+{"orders":[{"id":"D100","items":[{"name":"cơm gà","price":50000},{"name":"trà","price":20000}]},{"id":"D101","items":[{"name":"bún","price":40000},{"name":"nước","price":15000}]}],"policy":{"max_vnd":40000,"description":"Chính sách giả lập: đề xuất tối đa giá món thiếu và 40000 VND; nhân viên quyết định."}}
