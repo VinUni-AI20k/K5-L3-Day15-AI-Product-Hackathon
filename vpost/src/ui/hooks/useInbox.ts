@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  isCancelledError,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -32,6 +33,7 @@ import {
   type InboxThreadMutationResponse,
   type InboxThreadRunsResponse,
 } from "@/ui/schemas/inbox.schema";
+import { isAbortError, suppressAbortRejection } from "@/ui/services/abort";
 import { ApiError } from "@/ui/services/api-error";
 import {
   setCommentHidden,
@@ -110,6 +112,10 @@ export function toThreadListFilterRecord(
   };
 }
 
+function isInboxCancellation(error: unknown): boolean {
+  return isAbortError(error) || isCancelledError(error);
+}
+
 /** Helper to invalidate the thread list and optionally one open thread. */
 export function useInvalidateInbox() {
   const queryClient = useQueryClient();
@@ -117,9 +123,15 @@ export function useInvalidateInbox() {
 
   return useCallback(
     (threadId?: string | null) => {
-      void queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) });
+      suppressAbortRejection(
+        queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) }),
+        isInboxCancellation,
+      );
       if (threadId) {
-        void queryClient.invalidateQueries({ queryKey: inboxKeys.thread(tenantKey, threadId) });
+        suppressAbortRejection(
+          queryClient.invalidateQueries({ queryKey: inboxKeys.thread(tenantKey, threadId) }),
+          isInboxCancellation,
+        );
       }
     },
     [queryClient, tenantKey],
@@ -209,7 +221,10 @@ export function useInboxThread(threadId: string | null) {
     const wasVisible = prevVisibleRef.current;
     prevVisibleRef.current = isVisible;
     if (!wasVisible && isVisible && isRunning && isResolved && normalizedId.length > 0) {
-      void refetchRef.current({ cancelRefetch: false });
+      suppressAbortRejection(
+        refetchRef.current({ cancelRefetch: false }),
+        isInboxCancellation,
+      );
     }
   }, [isRunning, isResolved, isVisible, normalizedId]);
 
@@ -229,10 +244,16 @@ export function useInboxThread(threadId: string | null) {
       prev.running &&
       !isRunning
     ) {
-      void queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) });
-      void queryClient.invalidateQueries({
-        queryKey: inboxKeys.threadRuns(tenantKey, normalizedId),
-      });
+      suppressAbortRejection(
+        queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) }),
+        isInboxCancellation,
+      );
+      suppressAbortRejection(
+        queryClient.invalidateQueries({
+          queryKey: inboxKeys.threadRuns(tenantKey, normalizedId),
+        }),
+        isInboxCancellation,
+      );
     }
   }, [isResolved, isRunning, normalizedId, queryClient, tenantKey]);
 
@@ -287,8 +308,14 @@ export function useMarkThreadRead() {
       );
     },
     onSettled: (_data, _error, { threadId }) => {
-      void queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) });
-      void queryClient.invalidateQueries({ queryKey: inboxKeys.thread(tenantKey, threadId) });
+      suppressAbortRejection(
+        queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) }),
+        isInboxCancellation,
+      );
+      suppressAbortRejection(
+        queryClient.invalidateQueries({ queryKey: inboxKeys.thread(tenantKey, threadId) }),
+        isInboxCancellation,
+      );
     },
   });
 }
@@ -372,8 +399,14 @@ export function useClearThreadAttention() {
       );
     },
     onSettled: (_data, _error, { threadId }) => {
-      void queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) });
-      void queryClient.invalidateQueries({ queryKey: inboxKeys.thread(tenantKey, threadId) });
+      suppressAbortRejection(
+        queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) }),
+        isInboxCancellation,
+      );
+      suppressAbortRejection(
+        queryClient.invalidateQueries({ queryKey: inboxKeys.thread(tenantKey, threadId) }),
+        isInboxCancellation,
+      );
     },
   });
 }
@@ -421,9 +454,18 @@ export function useInboxSyncComments() {
     mutationFn: (params) => syncComments(params ?? {}),
     retry: false,
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) });
-      void queryClient.invalidateQueries({ queryKey: ["inbox", tenantKey, "thread"] as const });
-      void queryClient.invalidateQueries({ queryKey: moderationKeys.all(tenantKey) });
+      suppressAbortRejection(
+        queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) }),
+        isInboxCancellation,
+      );
+      suppressAbortRejection(
+        queryClient.invalidateQueries({ queryKey: ["inbox", tenantKey, "thread"] as const }),
+        isInboxCancellation,
+      );
+      suppressAbortRejection(
+        queryClient.invalidateQueries({ queryKey: moderationKeys.all(tenantKey) }),
+        isInboxCancellation,
+      );
     },
   });
 }

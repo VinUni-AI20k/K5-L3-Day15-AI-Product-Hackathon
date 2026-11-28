@@ -373,6 +373,43 @@ SCHEMA_STATEMENTS = (
     create index if not exists comment_thread_attention_active
       on comment_thread_attention(tenant_id, tag) where tag != ''
     """,
+    """
+    create table if not exists agent_run(
+      seq bigint generated always as identity,
+      id text primary key,
+      tenant_id text not null,
+      thread_id text not null,
+      comment_id text not null default '',
+      reply_message_id text not null default '',
+      kind text not null,
+      status text not null default 'running',
+      outcome text not null default '',
+      steps jsonb not null default '[]'::jsonb,
+      started_at text not null,
+      updated_at text not null,
+      finished_at text not null default ''
+    )
+    """,
+    """
+    create index if not exists agent_run_tenant_thread
+      on agent_run(tenant_id, thread_id, started_at desc, seq desc)
+    """,
+    """
+    create index if not exists agent_run_tenant_status
+      on agent_run(tenant_id, status, started_at desc)
+    """,
+    """
+    create index if not exists agent_run_tenant_comment
+      on agent_run(tenant_id, thread_id, comment_id) where comment_id != ''
+    """,
+    """
+    create index if not exists agent_run_tenant_reply_msg
+      on agent_run(tenant_id, thread_id, reply_message_id) where reply_message_id != ''
+    """,
+    """
+    create index if not exists agent_run_started_at
+      on agent_run(started_at)
+    """,
 )
 
 
@@ -1927,6 +1964,31 @@ def claim_comment_reply(tenant_id, comment_id, new_draft_id, text, ts, *, attemp
         return None, "CONFLICT"
 
 
+def _thread_blocked_for_auto_claim_in_tx(c, tenant_id, thread_id, c_row, ref_dt):
+    """True nếu hội thoại đã có phản hồi/thao tác nhân viên hoặc Page ngay dưới khoá giao dịch (R5)."""
+    if c_row["is_from_page"] or c_row["status"] in ("replied", "ignored"):
+        return True
+    tree_rows = _thread_tree_rows_in_conn(c, tenant_id, thread_id)
+    tree_ids = [r["id"] for r in tree_rows] or [thread_id]
+    for r in tree_rows:
+        if r["status"] != "deleted" and r["is_from_page"]:
+            return True
+    draft_rows = c.execute(
+        "select status, edited_text, attempt_token, created_at, updated_at "
+        "from comment_draft where tenant_id=%s and comment_id = any(%s)",
+        (tenant_id, tree_ids),
+    ).fetchall()
+    for dr in draft_rows:
+        st = dr.get("status") or ""
+        if st == "sent":
+            return True
+        if st == "sending" and not _is_stale_sending(dr, ref_dt):
+            return True
+        if st == "draft" and (dr.get("edited_text") or "").strip():
+            return True
+    return False
+
+
 def claim_thread_reply(
     tenant_id,
     thread_id,
@@ -1942,15 +2004,17 @@ def claim_thread_reply(
 
     Trả (draft_id, error_code|None, existing_sent_draft|None):
     - error_code == 'ALREADY_SENT': client_id đã gửi thành công trước đó → trả kết quả lưu, không gọi lại Facebook.
-    - error_code == 'CONFLICT': đang có lượt gửi in-flight cùng hội thoại (hoặc client_id dùng cho hội thoại khác).
+    - error_code == 'CONFLICT': đang có lượt gửi in-flight cùng hội thoại (hoặc client_id dùng cho hội thoại khác,
+      hoặc với `sent_by='auto'` khi hội thoại đã được trả lời / bỏ qua / có phản hồi Page hay nháp nhân viên sửa).
     - client_id đang ở trạng thái 'failed' (hoặc vừa phục hồi từ 'sending' treo): chuyển lại sang 'sending' để gửi lại.
     """
     tok = (attempt_token or "").strip() or str(uuid.uuid4())
     actor = str(sent_by or "operator")
+    ref_dt, _ = _ref_time(ts)
     try:
         with tx_locked(_comment_lock_key(tenant_id, thread_id)) as c:
             c_row = c.execute(
-                "select status, can_comment, parent_id from fb_comment where id=%s and tenant_id=%s",
+                "select status, can_comment, parent_id, is_from_page from fb_comment where id=%s and tenant_id=%s",
                 (thread_id, tenant_id),
             ).fetchone()
             if not c_row or c_row["status"] == "deleted" or c_row["parent_id"]:
@@ -1969,6 +2033,8 @@ def claim_thread_reply(
                     return existing["id"], "ALREADY_SENT", _draft(existing)
                 if existing["status"] == "sending":
                     return None, "CONFLICT", None
+                if actor == "auto" and _thread_blocked_for_auto_claim_in_tx(c, tenant_id, thread_id, c_row, ref_dt):
+                    return None, "CONFLICT", None
                 if not c_row["can_comment"]:
                     return None, "CANNOT_COMMENT", None
                 other_busy = c.execute(
@@ -1986,6 +2052,9 @@ def claim_thread_reply(
                 if cur.rowcount == 0:
                     return None, "CONFLICT", None
                 return existing["id"], None, None
+
+            if actor == "auto" and _thread_blocked_for_auto_claim_in_tx(c, tenant_id, thread_id, c_row, ref_dt):
+                return None, "CONFLICT", None
 
             if not c_row["can_comment"]:
                 return None, "CANNOT_COMMENT", None

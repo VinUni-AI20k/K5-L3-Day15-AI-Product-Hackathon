@@ -22,7 +22,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 import schedule  # noqa: E402
 import tools  # noqa: E402
 
-tools.UPLOADS = tempfile.mkdtemp()   # ảnh test không ghi vào data/uploads của repo
+if "server" not in sys.modules:   # server mount thư mục ảnh lúc nạp — chỉ đổi khi chưa nạp
+    tools.UPLOADS = tempfile.mkdtemp()   # ảnh test không ghi vào data/uploads của repo
 import server  # noqa: E402
 
 INV = {"T1": [{"mau": "Đen", "size": s, "ton": 3, "trang_thai": "Còn hàng"} for s in "SML"]}

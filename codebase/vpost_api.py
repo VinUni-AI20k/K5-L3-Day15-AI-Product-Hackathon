@@ -23,6 +23,7 @@ from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 import agent
+import agent_runs
 import facebook
 import inbox_store
 import moderation_api
@@ -1111,7 +1112,17 @@ def _build_thread_records(rows, read_states, attentions=None):
     return records
 
 
-def _serialize_thread(rec, *, chans, jobs_by_id, catalog_by_code, active_drafts, tags_by_from, auto_replies=None):
+def _serialize_thread(
+    rec,
+    *,
+    chans,
+    jobs_by_id,
+    catalog_by_code,
+    active_drafts,
+    tags_by_from,
+    auto_replies=None,
+    latest_runs=None,
+):
     root = rec["root"]
     ch_info = chans.get(root["channel_id"]) or {}
     job = jobs_by_id.get(root["post_job_id"]) if root.get("post_job_id") else None
@@ -1171,19 +1182,31 @@ def _serialize_thread(rec, *, chans, jobs_by_id, catalog_by_code, active_drafts,
         "moderation": moderation_store.format_comment_moderation(root),
         "attention": attention_view,
         "autoReply": auto_reply_view,
+        "agentRun": (latest_runs or {}).get(rec["id"]),
         "updatedAt": rec["updated_at"],
     }
 
 
-def _message_view(m, *, thread_id, liked_set, client_by_reply):
+def _message_view(
+    m,
+    *,
+    thread_id,
+    liked_set,
+    client_by_reply,
+    run_id_by_comment=None,
+    run_id_by_reply=None,
+):
     from_page = bool(m["is_from_page"])
     client_id = client_by_reply.get(m["id"])
     if not from_page:
         sent_by = None
-    elif m.get("sent_by") == "auto" or (client_id or "").startswith("auto:"):
-        sent_by = "auto"
+        agent_run_id = (run_id_by_comment or {}).get(m["id"])
     else:
-        sent_by = "operator"
+        if m.get("sent_by") == "auto" or (client_id or "").startswith("auto:"):
+            sent_by = "auto"
+        else:
+            sent_by = "operator"
+        agent_run_id = (run_id_by_reply or {}).get(m["id"])
     return {
         "id": m["id"],
         "threadId": thread_id,
@@ -1201,6 +1224,7 @@ def _message_view(m, *, thread_id, liked_set, client_by_reply):
         "userMessage": None,
         "clientId": client_id,
         "sentBy": sent_by,
+        "agentRunId": agent_run_id,
         "moderation": moderation_store.format_comment_moderation(m),
     }
 
@@ -1225,6 +1249,7 @@ def _outgoing_draft_message_view(d, *, root, channel_name):
         "userMessage": d["user_message"] or None,
         "clientId": cid,
         "sentBy": sent_by,
+        "agentRunId": None,
         "moderation": None,
     }
 
@@ -1256,6 +1281,7 @@ def _thread_view(thread_id: str, *, rec=None, chans=None, tenant_id=None):
     active_drafts = store.active_thread_drafts(tid, [thread_id])
     tags_by_from = inbox_store.tags_for(tid, [rec["customer_id"]]) if rec["customer_id"] else {}
     auto_replies = store.latest_auto_reply_for_threads(tid, [thread_id])
+    latest_runs = agent_runs.latest_runs_for_threads(tid, [thread_id], now_dt=now())
     return _serialize_thread(
         rec,
         chans=chans,
@@ -1264,17 +1290,36 @@ def _thread_view(thread_id: str, *, rec=None, chans=None, tenant_id=None):
         active_drafts=active_drafts,
         tags_by_from=tags_by_from,
         auto_replies=auto_replies,
+        latest_runs=latest_runs,
     )
 
 
-def _message_for_sent_draft(thread_id: str, draft: dict, *, root: dict, chans: dict, tenant_id=None):
+def _message_for_sent_draft(
+    thread_id: str,
+    draft: dict,
+    *,
+    root: dict,
+    chans: dict,
+    tenant_id=None,
+    agent_run_id=None,
+):
     tid = tenant_id or TENANT_ID
     fb_reply_id = draft.get("fb_reply_id") or ""
     saved = store.get_comment(tid, fb_reply_id) if fb_reply_id else None
     if saved:
         liked = set(inbox_store.liked_ids(tid, [saved["id"]]))
         client_map = {saved["id"]: draft["client_id"]} if draft.get("client_id") else {}
-        return _message_view(saved, thread_id=thread_id, liked_set=liked, client_by_reply=client_map)
+        rid = agent_run_id
+        if rid is None:
+            _, by_rep = agent_runs.message_run_ids(tid, thread_id, (), [saved["id"]])
+            rid = by_rep.get(saved["id"])
+        return _message_view(
+            saved,
+            thread_id=thread_id,
+            liked_set=liked,
+            client_by_reply=client_map,
+            run_id_by_reply={saved["id"]: rid} if rid else None,
+        )
     ch_name = (chans.get(root["channel_id"]) or {}).get("name") or root["channel_id"]
     cid = draft.get("client_id") or None
     sent_by = "auto" if (draft.get("sent_by") == "auto" or (cid or "").startswith("auto:")) else "operator"
@@ -1295,8 +1340,26 @@ def _message_for_sent_draft(thread_id: str, draft: dict, *, root: dict, chans: d
         "userMessage": None,
         "clientId": cid,
         "sentBy": sent_by,
+        "agentRunId": agent_run_id,
         "moderation": None,
     }
+
+
+def _format_draft_reasons(reasons) -> str:
+    parts = []
+    for r in reasons or ():
+        if isinstance(r, dict):
+            issue = str(r.get("issue") or "").strip()
+            field = str(r.get("field") or "").strip()
+            if issue:
+                parts.append(issue)
+            elif field:
+                parts.append(field)
+        elif isinstance(r, (list, tuple)) and len(r) >= 2:
+            parts.append(str(r[1]))
+        elif r:
+            parts.append(str(r))
+    return "; ".join(parts)
 
 
 def generate_thread_draft(thread_id: str):
@@ -1314,43 +1377,283 @@ def generate_thread_draft(thread_id: str):
     visible_history = [m for m in rec["fb_msgs"] if not m["is_hidden"]]
     history = visible_history if visible_history else [root]
     target_comment = rec["last_customer_msg"] or root
-    res = agent.draft_comment_reply(target_comment, post, row, page, model=MODEL, history=history)
-    ts = z(now())
-    draft_status = "draft" if res["decision"] == "reply" else "flagged"
-    ok, err = store.create_ai_comment_draft(
+    run_comment_id = target_comment["id"] if not target_comment.get("is_from_page") else None
+
+    run_id = agent_runs.start_run(
         TENANT_ID,
         thread_id,
-        {
-            "id": str(uuid.uuid4()),
-            "comment_id": thread_id,
-            "target_comment_id": target_comment["id"],
-            "status": draft_status,
-            "ai_text": res["reply"],
-            "edited_text": "",
-            "reasons": res["reasons"],
-            "warnings": res["warnings"],
-            "model": res["model"],
-            "tokens_in": res["tokens_in"],
-            "tokens_out": res["tokens_out"],
-            "fb_reply_id": "",
-            "client_id": "",
-            "error_code": "",
-            "user_message": "",
-            "created_at": ts,
-            "updated_at": ts,
-            "sent_at": "",
-        },
-        allow_any_root=True,
+        "draft",
+        comment_id=run_comment_id,
+        now_dt=now(),
     )
-    if not ok:
-        return None, err
-    log.info(
-        "comment_thread_draft_created tenant=%s thread_id=%s status=%s",
-        TENANT_ID,
-        thread_id,
-        draft_status,
-    )
-    return draft_status, None
+
+    try:
+        has_customer_text = any(
+            (not m.get("is_from_page")) and bool(rules.scrub_pii(m.get("message") or "").strip())
+            for m in history
+        ) or (
+            not target_comment.get("is_from_page")
+            and bool(rules.scrub_pii(target_comment.get("message") or "").strip())
+        )
+        can_compose = False
+        if not has_customer_text:
+            agent_runs.add_step(
+                TENANT_ID,
+                run_id,
+                "read",
+                "blocked",
+                detail="Bình luận không có nội dung chữ — nhân viên xem trực tiếp trên Facebook",
+                now_dt=now(),
+            )
+        else:
+            agent_runs.add_step(
+                TENANT_ID,
+                run_id,
+                "read",
+                "ok",
+                detail="Đã đọc %d tin nhắn trong hội thoại" % len(history),
+                now_dt=now(),
+            )
+            had_pii = any(bool(rules.find_pii_spans(m.get("message") or "")) for m in history)
+            mod_cat = str(target_comment.get("moderation_category") or "").strip()
+            if had_pii:
+                safety_detail = "Đã ẩn thông tin cá nhân (SĐT/email) trước khi gửi AI soạn nháp"
+            elif mod_cat:
+                safety_detail = "Ghi nhận cảnh báo kiểm duyệt (%s), tiếp tục soạn nháp chờ duyệt" % mod_cat
+            else:
+                safety_detail = "Không phát hiện dữ liệu nhạy cảm cần ẩn trước khi soạn nháp"
+            agent_runs.add_step(
+                TENANT_ID,
+                run_id,
+                "safety",
+                "ok",
+                detail=safety_detail,
+                now_dt=now(),
+            )
+
+            if not row:
+                agent_runs.add_step(
+                    TENANT_ID,
+                    run_id,
+                    "facts",
+                    "blocked",
+                    detail="Không tìm thấy sản phẩm trong danh mục — cần nhân viên tự trả lời",
+                    now_dt=now(),
+                )
+            else:
+                stock = tools.check_stock(row)
+                if stock.get("hard"):
+                    hard_msg = "; ".join(m for _, m in stock["hard"])
+                    agent_runs.add_step(
+                        TENANT_ID,
+                        run_id,
+                        "facts",
+                        "blocked",
+                        detail="Tồn kho lỗi cứng: %s" % hard_msg,
+                        now_dt=now(),
+                    )
+                else:
+                    code = str(row.get("ma_sp") or root.get("product_code") or "").strip()
+                    price_val = rules.parse_price(row.get("gia_ban"))
+                    fparts = []
+                    if price_val is not None:
+                        fparts.append("giá %s" % rules.fmt_vnd(price_val))
+                    if stock.get("sizes"):
+                        fparts.append("size %s" % ", ".join(stock["sizes"]))
+                    if stock.get("colors"):
+                        fparts.append("màu %s" % ", ".join(stock["colors"]))
+                    facts_detail = (
+                        "Mã %s: %s" % (code, ", ".join(fparts))
+                        if (code and fparts)
+                        else ("Đã nạp dữ liệu sản phẩm %s" % code if code else "Đã nạp dữ liệu sản phẩm")
+                    )
+                    agent_runs.add_step(
+                        TENANT_ID,
+                        run_id,
+                        "facts",
+                        "ok",
+                        detail=facts_detail,
+                        now_dt=now(),
+                    )
+                    can_compose = True
+                    agent_runs.add_step(
+                        TENANT_ID,
+                        run_id,
+                        "compose",
+                        "running",
+                        detail="Đang gọi AI soạn nháp trả lời…",
+                        now_dt=now(),
+                    )
+
+        res = agent.draft_comment_reply(target_comment, post, row, page, model=MODEL, history=history)
+
+        model_failed = False
+        if can_compose:
+            reason_text = _format_draft_reasons(res.get("reasons"))
+            reason_fields = {
+                str(r.get("field") or "") for r in (res.get("reasons") or ()) if isinstance(r, dict)
+            }
+            if res["decision"] == "reply":
+                agent_runs.add_step(
+                    TENANT_ID,
+                    run_id,
+                    "compose",
+                    "ok",
+                    detail="AI đã soạn nháp (%d ký tự, %d lượt)" % (len(res["reply"]), int(res.get("attempts") or 1)),
+                    now_dt=now(),
+                )
+                warn_note = " (%d cảnh báo)" % len(res["warnings"]) if res.get("warnings") else ""
+                agent_runs.add_step(
+                    TENANT_ID,
+                    run_id,
+                    "output_check",
+                    "ok",
+                    detail="Đạt kiểm tra đầu ra (khớp giá, tồn kho, không có PII/link)%s" % warn_note,
+                    now_dt=now(),
+                )
+            elif "model" in reason_fields:
+                model_failed = True
+                agent_runs.add_step(
+                    TENANT_ID,
+                    run_id,
+                    "compose",
+                    "error",
+                    detail=reason_text or "Lỗi khi gọi mô hình AI",
+                    now_dt=now(),
+                )
+            elif "reply" in reason_fields:
+                agent_runs.add_step(
+                    TENANT_ID,
+                    run_id,
+                    "compose",
+                    "ok",
+                    detail="AI đã soạn nháp (%d lượt)" % int(res.get("attempts") or 1),
+                    now_dt=now(),
+                )
+                agent_runs.add_step(
+                    TENANT_ID,
+                    run_id,
+                    "output_check",
+                    "blocked",
+                    detail=reason_text or "Nháp AI không vượt qua kiểm tra đầu ra",
+                    now_dt=now(),
+                )
+            else:
+                agent_runs.add_step(
+                    TENANT_ID,
+                    run_id,
+                    "compose",
+                    "blocked",
+                    detail=("AI đánh dấu cần nhân viên xử lý: %s" % reason_text)
+                    if reason_text
+                    else "AI đánh dấu cần nhân viên xử lý",
+                    now_dt=now(),
+                )
+                agent_runs.add_step(
+                    TENANT_ID,
+                    run_id,
+                    "output_check",
+                    "skipped",
+                    detail="Bỏ qua kiểm tra đầu ra do AI đề xuất nhân viên tự trả lời",
+                    now_dt=now(),
+                )
+
+        ts = z(now())
+        draft_status = "draft" if res["decision"] == "reply" else "flagged"
+        ok, err = store.create_ai_comment_draft(
+            TENANT_ID,
+            thread_id,
+            {
+                "id": str(uuid.uuid4()),
+                "comment_id": thread_id,
+                "target_comment_id": target_comment["id"],
+                "status": draft_status,
+                "ai_text": res["reply"],
+                "edited_text": "",
+                "reasons": res["reasons"],
+                "warnings": res["warnings"],
+                "model": res["model"],
+                "tokens_in": res["tokens_in"],
+                "tokens_out": res["tokens_out"],
+                "fb_reply_id": "",
+                "client_id": "",
+                "error_code": "",
+                "user_message": "",
+                "created_at": ts,
+                "updated_at": ts,
+                "sent_at": "",
+            },
+            allow_any_root=True,
+        )
+        if not ok:
+            agent_runs.add_step(
+                TENANT_ID,
+                run_id,
+                "action",
+                "blocked" if err == "CONFLICT" else "error",
+                label="Lưu nháp",
+                detail="Không thể lưu nháp (%s)" % (err or "ERROR"),
+                now_dt=now(),
+            )
+            agent_runs.finish_run(TENANT_ID, run_id, status="error", outcome="failed", now_dt=now())
+            return None, err
+
+        if draft_status == "draft":
+            agent_runs.add_step(
+                TENANT_ID,
+                run_id,
+                "action",
+                "ok",
+                label="Lưu nháp",
+                detail="Đã lưu nháp AI chờ nhân viên duyệt",
+                now_dt=now(),
+            )
+            agent_runs.finish_run(TENANT_ID, run_id, status="done", outcome="draft_saved", now_dt=now())
+        elif model_failed:
+            agent_runs.add_step(
+                TENANT_ID,
+                run_id,
+                "action",
+                "error",
+                label="Lưu nháp",
+                detail="Đã lưu trạng thái đánh dấu do lỗi gọi mô hình AI",
+                now_dt=now(),
+            )
+            agent_runs.finish_run(TENANT_ID, run_id, status="error", outcome="failed", now_dt=now())
+        else:
+            agent_runs.add_step(
+                TENANT_ID,
+                run_id,
+                "action",
+                "ok",
+                label="Cần bạn",
+                detail="Đã gắn cờ nháp để nhân viên tự trả lời",
+                now_dt=now(),
+            )
+            agent_runs.finish_run(TENANT_ID, run_id, status="done", outcome="can_ban", now_dt=now())
+
+        log.info(
+            "comment_thread_draft_created tenant=%s thread_id=%s status=%s",
+            TENANT_ID,
+            thread_id,
+            draft_status,
+        )
+        return draft_status, None
+    except Exception as exc:
+        try:
+            agent_runs.add_step(
+                TENANT_ID,
+                run_id,
+                "action",
+                "error",
+                label="Lưu nháp",
+                detail="Lỗi hệ thống khi soạn nháp (%s)" % type(exc).__name__,
+                now_dt=now(),
+            )
+            agent_runs.finish_run(TENANT_ID, run_id, status="error", outcome="failed", now_dt=now())
+        except Exception:
+            pass
+        raise
 
 
 def threads_needing_auto_draft(limit: int) -> list[str]:
@@ -1671,6 +1974,7 @@ def sync_comments(body: Optional[SyncCommentsIn] = None):
 @router.get("/comments/updates")
 def comment_updates(since: Optional[str] = None):
     since_f = (since or "").strip() or None
+    running_ids = agent_runs.running_thread_ids(TENANT_ID, now_dt=now())
     if not since_f:
         cs, ds, att_s, ar_s = store.comment_updates_watermark_v2(TENANT_ID)
         return {
@@ -1680,6 +1984,7 @@ def comment_updates(since: Optional[str] = None):
             "draftsReady": [],
             "needYou": [],
             "autoReplied": [],
+            "runningThreadIds": running_ids,
         }
 
     cs, ds, att_s, ar_s = _parse_updates_cursor_v2(since_f)
@@ -1705,6 +2010,7 @@ def comment_updates(since: Optional[str] = None):
         "draftsReady": drafts_ready,
         "needYou": need_you,
         "autoReplied": auto_replied,
+        "runningThreadIds": running_ids,
     }
 
 
@@ -1796,6 +2102,7 @@ def list_comment_threads(
     page_ids = [r["id"] for r in page_recs]
     active_drafts = store.active_thread_drafts(TENANT_ID, page_ids) if page_ids else {}
     auto_replies = store.latest_auto_reply_for_threads(TENANT_ID, page_ids) if page_ids else {}
+    latest_runs = agent_runs.latest_runs_for_threads(TENANT_ID, page_ids, now_dt=now()) if page_ids else {}
     from_ids = list(dict.fromkeys(r["customer_id"] for r in page_recs if r["customer_id"]))
     tags_by_from = inbox_store.tags_for(TENANT_ID, from_ids) if from_ids else {}
 
@@ -1808,6 +2115,7 @@ def list_comment_threads(
             active_drafts=active_drafts,
             tags_by_from=tags_by_from,
             auto_replies=auto_replies,
+            latest_runs=latest_runs,
         )
         for rec in page_recs
     ]
@@ -1873,9 +2181,21 @@ def get_comment_thread(
     channel_name = (chans.get(root["channel_id"]) or {}).get("name") or root["channel_id"]
     real_ids = [e["id"] for e in page_entries if e["kind"] == "fb"]
     liked_set = set(inbox_store.liked_ids(TENANT_ID, real_ids)) if real_ids else set()
+    customer_ids = [e["id"] for e in page_entries if e["kind"] == "fb" and not e["row"]["is_from_page"]]
+    page_msg_ids = [e["id"] for e in page_entries if e["kind"] == "fb" and e["row"]["is_from_page"]]
+    run_id_by_comment, run_id_by_reply = agent_runs.message_run_ids(
+        TENANT_ID, thread_id, customer_ids, page_msg_ids
+    )
 
     messages = [
-        _message_view(e["row"], thread_id=thread_id, liked_set=liked_set, client_by_reply=client_by_reply)
+        _message_view(
+            e["row"],
+            thread_id=thread_id,
+            liked_set=liked_set,
+            client_by_reply=client_by_reply,
+            run_id_by_comment=run_id_by_comment,
+            run_id_by_reply=run_id_by_reply,
+        )
         if e["kind"] == "fb"
         else _outgoing_draft_message_view(e["row"], root=root, channel_name=channel_name)
         for e in page_entries
@@ -1886,6 +2206,19 @@ def get_comment_thread(
         "thread": thread,
         "messages": messages,
         "olderCursor": older_cursor,
+    }
+
+
+@router.get("/comments/threads/{thread_id}/runs")
+def get_comment_thread_runs(
+    thread_id: str,
+    limit: int = Query(10, ge=1, le=100),
+):
+    _load_thread_record(thread_id)
+    items = agent_runs.list_thread_runs(TENANT_ID, thread_id, limit=limit, now_dt=now())
+    return {
+        "tenantId": TENANT_ID,
+        "items": items,
     }
 
 
@@ -1954,6 +2287,7 @@ def send_thread_reply(
     tenant_id=None,
     sent_by: str = "operator",
     clear_attention: bool = True,
+    agent_run_id: Optional[str] = None,
 ) -> dict:
     """Đường gửi trả lời dùng chung cho người vận hành và auto-reply (cùng kiểm tra nội dung, fencing, idempotency)."""
     if sent_by != "auto" and str(client_id or "").strip().lower().startswith("auto:"):
@@ -1972,7 +2306,9 @@ def send_thread_reply(
             return {
                 "tenantId": tid,
                 "thread": _thread_view(thread_id, rec=rec, chans=chans, tenant_id=tid),
-                "message": _message_for_sent_draft(thread_id, existing, root=root, chans=chans, tenant_id=tid),
+                "message": _message_for_sent_draft(
+                    thread_id, existing, root=root, chans=chans, tenant_id=tid, agent_run_id=agent_run_id
+                ),
                 "alreadySent": True,
             }
         if existing["status"] == "sending":
@@ -2008,7 +2344,9 @@ def send_thread_reply(
             return {
                 "tenantId": tid,
                 "thread": _thread_view(thread_id, chans=chans, tenant_id=tid),
-                "message": _message_for_sent_draft(thread_id, existing_sent, root=root, chans=chans, tenant_id=tid),
+                "message": _message_for_sent_draft(
+                    thread_id, existing_sent, root=root, chans=chans, tenant_id=tid, agent_run_id=agent_run_id
+                ),
                 "alreadySent": True,
             }
         if claim_err == "NOT_FOUND":
@@ -2092,7 +2430,9 @@ def send_thread_reply(
             return {
                 "tenantId": tid,
                 "thread": _thread_view(thread_id, chans=chans, tenant_id=tid),
-                "message": _message_for_sent_draft(thread_id, current, root=root, chans=chans, tenant_id=tid),
+                "message": _message_for_sent_draft(
+                    thread_id, current, root=root, chans=chans, tenant_id=tid, agent_run_id=agent_run_id
+                ),
                 "alreadySent": True,
             }
         raise ApiError(409, "CONFLICT", "Lượt gửi này đã được thay thế bởi lượt thử lại mới hơn")
@@ -2111,6 +2451,7 @@ def send_thread_reply(
         thread_id=thread_id,
         liked_set=liked,
         client_by_reply={saved_reply["id"]: client_id},
+        run_id_by_reply={saved_reply["id"]: agent_run_id} if agent_run_id else None,
     )
     return {
         "tenantId": tid,
