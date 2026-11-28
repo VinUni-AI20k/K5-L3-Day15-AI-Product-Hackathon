@@ -59,7 +59,7 @@ describe("isNavItemActive", () => {
 });
 
 describe("NAV_SECTIONS", () => {
-  it("has the wave-1 IA plus onboarding and appearance: 5 visible groups, 13 destinations, platform gated", () => {
+  it("has the wave-1 IA plus onboarding, appearance and writing-style: 5 visible groups, 14 destinations, platform gated", () => {
     const sections = visibleNavSections({ hasPlatformRole: true });
     expect(sections.map((s) => s.title)).toEqual([
       "Bàn làm việc",
@@ -70,7 +70,7 @@ describe("NAV_SECTIONS", () => {
       "Nền tảng",
     ]);
     expect(sections.flatMap((s) => s.items.map((i) => i.href))).toEqual([
-      "/",
+      "/overview",
       "/compose",
       "/bulk",
       "/posts",
@@ -82,11 +82,21 @@ describe("NAV_SECTIONS", () => {
       // rather than a tab of /sync — a salesperson opens it during a call.
       "/data-mapping",
       "/channels",
+      "/writing-style",
       "/prompts",
       "/members",
       "/platform",
       "/platform/appearance",
     ]);
+  });
+
+  it("places Phong cách viết in the Cài đặt group alongside Kênh and Mẫu prompt", () => {
+    const flat = flattenNavItems();
+    expect(flat).toContainEqual({
+      href: "/writing-style",
+      label: "Phong cách viết",
+      section: "Cài đặt",
+    });
   });
 
   it("no longer routes retired destinations", () => {
