@@ -1,0 +1,171 @@
+{
+  "status": "ON-01 đến ON-06 là đoạn ML mẫu tự soạn. D02 là đoạn diễn giải ngắn từ PDF AI20K Ngày 2.",
+  "sources": {
+    "AI20K-D02": "Ngày 2 — Discovery & Problem Framing.pdf (AI20K). Số trang tính từ bìa PDF là trang 1."
+  },
+  "passages": [
+    {
+      "code": "ON-01",
+      "title": "Hồi quy và phân loại",
+      "text": "Trong ví dụ này, hồi quy tuyến tính dự đoán một giá trị số liên tục. Mô hình phân loại dự đoán nhãn."
+    },
+    {
+      "code": "ON-02",
+      "title": "Tập test",
+      "text": "Tập test được giữ riêng, không dùng để huấn luyện. Kết quả trên tập test giúp đánh giá mô hình dự đoán tốt đến đâu trên dữ liệu mới."
+    },
+    {
+      "code": "ON-03",
+      "title": "Quá khớp",
+      "text": "Quá khớp (overfitting) xảy ra khi mô hình học quá sát dữ liệu huấn luyện, kể cả nhiễu. Khi đó điểm trên tập huấn luyện cao nhưng điểm trên dữ liệu mới thấp."
+    },
+    {
+      "code": "ON-04",
+      "title": "Tập validation",
+      "text": "Tập validation được tách khỏi tập huấn luyện để chọn siêu tham số và so sánh các mô hình trong lúc phát triển. Tập test chỉ dùng sau cùng để đánh giá lần cuối."
+    },
+    {
+      "code": "ON-05",
+      "title": "Gradient descent",
+      "text": "Gradient descent cập nhật tham số theo hướng làm giảm hàm mất mát. Tốc độ học (learning rate) quyết định bước cập nhật: quá lớn có thể không hội tụ, quá nhỏ thì học rất chậm."
+    },
+    {
+      "code": "ON-06",
+      "title": "Chuẩn hoá dữ liệu",
+      "text": "Chuẩn hoá đưa các đặc trưng về cùng thang đo, ví dụ trừ trung bình rồi chia độ lệch chuẩn. Trung bình và độ lệch chuẩn phải tính từ tập huấn luyện rồi áp dụng cho tập test."
+    },
+    {
+      "code": "D02-P009",
+      "source": "AI20K-D02",
+      "page": 9,
+      "title": "Kiểm chứng thống kê về AI",
+      "text": "Trước khi dùng một thống kê, kiểm cỡ mẫu và cách chọn mẫu, định nghĩa thất bại, bên thu thập và động cơ của họ. Cuối cùng đối chiếu bản tường thuật với nguồn gốc để xem điều kiện nào đã bị lược bỏ."
+    },
+    {
+      "code": "D02-P014",
+      "source": "AI20K-D02",
+      "page": 14,
+      "title": "Tiêu chí PAIR: Automate và Augment",
+      "text": "Chọn cách dùng AI theo từng tác vụ. Automate phù hợp với việc nguy hiểm, việc cần xử lý ở quy mô lớn hoặc việc có đáp án rõ. Augment phù hợp khi người dùng muốn tự làm hoặc cần có người chịu trách nhiệm về kết quả. Một workflow có thể dùng cả hai cách ở những bước khác nhau."
+    },
+    {
+      "code": "D02-P017",
+      "source": "AI20K-D02",
+      "page": 17,
+      "title": "Baseline không dùng AI",
+      "text": "Ghi lại hiệu quả của cách làm hiện tại để có mốc so sánh. Chẳng hạn, phần mềm định tuyến có sẵn hoặc trang tra cứu vận đơn có thể giải quyết một phần đáng kể công việc. Chỉ tăng độ phức tạp khi đo được mức cải thiện."
+    },
+    {
+      "code": "D02-P020",
+      "source": "AI20K-D02",
+      "page": 20,
+      "title": "Kim cương đôi: Discover, Define, Develop và Deliver",
+      "text": "Kim cương thứ nhất tìm đúng vấn đề. Discover mở rộng quan sát, sau đó Define thu hẹp về một phát biểu bài toán. Kim cương thứ hai tìm giải pháp. Develop mở rộng các phương án, còn Deliver thu hẹp về phương án được kiểm chứng."
+    },
+    {
+      "code": "D02-P024",
+      "source": "AI20K-D02",
+      "page": 24,
+      "title": "Kỹ thuật 5 Whys",
+      "text": "Hỏi vì sao qua nhiều tầng để tìm nguyên nhân sâu hơn triệu chứng. Trong ví dụ giao COD, phân tích từ chuyến giao hỏng dẫn đến việc khách chưa được xác nhận giờ giao. Phát hiện này mở ra cách xử lý bằng xác nhận lịch."
+    },
+    {
+      "code": "D02-P026",
+      "source": "AI20K-D02",
+      "page": 26,
+      "title": "Đặt câu hỏi How Might We",
+      "text": "Viết câu hỏi mở về điều người dùng cần đạt, ở mức đủ cụ thể để tìm phương án. Ví dụ, hỏi cách để khách biết và xác nhận giờ giao, qua đó giữ được nhiều lựa chọn triển khai."
+    },
+    {
+      "code": "D02-P034",
+      "source": "AI20K-D02",
+      "page": 34,
+      "title": "Stakeholder map: năm vai",
+      "text": "Xác định ai dùng hệ thống, ai kiểm đầu ra, ai chịu hậu quả khi sai, ai có quyền cho chạy hoặc dừng và ai cấp ngân sách. Lập sơ đồ riêng cho từng đề xuất. Vai chưa có người cụ thể cần ghi vào danh sách rủi ro."
+    },
+    {
+      "code": "D02-P037",
+      "source": "AI20K-D02",
+      "page": 37,
+      "title": "Ba phần của metric thành công",
+      "text": "Một metric thành công cần nêu hướng cải thiện, một ngưỡng bằng số và dữ liệu dùng để đo. Ba phần giúp người đánh giá biết căn cứ nào để kết luận hệ thống đạt."
+    },
+    {
+      "code": "D02-P040",
+      "source": "AI20K-D02",
+      "page": 40,
+      "title": "Chi phí báo nhầm và bỏ sót",
+      "text": "Trong dự đoán từ chối COD, báo nhầm là gắn cờ một đơn bình thường, có thể làm phiền khách hoặc mất đơn. Bỏ sót là để một đơn sẽ bị từ chối tiếp tục đi giao, gây tốn chuyến. Ghi hai loại chi phí riêng để quyết định nên ưu tiên giảm lỗi nào."
+    },
+    {
+      "code": "D02-P042",
+      "source": "AI20K-D02",
+      "page": 42,
+      "title": "Precision, recall và đánh đổi",
+      "text": "Precision tính tỷ lệ đơn thật sự bị từ chối trong số đơn đã gắn cờ. Recall tính tỷ lệ đơn gắn cờ trong số đơn thật sự bị từ chối. Khi chi phí hai loại lỗi khác nhau, có thể đặt một chỉ số làm ràng buộc và tối ưu chỉ số còn lại."
+    },
+    {
+      "code": "D02-P046",
+      "source": "AI20K-D02",
+      "page": 46,
+      "title": "Bốn câu hỏi đánh giá tính khả thi",
+      "text": "Kiểm xem dữ liệu có sẵn và có nhãn không, quy trình chịu được bao nhiêu lỗi và ai phát hiện, tác vụ cần các bước cố định hay tự chủ, và chi phí xây dựng lẫn vận hành có vừa ngân sách không."
+    },
+    {
+      "code": "D02-P047",
+      "source": "AI20K-D02",
+      "page": 47,
+      "title": "Thang giải pháp: từ quy tắc đến agent",
+      "text": "Bắt đầu bằng quy trình hoặc phần mềm sẵn có, rồi cân nhắc quy tắc hoặc một lần gọi mô hình, workflow cố định và agent. Chỉ tăng độ phức tạp khi đo được lợi ích. Agent tự chọn công cụ và cần giới hạn cùng điều kiện dừng."
+    },
+    {
+      "code": "D02-P051",
+      "source": "AI20K-D02",
+      "page": 51,
+      "title": "Gate 0: Go, No-go và Reframe",
+      "text": "Go khi bài toán, baseline và ngưỡng đã rõ, có hướng lấy dữ liệu và có chốt rủi ro. No-go khi cách hiện tại đã đủ hoặc chi phí và rủi ro vượt lợi ích. Reframe khi có nhu cầu thật nhưng đề bài đặt sai. Quyết định cần dẫn bằng chứng."
+    },
+    {
+      "code": "D02-P053",
+      "source": "AI20K-D02",
+      "page": 53,
+      "title": "Acceptance test và giả thuyết lỗi",
+      "text": "Mỗi acceptance test mô tả đầu vào cụ thể và hành vi mong đợi để người đọc quyết định đạt hay trượt. Giả thuyết lỗi mô tả điều kiện hệ thống có thể hỏng, chẳng hạn khi địa chỉ bị viết tắt hoặc nhãn dữ liệu gộp những trường hợp khác nhau."
+    },
+    {
+      "code": "D02-P055",
+      "source": "AI20K-D02",
+      "page": 55,
+      "title": "Risk register: nguyên nhân, hậu quả và người phụ trách",
+      "text": "Ghi nguyên nhân, hậu quả và người chịu trách nhiệm cho mỗi rủi ro. Chẳng hạn, nếu nhãn từ chối COD gộp cả ca tài xế không gọi được, mô hình có thể gắn cờ nhầm. Thiếu người có quyền dừng hệ thống cũng cần được ghi nhận."
+    },
+    {
+      "code": "D02-P068",
+      "source": "AI20K-D02",
+      "page": 68,
+      "title": "Viết ca bình thường và ca biên trong lab",
+      "text": "Bài lab yêu cầu 10 ca bình thường, 10 ca biên và 5 giả thuyết lỗi. Sau khi viết, đọc chéo để kiểm đầu vào và hành vi mong đợi đã đủ rõ. Viết lại ca mà người đọc chưa thể quyết định đạt hay trượt."
+    },
+    {
+      "code": "D02-P078",
+      "source": "AI20K-D02",
+      "page": 78,
+      "title": "Khảo sát trong giai đoạn Discover",
+      "text": "Dùng khảo sát để đo tần suất hoặc tỷ lệ khi đã biết điều cần hỏi. Hỏi về hành vi đã xảy ra, mỗi câu chỉ hỏi một việc và dùng khoảng số khi phù hợp. Ghi số người nhận và số người trả lời để người đọc đánh giá khả năng lệch mẫu."
+    },
+    {
+      "code": "D02-P080",
+      "source": "AI20K-D02",
+      "page": 80,
+      "title": "Phân tích dữ liệu và log hệ thống",
+      "text": "Khi có quyền đọc log, kiểm tra ai ghi dữ liệu và dữ liệu bắt đầu từ khi nào. Dùng số đếm để lập mốc ban đầu, xem phân bố và chia theo thời gian, khu vực hoặc loại trường hợp. Những ca bất thường có thể bị bỏ sót nếu chỉ nhìn số trung bình."
+    },
+    {
+      "code": "D02-P083",
+      "source": "AI20K-D02",
+      "page": 83,
+      "title": "Sáu phần của phát biểu bài toán",
+      "text": "Phát biểu bài toán nêu người dùng cụ thể, việc họ đang cố làm, điểm nghẽn, mức thiệt hại, cách đo thành công và phạm vi. Tiêu chí thành công cần có hướng thay đổi, ngưỡng và dữ liệu đo. Phạm vi nêu rõ hệ thống sẽ làm đến đâu."
+    }
+  ]
+}

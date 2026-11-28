@@ -1,0 +1,52 @@
+# Mô phỏng chi phí khi dùng thật — điền ở guide bước 4.2.
+# Ôn lại: ngày 13, ngày 1, ngày 14 · lab ngày 13, lab ngày 14.
+# Mọi số phải có nguồn (data / phỏng vấn / khảo sát / quy mô khoá có nguồn) hoặc ghi rõ "(tự ước tính)".
+# Chạy: python run.py simulate --try   (10 phiên, kiểm khung — làm trước CP3)
+#       python run.py simulate         (đủ số phiên dưới đây — bản nộp CP4)
+# Ghi rõ nguồn hoặc đánh dấu tự ước tính cho từng giả định.
+
+sessions: 50        # số phiên mô phỏng — bản nộp ≥50
+seed: 42            # giữ cố định để chạy lại ra cùng chuỗi phiên
+
+users:              # số người dùng thật nếu đưa vào dùng — 3 kịch bản, ở quy mô thật của sản phẩm
+                    # track A: khoá học · track B–F: người dùng của sản phẩm / nhóm nhắm tới, nguồn công khai có link
+  low: 200
+  base: 436
+  high: 721
+  source: "Thấp 200 (tự ước tính). Mốc cơ sở 436 tài khoản hoạt động và cao 721 tài khoản theo README của gói BTC preclass. Đây là kịch bản quy mô, chưa phải số người dùng SauBa."
+
+personas:           # ≥3 kiểu người dùng; share cộng lại = 1
+  - name: dung_it
+    share: 0.5              # tỉ lệ người dùng kiểu này
+    uses_per_month: 4       # số phiên / người / tháng
+    turns_per_session: 1    # số lượt hỏi trong một phiên
+    source: "Tỷ trọng 50%, 4 phiên/tháng, 1 lượt/phiên (tự ước tính)."
+  - name: dung_vua
+    share: 0.3
+    uses_per_month: 10
+    turns_per_session: 3
+    source: "Tỷ trọng 30%, 10 phiên/tháng, 3 lượt/phiên (tự ước tính)."
+  - name: dung_nhieu
+    share: 0.2
+    uses_per_month: 20
+    turns_per_session: 5
+    source: "Tỷ trọng 20%, 20 phiên/tháng, 5 lượt/phiên (tự ước tính)."
+# Mỗi lượt hỏi lấy ngẫu nhiên một đầu vào trong eval/benchmark.csv (type thuong và kho).
+# Persona hỏi kiểu riêng: thêm vào persona đó
+#     types: [thuong, kho, tu_choi]
+# hoặc
+#     inputs: ["câu hỏi kiểu 1", "câu hỏi kiểu 2"]
+
+prices:             # USD / 1 triệu token — chép từ further-reading/model-prices.md của repo đề. ≥2 mức model
+  - model: gpt-5.4-mini
+    input: 0.75
+    output: 4.50
+    source: "https://developers.openai.com/api/docs/models/gpt-5.4-mini · giá chuẩn, xem 28/11/2026"
+  - model: gpt-5.4
+    input: 2.50
+    output: 15.00
+    source: "https://developers.openai.com/api/docs/models/gpt-5.4 · giá chuẩn, xem 28/11/2026 · mức giá đối chiếu"
+
+usd_to_vnd:         # tuỳ chọn: điền thì bản tóm tắt in thêm tiền Việt
+  rate:
+  source:

@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SauBa — Tự ôn theo tài liệu</title>
+<style>
+*{box-sizing:border-box}
+:root{font-family:"Segoe UI",system-ui,sans-serif;color:#142b23;background:#f3f6f2;line-height:1.55;--green:#1c6147;--muted:#536a5d;--line:#dce6dd;--paper:#fff}
+body{margin:0} [hidden]{display:none!important}
+header{background:#fafcf9;border-bottom:1px solid var(--line)}
+.bar,main{max-width:1180px;margin:auto;padding:0 26px}
+.bar{display:flex;align-items:center;justify-content:space-between;min-height:75px;gap:20px;flex-wrap:wrap}
+.brand{color:#153a2b;font-weight:850;letter-spacing:-.06em;font-size:1.55rem;text-decoration:none}.brand span{color:#21815d}
+nav{display:flex;gap:4px;flex-wrap:wrap}nav a{color:#365344;text-decoration:none;padding:8px 12px;border-radius:8px;font-weight:600;font-size:.94rem}
+nav a:hover,nav a[aria-current=page]{background:#e4eee6;color:#1b5e44}
+.mode,.tag{font-size:.875rem;border-radius:99px;padding:4px 11px;background:#e5f1e7;color:#285c42}
+main{padding-top:36px;padding-bottom:64px}h1,h2,h3,p{margin:0}
+h1{font-size:clamp(2.45rem,6vw,4.5rem);line-height:1.04;letter-spacing:-.063em;margin-bottom:18px}
+h2{font-size:1.35rem;letter-spacing:-.025em}h3{font-size:1.1rem}
+.hero{background:radial-gradient(ellipse at 92% 5%,#337554 0,transparent 52%),#102e24;color:#fff;border-radius:25px;display:grid;grid-template-columns:1.25fr .95fr;gap:36px;align-items:center;padding:clamp(26px,5vw,66px)}
+.hero p{max-width:36ch;color:#d5e7da;font-size:1.08rem}
+.hero .eyebrow{color:#b7ecc9;margin-bottom:12px;font-size:.9rem;font-weight:750;letter-spacing:.08em}
+.hero h1 span{color:#b9edc6}
+.hero .primary{background:#caf0cd;color:#153b29}.hero .secondary{background:#ffffff0e;color:#eff8f0;border-color:#ffffff55}
+.preview-card{background:#f3f8ee;color:#233e2f;border:1px solid #fff5;border-radius:16px;padding:22px;transform:rotate(2deg);box-shadow:0 18px 45px #071b1850}
+.preview-card p{color:#526b58;font-size:.95rem;margin-top:7px}.preview-card .tag{margin:0 0 10px}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:24px}
+.panel,.card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:24px}
+.card h2{font-size:1.12rem}.card p{color:var(--muted);margin:6px 0 14px}
+.feature{
+  --accent:#195b44;--wash:#dff0e4;--shadow:#163d261f;
+  display:flex;flex-direction:column;min-width:0;overflow:hidden;
+  color:inherit;text-decoration:none;
+  transition:transform .35s cubic-bezier(.2,.7,.25,1),box-shadow .35s,border-color .35s
+}
+.feature-create{--accent:#45549a;--wash:#e9ecfa;--shadow:#37448624}
+.feature-history{--accent:#88521e;--wash:#f5eadb;--shadow:#67411e24}
+.feature-art{
+  display:grid;place-items:center;position:relative;isolation:isolate;
+  height:106px;overflow:hidden;margin-bottom:19px;border-radius:10px;
+  background:radial-gradient(circle at 1px 1px,color-mix(in srgb,var(--accent) 24%,transparent) 1px,transparent 1.5px) 0 0 / 12px 12px,var(--wash)
+}
+.feature-art::before{
+  content:"";position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(115deg,transparent 24%,#fff9 49%,transparent 70%);
+  transform:translateX(-110%)
+}
+.symbol,.symbol::before,.symbol::after{
+  width:48px;height:58px;border:1px solid color-mix(in srgb,var(--accent) 37%,white);
+  border-radius:7px;box-shadow:0 5px 10px var(--shadow)
+}
+.symbol{
+  display:grid;place-content:center;position:relative;color:var(--accent);
+  background:#fff;font-size:.82rem;font-weight:800;
+  transition:transform .42s cubic-bezier(.2,.7,.25,1)
+}
+.symbol::before,.symbol::after{content:"";position:absolute;inset:0;z-index:-1;background:#fffd;transition:transform .42s cubic-bezier(.2,.7,.25,1)}
+.symbol::before{transform:translate(-9px,5px) rotate(-9deg)}
+.symbol::after{transform:translate(9px,-5px) rotate(9deg)}
+.feature-create .symbol span{font-size:1.65rem;line-height:1}
+.feature-history .symbol span{width:20px;height:16px;border-block:2px solid currentColor;position:relative}
+.feature-history .symbol span::after{content:"";position:absolute;top:5px;left:0;width:14px;border-top:2px solid currentColor}
+.feature-cta{align-self:flex-start;margin-top:auto;color:var(--accent);font-weight:700;padding:6px 11px;background:var(--wash);border-radius:8px;transition:background .25s,color .25s}
+.feature:is(:hover,:focus-visible){border-color:var(--accent);box-shadow:0 15px 30px var(--shadow);transform:translateY(-5px)}
+.feature:is(:hover,:focus-visible) .symbol{transform:translateY(-4px) rotate(-5deg)}
+.feature:is(:hover,:focus-visible) .symbol::before{transform:translate(-15px,6px) rotate(-13deg)}
+.feature:is(:hover,:focus-visible) .symbol::after{transform:translate(15px,-5px) rotate(13deg)}
+.feature:is(:hover,:focus-visible) .feature-art::before{animation:sweep .7s ease-out both}
+.feature:is(:hover,:focus-visible) .feature-cta{background:var(--accent);color:white}
+@keyframes sweep{to{transform:translateX(110%)}}
+.button,button,nav a{transition:background .2s,color .2s,transform .2s}
+.button:not(:disabled):active,button:not(:disabled):active{transform:scale(.97)}
+.pane{max-width:820px;margin:auto}.pane h1{font-size:clamp(2rem,5vw,3rem)}
+.lead,.help{color:var(--muted);margin:8px 0 15px}
+label,.source{display:block;font-size:.94rem;color:var(--muted)}
+.upload{display:grid;gap:8px;border:1px dashed #8eb49e;background:#f2f8f3;border-radius:12px;padding:18px;margin:12px 0}
+input,textarea,button{font:inherit}input[type=file]{width:100%;font-size:.94rem}
+input::file-selector-button{font:inherit;border:0;border-radius:7px;background:#e1efe3;color:#1b543d;padding:8px 12px;margin-right:9px;cursor:pointer}
+textarea{width:100%;min-height:90px;resize:vertical;margin:8px 0;padding:10px 12px;border:1px solid #b8cdc0;border-radius:9px;color:inherit}
+button,.button{display:inline-block;text-decoration:none;border:1px solid transparent;border-radius:9px;padding:9px 14px;background:var(--green);color:white;font-weight:650;cursor:pointer}
+.secondary{color:var(--green);background:#e8f3e9;border-color:#dceadf}
+button:disabled{opacity:.5;cursor:not-allowed} :focus-visible{outline:3px solid #518e6d;outline-offset:3px}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:14px}
+article{padding:18px 0;border-top:1px solid var(--line)}article:first-child{border-top:0}
+.result{margin-top:10px;padding:12px 14px;background:#f0f7f1;border-radius:9px}
+.result ul{margin:6px 0;padding-left:23px}details{margin-top:8px;overflow-wrap:anywhere}
+.tag{display:inline-block;margin:7px 0}.status{white-space:pre-line;overflow-wrap:anywhere}.history-row{display:flex;gap:16px;justify-content:space-between;align-items:center}.history-row h3{overflow-wrap:anywhere}.history-row button{flex-shrink:0}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:12px;margin:18px 0}
+.metric{padding:14px;background:#edf6ee;border-radius:10px}.metric strong{display:block;font-size:1.45rem}
+.attempt-submit{padding-top:16px;border-top:1px solid var(--line)}
+.answer-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.study-plan{margin:18px 0;padding:16px;border:1px solid var(--line);border-radius:12px;background:#f4f9f3}
+.study-plan ol{padding-left:24px;margin:10px 0}
+.study-plan li+li{margin-top:14px}.study-plan p{overflow-wrap:anywhere}
+.document-picker{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:6px 0 17px}
+.document-picker select{font:inherit;max-width:100%;min-width:min(240px,100%);border:1px solid #b8cdc0;border-radius:8px;background:white;padding:8px;color:inherit}
+.composer{border:1px solid #b8cdc0;border-radius:12px;padding:10px 12px;background:#fbfdfb}
+.composer:focus-within{border-color:var(--green)}
+.composer textarea{border:0;background:transparent;margin:3px 0 0;padding:7px 0}
+.workspace{max-width:1050px}
+.workspace-heading{margin-bottom:22px}.workspace-heading h1{margin-bottom:8px}.workspace-heading p{color:var(--muted)}
+.workspace-grid{display:grid;grid-template-columns:minmax(250px, .85fr) minmax(0,1.65fr);align-items:start;gap:20px}
+.workspace .panel{box-shadow:0 12px 32px #172b2010}
+.panel-heading{margin-bottom:12px}.panel-heading p{margin-top:4px;color:var(--muted)}
+.dropzone{position:relative;display:grid;justify-items:center;text-align:center;gap:10px;padding:32px 16px;margin:0 0 14px;background:radial-gradient(ellipse at 50% 30%,#e0f1e5,transparent 70%),#f5f9f5;border:1px dashed #80a890;border-radius:13px;transition:background .22s,border-color .22s,box-shadow .22s}
+.dropzone:is(:hover,.dragging){background:#e9f5ec;border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green)}
+.dropzone[aria-busy=true]{border-style:solid}
+.pdf-mark{display:grid;place-items:center;flex-shrink:0;width:38px;height:44px;border-radius:7px;color:#195b44;background:#e1efe5;font-size:.76rem;font-weight:800;letter-spacing:.03em}
+.dropzone .pdf-mark{width:56px;height:62px;background:#fff;box-shadow:0 5px 18px #1539271a;margin-bottom:4px}
+.dropzone strong{color:#1d3c2f;font-size:1.08rem}.dropzone p{color:var(--muted);font-size:.875rem}
+.file-input{position:absolute;width:1px!important;height:1px;overflow:hidden;clip-path:inset(50%)}
+.file-input:focus-visible+.button{outline:3px solid #518e6d;outline-offset:3px}
+.dropzone[aria-busy=true] .button{opacity:.55;pointer-events:none}
+.library-row{display:flex;gap:10px;align-items:center;padding:10px 0;min-width:0;border-top:1px solid var(--line)}
+.library-row span:nth-child(2){flex:1;overflow-wrap:anywhere;font-weight:600}
+.library-row button{flex-shrink:0}.document-picker select{width:100%}
+.library-empty{padding:11px 12px;background:#f4f8f4;border-radius:8px;color:var(--muted)}
+.workspace .composer{margin-top:6px;padding:12px 14px;background:#f7faf7}
+.workspace .composer:focus-within{box-shadow:0 0 0 3px #dceee0}
+.workspace .composer textarea{min-height:118px}
+.workspace .composer textarea:focus-visible{outline:0}
+.create-footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid var(--line);padding-top:14px;margin-top:16px}
+.create-footer .help{margin:0;flex:1 1 220px}
+.upload-status{min-height:1.5em}.upload-status[data-error=true]{color:#9c392e}
+@media(max-width:740px){.workspace-grid{grid-template-columns:1fr}.dropzone{padding-block:22px}}
+.attachments{display:flex;flex-wrap:wrap;gap:7px}
+.attachment{display:inline-flex;gap:7px;align-items:center;min-width:0;max-width:100%;background:#e3efe5;border-radius:8px;padding:4px 8px}
+.attachment span{overflow-wrap:anywhere}.attachment button{padding:0 6px;color:var(--green);background:transparent}
+.options{padding:0;border:0;margin:8px 0}.options label{display:flex;gap:10px;align-items:baseline;padding:9px;border:1px solid var(--line);border-radius:8px;margin:5px 0;cursor:pointer}
+.options label:has(:checked){background:#e4f0e6;border-color:var(--green)}
+.code-input,.code-example{font-family:Consolas,monospace;tab-size:4;min-height:145px}
+.code-example{background:#edf4ed;padding:12px;white-space:pre-wrap;overflow-wrap:anywhere;min-height:0}
+@media(max-width:740px){.hero,.cards{grid-template-columns:1fr}.preview-card{transform:none}.bar{padding-block:12px}.bar,main{padding-inline:16px}nav{order:3;width:100%}nav a{padding-inline:8px}.panel,.card{padding:16px}}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .feature:is(:hover,:focus-visible),.feature:is(:hover,:focus-visible) .symbol,.button:active,button:active{transform:none}
+}
+</style>
+<header>
+  <div class="bar">
+    <a href="#home" class="brand">Sau<span>Ba</span></a>
+    <nav aria-label="Điều hướng chính">
+      <a href="#home">Trang chủ</a><a href="#upload">Upload tài liệu</a>
+      <a href="#create">Tạo đề</a><a href="#history">Đề đã tạo</a><a href="#attempts">Bài đã làm</a>
+    </nav>
+    <span class="mode" id="mode">Đang kiểm tra model</span>
+  </div>
+</header>
+<main>
+  <section data-page="home">
+    <div class="hero">
+      <div>
+        <p class="eyebrow">AI20K · TỰ ÔN</p>
+        <h1>Ôn bài từ chính<br><span>tài liệu của bạn.</span></h1>
+        <p>Tải PDF, yêu cầu AI tạo đề theo chủ đề bạn muốn và xem lại đúng trang nguồn sau khi trả lời.</p>
+        <div class="actions"><a class="button primary" href="#create">Tạo đề ôn</a><a class="button secondary" href="#upload">Upload tài liệu</a></div>
+      </div>
+      <div class="preview-card">
+        <span class="tag">Câu hỏi mẫu</span>
+        <h2>Vì sao cần giữ riêng tập test?</h2>
+        <p>Trả lời theo cách của bạn, rồi xem những ý đã đạt và phần cần ôn lại.</p>
+        <div class="actions"><button class="secondary" id="sample">Làm thử đề mẫu</button></div>
+      </div>
+    </div>
+    <div class="cards">
+      <a class="card feature" href="#upload">
+        <span class="feature-art" aria-hidden="true"><span class="symbol">PDF</span></span>
+        <h2>Tài liệu của bạn</h2><p>Thêm PDF để làm nguồn cho đề ôn.</p>
+        <span class="feature-cta">Chọn tài liệu</span>
+      </a>
+      <a class="card feature feature-create" href="#create">
+        <span class="feature-art" aria-hidden="true"><span class="symbol"><span>✦</span></span></span>
+        <h2>Đề theo yêu cầu</h2><p>Chọn số câu và chủ đề bằng lời của bạn.</p>
+        <span class="feature-cta">Nhập yêu cầu</span>
+      </a>
+      <a class="card feature feature-history" href="#history">
+        <span class="feature-art" aria-hidden="true"><span class="symbol"><span></span></span></span>
+        <h2>Đề đã tạo</h2><p>Mở lại đề đã lưu để tiếp tục tự ôn.</p>
+        <span class="feature-cta">Xem danh sách</span>
+      </a>
+    </div>
+  </section>
+  <section class="pane workspace" data-page="upload" hidden>
+    <div class="workspace-heading"><h1>Upload tài liệu</h1><p>Thêm PDF để tạo đề ôn từ nội dung bạn đang học.</p></div>
+    <div class="workspace-grid">
+    <section class="panel">
+      <h2 class="panel-heading">Tài liệu đã tải</h2>
+      <div id="documentLibrary" aria-live="polite"></div>
+    </section>
+    <section class="panel">
+      <div id="dropzone" class="dropzone">
+        <span class="pdf-mark" aria-hidden="true">PDF</span>
+        <strong>Kéo thả PDF vào đây</strong>
+        <p id="uploadHint">PDF có lớp chữ · Tối đa 30 MB mỗi tệp</p>
+        <input class="file-input" type="file" id="file" accept=".pdf,application/pdf" aria-describedby="uploadHint" multiple>
+        <label class="button" for="file">Chọn tệp PDF</label>
+      </div>
+      <p id="fileStatus" class="status help upload-status" aria-live="polite"></p>
+      <div id="preview"></div>
+      <a id="toCreate" class="button secondary" href="#create" hidden>Tiếp tục tạo đề</a>
+    </section>
+    </div>
+  </section>
+  <section class="pane workspace" data-page="create" hidden>
+    <div class="workspace-heading"><h1>Tạo đề</h1><p>Chọn tài liệu và cho SauBa biết bạn muốn ôn gì.</p></div>
+    <form class="panel" id="createForm">
+      <div class="workspace-grid">
+      <aside>
+      <h2 class="panel-heading">Nguồn ôn tập</h2>
+      <label for="documentPicker">Tài liệu đã tải lên</label>
+      <div class="document-picker">
+        <select id="documentPicker"><option value="">Chọn tài liệu để đính kèm</option></select>
+        <a class="button secondary" href="#upload">＋ Tải thêm PDF</a>
+      </div>
+      <p id="documentHint" class="library-empty" aria-live="polite"></p>
+      </aside>
+      <div>
+      <h2 class="panel-heading">Yêu cầu tạo đề</h2>
+      <label for="request">Bạn muốn ôn gì?</label>
+      <div class="composer">
+        <div id="attachments" class="attachments" aria-label="Tài liệu đính kèm"></div>
+        <textarea id="request" maxlength="500" required placeholder="Ví dụ: Tạo 3 câu trắc nghiệm, 1 câu code và 1 câu tự luận."></textarea>
+      </div>
+      <div class="actions">
+        <button type="button" class="secondary suggestion">Tạo 6 câu ôn cả tài liệu</button>
+        <button type="button" class="secondary suggestion">Tạo 4 câu về các khái niệm chính</button>
+      </div>
+      <div class="create-footer">
+      <p id="help" class="help">Mặc định 6 câu, chia gần nhất theo tỷ lệ 60% trắc nghiệm, 20% code, 20% text.</p>
+      <button id="generate" disabled>Sinh đề từ PDF</button>
+      </div>
+      <p id="createStatus" class="status help" aria-live="polite"></p>
+      </div>
+      </div>
+    </form>
+  </section>
+  <section class="pane" data-page="history" hidden>
+    <h1>Đề đã tạo</h1>
+    <div class="panel" id="history" aria-live="polite"></div>
+  </section>
+  <section class="pane" data-page="quiz" hidden>
+    <h1>Đề tự ôn</h1>
+    <div class="panel">
+      <h2 id="quizTitle"></h2>
+      <p id="quizStatus" class="status help" aria-live="polite"></p>
+      <form id="attemptForm">
+        <div id="questions"></div>
+        <div id="submitArea" class="attempt-submit" hidden>
+          <button id="submitAttempt">Nộp bài</button>
+          <p id="submitStatus" class="status help" aria-live="polite"></p>
+        </div>
+      </form>
+    </div>
+  </section>
+  <section class="pane" data-page="submitted" hidden>
+    <h1>Nộp bài thành công</h1>
+    <div class="panel" id="submission"></div>
+  </section>
+  <section class="pane" data-page="attempts" hidden>
+    <h1>Bài đã làm</h1>
+    <div class="panel" id="attemptList" aria-live="polite"></div>
+  </section>
+  <section class="pane" data-page="review" hidden>
+    <h1>Xem lại bài thi</h1>
+    <div class="panel" id="review" aria-live="polite"></div>
+  </section>
+</main>
+<script>
+const get = id => document.getElementById(id);
+const file = get("file"), generate = get("generate"), sample = get("sample");
+const dropzone = get("dropzone");
+let ready = false, busy = false;
+const selectedDocuments = new Map();
+const documentPicker = get("documentPicker");
+let documents = [];
+let currentAttempt = "";
+function element(tag, text, style) {
+  const node = document.createElement(tag);
+  if (text) node.textContent = text;
+  if (style) node.className = style;
+  return node;
+}
+async function api(path, body) {
+  const response = await fetch("/api/" + path, body === undefined ? {} : {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error);
+  return data;
+}
+function controls() {
+  generate.disabled = busy || !ready || !selectedDocuments.size;
+  sample.disabled = file.disabled = busy;
+  documentPicker.disabled = busy;
+  dropzone.setAttribute("aria-busy", String(file.disabled));
+}
+function renderDocuments() {
+  const placeholder = element("option", documents.length ? "Chọn tài liệu để đính kèm" : "Chưa có tài liệu");
+  placeholder.value = "";
+  documentPicker.replaceChildren(placeholder, ...documents.map(doc => {
+    const option = element("option", doc.name);
+    option.value = doc.id;
+    option.disabled = selectedDocuments.has(doc.id);
+    return option;
+  }));
+  get("attachments").replaceChildren(...[...selectedDocuments].map(([id, name]) => {
+    const chip = element("div", "", "attachment");
+    const remove = element("button", "×");
+    remove.type = "button";
+    remove.setAttribute("aria-label", "Bỏ đính kèm " + name);
+    remove.onclick = () => {
+      selectedDocuments.delete(id);
+      renderDocuments();
+      documentPicker.focus();
+    };
+    chip.append(element("span", name), remove);
+    return chip;
+  }));
+  get("documentHint").textContent = selectedDocuments.size
+    ? "Đã đính kèm " + selectedDocuments.size + " tài liệu."
+    : documents.length ? "Chọn ít nhất một PDF để tạo đề." : "Thư viện đang trống. Hãy tải PDF đầu tiên.";
+  const library = get("documentLibrary");
+  library.replaceChildren(...documents.map(doc => {
+    const row = element("div", "", "library-row");
+    const icon = element("span", "PDF", "pdf-mark");
+    icon.setAttribute("aria-hidden", "true");
+    const use = element("button", "Dùng", "secondary");
+    use.setAttribute("aria-label", "Tạo đề với " + doc.name);
+    use.onclick = () => {
+      selectedDocuments.set(doc.id, doc.name);
+      renderDocuments();
+      location.hash = "create";
+    };
+    row.append(icon, element("span", doc.name), use);
+    return row;
+  }));
+  if (!documents.length) library.append(element("p", "Tài liệu tải lên sẽ xuất hiện ở đây.", "library-empty"));
+  controls();
+}
+async function loadDocuments() {
+  documents = await api("documents");
+  renderDocuments();
+}
+documentPicker.onchange = () => {
+  const doc = documents.find(item => item.id === documentPicker.value);
+  if (doc) selectedDocuments.set(doc.id, doc.name);
+  renderDocuments();
+};
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+let activePage, cardObserver;
+function enter(node, delay = 0, distance = 10) {
+  if (reducedMotion.matches || !node.animate) return;
+  node.animate(
+    [{opacity: 0, transform: "translateY(" + distance + "px)"}, {opacity: 1, transform: "translateY(0)"}],
+    {duration: 420, delay, easing: "cubic-bezier(.2,.7,.25,1)", fill: "backwards"}
+  );
+}
+function animateHome(section) {
+  enter(section.querySelector(".hero"));
+  if (reducedMotion.matches || !("IntersectionObserver" in window)) return;
+  cardObserver = new IntersectionObserver((entries, observer) => {
+    let index = 0;
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      enter(entry.target, index++ * 85, 18);
+      observer.unobserve(entry.target);
+    }
+  }, {threshold: .12});
+  section.querySelectorAll(".feature").forEach(card => cardObserver.observe(card));
+}
+function showPage() {
+  const [requested, id] = location.hash.slice(1).split("/");
+  const page = ["home", "upload", "create", "history", "quiz", "submitted", "attempts", "review"].includes(requested) ? requested : "home";
+  document.querySelectorAll("[data-page]").forEach(section => section.hidden = section.dataset.page !== page);
+  document.querySelectorAll("nav a").forEach(link => {
+    if (link.hash === "#" + page) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  });
+  if (activePage !== page) {
+    if (cardObserver) cardObserver.disconnect();
+    if (activePage) window.scrollTo(0, 0);
+    activePage = page;
+    const section = document.querySelector('[data-page="' + page + '"]');
+    if (page === "home") animateHome(section);
+    else enter(section);
+  }
+  if (page === "history") loadHistory();
+  if (page === "create") loadDocuments().catch(error => get("createStatus").textContent = error.message);
+  if (page === "upload") loadDocuments().catch(error => get("documentLibrary").textContent = error.message);
+  if (page === "attempts") loadAttempts();
+  if (page === "review" || page === "submitted") loadAttempt(page, id);
+  if (page === "create" && !busy) get("request").focus({preventScroll: true});
+}
+window.addEventListener("hashchange", showPage);
+get("questions").append(element("p", "Mở đề đã tạo hoặc quay về Trang chủ để làm thử đề mẫu.", "help"));
+showPage();
+api("status").then(status => {
+  ready = status.ready;
+  get("mode").textContent = ready ? "Model đã cấu hình" : "Chế độ mẫu";
+  if (!ready) get("help").textContent += " Để sinh đề từ PDF, cấu hình model trong .env.";
+  controls();
+}).catch(() => get("mode").textContent = "Chưa kết nối máy chủ");
+async function uploadFiles(files) {
+  if (busy || !files.length) return;
+  get("toCreate").hidden = true;
+  get("preview").replaceChildren();
+  const status = get("fileStatus");
+  const results = [];
+  busy = true; controls();
+  status.dataset.error = "false";
+  try {
+    for (const [index, selected] of files.entries()) {
+      status.textContent = "Đang đọc tệp " + (index + 1) + "/" + files.length + " · " + selected.name;
+      try {
+        if (selected.type !== "application/pdf" && !/\.pdf$/i.test(selected.name)) throw new Error("Chỉ hỗ trợ tệp PDF.");
+        if (selected.size > 30 * 1024 * 1024) throw new Error("PDF phải nhỏ hơn hoặc bằng 30 MB.");
+        const encoded = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(",")[1]);
+          reader.onerror = () => reject(new Error("Không đọc được tệp."));
+          reader.readAsDataURL(selected);
+        });
+        const data = await api("upload", {pdf: encoded, name: selected.name});
+        selectedDocuments.set(data.document, selected.name);
+        documents.unshift({id: data.document, name: selected.name});
+        renderDocuments();
+        get("toCreate").hidden = false;
+        results.push(selected.name + " · " + data.pages + " trang có chữ"
+          + (data.skipped.length ? " · " + data.skipped.length + " trang chưa đọc được" : ""));
+        const preview = element("details");
+        preview.append(element("summary", selected.name + " · Xem trang " + data.preview.page), element("p", data.preview.text));
+        get("preview").append(preview);
+      } catch (error) {
+        status.dataset.error = "true";
+        results.push(selected.name + " · " + error.message);
+      }
+    }
+  } finally {
+    status.textContent = results.join("\n");
+    file.value = "";
+    busy = false;
+    controls();
+  }
+}
+file.addEventListener("change", () => uploadFiles([...file.files]));
+dropzone.addEventListener("dragover", event => {
+  event.preventDefault();
+  if (!busy) dropzone.classList.add("dragging");
+});
+dropzone.addEventListener("dragleave", event => {
+  if (!dropzone.contains(event.relatedTarget)) dropzone.classList.remove("dragging");
+});
+dropzone.addEventListener("drop", event => {
+  event.preventDefault();
+  dropzone.classList.remove("dragging");
+  uploadFiles([...event.dataTransfer.files]);
+});
+async function displayQuiz(data) {
+  const started = await api("start", {quiz: data.quiz});
+  currentAttempt = started.attempt;
+  get("quizTitle").textContent = data.title;
+  get("questions").replaceChildren(...data.questions.map(questionCard));
+  get("submitArea").hidden = false;
+  get("submitStatus").textContent = "";
+  get("quizStatus").textContent = data.questions.length + " câu"
+    + (data.requested && data.questions.length < data.requested
+      ? " · " + data.questions.length + "/" + data.requested + " câu yêu cầu vượt qua kiểm nguồn." : "");
+  location.hash = "quiz";
+}
+async function loadHistory() {
+  const panel = get("history");
+  panel.textContent = "Đang tải đề…";
+  try {
+    const entries = await api("quizzes");
+    if (!entries.length) {
+      panel.replaceChildren(element("p", "Chưa có đề nào được tạo từ PDF.", "help"));
+      const link = element("a", "Tạo đề đầu tiên", "button");
+      link.href = "#create";
+      panel.append(link);
+      return;
+    }
+    panel.replaceChildren(...entries.map(entry => {
+      const row = element("article", "", "history-row");
+      const details = element("div");
+      details.append(element("h3", entry.title), element("p", entry.count + " câu", "source"));
+      const open = element("button", "Mở đề", "secondary");
+      open.onclick = async () => {
+        open.disabled = true;
+        try { await displayQuiz(await api("quizzes/" + entry.quiz)); }
+        catch (error) { panel.append(element("p", error.message, "help")); }
+        finally { open.disabled = false; }
+      };
+      row.append(details, open);
+      return row;
+    }));
+  } catch (error) { panel.textContent = error.message; }
+}
+async function loadQuiz(mode) {
+  if (busy) return;
+  busy = true; controls();
+  const status = mode === "sample" ? get("quizStatus") : get("createStatus");
+  if (mode === "sample") location.hash = "quiz";
+  status.textContent = mode === "sample" ? "Đang mở đề mẫu…" : "Đang sinh câu hỏi và kiểm nguồn…";
+  try {
+    const data = await api(mode, {documents: [...selectedDocuments.keys()], request: get("request").value.trim()});
+    status.textContent = "";
+    await displayQuiz(data);
+  } catch (error) { status.textContent = error.message; }
+  finally { busy = false; controls(); }
+}
+function questionCard(question, index) {
+  const card = element("article");
+  const type = {choice: "Trắc nghiệm", code: "Điền code", text: "Điền text"}[question.kind];
+  const source = [question.document, question.code, question.page ? "Trang " + question.page : ""].filter(Boolean).join(" · ");
+  card.append(element("h3", (index + 1) + ". " + question.question),
+    element("p", type + " · " + source, "tag"));
+  card.dataset.question = index;
+  if (question.kind === "choice") {
+    const options = element("fieldset", "", "options");
+    options.append(element("legend", "Chọn một đáp án"));
+    question.options.forEach((option, i) => {
+      const label = element("label"), input = element("input");
+      input.type = "radio";
+      input.name = "answer-" + index;
+      input.value = i;
+      label.append(input, element("span", String.fromCharCode(65 + i) + ". " + option));
+      options.append(label);
+    });
+    card.append(options);
+    return card;
+  }
+  const answer = element("textarea");
+  answer.id = "answer-" + index;
+  answer.maxLength = 4000;
+  answer.placeholder = question.kind === "code" ? "Nhập code hoặc giả mã theo đề" : "Nhập câu trả lời";
+  if (question.kind === "code") {
+    answer.className = "code-input";
+    answer.spellcheck = false;
+  }
+  const label = element("label", question.kind === "code" ? "Bài làm code · Chấm theo rubric" : "Câu trả lời của bạn");
+  label.htmlFor = answer.id;
+  card.append(label, answer);
+  return card;
+}
+get("attemptForm").onsubmit = async event => {
+  event.preventDefault();
+  const button = get("submitAttempt"), status = get("submitStatus");
+  const attempt = currentAttempt;
+  if (!attempt || button.disabled) return;
+  const questions = get("questions");
+  const fields = [...questions.querySelectorAll("textarea, input")];
+  const answers = [...questions.querySelectorAll("[data-question]")]
+    .map(card => card.querySelector("textarea, input:checked")?.value || "");
+  for (const field of fields) field.disabled = true;
+  button.disabled = true;
+  status.textContent = "Đang chấm toàn bộ bài. Vui lòng chờ…";
+  try {
+    const result = await api("submit", {attempt, answers});
+    if (currentAttempt === attempt) {
+      currentAttempt = "";
+      get("submitArea").hidden = true;
+      location.hash = "submitted/" + result.id;
+    }
+  } catch (error) {
+    status.textContent = error.message;
+    for (const field of fields) field.disabled = false;
+  } finally {
+    button.disabled = false;
+  }
+};
+function durationText(seconds) {
+  return Math.floor(seconds / 60) + " phút " + seconds % 60 + " giây";
+}
+function metrics(summary) {
+  const grid = element("div", "", "metrics");
+  for (const [label, value] of [
+    ["Thời gian làm bài", durationText(summary.duration)],
+    ["Điểm", summary.score.toLocaleString("vi-VN") + " / 10"],
+    ["Số câu đúng", summary.correct + " / " + summary.total]
+  ]) {
+    const tile = element("div", "", "metric");
+    tile.append(element("span", label), element("strong", value));
+    grid.append(tile);
+  }
+  return grid;
+}
+function linkTo(label, hash, style = "button") {
+  const link = element("a", label, style);
+  link.href = "#" + hash;
+  return link;
+}
+async function loadAttempts() {
+  const panel = get("attemptList");
+  panel.textContent = "Đang tải bài đã làm…";
+  try {
+    const entries = await api("attempts");
+    if (!entries.length) {
+      panel.replaceChildren(element("p", "Bạn chưa nộp bài nào.", "help"), linkTo("Mở đề đã tạo", "history"));
+      return;
+    }
+    panel.replaceChildren(...entries.map(entry => {
+      const row = element("article", "", "history-row");
+      const info = element("div");
+      info.append(element("h3", entry.title), element("p",
+        new Date(entry.submitted * 1000).toLocaleString("vi-VN") + " · " + entry.score.toLocaleString("vi-VN") + "/10", "source"));
+      row.append(info, linkTo("Xem lại bài thi", "review/" + entry.id, "button secondary"));
+      return row;
+    }));
+  } catch (error) { panel.textContent = error.message; }
+}
+function reviewCard(row, index) {
+  const card = element("article");
+  const detail = element("details");
+  const ideas = element("ul");
+  for (const item of row.ideas) ideas.append(element("li", item.idea + " · " + item.status));
+  detail.append(element("summary", "Xem chi tiết đáp án"), ideas);
+  if (row.correct_answer) detail.append(element("p", "Đáp án đúng · " + row.correct_answer));
+  if (row.example_code) detail.append(element("p", "Code tham khảo"), element("pre", row.example_code, "code-example"));
+  card.append(element("h3", (index + 1) + ". " + row.question),
+    element("p", row.verdict, "tag"), element("p", "Câu trả lời của bạn", "source"),
+    element(row.kind === "code" ? "pre" : "p", row.answer || "Bỏ trống",
+      row.kind === "code" ? "code-example" : "answer-text"), detail);
+  if (row.verdict !== "Đúng") {
+    const guide = element("details");
+    const points = element("ul");
+    for (const item of row.ideas.filter(item => item.status !== "đạt")) {
+      points.append(element("li", item.idea));
+    }
+    guide.append(element("summary", "Xem hướng dẫn ôn tập"),
+      element("p", "Đọc đoạn nguồn bên dưới, rồi thử giải thích lại các ý sau:"), points,
+      element("p", [row.source.document, row.source.code, row.source.page ? "Trang " + row.source.page : ""].filter(Boolean).join(" · "), "tag"),
+      element("p", row.source.text));
+    card.append(guide);
+  }
+  return card;
+}
+function studyPlan(id, entry) {
+  const panel = element("section", "", "study-plan");
+  const output = element("div");
+  output.setAttribute("aria-live", "polite");
+  panel.append(element("h3", "Kế hoạch ôn tập"));
+  if (entry.results.every(row => row.verdict === "Đúng")) {
+    panel.append(element("p", "Bạn đã đạt tất cả các ý trong bài.", "help"));
+    return panel;
+  }
+  const button = element("button", "Lập kế hoạch ôn tập");
+  button.onclick = async () => {
+    button.disabled = true;
+    output.textContent = "Đang đối chiếu bài làm với tài liệu…";
+    try {
+      const plan = await api("study-plan", {attempt: id});
+      const list = element("ol");
+      for (const step of plan) {
+        const item = element("li");
+        const source = step.source;
+        const location = [source.code, source.page ? "Trang " + source.page : ""].filter(Boolean).join(" · ");
+        const sections = [...(source.sections || [])].reverse();
+        if (!sections.length && step.topic) sections.push(step.topic + " (chủ đề suy ra)");
+        const path = [location, ...sections, source.document].filter(Boolean).join(" → ");
+        item.append(element("strong", step.idea),
+          element("p", "Câu " + step.questions.map(q => q.number).join(", ") + " · " + step.status, "source"),
+          element("p", path, "source"));
+        if (step.diagnosis) item.append(element("p", step.diagnosis));
+        item.append(element("p", "Tự luyện: " + step.practice));
+        if (step.connect) item.append(element("p", "Nối với mục rộng hơn: " + step.connect));
+        const details = element("details");
+        details.append(element("summary", "Đọc đoạn nguồn"), element("p", source.text));
+        item.append(details);
+        list.append(item);
+      }
+      if (plan.length) {
+        output.replaceChildren(element("p", "Ôn theo thứ tự bên dưới, từ ý cụ thể đến mục chứa ý đó.", "help"), list);
+        enter(output);
+      } else {
+        output.textContent = "Bài này không có ý nào cần ôn lại.";
+      }
+      button.hidden = true;
+    } catch (error) {
+      output.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  };
+  panel.append(button, output);
+  return panel;
+}
+async function loadAttempt(page, id) {
+  const panel = get(page === "review" ? "review" : "submission");
+  const route = location.hash;
+  panel.textContent = "Đang tải kết quả…";
+  try {
+    const entry = await api("attempts/" + encodeURIComponent(id || ""));
+    if (location.hash !== route) return;
+    panel.replaceChildren(element("h2", entry.summary.title), metrics(entry.summary));
+    if (page === "submitted") {
+      panel.append(linkTo("Xem lại bài thi", "review/" + id));
+    } else {
+      panel.append(linkTo("Bài đã làm", "attempts", "button secondary"), studyPlan(id, entry),
+        ...entry.results.map(reviewCard));
+    }
+  } catch (error) {
+    if (location.hash === route) panel.textContent = error.message;
+  }
+}
+get("createForm").onsubmit = event => {
+  event.preventDefault();
+  if (!get("request").value.trim()) {
+    get("createStatus").textContent = "Hãy nhập yêu cầu tạo đề.";
+    return;
+  }
+  loadQuiz("generate");
+};
+document.querySelectorAll(".suggestion").forEach(button => button.onclick = () => {
+  get("request").value = button.textContent;
+  get("request").focus();
+});
+sample.onclick = () => loadQuiz("sample");
+</script>
+</html>
