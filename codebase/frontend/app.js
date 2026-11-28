@@ -9,12 +9,13 @@
   const CONFIRMED_CAPTURES_KEY = "skybill_confirmed_captures_v1";
   const CATEGORIES = [
     "Ăn uống",
-    "Đi lại",
+    "Di chuyển",
     "Mua sắm",
-    "Hoá đơn & Tiện ích",
+    "Hóa đơn & Nhà ở",
     "Giải trí",
-    "Sức khoẻ",
-    "Chưa phân loại",
+    "Sức khỏe",
+    "Khác",
+    "không rõ",
   ];
 
   const SEED_RECEIPTS = [
@@ -33,7 +34,7 @@
       date: "2026-11-08",
       time: "17:20",
       merchant: "Nhà Thuốc An Tâm",
-      category: "Sức khoẻ",
+      category: "Sức khỏe",
       date_source: "Từ hóa đơn",
       total: 130000,
       items: [{ name: "Vitamin C & Khẩu trang", price: 130000 }],
@@ -43,7 +44,7 @@
       date: "2026-11-15",
       time: "10:10",
       merchant: "Internet & Điện Mẫu",
-      category: "Hoá đơn & Tiện ích",
+      category: "Hóa đơn & Nhà ở",
       date_source: "Từ hóa đơn",
       total: 570000,
       items: [{ name: "Điện + Internet tháng 11", price: 570000 }],
@@ -196,7 +197,7 @@
         pill.classList.add("online");
       }
       if (ocrEl) {
-        ocrEl.textContent = health.ocr?.engine_ready ? "ONNX Sẵn sàng" : "Fallback / Mock";
+        ocrEl.textContent = health.ocr?.engine_ready ? `OCR: ${health.ocr.engine_version}` : "OCR chưa sẵn sàng";
       }
       const rRes = await fetch("/api/receipts");
       if (rRes.ok) {
@@ -371,7 +372,7 @@
     // Category breakdown
     const byCat = {};
     list.forEach((r) => {
-      const c = r.category || "Chưa phân loại";
+      const c = r.category || "không rõ";
       byCat[c] = (byCat[c] || 0) + (Number(r.total) || 0);
     });
     const catBox = $("day-category-breakdown");
@@ -585,7 +586,9 @@
     $("btn-run-ocr").textContent = "Đang đọc hóa đơn…";
 
     let scanData = null;
-    if (state.backendOnline && modeHint === "auto") {
+    let scanError = "";
+    const useBackend = state.backendOnline && modeHint === "auto";
+    if (useBackend) {
       try {
         const res = await fetch("/api/receipts/scan", {
           method: "POST",
@@ -597,29 +600,38 @@
             filename,
           }),
         });
-        if (res.ok) scanData = await res.json();
-      } catch (_) {}
+        const body = await res.json();
+        if (res.ok) scanData = body;
+        else scanError = body.error || "Máy chủ chưa đọc được ảnh.";
+      } catch (_) {
+        scanError = "Chưa kết nối được máy chủ để đọc ảnh.";
+      }
     }
 
     $("btn-run-ocr").disabled = false;
     $("btn-run-ocr").textContent = "Đọc hóa đơn (Tạo bản xem nhanh)";
 
     // Evaluate quality / G10 blurry check
-    const isBlurry =
-      modeHint === "blurry" ||
-      (scanData &&
-        (scanData.quality_report?.quality_status === "fail" ||
-          !scanData.validation?.calculated_total));
+    // Backend là nguồn quyết định: không hợp lệ / lỗi → Cần đọc lại, không tạo bản nháp giả.
+    const backendRejected = useBackend && (!scanData || !scanData.validation?.valid || !scanData.draft);
+    const isBlurry = modeHint === "blurry" || backendRejected;
 
     if (isBlurry) {
-      $("reread-reason").textContent =
-        "Ảnh bị mờ hoặc chưa xác định rõ số tiền thực trả (G10). Tổng chi tiêu trong sổ được giữ nguyên.";
+      const missing = scanData?.validation?.missing_fields || [];
+      const reason = scanError
+        || (scanData?.quality_report?.quality_status === "fail" ? "Ảnh bị mờ hoặc lóa (G10)." : "")
+        || (missing.includes("paid_total") ? "Chưa xác định rõ số tiền thực trả." : "")
+        || (missing.includes("date") ? "Chưa đọc được ngày hợp lệ." : "")
+        || "Ảnh bị mờ hoặc chưa xác định rõ số tiền thực trả (G10).";
+      $("reread-reason").textContent = reason + " Chưa ghi khoản chi, tổng chi tiêu trong sổ được giữ nguyên.";
       $("reread-preview").src = state.currentImageDataUrl;
       showSheetStep("reread");
       return;
     }
 
-    const draft = scanData?.draft || {
+    const draft = scanData?.draft
+      ? { ...scanData.draft, total: scanData.draft.printed_total }
+      : {
       merchant: modeHint === "nodate" ? "Tiệm Bánh Phố Cổ" : "Highlands Coffee",
       date: targetDate,
       category: "Ăn uống",
@@ -635,7 +647,7 @@
 
     state.currentDraft = {
       ...draft,
-      capture_id: state.activeCaptureId,
+      capture_id: draft.capture_id || state.activeCaptureId,
       date: draft.date || targetDate,
       date_source: dateSource,
       image_data_url: state.currentImageDataUrl,
@@ -654,7 +666,7 @@
     srcBadge.textContent = draft.date_source || "Từ hóa đơn";
     srcBadge.classList.toggle("default-date", Boolean(isDefaultDate));
 
-    state.selectedCategory = CATEGORIES.includes(draft.category) ? draft.category : "Chưa phân loại";
+    state.selectedCategory = CATEGORIES.includes(draft.category) ? draft.category : "không rõ";
     renderCategoryChips();
 
     $("draft-thumb-img").src = state.currentImageDataUrl;
@@ -683,7 +695,8 @@
     if (!state.currentDraft) return;
 
     const captureId = state.currentDraft.capture_id || state.activeCaptureId;
-    if (state.confirmedCaptures.has(captureId)) {
+    // Bản nháp từ backend: để backend kiểm trùng. Bản nháp demo cục bộ: kiểm trùng ở đây.
+    if (!state.currentDraft.draft_id && state.confirmedCaptures.has(captureId)) {
       showToast("Trùng mã lượt chụp — giữ nguyên tổng ngày!");
       closeCaptureSheet();
       return;
@@ -714,29 +727,41 @@
       time: new Date().toTimeString().slice(0, 5),
     };
 
-    if (state.backendOnline) {
+    let duplicate = false;
+    if (state.backendOnline && payload.draft_id) {
       try {
         const res = await fetch("/api/receipts/confirm", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ ...payload, image_data_url: undefined }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.receipt) savedRecord = { ...data.receipt, image_data_url: state.currentImageDataUrl, date_source: payload.date_source, capture_id: captureId };
+        const data = await res.json();
+        if (!res.ok || !data.receipt) {
+          showToast(data.error || "Chưa lưu được khoản chi. Hãy thử lại.");
+          return;
         }
-      } catch (_) {}
+        duplicate = Boolean(data.duplicate);
+        savedRecord = { ...data.receipt, image_data_url: state.currentImageDataUrl };
+      } catch (_) {
+        showToast("Chưa kết nối được máy chủ. Chưa ghi khoản chi.");
+        return;
+      }
     }
 
     state.confirmedCaptures.add(captureId);
     state.lastSubmittedCaptureId = captureId;
+    if (duplicate) {
+      closeCaptureSheet();
+      showToast("Trùng mã lượt chụp — khoản đã có, giữ nguyên tổng ngày!");
+      return;
+    }
     state.receipts.push(savedRecord);
     saveLocalCache();
 
-    const [y, m] = date.split("-").map(Number);
+    const [y, m] = savedRecord.date.split("-").map(Number);
     state.calYear = y;
     state.calMonth = m;
-    state.selectedDate = date;
+    state.selectedDate = savedRecord.date;
     state.dayExpanded = true;
 
     closeCaptureSheet();
@@ -968,6 +993,7 @@
       const reader = new FileReader();
       reader.onload = () => setCapturedImage(reader.result);
       reader.readAsDataURL(file);
+      e.target.value = ""; // cho phép chọn lại đúng ảnh cũ (ca chụp trùng)
     });
 
     $("btn-sample-clear").addEventListener("click", () => setCapturedImage(generateSampleReceiptImage("clear")));

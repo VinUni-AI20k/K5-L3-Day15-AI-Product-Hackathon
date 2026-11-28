@@ -7,7 +7,7 @@ Theo danh sách phân phòng, nhóm hiển thị là **404 ERROR**, đội **#5*
 
 Track E · Tài chính · Nhật ký chi tiêu cá nhân
 
-**Thay đổi đề tài:** Đổi từ Track D (Thương mại điện tử) ở CP1 sang Track E (Tài chính cá nhân), với lát cắt ghi khoản chi từ ảnh hóa đơn sau một lần bấm Chốt.
+**Lịch sử chọn track.** Nhóm chọn Track D (Thương mại điện tử) ban đầu rồi cập nhật CP1 sang Track E (Tài chính cá nhân). Ở CP2, nhóm thêm bước xem nhanh và bấm Chốt trước khi lưu khoản chi vào lịch. [Lát cắt ở bản CP1 đã sửa](README.md#cp1)
 
 ## §0. Hiện tại việc này diễn ra thế nào *(guide 1.1)*
 
@@ -40,8 +40,11 @@ Track E · Tài chính · Nhật ký chi tiêu cá nhân
 - **Một điều đáng né:** Tự động lưu khi đọc sai số tiền hoặc ghi thiếu/trùng gây lệch tổng (12/500 review ở hai app nêu lỗi ghi thiếu, trùng hoặc sai tổng), và thiếu chế độ xem chi tiết từng ngày (*“không hiện được từng ngày cụ thể”* — Money Lover · 147).
 - **Mình khác gì (theo pain 1.2):** Tập trung đúng một lát cắt: chụp một hóa đơn → xem nhanh số thực trả và ngày chi → bấm Chốt một lần (dùng mã lượt chụp chống cộng trùng), ảnh mờ đẩy sang **Cần đọc lại**, và chạm ngày trên lịch mở ngay từng khoản kèm ảnh hóa đơn gốc.
 
+<a id="lat-cat"></a>
 ## §4. Thiết kế *(guide 2.2, 3.2)*
-- **Lát cắt dự kiến:** Khi người dùng chụp một hóa đơn, AI đọc ngày mua và số tiền thực trả rồi phân loại khoản chi để người dùng xem nhanh và bấm Chốt một lần trước khi khoản chi xuất hiện trên lịch.
+
+- **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả). Khi người ghi chi tiêu cá nhân chụp một hóa đơn, AI chọn nhóm chi dựa trên nội dung hóa đơn để họ có một khoản chi trên lịch sau khi bấm Chốt.
+
 **Hình dạng: workflow cố định.** Các bước đọc ảnh, kiểm số tiền, xem nhanh, chốt và tổng hợp diễn ra theo thứ tự. Ở CP2, văn bản OCR giả đi qua đúng luồng CLI. Đọc ảnh và màn hình lịch dành cho bản tiếp theo.
 
 ```mermaid
@@ -136,7 +139,7 @@ flowchart TD
 
 | Thời điểm | Đổi gì | Vì sao (trỏ về câu thử / lỗi / bằng chứng nào) |
 |---|---|---|
-|  |  |  |
+| 28/11/2026 | Khôi phục nhãn Canvas theo mẫu, ghi rõ lát cắt Track E của CP1 và bước Chốt được thêm ở CP2. | Đối chiếu bản CP1 đã sửa tại commit `9cef839` và luồng Chốt tại commit `0cea24c`. |
 
 **Sau CP4 (đến 23:59 Thứ Bảy 28/11)** (sửa theo góp ý — không sửa chuẩn "đạt", câu thử, số bằng chứng, kết quả các lượt đã chạy)
 

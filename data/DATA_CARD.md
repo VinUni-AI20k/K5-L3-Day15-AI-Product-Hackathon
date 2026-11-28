@@ -36,4 +36,4 @@
 
 ## Lưu trong bản chạy thử
 
-CLI lưu hóa đơn sau khi người dùng Chốt vào SQLite trong `data/runtime/`. Mỗi câu eval/simulate dùng sổ tạm riêng để ổn định đáp án.
+Web và CLI lưu hóa đơn sau khi người dùng Chốt vào `CSDL/receipts.json` (khởi tạo từ `data/expenses.json`, không commit; đổi thư mục bằng `SKYBILL_STORAGE_DIR`). Mỗi câu eval/simulate dùng sổ tạm riêng là bản sao `data/expenses.json` để ổn định đáp án.

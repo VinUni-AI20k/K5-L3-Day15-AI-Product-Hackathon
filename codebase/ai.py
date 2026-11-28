@@ -14,12 +14,13 @@ Chế độ giả (mặc định khi .env chưa có MODEL_PROVIDER, hoặc MODEL
     trả một câu giả cố định, model "fake", token 0 — để luồng chạy hết từ trước CP2 (guide bước 3.2).
     Lượt `run.py eval` / `run.py simulate` chạy bằng model giả KHÔNG được tính.
 
-Nối model thật: điền .env (chép từ .env.example) với MODEL_PROVIDER=openai, MODEL_NAME và API_KEY.
+Nối model thật qua OpenAI hoặc llama.cpp chạy cục bộ. Xem docs/connect-model.md.
 Không dán API key vào file này.
 """
 import json
 import os
 from urllib.error import HTTPError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from tracing import model_call
@@ -45,24 +46,24 @@ MODEL_PROVIDER = (os.environ.get("MODEL_PROVIDER") or "fake").strip().lower()
 MODEL_NAME = (os.environ.get("MODEL_NAME") or "").strip()
 API_KEY = (os.environ.get("API_KEY") or "").strip()
 
-
-def call_openai(system: str, user: str) -> dict:
-    if not MODEL_NAME or not API_KEY:
-        raise RuntimeError("Cần điền MODEL_NAME và API_KEY vào .env để thử OpenAI.")
+def _call_chat(url: str, system: str, user: str, *, api_key: str = "", max_tokens: int = 0) -> dict:
     messages = [{"role": "user", "content": user}]
     if system:
         messages.insert(0, {"role": "system", "content": system})
+    payload = {"model": MODEL_NAME, "messages": messages}
+    if max_tokens:
+        payload.update(max_tokens=max_tokens, temperature=0)
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = "Bearer " + api_key
     request = Request(
-        "https://api.openai.com/v1/chat/completions",
-        data=json.dumps({"model": MODEL_NAME, "messages": messages}).encode("utf-8"),
-        headers={"Content-Type": "application/json", "Authorization": "Bearer " + API_KEY},
-        method="POST",
+        url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST",
     )
     try:
         with urlopen(request, timeout=60) as response:
             result = json.load(response)
     except HTTPError as error:
-        raise RuntimeError(f"OpenAI trả HTTP {error.code}. Kiểm tra cấu hình, quyền model và hạn mức.") from None
+        raise RuntimeError(f"{MODEL_PROVIDER} trả HTTP {error.code}. Kiểm tra kết nối và cấu hình model.") from None
 
     usage = result["usage"]
     content = result["choices"][0]["message"]["content"]
@@ -83,5 +84,13 @@ def call_model(system: str, user: str) -> dict:
         return {"text": "[câu trả lời giả — chưa nối model] " + last[:60], "model": "fake", "tokens_in": 0, "tokens_out": 0}
 
     if MODEL_PROVIDER == "openai":
-        return call_openai(system, user)
+        if not MODEL_NAME or not API_KEY:
+            raise RuntimeError("Cần điền MODEL_NAME và API_KEY vào .env để thử OpenAI.")
+        return _call_chat("https://api.openai.com/v1/chat/completions", system, user, api_key=API_KEY)
+    if MODEL_PROVIDER == "llamacpp":
+        local_url = (os.environ.get("SKYBILL_MODEL_URL") or "http://127.0.0.1:18088").rstrip("/")
+        endpoint = urlsplit(local_url)
+        if not MODEL_NAME or endpoint.scheme != "http" or endpoint.hostname not in {"127.0.0.1", "::1", "localhost"}:
+            raise RuntimeError("Cần MODEL_NAME và SKYBILL_MODEL_URL trỏ đến llama-server trên máy này.")
+        return _call_chat(local_url + "/v1/chat/completions", system, user, max_tokens=32)
     raise NotImplementedError("Chưa có adapter cho MODEL_PROVIDER=%s — xem docs/connect-model.md" % MODEL_PROVIDER)
