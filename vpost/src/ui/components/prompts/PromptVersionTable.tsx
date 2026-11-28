@@ -135,11 +135,11 @@ export function PromptVersionTable({
       width: pixel(110),
       renderCell: (row) => (
         <Stack direction="vertical" gap={0.5}>
-          <Text weight="semibold" hasTabularNumbers>
+          <Text type="supporting" weight="semibold" hasTabularNumbers>
             {row.label.number}
           </Text>
           {row.label.origin ? (
-            <Text type="supporting" color="secondary">
+            <Text type="supporting" size="xsm" color="secondary">
               {row.label.origin}
             </Text>
           ) : null}
@@ -150,21 +150,25 @@ export function PromptVersionTable({
       key: "name",
       header: "Tên",
       width: proportional(1),
-      renderCell: (row) => <Text>{row.item.name}</Text>,
+      renderCell: (row) => (
+        <Text type="supporting" weight="medium">
+          {row.item.name}
+        </Text>
+      ),
     },
     {
       key: "status",
       header: "Trạng thái",
       width: pixel(130),
       renderCell: (row) => (
-        <Stack direction="vertical" gap={0.5} align="start">
+        <Stack direction="vertical" gap={1} align="start">
           <Badge
             variant={PROMPT_STATUS_BADGE_VARIANTS[row.item.status]}
             label={PROMPT_STATUS_LABELS[row.item.status]}
           />
           {/* The Named Status Rule: the pill never carries the fact alone. */}
           {row.label.supersededNote ? (
-            <Text type="supporting" color="secondary">
+            <Text type="supporting" size="xsm" color="secondary">
               {row.label.supersededNote}
             </Text>
           ) : null}
@@ -177,9 +181,13 @@ export function PromptVersionTable({
       width: proportional(2),
       renderCell: (row) =>
         row.item.changelog.trim() ? (
-          <Text color="secondary">{row.item.changelog}</Text>
+          <Text type="supporting" color="secondary">
+            {row.item.changelog}
+          </Text>
         ) : (
-          <Text color="placeholder">Không ghi lý do</Text>
+          <Text type="supporting" color="placeholder">
+            Không ghi lý do
+          </Text>
         ),
     },
     {
@@ -188,11 +196,11 @@ export function PromptVersionTable({
       width: pixel(160),
       renderCell: (row) => (
         <Stack direction="vertical" gap={0.5}>
-          <Text color="secondary" hasTabularNumbers>
+          <Text type="supporting" color="secondary" hasTabularNumbers>
             {row.label.stamp}
           </Text>
           {row.item.createdBy ? (
-            <Text type="supporting" color="secondary" wordBreak="break-all">
+            <Text type="supporting" size="xsm" color="secondary" wordBreak="break-all">
               {row.item.createdBy}
             </Text>
           ) : null}
@@ -228,16 +236,18 @@ export function PromptVersionTable({
   ];
 
   return (
-    <Stack direction="vertical" gap={3}>
-      <Table
-        data={rows as VersionRow[]}
-        columns={columns}
-        idKey="key"
-        density="compact"
-        hasHover
-        verticalAlign="top"
-        rowCount={rows.length}
-      />
+    <Stack direction="vertical" gap={4}>
+      <div className="border-border bg-card overflow-hidden rounded-xl border">
+        <Table
+          data={rows as VersionRow[]}
+          columns={columns}
+          idKey="key"
+          density="compact"
+          hasHover
+          verticalAlign="top"
+          rowCount={rows.length}
+        />
+      </div>
 
       {open ? <PromptBodyPanel id={detailId} descriptor={open} onClose={closeDetail} /> : null}
     </Stack>
@@ -387,13 +397,13 @@ function RowActions({
       </HStack>
 
       {isBuiltIn ? (
-        <Text type="supporting" color="secondary">
+        <Text type="supporting" size="xsm" color="secondary">
           Đi kèm phần mềm — không bật tay được.
         </Text>
       ) : null}
 
       {isConfirming ? (
-        <Stack direction="vertical" gap={2} align="start">
+        <div className="border-border bg-muted/50 space-y-2.5 rounded-lg border p-3">
           <Text type="supporting" role="alert">
             Kích hoạt {rowName}? Mọi caption sinh sau đó dùng bản này; caption đã sinh không đổi.
           </Text>
@@ -431,7 +441,7 @@ function RowActions({
               Không
             </Button>
           </HStack>
-        </Stack>
+        </div>
       ) : null}
     </Stack>
   );
@@ -454,14 +464,14 @@ function PromptBodyPanel({
   const { item, label } = descriptor;
 
   return (
-    <Card padding={4} aria-labelledby={headingId}>
-      <Stack direction="vertical" gap={3}>
+    <Card padding={5} aria-labelledby={headingId}>
+      <Stack direction="vertical" gap={4}>
         <HStack gap={3} justify="between" align="start" wrap="wrap">
           <Stack direction="vertical" gap={0.5}>
             <Heading level={3} id={headingId}>
               Nội dung {label.number} — {item.name}
             </Heading>
-            <Text type="supporting" color="secondary">
+            <Text type="supporting" size="xsm" color="secondary">
               {label.origin ? `${label.origin} · ` : ""}
               {label.stamp}
             </Text>
@@ -471,21 +481,21 @@ function PromptBodyPanel({
           </Button>
         </HStack>
 
-        <Stack direction="vertical" gap={1}>
+        <Stack direction="vertical" gap={1.5}>
           <Text type="label">System prompt</Text>
-          <pre className="bg-muted/40 max-h-64 overflow-auto rounded-md border p-3 font-mono text-xs break-words whitespace-pre-wrap">
+          <pre className="border-border bg-muted/40 text-foreground max-h-64 overflow-auto rounded-lg border p-4 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">
             {item.systemPrompt ?? "(không có sẵn nội dung cho phiên bản này)"}
           </pre>
         </Stack>
 
-        <Stack direction="vertical" gap={1}>
+        <Stack direction="vertical" gap={1.5}>
           <Text type="label">Nội dung prompt</Text>
-          <pre className="bg-muted/40 max-h-96 overflow-auto rounded-md border p-3 font-mono text-xs break-words whitespace-pre-wrap">
+          <pre className="border-border bg-muted/40 text-foreground max-h-96 overflow-auto rounded-lg border p-4 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">
             {item.body ?? "(không có sẵn nội dung cho phiên bản này)"}
           </pre>
         </Stack>
 
-        <Text type="supporting" color="secondary">
+        <Text type="supporting" size="xsm" color="secondary">
           Biến dùng trong bản này:{" "}
           {item.variables.length > 0 ? item.variables.join(", ") : "(không có)"}.
         </Text>

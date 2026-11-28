@@ -10,7 +10,6 @@ import {
 
 import { cn } from "@/shared/utils";
 import { Badge } from "@/ui/components/ui/badge";
-import { Eyebrow } from "@/ui/components/ui/eyebrow";
 import type { OperatorWaitingProps } from "./first-run.types";
 
 export function OperatorWaitingCard({
@@ -26,24 +25,24 @@ export function OperatorWaitingCard({
   const isViewer = role === "viewer";
 
   return (
-    <Card padding={4} className="border-border bg-card shadow-xs">
-      <Stack direction="vertical" gap={3}>
+    <Card padding={5} className="border-border bg-card rounded-xl">
+      <Stack direction="vertical" gap={4}>
         {/* Header khối chờ */}
-        <Stack direction="vertical" gap={1}>
+        <Stack direction="vertical" gap={1.5}>
           <Stack direction="horizontal" gap={2} align="center" justify="between" wrap="wrap">
-            <Eyebrow>SỔ MẪU VẢI — KHÔNG GIAN LÀM VIỆC</Eyebrow>
+            <p className="text-foreground-subtle text-sm font-medium">Không gian làm việc</p>
             <Badge tone={isEditor ? "info" : "neutral"}>
               {isEditor ? "Biên tập viên (editor)" : "Chỉ xem (viewer)"}
             </Badge>
           </Stack>
 
-          <Heading level={2} className="text-foreground text-lg font-semibold tracking-tight">
+          <Heading level={2} className="text-foreground text-lg font-semibold">
             {isReady
               ? `Xưởng ${tenantName} đã sẵn sàng làm việc`
               : `Xưởng ${tenantName} đang trong quá trình chuẩn bị`}
           </Heading>
 
-          <Text type="supporting" className="text-xs text-muted-foreground leading-relaxed">
+          <Text type="supporting" className="text-muted-foreground text-sm leading-relaxed">
             {isEditor
               ? isReady
                 ? "Quản trị viên đã kết nối dữ liệu kho hàng và trang Fanpage. Bạn có thể bắt đầu soạn bài và tạo nội dung ngay bây giờ."
@@ -55,10 +54,10 @@ export function OperatorWaitingCard({
         <Divider orientation="horizontal" />
 
         {/* Danh sách 3 tín hiệu trạng thái thời gian thực */}
-        <Stack direction="vertical" gap={1.5}>
-          <Eyebrow className="text-[10px] text-foreground-subtle">
-            TRẠNG THÁI HỆ THỐNG HIỆN TẠI
-          </Eyebrow>
+        <Stack direction="vertical" gap={2}>
+          <h3 className="text-foreground text-sm font-semibold">
+            Trạng thái hệ thống hiện tại
+          </h3>
 
           <Stack direction="vertical" gap={2}>
             {signals.map((signal, index) => {
@@ -69,10 +68,10 @@ export function OperatorWaitingCard({
                   key={index}
                   data-slot="signal-row"
                   className={cn(
-                    "flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg border",
+                    "flex flex-col justify-between gap-2 rounded-xl border p-4 sm:flex-row sm:items-center",
                     isSignalReady
-                      ? "bg-success/5 border-success/30 text-foreground"
-                      : "bg-warning/5 border-warning/30 text-foreground",
+                      ? "border-success/30 bg-success/10 text-foreground"
+                      : "border-warning/30 bg-warning/10 text-foreground",
                   )}
                 >
                   <Stack direction="horizontal" gap={2} align="center">
@@ -81,14 +80,14 @@ export function OperatorWaitingCard({
                       label={isSignalReady ? "Đã sẵn sàng" : "Đang chờ admin"}
                       isPulsing={!isSignalReady}
                     />
-                    <Text weight="medium" className="text-xs text-foreground">
+                    <Text weight="medium" className="text-foreground text-sm">
                       {signal.label}
                     </Text>
                   </Stack>
 
                   <Stack direction="horizontal" gap={2} align="center">
                     {signal.detail ? (
-                      <span className="font-mono text-[11px] text-muted-foreground">
+                      <span className="text-muted-foreground font-mono text-xs">
                         {signal.detail}
                       </span>
                     ) : null}
@@ -123,7 +122,7 @@ export function OperatorWaitingCard({
               onClick={onCompose}
             />
           ) : isReady && isViewer ? (
-            <Text type="supporting" className="text-xs text-muted-foreground italic">
+            <Text type="supporting" className="text-muted-foreground text-xs">
               Tài khoản chỉ xem — không có quyền đăng bài
             </Text>
           ) : null}

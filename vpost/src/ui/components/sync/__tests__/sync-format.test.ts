@@ -4,7 +4,7 @@ import {
   formatCount,
   formatDuration,
   percentOf,
-  segmentWidth,
+  segmentPercent,
 } from "@/ui/components/sync/sync-format";
 
 /**
@@ -49,20 +49,23 @@ describe("percentOf", () => {
   });
 });
 
-describe("segmentWidth", () => {
-  it("collapses to zero instead of dividing by zero", () => {
-    expect(segmentWidth(0, 0)).toBe("0%");
-    expect(segmentWidth(5, 0)).toBe("0%");
-    expect(segmentWidth(-5, 10)).toBe("0%");
-    expect(segmentWidth(Number.NaN, 10)).toBe("0%");
+describe("segmentPercent", () => {
+  it("collapses to zero instead of dividing by zero or propagating non-finite inputs", () => {
+    expect(segmentPercent(0, 0)).toBe(0);
+    expect(segmentPercent(5, 0)).toBe(0);
+    expect(segmentPercent(-5, 10)).toBe(0);
+    expect(segmentPercent(Number.NaN, 10)).toBe(0);
+    expect(segmentPercent(5, Number.NaN)).toBe(0);
+    expect(segmentPercent(Number.POSITIVE_INFINITY, 10)).toBe(0);
+    expect(segmentPercent(5, Number.POSITIVE_INFINITY)).toBe(0);
   });
 
   it("clamps a segment that would overflow its track", () => {
-    expect(segmentWidth(150, 100)).toBe("100%");
+    expect(segmentPercent(150, 100)).toBe(100);
   });
 
   it("keeps full precision so segments still add up", () => {
-    expect(segmentWidth(1, 3)).toBe(`${(1 / 3) * 100}%`);
+    expect(segmentPercent(1, 3)).toBe((1 / 3) * 100);
   });
 });
 

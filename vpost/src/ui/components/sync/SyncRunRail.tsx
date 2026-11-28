@@ -1,10 +1,10 @@
 "use client";
 
+import { Check, Copy } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 import { cn } from "@/shared/utils";
 import { Badge } from "@/ui/components/ui/badge";
-import { Button } from "@/ui/components/ui/button";
 import { formatCount, formatDateTime, formatDuration } from "@/ui/components/sync/sync-format";
 import { NO_TALLY, runTally } from "@/ui/components/sync/sync-run-tally";
 import { shortenId } from "@/ui/schemas/catalog.schema";
@@ -46,29 +46,25 @@ export function SyncRunRail({ run }: { run: SyncRun }) {
   const deletedMedia = run.counts?.mediaDeleted ?? 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Eyebrow styling on a real heading: the rail needs a landmark title
-              in the outline, and <Eyebrow> is a <p> by design. */}
-          <h2 className="text-foreground-subtle font-mono text-xs tracking-widest uppercase">
-            Lần chạy gần nhất
-          </h2>
+          <h2 className="text-foreground text-base font-semibold">Lần chạy gần nhất</h2>
           <Badge tone={SYNC_STATUS_TONES[run.status]}>{SYNC_STATUS_LABELS[run.status]}</Badge>
         </div>
         <p className="text-muted-foreground text-sm">{SYNC_STATUS_HINTS[run.status]}</p>
       </div>
 
-      <dl className="space-y-1.5 text-sm">
+      <dl className="border-border bg-card space-y-2 rounded-xl border p-4 text-sm">
         <RailRow label="Bắt đầu" value={formatDateTime(run.startedAt)} />
         <RailRow
           label="Kết thúc"
           value={run.finishedAt ? formatDateTime(run.finishedAt) : "— (chưa xong)"}
         />
         <RailRow label="Thời gian chạy" value={duration ?? "— (chưa xong)"} />
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-center gap-2">
           <dt className="text-muted-foreground w-28 shrink-0 text-xs">Mã lần chạy</dt>
-          <dd className="flex min-w-0 flex-1 items-baseline gap-2">
+          <dd className="flex min-w-0 flex-1 items-center gap-2">
             <span className="text-muted-foreground truncate font-mono text-xs" title={run.syncRunId}>
               {shortenId(run.syncRunId, 8)}
             </span>
@@ -80,7 +76,7 @@ export function SyncRunRail({ run }: { run: SyncRun }) {
       {run.errorCode || run.errorMessage ? (
         <p
           role="alert"
-          className="border-destructive/30 bg-destructive/5 text-destructive rounded-xl border px-3 py-2 text-sm"
+          className="border-destructive/30 bg-destructive/10 text-destructive rounded-xl border px-4 py-3 text-sm"
         >
           <span className="font-medium">Lý do dừng:</span> {run.errorMessage ?? "Không rõ"}
           {run.errorCode ? <span className="font-mono text-xs"> ({run.errorCode})</span> : null}
@@ -91,17 +87,19 @@ export function SyncRunRail({ run }: { run: SyncRun }) {
           The API has no forecast for the next run, and labelling them as one
           would be an invented number. */}
       {deletedProducts + deletedMedia > 0 ? (
-        <div className="border-warning/40 space-y-1.5 rounded-xl border p-3">
+        <div className="border-warning/30 bg-warning/10 space-y-1.5 rounded-xl border p-4">
           <p className="text-warning-foreground text-sm font-semibold">
             Lần chạy vừa rồi đã xoá
           </p>
           <p className="text-muted-foreground text-sm">
             Sản phẩm và ảnh không còn thuộc nguồn hiện tại đã bị xoá khỏi hệ thống.
           </p>
-          <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
-            <span className="font-mono tabular-nums">{formatCount(deletedProducts)}</span>
+          <p className="text-foreground flex flex-wrap items-baseline gap-x-2 text-sm">
+            <span className="font-mono font-medium tabular-nums">
+              {formatCount(deletedProducts)}
+            </span>
             <span>sản phẩm</span>
-            <span className="font-mono tabular-nums">{formatCount(deletedMedia)}</span>
+            <span className="font-mono font-medium tabular-nums">{formatCount(deletedMedia)}</span>
             <span>file</span>
           </p>
         </div>
@@ -112,16 +110,6 @@ export function SyncRunRail({ run }: { run: SyncRun }) {
   );
 }
 
-/**
- * The recent runs, newest first. Two things this list must never blur:
- * - a run still in flight has no end and no issue count, so it says so instead
- *   of showing "0 vấn đề", which reads like a clean run;
- * - a failed run shows the code it stopped on, because "0 vấn đề" on a run that
- *   never got to look at anything is the most misleading number on this screen.
- *
- * A tenant whose only run is the one described above gets a sentence, not an
- * empty box.
- */
 function RecentRunsList({
   runs,
   currentRunId,
@@ -135,11 +123,8 @@ function RecentRunsList({
   const previous = runs.filter((item) => item.syncRunId !== currentRunId);
 
   return (
-    <section aria-labelledby={headingId} className="border-border space-y-2 border-t pt-4">
-      <h3
-        id={headingId}
-        className="text-foreground-subtle font-mono text-xs tracking-widest uppercase"
-      >
+    <section aria-labelledby={headingId} className="border-border space-y-3 border-t pt-5">
+      <h3 id={headingId} className="text-foreground text-sm font-semibold">
         Các lần chạy trước
       </h3>
 
@@ -150,7 +135,7 @@ function RecentRunsList({
       ) : (
         // Rows in one bordered surface, not five bordered boxes: scanned data is
         // a list, and five identical cards read as five separate alerts.
-        <ul className="border-border divide-border divide-y rounded-md border">
+        <ul className="border-border bg-card divide-border divide-y rounded-xl border">
           {previous.map((item) => (
             <RecentRunRow key={item.syncRunId} run={item} />
           ))}
@@ -165,55 +150,46 @@ function RecentRunRow({ run }: { run: RecentSyncRun }) {
   const duration = formatDuration(run.startedAt, run.finishedAt);
 
   return (
-    <li className="flex items-start gap-3 px-3 py-2.5">
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <p className="flex items-center gap-2 text-xs">
+    <li className="flex items-start gap-3 px-4 py-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <p className="flex items-center gap-2 text-sm">
           <span
             aria-hidden="true"
-            className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[run.status])}
+            className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[run.status])}
           />
           {/* Colour is never the only carrier — the status is written out too. */}
-          <span className="truncate font-medium">{SYNC_STATUS_LABELS[run.status]}</span>
+          <span className="text-foreground truncate font-medium">
+            {SYNC_STATUS_LABELS[run.status]}
+          </span>
         </p>
 
-        {/* When it ran, and for how long. Demoted on purpose: five dates in a
-            column are five near-identical strings and tell nobody anything. */}
-        <p className="text-muted-foreground font-mono text-[11px] tabular-nums">
+        <p className="text-foreground-subtle font-mono text-xs tabular-nums">
           {formatDateTime(run.startedAt)}
           {duration ? ` · ${duration}` : ""}
         </p>
 
-        {/* Why there is no number. "Chưa kết thúc" and "không ghi được số vấn
-            đề" are two different facts — one is a run still going, the other is
-            the system failing to record — and a 10px unit label cannot carry
-            that difference on its own. */}
-        {tally.note ? <p className="text-muted-foreground text-[11px]">{tally.note}</p> : null}
+        {tally.note ? <p className="text-muted-foreground text-xs">{tally.note}</p> : null}
 
-        {/* A run that died mid-way is BOTH unfinished and failed, and the reason
-            is the only useful thing left on it — so it is never folded into the
-            tally branch above. */}
         {run.errorCode ? (
-          <p className="text-muted-foreground text-[11px]">
+          <p className="text-muted-foreground text-xs">
             Dừng vì <span className="font-mono">{run.errorCode}</span>
           </p>
         ) : null}
       </div>
 
-      <p className="w-18 shrink-0 text-right">
+      <p className="w-20 shrink-0 text-right">
         <span
           // The placeholder has no number behind it; the label below says what
           // is missing, so the dash is decoration for a screen reader.
           aria-hidden={tally.value === NO_TALLY}
           className={cn(
             "block font-mono text-base leading-5 font-semibold tabular-nums",
-            tally.isQuiet && "text-muted-foreground",
+            tally.isQuiet ? "text-muted-foreground" : "text-foreground",
           )}
         >
           {tally.value}
         </span>
-        <span className="text-foreground-subtle block font-mono text-[10px] tracking-widest uppercase">
-          {tally.label}
-        </span>
+        <span className="text-foreground-subtle block text-xs font-medium">{tally.label}</span>
       </p>
     </li>
   );
@@ -270,11 +246,20 @@ function CopyRunId({ syncRunId, tenantId }: { syncRunId: string; tenantId: strin
   }
 
   return (
-    <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-      <Button type="button" variant="link" size="xs" onClick={() => void copy()}>
-        Sao chép
+    <span className="flex min-w-0 flex-wrap items-center gap-x-2">
+      <button
+        type="button"
+        onClick={() => void copy()}
+        className="text-accent-foreground focus-visible:ring-ring inline-flex min-h-10 items-center gap-1 rounded-sm px-1.5 text-xs font-medium underline-offset-4 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:min-h-8 motion-safe:transition-colors motion-safe:duration-150"
+      >
+        {state === "copied" ? (
+          <Check className="size-3.5" aria-hidden="true" />
+        ) : (
+          <Copy className="size-3.5" aria-hidden="true" />
+        )}
+        <span>{state === "copied" ? "Đã chép" : "Sao chép"}</span>
         <span className="sr-only"> mã lần chạy</span>
-      </Button>
+      </button>
       <span role="status" className="min-w-0 basis-full text-xs">
         {state === "copied" ? <span className="text-muted-foreground">Đã chép.</span> : null}
         {state === "failed" ? (

@@ -90,7 +90,7 @@ export function SupportSessionDialog({
         subtitle="Phiên chỉ đọc, có thời hạn, và được ghi lại."
         onOpenChange={start.isPending ? undefined : () => close()}
       />
-      <Stack direction="vertical" gap={3} padding={4}>
+      <Stack direction="vertical" gap={4} padding={5}>
         <Banner
           status="warning"
           title="Mỗi lần vào đều được ghi vào sổ của khách"

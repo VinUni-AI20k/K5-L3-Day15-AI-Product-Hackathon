@@ -3,7 +3,12 @@
 import { Fragment, useId } from "react";
 
 import { cn } from "@/shared/utils";
-import { formatClock, formatCount, percentOf, segmentWidth } from "@/ui/components/sync/sync-format";
+import {
+  formatClock,
+  formatCount,
+  percentOf,
+  segmentPercent,
+} from "@/ui/components/sync/sync-format";
 import {
   buildStages,
   type SegmentTone,
@@ -31,6 +36,12 @@ const SEGMENT_BAR: Record<SegmentTone, string> = {
   rejected: "bg-warning",
 };
 
+const SEGMENT_FILL: Record<SegmentTone, string> = {
+  kept: "fill-primary",
+  neutral: "fill-muted-foreground/40",
+  rejected: "fill-warning",
+};
+
 const SEGMENT_TEXT: Record<SegmentTone, string> = {
   kept: "text-foreground",
   neutral: "text-muted-foreground",
@@ -49,9 +60,9 @@ export function SyncFunnel({
   const stages = buildStages(counts);
 
   return (
-    <section aria-labelledby={headingId} className="@container space-y-2.5">
+    <section aria-labelledby={headingId} className="@container space-y-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 id={headingId} className="text-base font-semibold">
+        <h2 id={headingId} className="text-foreground text-lg font-semibold">
           Dòng dữ liệu của lần chạy này
         </h2>
         <p className="text-muted-foreground text-sm">Số vào → số bỏ lại → số đi tiếp.</p>
@@ -62,7 +73,7 @@ export function SyncFunnel({
           <StageRow key={stage.ordinal} stage={stage} />
         ))}
 
-        <div className="border-border flex flex-col gap-3 border-t p-4 @lg:flex-row @lg:gap-4">
+        <div className="border-border flex flex-col gap-3 border-t p-5 @lg:flex-row @lg:gap-5">
           <StageHeading
             ordinal="03"
             title="Ghi vào hệ thống"
@@ -82,12 +93,21 @@ export function SyncFunnel({
 
 function StageRow({ stage }: { stage: Stage }) {
   const share = percentOf(stage.forwardValue, stage.total);
+  const barSegments = stage.segments.reduce<
+    { key: string; tone: SegmentTone; x: number; width: number }[]
+  >((acc, segment) => {
+    const prevEnd = acc.length > 0 ? acc[acc.length - 1].x + acc[acc.length - 1].width : 0;
+    const rawPct = segmentPercent(segment.value, stage.total);
+    const width = Math.max(0, Math.min(100 - prevEnd, rawPct));
+    acc.push({ key: segment.key, tone: segment.tone, x: prevEnd, width });
+    return acc;
+  }, []);
 
   return (
-    <div className="border-border flex flex-col gap-3 border-b p-4 @lg:flex-row @lg:gap-4">
+    <div className="border-border flex flex-col gap-3 border-b p-5 @lg:flex-row @lg:gap-5">
       <StageHeading ordinal={stage.ordinal} title={stage.title} detail={stage.totalLabel} />
 
-      <div className="min-w-0 flex-1 space-y-2.5">
+      <div className="min-w-0 flex-1 space-y-3">
         {/* No input means no percentage: "0%" would read as a loss that never
             happened (core-dashboard-analytics §4). */}
         {stage.total <= 0 ? (
@@ -95,7 +115,7 @@ function StageRow({ stage }: { stage: Stage }) {
         ) : (
           <>
             <p className="flex flex-wrap items-baseline gap-x-2">
-              <span className="text-3xl leading-8 font-semibold tabular-nums">
+              <span className="text-foreground text-3xl leading-8 font-semibold tabular-nums">
                 {formatCount(stage.forwardValue)}
               </span>
               <span className="text-muted-foreground text-sm">
@@ -104,20 +124,25 @@ function StageRow({ stage }: { stage: Stage }) {
               </span>
             </p>
 
-            <div
+            <svg
               aria-hidden="true"
-              className="bg-muted flex h-2.5 w-full overflow-hidden rounded-full"
+              viewBox="0 0 100 10"
+              preserveAspectRatio="none"
+              className="bg-muted block h-2.5 w-full overflow-hidden rounded-full"
             >
-              {stage.segments.map((segment) => (
-                <span
-                  key={segment.key}
-                  className={cn("h-full", SEGMENT_BAR[segment.tone])}
-                  // Data-driven geometry, not a design value: the share of a
-                  // segment is only known at runtime, so it cannot be a class.
-                  style={{ width: segmentWidth(segment.value, stage.total) }}
-                />
-              ))}
-            </div>
+              {barSegments.map((segment) =>
+                segment.width > 0 ? (
+                  <rect
+                    key={segment.key}
+                    x={segment.x}
+                    y={0}
+                    width={segment.width}
+                    height={10}
+                    className={SEGMENT_FILL[segment.tone]}
+                  />
+                ) : null,
+              )}
+            </svg>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
               <dl className="flex flex-wrap items-center gap-x-4 gap-y-1.5">

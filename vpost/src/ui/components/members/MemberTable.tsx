@@ -111,11 +111,19 @@ export function MemberTable({
       renderCell: (member) => (
         <Stack direction="vertical" gap={0.5}>
           <HStack gap={2} align="center" wrap="wrap">
-            <Text>{memberDisplayName(member)}</Text>
-            {member.isYou ? <Text type="supporting">(bạn)</Text> : null}
+            <Text type="supporting" weight="medium">
+              {memberDisplayName(member)}
+            </Text>
+            {member.isYou ? (
+              <Text type="supporting" color="secondary">
+                (bạn)
+              </Text>
+            ) : null}
           </HStack>
           {member.email?.trim() ? (
-            <Text type="supporting">{member.email}</Text>
+            <Text type="supporting" color="secondary">
+              {member.email}
+            </Text>
           ) : (
             <Text type="supporting" color="placeholder">
               Không có email — đăng nhập bằng tài khoản mạng xã hội
@@ -127,7 +135,7 @@ export function MemberTable({
     {
       key: "role",
       header: "Vai trò",
-      width: pixel(150),
+      width: pixel(140),
       renderCell: (member) => (
         <Badge
           variant={MEMBERSHIP_ROLE_BADGE_TONES[member.role]}
@@ -138,10 +146,12 @@ export function MemberTable({
     {
       key: "status",
       header: "Trạng thái",
-      width: pixel(140),
+      width: pixel(130),
       renderCell: (member) =>
         member.status === "active" ? (
-          <Text color="secondary">{memberStatusLabel(member.status)}</Text>
+          <Text type="supporting" color="secondary">
+            {memberStatusLabel(member.status)}
+          </Text>
         ) : (
           // Anything other than active is exceptional — that is what a badge is
           // for, and the plain rows stay quiet around it.
@@ -151,13 +161,17 @@ export function MemberTable({
     {
       key: "joinedAt",
       header: "Vào công ty",
-      width: pixel(170),
-      renderCell: (member) => <Text color="secondary">{formatDateTime(member.joinedAt)}</Text>,
+      width: pixel(160),
+      renderCell: (member) => (
+        <Text type="supporting" color="secondary" hasTabularNumbers>
+          {formatDateTime(member.joinedAt)}
+        </Text>
+      ),
     },
     {
       key: "actions",
       header: "Thao tác",
-      width: pixel(520),
+      width: pixel(360),
       renderCell: (member) => {
         const name = memberDisplayName(member);
         const isBusy = busyMembershipId === member.membershipId;
@@ -173,7 +187,7 @@ export function MemberTable({
               : roleChangeBlockReason(actorRole, member, nextRole);
 
           return (
-            <Stack direction="vertical" gap={2}>
+            <div className="border-border bg-muted/50 space-y-2.5 rounded-lg border p-3">
               <Text type="supporting" role="alert">
                 Đổi vai trò của {name}
                 {member.isYou ? " (chính bạn)" : ""}?
@@ -181,15 +195,17 @@ export function MemberTable({
                   ? " Quyền của bạn trong công ty này đổi ngay sau khi lưu."
                   : " Người này sẽ có đúng quyền của vai trò mới ngay lập tức."}
               </Text>
-              <Selector
-                label={`Vai trò mới cho ${name}`}
-                isLabelHidden
-                size="sm"
-                width={260}
-                options={roleOptions}
-                value={nextRole ?? undefined}
-                onChange={(value) => setDraftRole(value as MembershipRole)}
-              />
+              <div className="max-w-xs">
+                <Selector
+                  label={`Vai trò mới cho ${name}`}
+                  isLabelHidden
+                  size="sm"
+                  width="100%"
+                  options={roleOptions}
+                  value={nextRole ?? undefined}
+                  onChange={(value) => setDraftRole(value as MembershipRole)}
+                />
+              </div>
               <HStack gap={2} align="center" wrap="wrap">
                 <Button
                   size="sm"
@@ -216,14 +232,14 @@ export function MemberTable({
                   Huỷ
                 </Button>
               </HStack>
-            </Stack>
+            </div>
           );
         }
 
         // --- Step 2b: remove, with the consequence spelled out --------------
         if (isAsking && pending?.kind === "remove") {
           return (
-            <Stack direction="vertical" gap={2}>
+            <div className="border-destructive/30 bg-destructive/10 space-y-2.5 rounded-lg border p-3">
               <Text type="supporting" role="alert">
                 Gỡ {member.isYou ? "chính bạn" : name} khỏi công ty?{" "}
                 {removeMemberConsequence(member)}
@@ -252,7 +268,7 @@ export function MemberTable({
                   Giữ lại
                 </Button>
               </HStack>
-            </Stack>
+            </div>
           );
         }
 
@@ -304,17 +320,19 @@ export function MemberTable({
   ];
 
   return (
-    <Stack direction="vertical" isScrollable height="100%">
-      <Table
-        data={members as MemberRow[]}
-        columns={columns}
-        idKey="membershipId"
-        density="compact"
-        hasHover
-        verticalAlign="top"
-        textOverflow="truncate"
-        rowCount={members.length}
-      />
+    <div className="min-w-0 px-4 pb-6 sm:px-6">
+      <div className="border-border bg-card overflow-hidden rounded-xl border">
+        <Table
+          data={members as MemberRow[]}
+          columns={columns}
+          idKey="membershipId"
+          density="compact"
+          hasHover
+          verticalAlign="top"
+          textOverflow="truncate"
+          rowCount={members.length}
+        />
+      </div>
 
       {/* Mounted only while it is open, and `key`ed by the account: opening the
           dialog for a second member must not inherit the first one's typed
@@ -332,6 +350,6 @@ export function MemberTable({
           memberAccountId={resetTarget.accountId}
         />
       ) : null}
-    </Stack>
+    </div>
   );
 }

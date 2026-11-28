@@ -4,7 +4,6 @@ import {
   Badge,
   Banner,
   Button,
-  Divider,
   EmptyState,
   HStack,
   Heading,
@@ -18,6 +17,7 @@ import {
   proportional,
 } from "@astryxdesign/core";
 import type { TableColumn } from "@astryxdesign/core";
+import { Link2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
@@ -92,54 +92,56 @@ export function InvitePanel({ actorRole }: { actorRole: MembershipRole | null })
   }));
 
   return (
-    <Stack direction="vertical" gap={3}>
-      <Stack direction="vertical" gap={1}>
-        <Heading level={2}>Link mời</Heading>
-        <Text type="supporting">
-          Gửi link cho người bạn muốn thêm vào công ty. Ai mở link và đăng nhập sẽ vào công ty với
-          đúng vai trò bạn chọn — nên chỉ gửi cho người bạn tin.
-        </Text>
-      </Stack>
+    <div className="space-y-8">
+      <section className="border-border bg-card space-y-4 rounded-xl border p-5 sm:p-6">
+        <div className="max-w-prose space-y-1.5">
+          <Heading level={2}>Link mời</Heading>
+          <Text type="supporting" color="secondary">
+            Gửi link cho người bạn muốn thêm vào công ty. Ai mở link và đăng nhập sẽ vào công ty với
+            đúng vai trò bạn chọn — nên chỉ gửi cho người bạn tin.
+          </Text>
+        </div>
 
-      {grantable.length === 0 ? (
-        <Banner
-          status="info"
-          title="Bạn không tạo được link mời"
-          description="Chỉ chủ sở hữu và quản trị viên mới mời được người mới vào công ty."
-        />
-      ) : (
-        <HStack gap={3} align="end" wrap="wrap">
-          <Selector
-            label="Vai trò cấp cho người được mời"
-            size="sm"
-            width={300}
-            options={roleOptions}
-            value={role ?? undefined}
-            onChange={(value) => setRole(value as MembershipRole)}
+        {grantable.length === 0 ? (
+          <Banner
+            status="info"
+            title="Bạn không tạo được link mời"
+            description="Chỉ chủ sở hữu và quản trị viên mới mời được người mới vào công ty."
           />
-          <Button
-            variant="primary"
-            size="sm"
-            label="Tạo link mời"
-            isLoading={create.isPending}
-            isDisabled={create.isPending || role === null}
-            onClick={() => {
-              if (role === null) return;
-              create.reset();
-              create.mutate({ role });
-            }}
-          />
-        </HStack>
-      )}
+        ) : (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="w-full sm:max-w-sm">
+              <Selector
+                label="Vai trò cấp cho người được mời"
+                size="md"
+                width="100%"
+                options={roleOptions}
+                value={role ?? undefined}
+                onChange={(value) => setRole(value as MembershipRole)}
+              />
+            </div>
+            <Button
+              variant="primary"
+              size="md"
+              label="Tạo link mời"
+              isLoading={create.isPending}
+              isDisabled={create.isPending || role === null}
+              onClick={() => {
+                if (role === null) return;
+                create.reset();
+                create.mutate({ role });
+              }}
+            />
+          </div>
+        )}
 
-      {create.isError ? <ApiErrorNotice error={create.error} /> : null}
-      {create.isSuccess ? (
-        <NewInviteReveal invite={create.data} onDismiss={() => create.reset()} />
-      ) : null}
+        {create.isError ? <ApiErrorNotice error={create.error} /> : null}
+        {create.isSuccess ? (
+          <NewInviteReveal invite={create.data} onDismiss={() => create.reset()} />
+        ) : null}
+      </section>
 
       {revoke.isError ? <ApiErrorNotice error={revoke.error} /> : null}
-
-      <Divider />
 
       <InviteListBody
         isFirstLoad={isFirstLoad}
@@ -155,7 +157,7 @@ export function InvitePanel({ actorRole }: { actorRole: MembershipRole | null })
           revoke.mutate({ inviteId });
         }}
       />
-    </Stack>
+    </div>
   );
 }
 
@@ -282,10 +284,13 @@ function InviteListBody({
   // --- Loading (delayed so a fast answer does not flash) --------------------
   if (isFirstLoad) {
     return showSkeleton ? (
-      <Stack direction="vertical" gap={2} aria-hidden="true">
-        <Skeleton width="100%" height={16} />
-        <Skeleton width="100%" height={16} />
-      </Stack>
+      <div className="border-border bg-card overflow-hidden rounded-xl border p-4" aria-hidden="true">
+        <Stack direction="vertical" gap={3}>
+          <Skeleton width="100%" height={20} />
+          <Skeleton width="100%" height={20} />
+          <Skeleton width="100%" height={20} />
+        </Stack>
+      </div>
     ) : null;
   }
 
@@ -297,11 +302,21 @@ function InviteListBody({
   // --- Empty ----------------------------------------------------------------
   if (items.length === 0) {
     return (
-      <EmptyState
-        headingLevel={3}
-        title="Chưa có link mời nào"
-        description="Khi bạn tạo link mời, link sẽ được liệt kê ở đây để theo dõi và thu hồi. Nội dung link chỉ hiện đúng một lần lúc tạo."
-      />
+      <div className="border-border bg-card rounded-xl border p-6">
+        <EmptyState
+          headingLevel={3}
+          icon={
+            <span
+              aria-hidden="true"
+              className="bg-accent text-accent-foreground inline-flex size-10 items-center justify-center rounded-lg"
+            >
+              <Link2 className="size-5" />
+            </span>
+          }
+          title="Chưa có link mời nào"
+          description="Link mới tạo ở khung phía trên sẽ hiện tại đây để bạn theo dõi và thu hồi khi cần."
+        />
+      </div>
     );
   }
 
@@ -320,7 +335,7 @@ function InviteListBody({
     {
       key: "status",
       header: "Trạng thái",
-      width: pixel(140),
+      width: pixel(130),
       renderCell: (invite) => {
         const status = inviteStatus(invite, nowMs);
         return <Badge variant={INVITE_STATUS_TONES[status]} label={INVITE_STATUS_LABELS[status]} />;
@@ -329,14 +344,22 @@ function InviteListBody({
     {
       key: "usedCount",
       header: "Đã dùng",
-      width: pixel(110),
-      renderCell: (invite) => <Text color="secondary">{inviteUsageLabel(invite)}</Text>,
+      width: pixel(104),
+      renderCell: (invite) => (
+        <Text type="supporting" color="secondary" hasTabularNumbers>
+          {inviteUsageLabel(invite)}
+        </Text>
+      ),
     },
     {
       key: "expiresAt",
       header: "Hết hạn",
-      width: pixel(170),
-      renderCell: (invite) => <Text color="secondary">{formatDateTime(invite.expiresAt)}</Text>,
+      width: pixel(160),
+      renderCell: (invite) => (
+        <Text type="supporting" color="secondary" hasTabularNumbers>
+          {formatDateTime(invite.expiresAt)}
+        </Text>
+      ),
     },
     {
       key: "createdByEmail",
@@ -344,27 +367,35 @@ function InviteListBody({
       width: proportional(1),
       renderCell: (invite) =>
         invite.createdByEmail?.trim() ? (
-          <Text color="secondary">{invite.createdByEmail}</Text>
+          <Text type="supporting" color="secondary">
+            {invite.createdByEmail}
+          </Text>
         ) : (
-          <Text color="placeholder">Không rõ</Text>
+          <Text type="supporting" color="placeholder">
+            Không rõ
+          </Text>
         ),
     },
     {
       key: "actions",
       header: "Thao tác",
-      width: pixel(300),
+      width: pixel(260),
       renderCell: (invite) => {
         const status = inviteStatus(invite, nowMs);
         const isBusy = busyInviteId === invite.id;
 
         if (!isInviteRevocable(status)) {
           // Nothing to take back — and no dead button pretending otherwise.
-          return <Text color="placeholder">Không cần thu hồi</Text>;
+          return (
+            <Text type="supporting" color="placeholder">
+              Không cần thu hồi
+            </Text>
+          );
         }
 
         if (confirmingId === invite.id) {
           return (
-            <Stack direction="vertical" gap={2}>
+            <div className="border-destructive/30 bg-destructive/10 space-y-2 rounded-lg border p-3">
               <Text type="supporting" role="alert">
                 Thu hồi link này? Ai đang giữ link sẽ không dùng được nữa; người đã vào bằng link
                 này vẫn ở trong công ty.
@@ -393,7 +424,7 @@ function InviteListBody({
                   Giữ lại
                 </Button>
               </HStack>
-            </Stack>
+            </div>
           );
         }
 
@@ -414,7 +445,7 @@ function InviteListBody({
   ];
 
   return (
-    <Stack direction="vertical" gap={2}>
+    <Stack direction="vertical" gap={3}>
       {/* Rows kept on screen even when a refetch failed — with the failure said
           out loud, because acting on a stale invite list is exactly the risk. */}
       {isError ? (
@@ -425,16 +456,18 @@ function InviteListBody({
           endContent={<Button variant="secondary" size="sm" label="Thử lại" onClick={onRetry} />}
         />
       ) : null}
-      <Table
-        data={items as InviteRow[]}
-        columns={columns}
-        idKey="id"
-        density="compact"
-        hasHover
-        verticalAlign="top"
-        textOverflow="truncate"
-        rowCount={items.length}
-      />
+      <div className="border-border bg-card overflow-hidden rounded-xl border">
+        <Table
+          data={items as InviteRow[]}
+          columns={columns}
+          idKey="id"
+          density="compact"
+          hasHover
+          verticalAlign="top"
+          textOverflow="truncate"
+          rowCount={items.length}
+        />
+      </div>
     </Stack>
   );
 }

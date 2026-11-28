@@ -35,6 +35,7 @@ import type { Channel } from "@/ui/schemas/channel.schema";
  */
 export function ChannelGroupForm({
   mode,
+  submitVariant = "default",
   defaultValues,
   channels,
   pending,
@@ -43,6 +44,8 @@ export function ChannelGroupForm({
   onCancel,
 }: {
   mode: "create" | "edit";
+  /** Demotes the create submit while an inline edit form holds the primary slot. */
+  submitVariant?: "default" | "secondary";
   defaultValues?: ChannelGroupFormValues;
   /** The tickable channels plus how their own request went (4 states below). */
   channels: {
@@ -92,9 +95,12 @@ export function ChannelGroupForm({
     orphanIds.length === 0
   ) {
     return (
-      <p className="text-muted-foreground text-sm">
+      <p className="text-muted-foreground text-sm leading-relaxed">
         Chưa có kênh nào đang bật để thêm vào nhóm. Hãy{" "}
-        <Link href="/channels" className="underline underline-offset-4">
+        <Link
+          href="/channels"
+          className="text-accent-foreground focus-visible:ring-ring rounded-xs underline underline-offset-4 outline-none hover:opacity-80 focus-visible:ring-2"
+        >
           kết nối Page ở màn Kênh
         </Link>{" "}
         trước, rồi quay lại đây gom nhóm.
@@ -105,13 +111,13 @@ export function ChannelGroupForm({
   return (
     <form
       noValidate
-      className="space-y-4"
+      className="space-y-5"
       onSubmit={form.handleSubmit((values) =>
         onSubmit({ name: values.name.trim(), channelIds: [...values.channelIds] }),
       )}
     >
       <div className="space-y-1.5">
-        <label htmlFor={nameId} className="text-sm font-medium">
+        <label htmlFor={nameId} className="text-foreground text-sm font-medium">
           Tên nhóm kênh
         </label>
         <Input
@@ -121,6 +127,7 @@ export function ChannelGroupForm({
           aria-describedby={nameError ? `${nameId}-error` : undefined}
           placeholder="Ví dụ: Page chính"
           autoComplete="off"
+          className="h-10 text-sm"
         />
         {nameError ? (
           <p id={`${nameId}-error`} role="alert" className="text-destructive text-sm">
@@ -134,13 +141,13 @@ export function ChannelGroupForm({
         name="channelIds"
         render={({ field }) => (
           <fieldset
-            className="space-y-2"
+            className="space-y-2.5"
             aria-describedby={
               channelsError ? `${channelsErrorId} ${channelsHintId}` : channelsHintId
             }
           >
-            <legend className="text-sm font-medium">Kênh trong nhóm</legend>
-            <p id={channelsHintId} className="text-muted-foreground text-xs">
+            <legend className="text-foreground text-sm font-medium">Kênh trong nhóm</legend>
+            <p id={channelsHintId} className="text-muted-foreground text-xs leading-relaxed">
               Tick những Page bài viết sẽ được đăng lên (tối đa {MAX_CHANNELS_PER_GROUP} kênh). Danh
               sách chỉ hiện Page đang bật ở màn Kênh.
             </p>
@@ -148,7 +155,7 @@ export function ChannelGroupForm({
             {channels.isLoading ? (
               <div aria-hidden="true" className="space-y-2 motion-safe:animate-pulse">
                 {[0, 1].map((row) => (
-                  <div key={row} className="bg-muted h-6 w-64 rounded" />
+                  <div key={row} className="bg-muted h-10 w-full max-w-sm rounded-lg" />
                 ))}
               </div>
             ) : channels.error ? (
@@ -164,24 +171,29 @@ export function ChannelGroupForm({
                       {/* Raw checkbox: the project has no ui/checkbox primitive,
                           and the same shape is already used by the wizard's
                           channel picker (core-component-reuse §element table). */}
-                      <input
-                        type="checkbox"
-                        id={optionId}
-                        className="accent-primary size-4 align-middle"
-                        value={channel.channelId}
-                        checked={checked}
-                        disabled={pending}
-                        onChange={(event) => {
-                          const next = event.target.checked
-                            ? [...field.value, channel.channelId]
-                            : field.value.filter((id) => id !== channel.channelId);
-                          field.onChange(next);
-                        }}
-                      />
-                      <label htmlFor={optionId} className="ml-2 align-middle text-sm">
-                        {channel.name.trim().length > 0 ? channel.name : "(Page chưa có tên)"}{" "}
-                        <span className="text-muted-foreground font-mono text-xs break-all">
-                          {channel.externalId}
+                      <label
+                        htmlFor={optionId}
+                        className="hover:bg-muted/50 flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors duration-150 ease-out"
+                      >
+                        <input
+                          type="checkbox"
+                          id={optionId}
+                          className="accent-ring focus-visible:ring-ring size-4 shrink-0 rounded-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                          value={channel.channelId}
+                          checked={checked}
+                          disabled={pending}
+                          onChange={(event) => {
+                            const next = event.target.checked
+                              ? [...field.value, channel.channelId]
+                              : field.value.filter((id) => id !== channel.channelId);
+                            field.onChange(next);
+                          }}
+                        />
+                        <span className="text-foreground">
+                          {channel.name.trim().length > 0 ? channel.name : "(Page chưa có tên)"}{" "}
+                          <span className="text-muted-foreground font-mono text-xs break-all">
+                            {channel.externalId}
+                          </span>
                         </span>
                       </label>
                     </li>
@@ -193,33 +205,38 @@ export function ChannelGroupForm({
 
                   return (
                     <li key={channelId}>
-                      <input
-                        type="checkbox"
-                        id={optionId}
-                        className="accent-primary size-4 align-middle"
-                        value={channelId}
-                        checked={field.value.includes(channelId)}
-                        disabled={pending}
-                        onChange={(event) => {
-                          const next = event.target.checked
-                            ? [...field.value, channelId]
-                            : field.value.filter((id) => id !== channelId);
-                          field.onChange(next);
-                        }}
-                      />
-                      {/* The server refuses a group containing a disabled or
-                          deleted channel (CHANNEL_DISABLED), so the tick is a
-                          dead end. Say what to DO, not just what happened —
-                          otherwise "Lưu" fails and nothing on screen explains
-                          which row caused it. */}
-                      <label htmlFor={optionId} className="ml-2 align-middle text-sm">
-                        <span className="text-muted-foreground font-mono text-xs break-all">
-                          {channelId}
-                        </span>{" "}
-                        <span className="text-warning-foreground">
-                          — kênh này đã tắt hoặc đã bị gỡ ở màn Kênh.{" "}
-                          <strong className="font-medium">Bỏ tick kênh này để lưu được</strong>, hoặc
-                          bật lại nó ở màn Kênh trước.
+                      <label
+                        htmlFor={optionId}
+                        className="hover:bg-muted/50 flex min-h-10 cursor-pointer items-start gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors duration-150 ease-out"
+                      >
+                        <input
+                          type="checkbox"
+                          id={optionId}
+                          className="accent-ring focus-visible:ring-ring mt-0.5 size-4 shrink-0 rounded-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                          value={channelId}
+                          checked={field.value.includes(channelId)}
+                          disabled={pending}
+                          onChange={(event) => {
+                            const next = event.target.checked
+                              ? [...field.value, channelId]
+                              : field.value.filter((id) => id !== channelId);
+                            field.onChange(next);
+                          }}
+                        />
+                        {/* The server refuses a group containing a disabled or
+                            deleted channel (CHANNEL_DISABLED), so the tick is a
+                            dead end. Say what to DO, not just what happened —
+                            otherwise "Lưu" fails and nothing on screen explains
+                            which row caused it. */}
+                        <span>
+                          <span className="text-muted-foreground font-mono text-xs break-all">
+                            {channelId}
+                          </span>{" "}
+                          <span className="text-warning-foreground">
+                            — kênh này đã tắt hoặc đã bị gỡ ở màn Kênh.{" "}
+                            <strong className="font-medium">Bỏ tick kênh này để lưu được</strong>,
+                            hoặc bật lại nó ở màn Kênh trước.
+                          </span>
                         </span>
                       </label>
                     </li>
@@ -239,8 +256,13 @@ export function ChannelGroupForm({
 
       {error ? <ApiErrorNotice error={error} /> : null}
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={pending}>
+      <div className="flex flex-wrap gap-2 pt-1">
+        <Button
+          type="submit"
+          variant={submitVariant}
+          disabled={pending}
+          className="min-h-10 px-4 sm:min-h-9"
+        >
           {pending
             ? mode === "create"
               ? "Đang tạo…"
@@ -250,7 +272,13 @@ export function ChannelGroupForm({
               : "Lưu thay đổi"}
         </Button>
         {onCancel ? (
-          <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onCancel}
+            disabled={pending}
+            className="min-h-10 px-4 sm:min-h-9"
+          >
             Huỷ
           </Button>
         ) : null}

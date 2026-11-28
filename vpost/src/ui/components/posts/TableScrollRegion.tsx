@@ -38,7 +38,7 @@ export function TableScrollRegion({
       // the surface colour, so the region has to DECLARE its surface instead of
       // inheriting whatever happens to be behind it — a mismatch would leave a
       // coloured stripe down each edge.
-      className="scroll-cue-x bg-card overflow-x-auto rounded-xl border"
+      className="scroll-cue-x bg-card border-border focus-visible:ring-ring overflow-x-auto rounded-xl border outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
       tabIndex={0}
       role="region"
       aria-label={ariaLabel}

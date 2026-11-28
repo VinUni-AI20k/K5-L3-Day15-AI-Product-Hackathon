@@ -1,6 +1,16 @@
 "use client";
 
-import { Button, HStack, Stack, StatusDot, Table, Text, pixel, proportional } from "@astryxdesign/core";
+import {
+  Button,
+  HStack,
+  Stack,
+  StatusDot,
+  Table,
+  Text,
+  pixel,
+  proportional,
+  useMediaQuery,
+} from "@astryxdesign/core";
 import type { TableColumn } from "@astryxdesign/core";
 
 import { stockCellText } from "@/ui/components/inventory/stock-check";
@@ -38,11 +48,13 @@ export function ProductTable({
   selectedCode: string | null;
   onSelect: (code: string) => void;
 }) {
+  const isNarrow = useMediaQuery("(max-width: 1024px)");
+
   const columns: TableColumn<ProductRow>[] = [
     {
       key: "code",
       header: "Mã SP",
-      width: pixel(210),
+      width: pixel(isNarrow ? 164 : 184),
       renderCell: (product) => {
         const status = productStatus(product);
         const isSelected = selectedCode === product.code;
@@ -59,7 +71,7 @@ export function ProductTable({
                 aria-pressed alone would leave sighted users guessing. */}
             <Button
               variant={isSelected ? "secondary" : "ghost"}
-              size="sm"
+              size={isNarrow ? "md" : "sm"}
               label={product.code}
               aria-pressed={isSelected}
               onClick={() => onSelect(product.code)}
@@ -122,7 +134,7 @@ export function ProductTable({
   ];
 
   return (
-    <Stack direction="vertical" isScrollable height="100%">
+    <Stack direction="vertical" isScrollable height="100%" className="scroll-cue-x">
       <Table
         data={items as ProductRow[]}
         columns={columns}

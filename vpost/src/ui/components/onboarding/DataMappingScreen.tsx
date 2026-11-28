@@ -6,12 +6,14 @@ import {
   Button,
   EmptyState,
   HStack,
+  Heading,
   Link,
   RadioList,
   RadioListItem,
   Skeleton,
   VisuallyHidden,
 } from "@astryxdesign/core";
+import { Building2, Check, FileSpreadsheet, TableProperties } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -112,19 +114,16 @@ export function DataMappingScreen() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-6 sm:px-6">
       {/* Page Header */}
-      <div className="flex flex-col gap-1.5 border-b border-border/60 pb-5">
-        <p className="font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
-          CẤU HÌNH HỆ THỐNG · ONBOARDING
+      <header className="border-border flex flex-col gap-2 border-b pb-5">
+        <Heading level={1}>Kết nối & Ánh xạ dữ liệu</Heading>
+        <p className="text-muted-foreground max-w-3xl text-sm leading-relaxed">
+          VPOST học cấu trúc bảng sản phẩm của bạn một lần duy nhất. Bạn hoàn toàn không cần phải
+          đổi tên cột hay sắp xếp lại bảng tính đang dùng — hỗ trợ cả Google Sheet và file CSV xuất
+          từ Excel.
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-          Kết nối & Ánh xạ dữ liệu
-        </h1>
-        <p className="text-sm leading-relaxed text-muted-foreground max-w-3xl">
-          VPOST học cấu trúc bảng sản phẩm của bạn một lần duy nhất. Bạn hoàn toàn không cần phải đổi tên cột hay sắp xếp lại bảng tính đang dùng — hỗ trợ cả Google Sheet và file CSV xuất từ Excel.
-        </p>
-      </div>
+      </header>
 
       {/* Step Rail */}
       <StepRail current={step} hasSource={hasSource} onNavigate={requestStep} />
@@ -169,12 +168,22 @@ export function DataMappingScreen() {
 
       {/* Idle / No Company */}
       {!isResolved ? (
-        <EmptyState
-          isCompact
-          headingLevel={2}
-          title="Chưa chọn công ty"
-          description="Vui lòng chọn công ty ở thanh điều hướng trên cùng để bắt đầu kết nối dữ liệu."
-        />
+        <div className="border-border bg-card rounded-xl border p-6">
+          <EmptyState
+            isCompact
+            headingLevel={2}
+            icon={
+              <span
+                aria-hidden="true"
+                className="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl"
+              >
+                <Building2 className="size-5" aria-hidden="true" />
+              </span>
+            }
+            title="Chưa chọn công ty"
+            description="Vui lòng chọn công ty ở thanh điều hướng trên cùng để bắt đầu kết nối dữ liệu."
+          />
+        </div>
       ) : (
         <div className="flex flex-col gap-6">
           {step === "nguon" ? (
@@ -242,34 +251,35 @@ function StepRail({
 
           const cardContent = (
             <div
-              className={`group flex h-full flex-col justify-between rounded-lg border p-3.5 transition-all ${
+              className={`group flex h-full flex-col justify-between gap-2.5 rounded-xl border p-5 motion-safe:transition-colors motion-safe:duration-150 motion-safe:ease-out ${
                 isCurrent
-                  ? "border-primary bg-accent/40 shadow-xs ring-2 ring-primary/20"
+                  ? "border-ring bg-accent/50"
                   : isDone
-                    ? "border-border/80 bg-card hover:border-primary/40 hover:bg-accent/20 cursor-pointer"
-                    : "border-border/40 bg-card/60 opacity-70"
+                    ? "border-border bg-card hover:border-input hover:bg-sidebar active:bg-muted cursor-pointer"
+                    : "border-border bg-sidebar"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2.5">
                   <span
-                    className={`flex size-6 items-center justify-center rounded-full font-mono text-xs font-semibold ${
+                    aria-hidden="true"
+                    className={`flex size-6 shrink-0 items-center justify-center rounded-full font-mono text-xs font-semibold ${
                       isCurrent
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-accent text-accent-foreground"
                         : isDone
-                          ? "bg-leaf/20 text-leaf-deep"
+                          ? "bg-success/15 text-success-foreground"
                           : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    {isDone ? "✓" : `0${index + 1}`}
+                    {isDone ? <Check className="size-3.5" aria-hidden="true" /> : `0${index + 1}`}
                   </span>
                   <span
-                    className={`text-sm font-medium ${
+                    className={`truncate text-sm ${
                       isCurrent
-                        ? "text-primary font-semibold"
+                        ? "text-foreground font-semibold"
                         : isDone
-                          ? "text-foreground"
-                          : "text-muted-foreground"
+                          ? "text-foreground font-medium"
+                          : "text-muted-foreground font-medium"
                     }`}
                   >
                     {entry.label}
@@ -281,9 +291,7 @@ function StepRail({
                   label={isDone ? "Đã xong" : isCurrent ? "Đang làm" : "Chưa tới"}
                 />
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                {entry.summary}
-              </p>
+              <p className="text-muted-foreground text-xs leading-relaxed">{entry.summary}</p>
             </div>
           );
 
@@ -296,7 +304,7 @@ function StepRail({
                     event.preventDefault();
                     onNavigate(entry.key);
                   }}
-                  className="block h-full no-underline"
+                  className="focus-visible:ring-ring block h-full rounded-xl no-underline outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 >
                   {cardContent}
                 </Link>
@@ -331,11 +339,20 @@ function SourceStep({
   const upload = useUploadCatalogFile();
   const [choice, setChoice] = useState<CatalogTextSourceKind>(() => activeSourceChoice(source));
 
+  const continueDisabledReason =
+    isReady === true
+      ? null
+      : isReady === null
+        ? "Đang đọc cấu hình hiện tại…"
+        : (missingSourceReason(source) ?? "Vui lòng chọn nguồn dữ liệu ở trên trước.");
+
   return (
     <div className="flex flex-col gap-6">
-      {isError ? <ApiErrorNotice error={error} onRetry={onRetry} source="Nguồn dữ liệu" /> : null}
+      {isError ? (
+        <ApiErrorNotice error={error} shouldFocus={false} onRetry={onRetry} source="Nguồn dữ liệu" />
+      ) : null}
 
-      <div className="rounded-lg border border-border/80 bg-card p-4 md:p-5 shadow-xs">
+      <div className="border-border bg-card rounded-xl border p-5 sm:p-6">
         <RadioList
           label="Bảng sản phẩm của đơn vị nằm ở đâu"
           value={choice}
@@ -373,22 +390,22 @@ function SourceStep({
         />
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/40 p-4">
-        <div className="flex flex-col gap-0.5">
-          <p className="text-sm font-medium text-foreground">Sẵn sàng sang bước ánh xạ cột?</p>
-          <p className="text-xs text-muted-foreground">
-            Hệ thống chỉ đọc dòng tiêu đề và mẫu dữ liệu từ bảng của bạn — không sửa, không ghi đè gì lên bảng gốc.
+      <div className="border-border bg-sidebar flex flex-wrap items-center justify-between gap-4 rounded-xl border p-5">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <p className="text-foreground text-sm font-semibold">Sẵn sàng sang bước ánh xạ cột?</p>
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            Hệ thống chỉ đọc dòng tiêu đề và mẫu dữ liệu từ bảng của bạn — không sửa, không ghi đè
+            gì lên bảng gốc.
           </p>
+          {continueDisabledReason ? (
+            <p className="text-foreground-subtle text-xs">{continueDisabledReason}</p>
+          ) : null}
         </div>
         <Button
-          variant="primary"
+          variant={choice === "file" ? "secondary" : "primary"}
           label="Tiếp tục: Ánh xạ cột →"
           isDisabled={isReady !== true || upload.isPending}
-          tooltip={
-            isReady === null
-              ? "Đang đọc cấu hình hiện tại…"
-              : (missingSourceReason(source) ?? "Vui lòng chọn nguồn dữ liệu ở trên trước.")
-          }
+          tooltip={continueDisabledReason ?? undefined}
           onClick={onContinue}
         />
       </div>
@@ -410,6 +427,7 @@ function ReportStep({ onGoToMapping }: { onGoToMapping: () => void }) {
     return (
       <ApiErrorNotice
         error={profile.error}
+        shouldFocus={false}
         onRetry={() => void profile.refetch()}
         source="Báo cáo tương thích"
       />
@@ -418,12 +436,22 @@ function ReportStep({ onGoToMapping }: { onGoToMapping: () => void }) {
 
   if (profile.data?.state !== "profiled") {
     return (
-      <EmptyState
-        isCompact
-        headingLevel={3}
-        title="Chưa có nguồn dữ liệu để đọc"
-        description="Vui lòng quay lại bước 1 “Nguồn dữ liệu” để kết nối bảng Google Sheet hoặc tải file CSV lên."
-      />
+      <div className="border-border bg-card rounded-xl border p-6">
+        <EmptyState
+          isCompact
+          headingLevel={3}
+          icon={
+            <span
+              aria-hidden="true"
+              className="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl"
+            >
+              <FileSpreadsheet className="size-5" aria-hidden="true" />
+            </span>
+          }
+          title="Chưa có nguồn dữ liệu để đọc"
+          description="Vui lòng quay lại bước 1 “Nguồn dữ liệu” để kết nối bảng Google Sheet hoặc tải file CSV lên."
+        />
+      </div>
     );
   }
 
@@ -431,7 +459,7 @@ function ReportStep({ onGoToMapping }: { onGoToMapping: () => void }) {
     <div className="flex flex-col gap-6">
       <CompatibilityReport report={profile.data.report} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 pt-4">
+      <div className="border-border flex flex-wrap items-center justify-between gap-3 border-t pt-5">
         <Button
           variant="secondary"
           label="← Quay lại chỉnh ánh xạ cột"
@@ -512,6 +540,7 @@ function MappingStep({
     return (
       <ApiErrorNotice
         error={profile.error}
+        shouldFocus={false}
         onRetry={() => void profile.refetch()}
         source="Danh sách cột"
       />
@@ -520,12 +549,22 @@ function MappingStep({
 
   if (!report || !configured) {
     return (
-      <EmptyState
-        isCompact
-        headingLevel={3}
-        title="Chưa đọc được bảng sản phẩm nên chưa có cột để chọn"
-        description="Quay lại bước “Nguồn dữ liệu”: kiểm tra bảng Google Sheet (tên tab, quyền chia sẻ), hoặc tải lại file CSV."
-      />
+      <div className="border-border bg-card rounded-xl border p-6">
+        <EmptyState
+          isCompact
+          headingLevel={3}
+          icon={
+            <span
+              aria-hidden="true"
+              className="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl"
+            >
+              <TableProperties className="size-5" aria-hidden="true" />
+            </span>
+          }
+          title="Chưa đọc được bảng sản phẩm nên chưa có cột để chọn"
+          description="Quay lại bước “Nguồn dữ liệu”: kiểm tra bảng Google Sheet (tên tab, quyền chia sẻ), hoặc tải lại file CSV."
+        />
+      </div>
     );
   }
 

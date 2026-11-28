@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, HStack, Stack, StatusDot, Table, Text, pixel, proportional } from "@astryxdesign/core";
+import { Button, HStack, StatusDot, Table, Text, pixel, proportional } from "@astryxdesign/core";
 import type { TableColumn } from "@astryxdesign/core";
 import { useState } from "react";
 
@@ -69,14 +69,16 @@ export function ChannelTable({
     {
       key: "status",
       header: "Trạng thái",
-      width: pixel(130),
+      width: pixel(120),
       renderCell: (channel) => (
         <HStack gap={2} align="center">
           <StatusDot
             variant={CHANNEL_STATUS_TONES[channel.status]}
             label={CHANNEL_STATUS_LABELS[channel.status]}
           />
-          <Text>{CHANNEL_STATUS_LABELS[channel.status]}</Text>
+          <Text type="supporting" weight="medium">
+            {CHANNEL_STATUS_LABELS[channel.status]}
+          </Text>
         </HStack>
       ),
     },
@@ -86,39 +88,55 @@ export function ChannelTable({
       width: proportional(2),
       renderCell: (channel) =>
         channel.name.trim().length > 0 ? (
-          <Text>{channel.name}</Text>
+          <Text type="supporting" weight="medium">
+            {channel.name}
+          </Text>
         ) : (
-          <Text color="placeholder">(Page chưa có tên)</Text>
+          <Text type="supporting" color="placeholder">
+            (Page chưa có tên)
+          </Text>
         ),
     },
     {
       key: "externalId",
       header: "Page ID",
-      width: pixel(190),
-      renderCell: (channel) => <Text color="secondary">{channel.externalId}</Text>,
+      width: pixel(170),
+      renderCell: (channel) => (
+        <Text type="code" color="secondary">
+          {channel.externalId}
+        </Text>
+      ),
     },
     {
       key: "platform",
       header: "Nền tảng",
-      width: pixel(110),
-      renderCell: (channel) => <Text color="secondary">{CHANNEL_PLATFORM_LABELS[channel.platform]}</Text>,
+      width: pixel(104),
+      renderCell: (channel) => (
+        <Text type="supporting" color="secondary">
+          {CHANNEL_PLATFORM_LABELS[channel.platform]}
+        </Text>
+      ),
     },
     {
       key: "tokenExpiresAt",
       header: "Token hết hạn",
-      width: pixel(170),
+      width: pixel(160),
       renderCell: (channel) =>
         channel.tokenExpiresAt === null ? (
           // Long-lived Page tokens have no expiry — that is not missing data.
-          <Text color="secondary">Không hết hạn</Text>
+          <Text type="supporting" color="secondary">
+            Không hết hạn
+          </Text>
         ) : (
-          <Text color="secondary">{formatDateTime(channel.tokenExpiresAt)}</Text>
+          <Text type="supporting" color="secondary" hasTabularNumbers>
+            {formatDateTime(channel.tokenExpiresAt)}
+          </Text>
         ),
     },
     {
       key: "actions",
       header: "Thao tác",
-      width: pixel(280),
+      width: pixel(220),
       renderCell: (channel) => {
         const name = displayName(channel);
         const isBusy = busyChannelId === channel.channelId;
@@ -188,16 +206,18 @@ export function ChannelTable({
   ];
 
   return (
-    <Stack direction="vertical" isScrollable height="100%">
-      <Table
-        data={channels as ChannelRow[]}
-        columns={columns}
-        idKey="channelId"
-        density="compact"
-        hasHover
-        textOverflow="truncate"
-        rowCount={channels.length}
-      />
-    </Stack>
+    <div className="min-w-0 px-4 pb-6 sm:px-6">
+      <div className="border-border bg-card overflow-hidden rounded-xl border">
+        <Table
+          data={channels as ChannelRow[]}
+          columns={columns}
+          idKey="channelId"
+          density="compact"
+          hasHover
+          textOverflow="truncate"
+          rowCount={channels.length}
+        />
+      </div>
+    </div>
   );
 }

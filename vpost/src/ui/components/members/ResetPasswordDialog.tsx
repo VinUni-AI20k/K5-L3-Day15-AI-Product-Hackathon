@@ -129,16 +129,16 @@ export function ResetPasswordDialog({
         onOpenChange={isPending ? undefined : () => close()}
       />
 
-      <Stack direction="vertical" gap={3} padding={4}>
+      <Stack direction="vertical" gap={4} padding={5}>
         {isDone ? (
-          <Stack direction="vertical" gap={3}>
+          <Stack direction="vertical" gap={4}>
             <Banner
               status="success"
               role="status"
               title="Đã đặt lại mật khẩu"
               description={`${memberName} đăng nhập được ngay bằng mật khẩu mới. Hệ thống KHÔNG gửi mật khẩu đi đâu cả — bạn phải báo trực tiếp cho họ, và nhắc họ đổi lại sau khi vào được.`}
             />
-            <HStack gap={2}>
+            <HStack gap={2} justify="end">
               <Button variant="primary" label="Đóng" onClick={close} />
             </HStack>
           </Stack>
@@ -147,7 +147,7 @@ export function ResetPasswordDialog({
              request. `noValidate` — the wording comes from the shared policy,
              not from the browser (web-form-architecture rule 5). */
           <form action={formAction} noValidate onSubmit={() => setWasSubmitted(true)}>
-            <Stack direction="vertical" gap={3}>
+            <Stack direction="vertical" gap={4}>
               <input type="hidden" name="accountId" value={memberAccountId} />
 
               <Stack direction="vertical" gap={1} role="alert" aria-live="assertive">

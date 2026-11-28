@@ -24,9 +24,14 @@ export function RulesDisclosure({
   label?: string;
 }) {
   return (
-    <div className="border-border bg-card max-w-prose rounded-lg border px-2">
-      <Collapsible defaultIsOpen={false} trigger={<span className="text-sm font-medium">{label}</span>}>
-        <div className="text-muted-foreground space-y-2 px-2 pb-3 text-sm">{children}</div>
+    <div className="border-border bg-card max-w-prose rounded-xl border px-4 py-2 transition-colors duration-150 ease-out">
+      <Collapsible
+        defaultIsOpen={false}
+        trigger={<span className="text-foreground text-sm leading-5 font-medium">{label}</span>}
+      >
+        <div className="text-muted-foreground space-y-2 pt-1 pb-3 text-sm leading-relaxed">
+          {children}
+        </div>
       </Collapsible>
     </div>
   );

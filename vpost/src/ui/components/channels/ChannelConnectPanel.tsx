@@ -3,7 +3,6 @@
 import {
   Button,
   Collapsible,
-  Divider,
   Heading,
   HStack,
   Stack,
@@ -71,11 +70,10 @@ export function ChannelConnectPanel({
   blockedReasonOverride,
 }: {
   /**
-   * The empty state on "Page đã kết nối" sends the operator here to paste a
-   * token, and the token box now lives behind a disclosure. A boolean rather
-   * than the input ref this used to take: a ref into a subtree that is not
-   * mounted is `null`, so the old `tokenInputRef.current?.focus()` would have
-   * gone quietly nowhere the day the disclosure closed by default.
+   * Optional flag for entry points that explicitly send the operator to the
+   * manual token flow: opens the advanced disclosure on the first frame and
+   * moves focus to the token input. Defaults to `false` so general "Kết nối
+   * Page" navigation lands on the primary Facebook OAuth action.
    */
   shouldOpenTokenField?: boolean;
   /**
@@ -167,144 +165,152 @@ export function ChannelConnectPanel({
   }
 
   return (
-    <Stack direction="vertical" gap={4}>
-      <Stack direction="vertical" gap={1}>
-        <Heading level={2}>Kết nối thêm Page</Heading>
-        <Text type="supporting">
-          Đăng nhập bằng Facebook rồi cấp quyền cho những Page bạn muốn đăng bài. Hệ thống chỉ lưu
-          token của từng Page ở máy chủ — không có token nào hiển thị lại trên màn hình này.
-        </Text>
-      </Stack>
-
-      {/* THE action of this panel, and it looks like it (The One Indigo Rule).
-          A real anchor, because /api/channels/connect answers 302 to Facebook
-          and the click must leave the app — Astryx Button cannot wrap an <a>,
-          so this is the local primitive with `asChild`.
-          Blocked too: the round trip ends in the same import, so letting it run
-          would send the operator to Facebook and back for nothing. The disabled
-          form is a <button>, since a dead anchor is still clickable. */}
-      <Stack direction="vertical" gap={1}>
-        {areWritesBlocked ? (
-          <ActionButton type="button" size="lg" className="self-start" disabled>
-            Đăng nhập bằng Facebook
-          </ActionButton>
-        ) : (
-          <ActionButton asChild size="lg" className="self-start">
-            <a href={channelConnectHref()}>Đăng nhập bằng Facebook</a>
-          </ActionButton>
-        )}
-        <Text type="supporting" color="secondary">
-          Bạn sẽ được chuyển sang Facebook để cấp quyền, xong quay lại đây với danh sách Page đã
-          lấy về. Không cần dán token bằng tay.
-        </Text>
-        {/* The Named Status Rule: a control that is off says why, right next to
-            itself, in words — never by being grey. */}
-        {blockedReason ? (
-          <Text type="supporting" color="secondary" role="status">
-            {blockedReason}
+    <div className="space-y-6">
+      <section className="border-border bg-card space-y-4 rounded-xl border p-5 sm:p-6">
+        <div className="max-w-prose space-y-1.5">
+          <Heading level={2}>Kết nối thêm Page</Heading>
+          <Text type="supporting" color="secondary">
+            Đăng nhập bằng Facebook rồi cấp quyền cho những Page bạn muốn đăng bài. Hệ thống chỉ lưu
+            token của từng Page ở máy chủ — không có token nào hiển thị lại trên màn hình này.
           </Text>
-        ) : null}
-      </Stack>
+        </div>
 
-      <Divider />
+        {/* THE single primary action of this panel (9% ink rule).
+            A real anchor, because /api/channels/connect answers 302 to Facebook
+            and the click must leave the app — Astryx Button cannot wrap an <a>,
+            so this is the local primitive with `asChild`.
+            Blocked too: the round trip ends in the same import, so letting it run
+            would send the operator to Facebook and back for nothing. The disabled
+            form is a <button>, since a dead anchor is still clickable. */}
+        <div className="flex flex-col items-start gap-2">
+          {areWritesBlocked ? (
+            <ActionButton type="button" size="lg" className="min-h-10 px-5" disabled>
+              Đăng nhập bằng Facebook
+            </ActionButton>
+          ) : (
+            <ActionButton asChild size="lg" className="min-h-10 px-5">
+              <a href={channelConnectHref()}>Đăng nhập bằng Facebook</a>
+            </ActionButton>
+          )}
+          <Text type="supporting" color="secondary" className="max-w-prose">
+            Bạn sẽ được chuyển sang Facebook để cấp quyền, xong quay lại đây với danh sách Page đã
+            lấy về. Không cần dán token bằng tay.
+          </Text>
+          {/* The Named Status Rule: a control that is off says why, right next to
+              itself, in words — never by being grey. */}
+          {blockedReason ? (
+            <Text type="supporting" color="secondary" role="status">
+              {blockedReason}
+            </Text>
+          ) : null}
+        </div>
+      </section>
 
       {/* The manual route, folded away. It is not deprecated — for a tenant
           with no App Secret it is the only one that works — but it asks for a
           secret string, and that is not the first thing a shop owner should
           meet on this screen. */}
-      <Collapsible
-        isOpen={isTokenPanelOpen}
-        onOpenChange={setIsTokenPanelOpen}
-        trigger={<span className="text-sm font-medium">Cách nâng cao: dán User Access Token</span>}
-      >
-        {/* noValidate: the messages below are ours, not the browser's. */}
-        <form noValidate onSubmit={form.handleSubmit(submitToken)}>
-          <Stack direction="vertical" gap={3}>
-            <Text type="supporting" color="secondary">
-              Dùng khi công ty chưa cấu hình App Secret nên chưa đăng nhập bằng Facebook được. Token
-              chỉ được gửi thẳng tới máy chủ.
-            </Text>
-            <Controller
-              control={form.control}
-              name="userAccessToken"
-              render={({ field }) => (
-                <TextInput
-                  {...NO_AUTOFILL}
-                  data-1p-ignore=""
-                  ref={(node: HTMLInputElement | null) => {
-                    field.ref(node);
-                    tokenInputRef.current = node;
-                  }}
-                  label="User Access Token"
-                  type="password"
-                  value={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  htmlName="userAccessToken"
-                  placeholder="EAAG…"
-                  description={TOKEN_HINT}
-                  isRequired
-                  isDisabled={isBusy || areWritesBlocked}
-                  disabledMessage={blockedReason}
-                  status={fieldError ? { type: "error", message: fieldError } : undefined}
-                  statusVariant="detached"
-                  width="100%"
-                />
-              )}
-            />
-
-            <HStack gap={2} wrap="wrap" align="center">
-              <Button
-                type="submit"
-                variant="primary"
-                label={importChannels.isPending ? "Đang lấy danh sách Page…" : "Lấy danh sách Page"}
-                isLoading={importChannels.isPending}
-                isDisabled={refresh.isPending || areWritesBlocked}
-                tooltip={blockedReason}
-              />
-
-              {/* Always offered, never gated on the number of channels: the real
-                  precondition is "the server still holds a user token", which
-                  only the server knows. A tenant that just removed its last Page
-                  still has that token and must be able to pull the list back.
-                  With no stored token the server answers CHANNEL_NOT_CONFIGURED
-                  and its Vietnamese reason lands right below. */}
-              <Button
-                type="button"
-                variant="secondary"
-                label={refresh.isPending ? "Đang làm mới…" : "Làm mới danh sách Page"}
-                isLoading={refresh.isPending}
-                isDisabled={importChannels.isPending || areWritesBlocked}
-                tooltip={blockedReason}
-                onClick={() => {
-                  importChannels.reset();
-                  refresh.reset();
-                  setLastImport(null);
-                  refresh.mutate(undefined, {
-                    onSuccess: (data) =>
-                      setLastImport({
-                        imported: data.imported,
-                        updated: data.updated,
-                        skipped: data.skipped,
-                      }),
-                  });
-                }}
-              />
-            </HStack>
-
-            {lastImport ? (
-              <Text role="status" aria-live="polite">
-                {formatImportSummary(lastImport)}
+      <div className="border-border bg-card rounded-xl border px-5 py-2">
+        <Collapsible
+          isOpen={isTokenPanelOpen}
+          onOpenChange={setIsTokenPanelOpen}
+          trigger={
+            <span className="text-foreground text-sm leading-5 font-medium">
+              Cách nâng cao: dán User Access Token
+            </span>
+          }
+        >
+          {/* noValidate: the messages below are ours, not the browser's. */}
+          <form noValidate onSubmit={form.handleSubmit(submitToken)} className="pt-2 pb-4">
+            <Stack direction="vertical" gap={4}>
+              <Text type="supporting" color="secondary" className="max-w-prose">
+                Dùng khi công ty chưa cấu hình App Secret nên chưa đăng nhập bằng Facebook được.
+                Token chỉ được gửi thẳng tới máy chủ.
               </Text>
-            ) : null}
+              <Controller
+                control={form.control}
+                name="userAccessToken"
+                render={({ field }) => (
+                  <TextInput
+                    {...NO_AUTOFILL}
+                    data-1p-ignore=""
+                    ref={(node: HTMLInputElement | null) => {
+                      field.ref(node);
+                      tokenInputRef.current = node;
+                    }}
+                    label="User Access Token"
+                    type="password"
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    htmlName="userAccessToken"
+                    placeholder="EAAG…"
+                    description={TOKEN_HINT}
+                    isRequired
+                    isDisabled={isBusy || areWritesBlocked}
+                    disabledMessage={blockedReason}
+                    status={fieldError ? { type: "error", message: fieldError } : undefined}
+                    statusVariant="detached"
+                    width="100%"
+                  />
+                )}
+              />
 
-            {/* Both failures land here, right under the box the operator must
-                fix: an expired stored token is answered by pasting a new one. */}
-            {importChannels.isError ? <ApiErrorNotice error={importChannels.error} /> : null}
-            {refresh.isError ? <ApiErrorNotice error={refresh.error} /> : null}
-          </Stack>
-        </form>
-      </Collapsible>
-    </Stack>
+              <HStack gap={2} wrap="wrap" align="center">
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  label={
+                    importChannels.isPending ? "Đang lấy danh sách Page…" : "Lấy danh sách Page"
+                  }
+                  isLoading={importChannels.isPending}
+                  isDisabled={refresh.isPending || areWritesBlocked}
+                  tooltip={blockedReason}
+                />
+
+                {/* Always offered, never gated on the number of channels: the real
+                    precondition is "the server still holds a user token", which
+                    only the server knows. A tenant that just removed its last Page
+                    still has that token and must be able to pull the list back.
+                    With no stored token the server answers CHANNEL_NOT_CONFIGURED
+                    and its Vietnamese reason lands right below. */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  label={refresh.isPending ? "Đang làm mới…" : "Làm mới danh sách Page"}
+                  isLoading={refresh.isPending}
+                  isDisabled={importChannels.isPending || areWritesBlocked}
+                  tooltip={blockedReason}
+                  onClick={() => {
+                    importChannels.reset();
+                    refresh.reset();
+                    setLastImport(null);
+                    refresh.mutate(undefined, {
+                      onSuccess: (data) =>
+                        setLastImport({
+                          imported: data.imported,
+                          updated: data.updated,
+                          skipped: data.skipped,
+                        }),
+                    });
+                  }}
+                />
+              </HStack>
+
+              {lastImport ? (
+                <Text type="supporting" role="status" aria-live="polite">
+                  {formatImportSummary(lastImport)}
+                </Text>
+              ) : null}
+
+              {/* Both failures land here, right under the box the operator must
+                  fix: an expired stored token is answered by pasting a new one. */}
+              {importChannels.isError ? <ApiErrorNotice error={importChannels.error} /> : null}
+              {refresh.isError ? <ApiErrorNotice error={refresh.error} /> : null}
+            </Stack>
+          </form>
+        </Collapsible>
+      </div>
+    </div>
   );
 }

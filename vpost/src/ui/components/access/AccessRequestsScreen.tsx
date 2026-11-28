@@ -3,7 +3,6 @@
 import {
   Banner,
   Button,
-  EmptyState,
   HStack,
   Heading,
   SegmentedControl,
@@ -12,12 +11,14 @@ import {
   StackItem,
   Text,
 } from "@astryxdesign/core";
+import { RefreshCw } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 
 import { AccessRequestTable } from "@/ui/components/access/AccessRequestTable";
 import { AccessRequestTableSkeleton } from "@/ui/components/access/AccessRequestTableSkeleton";
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
+import { EmptyState } from "@/ui/components/feedback/EmptyState";
 import { presentApiError, toApiError } from "@/ui/components/feedback/present-api-error";
 import { TAB_PARAM, withTabParam } from "@/ui/components/navigation/tab-param";
 import { useAccessRequests } from "@/ui/hooks/useAccessRequests";
@@ -107,43 +108,51 @@ export function AccessRequestsScreen({
 
 
   return (
-    <Stack direction="vertical" height="100%">
-      <Stack direction="vertical" gap={3} paddingInline={4} paddingBlock={3}>
-        <Stack direction="vertical" gap={1}>
-          {/* h2: the hub above owns the page's h1 (core-accessibility §1). */}
-          <Heading level={2}>Lịch sử duyệt</Heading>
-          <Text type="supporting">
-            Lưu lại những tài khoản từng xin vào hệ thống theo luồng chờ duyệt cũ, ai quyết định và
-            lúc nào. Tab này chỉ để tra cứu — không thao tác được nữa.
-          </Text>
+    <div className="mx-auto flex h-full w-full max-w-7xl flex-col px-4 py-6 sm:px-6">
+      <Stack direction="vertical" gap={5} height="100%">
+        <Stack direction="vertical" gap={3}>
+          <Stack direction="vertical" gap={1}>
+            {/* h2: the hub above owns the page's h1 (core-accessibility §1). */}
+            <Heading level={2}>Lịch sử duyệt</Heading>
+            <Text type="supporting" color="secondary" className="max-w-prose">
+              Lưu lại những tài khoản từng xin vào hệ thống theo luồng chờ duyệt cũ, ai quyết định
+              và lúc nào. Tab này chỉ để tra cứu — không thao tác được nữa.
+            </Text>
+          </Stack>
+
+          <HStack gap={3} align="center" justify="between" wrap="wrap">
+            <div className="max-w-full overflow-x-auto pb-0.5">
+              <SegmentedControl
+                label="Lọc theo trạng thái yêu cầu"
+                value={status}
+                onChange={selectStatus}
+                size="sm"
+              >
+                {ACCESS_FILTER_STATUSES.map((value) => (
+                  <SegmentedControlItem
+                    key={value}
+                    value={value}
+                    label={ACCESS_FILTER_LABELS[value]}
+                  />
+                ))}
+              </SegmentedControl>
+            </div>
+
+            <Button
+              variant="secondary"
+              size="md"
+              icon={<RefreshCw className="size-4" aria-hidden="true" />}
+              label={requests.isFetching ? "Đang tải…" : "Tải lại"}
+              isLoading={requests.isFetching}
+              isDisabled={requests.isFetching}
+              onClick={() => void requests.refetch()}
+            />
+          </HStack>
         </Stack>
 
-        <HStack gap={3} align="center" wrap="wrap">
-          <SegmentedControl
-            label="Lọc theo trạng thái yêu cầu"
-            value={status}
-            onChange={selectStatus}
-            size="sm"
-          >
-            {ACCESS_FILTER_STATUSES.map((value) => (
-              <SegmentedControlItem key={value} value={value} label={ACCESS_FILTER_LABELS[value]} />
-            ))}
-          </SegmentedControl>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            label={requests.isFetching ? "Đang tải…" : "Tải lại"}
-            isDisabled={requests.isFetching}
-            onClick={() => void requests.refetch()}
-          />
-        </HStack>
-      </Stack>
-
-      {/* Said once, at the top, instead of a row of disabled buttons: the
-          operator needs to know WHERE the flow moved, not that this panel is
-          dead. `info`, not `warning` — nothing is broken. */}
-      <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
+        {/* Said once, at the top, instead of a row of disabled buttons: the
+            operator needs to know WHERE the flow moved, not that this panel is
+            dead. `info`, not `warning` — nothing is broken. */}
         <Banner
           status="info"
           title="Luồng duyệt đã nghỉ hưu"
@@ -152,35 +161,40 @@ export function AccessRequestsScreen({
             // The button has to land where the sentence above points: sending
             // the operator to the member list would leave them looking for an
             // invite form that lives one tab further on.
-            <Button variant="secondary" size="sm" label="Mở tab Link mời" onClick={onGoToInvites} />
+            <Button
+              variant="secondary"
+              size="sm"
+              label="Mở tab Link mời"
+              onClick={onGoToInvites}
+            />
           }
         />
+
+        <HStack gap={3} align="center" wrap="wrap">
+          <Heading level={3}>Lịch sử yêu cầu</Heading>
+          {/* Only once the list is real: "0 yêu cầu" while loading reads as an
+              answer, and an admin would act on it. */}
+          {requests.data ? (
+            <Text type="supporting" color="secondary" role="status" aria-live="polite">
+              {items.length} yêu cầu · {ACCESS_FILTER_LABELS[status].toLowerCase()}
+            </Text>
+          ) : null}
+        </HStack>
+
+        <StackItem size="fill">
+          <AccessRequestsBody
+            status={status}
+            isFirstLoad={isFirstLoad}
+            showSkeleton={showSkeleton}
+            isError={requests.isError}
+            error={requests.error}
+            onRetry={() => void requests.refetch()}
+            onShowAll={() => selectStatus("all")}
+            items={items}
+          />
+        </StackItem>
       </Stack>
-
-      <HStack gap={3} paddingInline={4} paddingBlock={3} align="center" wrap="wrap">
-        <Heading level={3}>Lịch sử yêu cầu</Heading>
-        {/* Only once the list is real: "0 yêu cầu" while loading reads as an
-            answer, and an admin would act on it. */}
-        {requests.data ? (
-          <Text type="supporting" role="status" aria-live="polite">
-            {items.length} yêu cầu · {ACCESS_FILTER_LABELS[status].toLowerCase()}
-          </Text>
-        ) : null}
-      </HStack>
-
-      <StackItem size="fill">
-        <AccessRequestsBody
-          status={status}
-          isFirstLoad={isFirstLoad}
-          showSkeleton={showSkeleton}
-          isError={requests.isError}
-          error={requests.error}
-          onRetry={() => void requests.refetch()}
-          onShowAll={() => selectStatus("all")}
-          items={items}
-        />
-      </StackItem>
-    </Stack>
+    </div>
   );
 }
 
@@ -208,11 +222,7 @@ function AccessRequestsBody({
 
   // --- Error, with nothing to fall back on ---------------------------------
   if (isError && items.length === 0) {
-    return (
-      <Stack direction="vertical" padding={4}>
-        <ApiErrorNotice error={error} onRetry={onRetry} />
-      </Stack>
-    );
+    return <ApiErrorNotice error={error} onRetry={onRetry} />;
   }
 
   // --- Empty: three different situations, three different sentences ---------
@@ -222,41 +232,40 @@ function AccessRequestsBody({
       // Saying "chưa có ai chờ duyệt" alone would leave someone waiting for a
       // row that is never coming (core-feedback-states §Empty, kind "done").
       return (
-        <Stack direction="vertical" padding={4}>
-          <EmptyState
-            headingLevel={4}
-            title="Không còn ai chờ duyệt"
-            description="Luồng chờ duyệt đã nghỉ hưu nên sẽ không có yêu cầu mới nào xuất hiện ở đây. Muốn thêm người, hãy tạo link mời ở tab “Link mời”."
-            actions={
-              <Button variant="secondary" label="Xem tất cả lịch sử" onClick={onShowAll} />
-            }
-          />
-        </Stack>
+        <EmptyState
+          kind="done"
+          headingLevel={4}
+          title="Không còn ai chờ duyệt"
+          description="Luồng chờ duyệt đã nghỉ hưu nên sẽ không có yêu cầu mới nào xuất hiện ở đây. Muốn thêm người, hãy tạo link mời ở tab “Link mời”."
+          action={
+            <Button variant="secondary" size="md" label="Xem tất cả lịch sử" onClick={onShowAll} />
+          }
+        />
       );
     }
 
     if (status === "all") {
       return (
-        <Stack direction="vertical" padding={4}>
-          <EmptyState
-            headingLevel={4}
-            title="Chưa có yêu cầu nào trong lịch sử"
-            description="Không tài khoản nào từng đi qua luồng chờ duyệt của đơn vị này. Ai đang ở trong công ty thì xem ở tab “Thành viên”; muốn thêm người mới thì tạo link mời ở tab “Link mời”."
-          />
-        </Stack>
+        <EmptyState
+          kind="idle"
+          headingLevel={4}
+          title="Chưa có yêu cầu nào trong lịch sử"
+          description="Không tài khoản nào từng đi qua luồng chờ duyệt của đơn vị này. Ai đang ở trong công ty thì xem ở tab “Thành viên”; muốn thêm người mới thì tạo link mời ở tab “Link mời”."
+        />
       );
     }
 
     // Filtered out, not lost: the data may well exist under another filter.
     return (
-      <Stack direction="vertical" padding={4}>
-        <EmptyState
-          headingLevel={4}
-          title={`Không có yêu cầu nào ở trạng thái “${ACCESS_FILTER_LABELS[status]}”`}
-          description="Dữ liệu vẫn còn nguyên — chỉ là không có ai ở trạng thái đang lọc. Xem tất cả để đối chiếu."
-          actions={<Button variant="secondary" label="Xem tất cả lịch sử" onClick={onShowAll} />}
-        />
-      </Stack>
+      <EmptyState
+        kind="no-result"
+        headingLevel={4}
+        title={`Không có yêu cầu nào ở trạng thái “${ACCESS_FILTER_LABELS[status]}”`}
+        description="Dữ liệu vẫn còn nguyên — chỉ là không có ai ở trạng thái đang lọc. Xem tất cả để đối chiếu."
+        action={
+          <Button variant="secondary" size="md" label="Xem tất cả lịch sử" onClick={onShowAll} />
+        }
+      />
     );
   }
 
@@ -266,20 +275,20 @@ function AccessRequestsBody({
   // server no longer agrees with. The rows stay (still the best information we
   // have) and the failure is said out loud, with a way to try again.
   return (
-    <Stack direction="vertical" height="100%">
+    <Stack direction="vertical" gap={4} height="100%">
       {isError ? (
-        <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
-          <Banner
-            status="warning"
-            title="Danh sách bên dưới có thể đã cũ — chưa làm mới được"
-            description={`${presentApiError(toApiError(error)).description} Những gì đang hiện là kết quả của lần tải gần nhất; hãy thử lại trước khi tra cứu.`}
-            endContent={<Button variant="secondary" size="sm" label="Thử lại" onClick={onRetry} />}
-          />
-        </Stack>
+        <Banner
+          status="warning"
+          title="Danh sách bên dưới có thể đã cũ — chưa làm mới được"
+          description={`${presentApiError(toApiError(error)).description} Những gì đang hiện là kết quả của lần tải gần nhất; hãy thử lại trước khi tra cứu.`}
+          endContent={<Button variant="secondary" size="sm" label="Thử lại" onClick={onRetry} />}
+        />
       ) : null}
 
       <StackItem size="fill">
-        <AccessRequestTable items={items} />
+        <div className="bg-card border-border min-w-0 overflow-hidden rounded-xl border">
+          <AccessRequestTable items={items} />
+        </div>
       </StackItem>
     </Stack>
   );

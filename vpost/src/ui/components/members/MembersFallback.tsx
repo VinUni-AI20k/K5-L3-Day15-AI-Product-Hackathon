@@ -19,7 +19,7 @@ export function MembersFallback({ tab }: { tab: MembersTab }) {
       aria-hidden="true"
       header={
         <LayoutHeader hasDivider>
-          <Stack direction="vertical" gap={3} padding={4}>
+          <div className="w-full space-y-4 px-4 py-4 sm:px-6 sm:py-5">
             <Stack direction="vertical" gap={2}>
               <Skeleton width={140} height={28} />
               <Skeleton width="100%" height={16} />
@@ -29,7 +29,7 @@ export function MembersFallback({ tab }: { tab: MembersTab }) {
               <Skeleton width={110} height={32} />
               <Skeleton width={140} height={32} />
             </HStack>
-          </Stack>
+          </div>
         </LayoutHeader>
       }
       content={
@@ -44,30 +44,30 @@ export function MembersFallback({ tab }: { tab: MembersTab }) {
 function MembersTabFallback({ tab }: { tab: MembersTab }) {
   if (tab === "invites") {
     return (
-      <Stack direction="vertical" gap={3} padding={4}>
+      <div className="w-full max-w-5xl space-y-4 px-4 py-6 sm:px-6 sm:py-8">
         <Skeleton width={160} height={24} />
         <Skeleton width="100%" height={16} />
-        <HStack gap={3}>
-          <Skeleton width={300} height={32} />
-          <Skeleton width={140} height={32} />
+        <HStack gap={3} wrap="wrap">
+          <Skeleton width={280} height={40} />
+          <Skeleton width={140} height={40} />
         </HStack>
         <Skeleton width="100%" height={16} />
         <Skeleton width="100%" height={16} />
-      </Stack>
+      </div>
     );
   }
 
   if (tab === "history") {
     return (
       <Stack direction="vertical">
-        <Stack direction="vertical" gap={2} paddingInline={4} paddingBlock={3}>
+        <div className="space-y-2 px-4 py-4 sm:px-6 sm:py-5">
           <Skeleton width={180} height={24} />
           <Skeleton width="100%" height={16} />
-          <HStack gap={3}>
-            <Skeleton width={320} height={32} />
+          <HStack gap={3} wrap="wrap">
+            <Skeleton width={280} height={32} />
             <Skeleton width={96} height={32} />
           </HStack>
-        </Stack>
+        </div>
         <AccessRequestTableSkeleton />
       </Stack>
     );
@@ -75,11 +75,13 @@ function MembersTabFallback({ tab }: { tab: MembersTab }) {
 
   return (
     <Stack direction="vertical">
-      <HStack gap={3} paddingInline={4} paddingBlock={3} align="center">
-        <Skeleton width={200} height={24} />
-        <Skeleton width={90} height={16} />
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
+        <HStack gap={3} align="center">
+          <Skeleton width={200} height={24} />
+          <Skeleton width={90} height={16} />
+        </HStack>
         <Skeleton width={96} height={32} />
-      </HStack>
+      </div>
       <MemberTableSkeleton />
     </Stack>
   );

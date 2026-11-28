@@ -12,6 +12,7 @@ import { cn } from "@/shared/utils";
  * Follows the design system pattern: icon tile + title/sentence + one clear action.
  */
 export type EmptyKind = "first-run" | "no-result" | "done" | "idle";
+export type EmptyHeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
 function DefaultEmptyIcon({ kind }: { kind: EmptyKind }) {
   switch (kind) {
@@ -32,6 +33,7 @@ export function EmptyState({
   description,
   action,
   icon,
+  headingLevel,
   className,
 }: {
   kind: EmptyKind;
@@ -40,12 +42,20 @@ export function EmptyState({
   action?: ReactNode;
   /** Optional Lucide icon override; defaults to a semantic icon per `kind`. */
   icon?: ReactNode;
+  /**
+   * Optional semantic heading level (`h1`–`h6`) for the title so the empty
+   * state stays in the document heading outline without changing visual size.
+   * Omit to render a plain `<p>`.
+   */
+  headingLevel?: EmptyHeadingLevel;
   className?: string;
 }) {
   const iconTileTone =
     kind === "done"
       ? "bg-success/15 text-success-foreground"
       : "bg-accent text-accent-foreground";
+
+  const TitleTag: "p" | `h${EmptyHeadingLevel}` = headingLevel ? `h${headingLevel}` : "p";
 
   return (
     <div
@@ -64,7 +74,7 @@ export function EmptyState({
       >
         {icon ?? <DefaultEmptyIcon kind={kind} />}
       </div>
-      <p className="text-foreground text-base leading-6 font-semibold">{title}</p>
+      <TitleTag className="text-foreground text-base leading-6 font-semibold">{title}</TitleTag>
       <div className="text-muted-foreground mt-1.5 max-w-prose text-sm leading-relaxed">
         {description}
       </div>

@@ -6,11 +6,11 @@ import { TableScrollRegion } from "@/ui/components/posts/TableScrollRegion";
 import { Badge } from "@/ui/components/ui/badge";
 import { Button } from "@/ui/components/ui/button";
 import { Textarea } from "@/ui/components/ui/textarea";
+import type { BulkRunRow } from "@/ui/hooks/useBulkRun";
 import {
   BULK_ROW_STATUS_LABELS,
   BULK_ROW_STATUS_TONES,
 } from "@/ui/schemas/bulk.schema";
-import type { BulkRunRow } from "@/ui/hooks/useBulkRun";
 
 /**
  * Per-code progress of a bulk run (E10.5).
@@ -21,10 +21,7 @@ import type { BulkRunRow } from "@/ui/hooks/useBulkRun";
  *
  * Status is a dye + its NAME, never the dye alone (The Named Status Rule): the
  * tone mapping lives in `bulk.schema` beside the labels, so a status can never
- * gain a colour without gaining a word. `info` for the three in-flight states is
- * deliberate — Fact Blue does not take part in the tint game (The 10% Tint
- * Rule), so "đang chạy" stays a plain surface and only the three outcomes
- * (madder / turmeric / leaf) carry a dyed background.
+ * gain a colour without gaining a word.
  *
  * Business rule 2: this table shows the product code and name, the outcome and
  * a link to the batch. Never stock, never price — the reason sentence comes
@@ -42,16 +39,16 @@ export interface BulkReviewActions {
 
 function ReviewCell({ row, review }: { row: BulkRunRow; review: BulkReviewActions }) {
   return (
-    <span className="flex flex-col gap-2">
+    <span className="flex flex-col gap-2.5">
       {row.media.length > 0 ? (
-        <span className="flex gap-1.5">
+        <span className="flex flex-wrap gap-2">
           {row.media.slice(0, 4).map((m) => (
             // eslint-disable-next-line @next/next/no-img-element -- ảnh ngoài (Drive), không qua next/image
             <img
               key={m.driveFileId}
               src={m.driveFileId}
               alt={m.fileName ?? "Ảnh sản phẩm"}
-              className="size-14 rounded-md border border-border object-cover"
+              className="border-border size-14 rounded-lg border object-cover"
             />
           ))}
         </span>
@@ -61,16 +58,17 @@ function ReviewCell({ row, review }: { row: BulkRunRow; review: BulkReviewAction
         value={row.caption ?? ""}
         disabled={review.disabled}
         onChange={(event) => review.onEditCaption(row.index, event.target.value)}
-        className="min-h-32 text-xs leading-relaxed"
+        className="min-h-32 rounded-lg text-sm leading-relaxed"
       />
       <span className="flex flex-wrap gap-2">
         <Button
           type="button"
           size="sm"
-          variant={row.approved ? "default" : "outline"}
+          variant={row.approved ? "default" : "secondary"}
           aria-pressed={row.approved}
           disabled={review.disabled || !row.caption?.trim()}
           onClick={() => review.onApprove(row.index, !row.approved)}
+          className="min-h-9 px-3"
         >
           {row.approved ? "Đã duyệt" : "Duyệt bài này"}
         </Button>
@@ -80,6 +78,7 @@ function ReviewCell({ row, review }: { row: BulkRunRow; review: BulkReviewAction
           variant="ghost"
           disabled={review.disabled}
           onClick={() => review.onReject(row.index)}
+          className="min-h-9 px-3"
         >
           Bỏ bài
         </Button>
@@ -96,14 +95,6 @@ export function BulkProgressTable({
   review?: BulkReviewActions;
 }) {
   return (
-    // The SAME scroll frame as the log and the schedule (ruling T3): one
-    // pattern for "this table is wider than its box", so an operator learns the
-    // soft edge once and reads it on every table in the app. It replaces the
-    // sentence this table used to print under itself — that cue was container-
-    // queried at 40rem, i.e. it appeared at a width guessed from `min-w-160`
-    // rather than from whether the table is REALLY overflowing, and it said in
-    // words what the shared cue says on the edge that actually has content
-    // behind it, on both sides, with no breakpoint to keep in sync.
     <TableScrollRegion aria-label="Bảng tiến độ chạy hàng loạt, cuộn ngang được">
       <table className="w-full min-w-160 border-collapse text-sm">
         <caption className="sr-only">
@@ -113,78 +104,78 @@ export function BulkProgressTable({
             fills in WHILE the run walks the list, and columns that resize on
             each row would make the whole table twitch (web-data-table §1). */}
         <colgroup>
-          <col className="w-[5%]" />
-          <col className="w-[13%]" />
-          <col className="w-[13%]" />
-          <col className="w-[12%]" />
-          <col className="w-[45%]" />
-          <col className="w-[14%]" />
+          <col className="w-12" />
+          <col className="w-32" />
+          <col className="w-32" />
+          <col className="w-32" />
+          <col className="w-auto" />
+          <col className="w-36" />
         </colgroup>
-        <thead className="bg-muted/60 text-xs text-foreground font-semibold">
+        <thead className="border-border bg-sidebar text-muted-foreground border-b text-xs font-medium">
           <tr className="text-left">
-            <th scope="col" className="px-3 py-2.5 whitespace-nowrap">
+            <th scope="col" className="px-3 py-3 whitespace-nowrap">
               #
             </th>
-            <th scope="col" className="px-3 py-2.5 whitespace-nowrap">
+            <th scope="col" className="px-3 py-3 whitespace-nowrap">
               Mã sản phẩm
             </th>
-            <th scope="col" className="px-3 py-2.5 whitespace-nowrap">
+            <th scope="col" className="px-3 py-3 whitespace-nowrap">
               Sản phẩm
             </th>
-            <th scope="col" className="px-3 py-2.5 whitespace-nowrap">
+            <th scope="col" className="px-3 py-3 whitespace-nowrap">
               Trạng thái
             </th>
-            <th scope="col" className="px-3 py-2.5 whitespace-nowrap">
+            <th scope="col" className="px-3 py-3 whitespace-nowrap">
               Lý do / ghi chú
             </th>
-            <th scope="col" className="px-3 py-2.5 whitespace-nowrap">
+            <th scope="col" className="px-3 py-3 whitespace-nowrap">
               Lô đăng
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border/60">
+        <tbody className="divide-border divide-y">
           {rows.map((row, index) => (
             <tr
               key={`${row.code}-${index}`}
-              className="border-border border-t align-top transition-colors hover:bg-muted/30"
+              className="border-border hover:bg-sidebar/70 border-t align-top transition-colors duration-150"
             >
-              <td className="text-foreground-subtle px-3 py-2.5 font-mono text-xs tabular-nums">
+              <td className="text-foreground-subtle px-3 py-3 font-mono text-xs tabular-nums">
                 {index + 1}
               </td>
               {/* The Mono Ledger Rule, and nowrap: a product code broken across
                   two lines is a different string to the eye reading it back to
                   the Sheet. */}
-              <td className="px-3 py-2.5 font-mono text-xs font-semibold text-foreground whitespace-nowrap">
+              <td className="text-foreground px-3 py-3 font-mono text-sm font-semibold whitespace-nowrap">
                 {row.code}
               </td>
-              <td className="px-3 py-2.5 text-xs text-foreground font-medium">
+              <td className="text-foreground px-3 py-3 text-sm font-medium">
                 {row.productName ?? "—"}
               </td>
-              <td className="px-3 py-2.5">
+              <td className="px-3 py-3">
                 <Badge tone={BULK_ROW_STATUS_TONES[row.status]}>
                   {BULK_ROW_STATUS_LABELS[row.status]}
                 </Badge>
               </td>
-              <td className="px-3 py-2.5 text-xs">
+              <td className="px-3 py-3 text-sm">
                 {review && row.status === "review" ? <ReviewCell row={row} review={review} /> : null}
                 {row.reason ? (
-                  <span className="max-w-prose break-words text-foreground leading-relaxed">
+                  <span className="text-foreground max-w-prose leading-relaxed break-words">
                     {row.reason}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">—</span>
                 )}
                 {row.errorCode ? (
-                  <span className="text-foreground-subtle block font-mono text-[11px] mt-0.5">
+                  <span className="text-foreground-subtle mt-1 block font-mono text-xs">
                     Mã lỗi: {row.errorCode}
                   </span>
                 ) : null}
               </td>
-              <td className="px-3 py-2.5 text-xs">
+              <td className="px-3 py-3 text-sm">
                 {row.batchId ? (
                   <Link
                     href={`/batches/${encodeURIComponent(row.batchId)}`}
-                    className="font-medium text-primary underline underline-offset-4 hover:opacity-80 transition-opacity"
+                    className="text-accent-foreground focus-visible:ring-ring rounded-sm font-medium underline underline-offset-4 transition-opacity duration-150 outline-none hover:opacity-80 focus-visible:ring-2"
                   >
                     Xem lô ({row.channelCount} kênh)
                   </Link>

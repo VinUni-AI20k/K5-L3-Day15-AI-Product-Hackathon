@@ -16,6 +16,7 @@ import {
   Stack,
   Text,
 } from "@astryxdesign/core";
+import { Sparkles } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
@@ -246,7 +247,7 @@ export function PromptTemplatesScreen() {
               divider stopped short of the shell edge instead of running the
               full width. Same box as the content below, so the h1 sits on the
               left edge of the panel it titles (the `/bulk` frame). */}
-          <div className="mx-auto w-full max-w-5xl px-6 py-4">
+          <div className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-5">
             <Stack direction="vertical" gap={1} paddingBlock={0} paddingInline={0}>
               <HStack gap={3} justify="between" align="start" wrap="wrap">
                 <Heading level={1} ref={headingRef} tabIndex={-1}>
@@ -263,7 +264,7 @@ export function PromptTemplatesScreen() {
                   Tải lại
                 </Button>
               </HStack>
-              <Text type="supporting">
+              <Text type="supporting" color="secondary" className="max-w-prose">
                 Prompt để AI viết caption Facebook. Mỗi lần sửa là một phiên bản mới — bản cũ giữ
                 nguyên, và chỉ một bản được dùng tại một thời điểm.
               </Text>
@@ -278,8 +279,8 @@ export function PromptTemplatesScreen() {
               Claiming it here keeps them inside this column instead of letting
               them escape to the shell wrapper (the trap AppFrame and
               BulkRunScreen both document). */}
-          <div className="relative mx-auto w-full max-w-5xl px-6 py-8">
-            <Stack direction="vertical" gap={4} paddingBlock={0} paddingInline={0}>
+          <div className="relative mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
+            <Stack direction="vertical" gap={8} paddingBlock={0} paddingInline={0}>
               {notice ? (
                 // Warnings ride along with the result instead of living inside the
                 // form: the form is closed by the time the server answers, so a
@@ -327,7 +328,7 @@ export function PromptTemplatesScreen() {
 
               {!versions.isError && data ? (
                 <>
-                  <Card padding={4} aria-labelledby="prompt-active-heading">
+                  <Card padding={5} aria-labelledby="prompt-active-heading">
                     <Stack direction="vertical" gap={3}>
                       <HStack gap={2} justify="between" align="center" wrap="wrap">
                         <Heading level={2} id="prompt-active-heading">
@@ -346,36 +347,48 @@ export function PromptTemplatesScreen() {
                         <Text type="supporting" color="secondary">
                           Tên
                         </Text>
-                        <Text weight="medium">{data.effective.name}</Text>
+                        <Text type="supporting" weight="medium">
+                          {data.effective.name}
+                        </Text>
                       </HStack>
-                      <pre className="bg-muted/40 max-h-64 overflow-auto rounded-md border p-3 font-mono text-xs break-words whitespace-pre-wrap">
+                      <pre className="border-border bg-muted/40 text-foreground max-h-64 overflow-auto rounded-lg border p-4 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">
                         {data.effective.body}
                       </pre>
                     </Stack>
                   </Card>
 
                   {tenantVersions.length === 0 ? (
-                    <EmptyState
-                      headingLevel={2}
-                      title="Đơn vị này chưa có phiên bản riêng"
-                      // A read-only session has no create button anywhere on the
-                      // screen, so the first-run copy must not point at one. Keyed
-                      // on read-only ONLY: an operator waiting for a save is still
-                      // allowed to write, and must not be told otherwise.
-                      description={firstRunDescription(access)}
-                      actions={
-                        access.isReadOnly || formOpen ? undefined : (
-                          <Button
-                            variant="primary"
-                            label="Tạo phiên bản đầu tiên"
-                            onClick={openBlankForm}
-                          />
-                        )
-                      }
-                    />
+                    <div className="border-border bg-card rounded-xl border p-6">
+                      <EmptyState
+                        headingLevel={2}
+                        icon={
+                          <span
+                            aria-hidden="true"
+                            className="bg-accent text-accent-foreground inline-flex size-10 items-center justify-center rounded-lg"
+                          >
+                            <Sparkles className="size-5" />
+                          </span>
+                        }
+                        title="Đơn vị này chưa có phiên bản riêng"
+                        // A read-only session has no create button anywhere on the
+                        // screen, so the first-run copy must not point at one. Keyed
+                        // on read-only ONLY: an operator waiting for a save is still
+                        // allowed to write, and must not be told otherwise.
+                        description={firstRunDescription(access)}
+                        actions={
+                          access.isReadOnly || formOpen ? undefined : (
+                            <Button
+                              variant="primary"
+                              label="Tạo phiên bản đầu tiên"
+                              onClick={openBlankForm}
+                            />
+                          )
+                        }
+                      />
+                    </div>
                   ) : null}
 
-                  <Stack direction="vertical" gap={3}>
+                  <Stack direction="vertical" gap={4}>
                     <HStack gap={3} justify="between" align="center" wrap="wrap">
                       <Heading level={2} id="prompt-versions-heading">
                         Các phiên bản ({data.versions.length})
@@ -385,7 +398,10 @@ export function PromptTemplatesScreen() {
                       ) : (
                         <Button
                           ref={triggerRef}
-                          variant="primary"
+                          // One primary CTA per view: on first run the empty state
+                          // owns the primary slot; while the form is open its submit
+                          // button owns it.
+                          variant={tenantVersions.length === 0 || formOpen ? "secondary" : "primary"}
                           size="sm"
                           label="Tạo phiên bản mới"
                           aria-expanded={formOpen}
@@ -409,7 +425,7 @@ export function PromptTemplatesScreen() {
                         no route may reach one in support mode (M3.3). Decided in
                         one place above — never inline, never with `isSaving`. */}
                     {isCreatePanelVisible ? (
-                      <Card padding={4} id={formPanelId}>
+                      <Card padding={5} id={formPanelId}>
                         <PromptVersionForm
                           key={draftKey}
                           nextVersion={data.nextVersion}
@@ -481,15 +497,34 @@ export function PromptTemplatesScreen() {
 /** Same shape as the loaded screen so nothing jumps when data arrives. */
 function PromptVersionsSkeleton() {
   return (
-    <Stack direction="vertical" gap={4} aria-hidden="true">
-      <Stack direction="vertical" gap={2}>
-        <Skeleton width={160} height={20} />
-        <Skeleton width="100%" height={96} />
-      </Stack>
-      <Stack direction="vertical" gap={2}>
-        {[0, 1, 2].map((row) => (
-          <Skeleton key={row} width="100%" height={32} index={row} />
-        ))}
+    <Stack direction="vertical" gap={8} aria-hidden="true">
+      <div className="border-border bg-card space-y-3 rounded-xl border p-5">
+        <HStack gap={2} justify="between" align="center">
+          <Skeleton width={120} height={24} />
+          <Skeleton width={140} height={24} />
+        </HStack>
+        <Skeleton width={220} height={18} />
+        <Skeleton width="100%" height={112} />
+      </div>
+
+      <Stack direction="vertical" gap={4}>
+        <HStack gap={3} justify="between" align="center">
+          <Skeleton width={180} height={24} />
+          <Skeleton width={148} height={32} />
+        </HStack>
+        <div className="border-border bg-card overflow-hidden rounded-xl border">
+          <Stack direction="vertical" gap={0} padding={0}>
+            {[0, 1, 2].map((row) => (
+              <HStack key={row} gap={3} padding={3} align="center">
+                <Skeleton width={96} height={16} index={row} />
+                <Skeleton width="100%" height={16} index={row} />
+                <Skeleton width={110} height={20} index={row} />
+                <Skeleton width={140} height={16} index={row} />
+                <Skeleton width={180} height={28} index={row} />
+              </HStack>
+            ))}
+          </Stack>
+        </div>
       </Stack>
     </Stack>
   );
