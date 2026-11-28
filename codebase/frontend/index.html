@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SkyBill · Lịch Hoá Đơn AI kiểu Locket</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Header cố định -->
+    <header class="top-header">
+      <div class="brand">
+        <div class="brand-badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="3" width="16" height="18" rx="3"></rect>
+            <path d="M8 8h8M8 12h8M8 16h5"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">SkyBill</h1>
+          <p class="brand-sub">Locket Hoá Đơn &amp; Xu Hướng Chi Tiêu</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-open-guide" type="button" class="btn btn-ghost btn-sm" title="Mở trang hướng dẫn từng bước">
+          <span>? Hướng dẫn từng bước</span>
+        </button>
+        <button id="btn-restart-tour" type="button" class="btn btn-outline btn-sm" title="Khởi động lại hướng dẫn tương tác từ đầu">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
+            <path d="M3 3v5h5"></path>
+          </svg>
+          <span>Chạy lại Tour</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- ================================================================
+           VIEW 1: CHỤP / TẢI HOÁ ĐƠN (Giao diện chủ đạo 1)
+           ================================================================ -->
+      <section id="view-capture" class="view active" aria-label="Chụp và tải hoá đơn">
+        <div class="section-intro">
+          <div>
+            <span class="pill-tag">Giao diện 1 · Ghi nhận hoá đơn</span>
+            <h2>Chụp ngay hoặc tải ảnh hoá đơn</h2>
+            <p class="muted">AI trích xuất món hàng, kiểm tra số học và lập bản nháp để bạn duyệt trước khi lưu vào ô ngày trên lịch.</p>
+          </div>
+          <div class="capture-mode-switch" role="tablist" aria-label="Chọn cách nhập ảnh">
+            <button id="mode-camera-btn" type="button" class="seg-btn active" role="tab" aria-selected="true">
+              Chụp ngay bằng app
+            </button>
+            <button id="mode-upload-btn" type="button" class="seg-btn" role="tab" aria-selected="false">
+              Tải ảnh từ app khác
+            </button>
+          </div>
+        </div>
+
+        <div class="capture-grid">
+          <!-- Khung nhập ảnh (Camera Locket hoặc Upload có chọn ngày) -->
+          <div class="card locket-card">
+            <!-- Chế độ 1A: Camera trực tiếp -->
+            <div id="panel-camera" class="capture-panel active">
+              <div class="panel-head">
+                <div>
+                  <h3>Khung chụp Locket</h3>
+                  <p class="muted-sm">Ảnh chụp trực tiếp sẽ tự động gắn vào <strong>ngày hôm nay (<span id="camera-today-label"></span>)</strong>.</p>
+                </div>
+                <span class="date-chip" id="camera-date-chip">Hôm nay</span>
+              </div>
+
+              <div class="locket-viewfinder" id="locket-viewfinder">
+                <video id="camera-video" autoplay playsinline muted class="hidden"></video>
+                <canvas id="camera-canvas" class="hidden"></canvas>
+                <img id="camera-preview" alt="Ảnh hoá đơn vừa chụp" class="hidden" />
+                <div id="camera-placeholder" class="viewfinder-placeholder">
+                  <div class="camera-icon-circle">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                      <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                  </div>
+                  <p class="placeholder-title">Sẵn sàng chụp hoá đơn trong ngày</p>
+                  <p class="placeholder-sub">Bật camera thiết bị hoặc dùng ảnh hoá đơn mẫu để thử ngay quy trình AI.</p>
+                </div>
+              </div>
+
+              <p id="camera-status-msg" class="status-note hidden"></p>
+
+              <div class="locket-controls">
+                <button id="btn-start-camera" type="button" class="btn btn-outline">Bật camera</button>
+                <button id="btn-shutter" type="button" class="shutter-btn" title="Chụp ảnh hoá đơn" disabled aria-label="Chụp ảnh hoá đơn">
+                  <span class="shutter-inner"></span>
+                </button>
+                <button id="btn-stop-camera" type="button" class="btn btn-ghost" disabled>Đóng cam</button>
+              </div>
+
+              <div class="sample-strip">
+                <span class="muted-sm">Không có camera? Thử nhanh:</span>
+                <button id="btn-sample-clear" type="button" class="btn btn-soft btn-sm">Dùng ảnh hoá đơn mẫu</button>
+                <button id="btn-sample-blurry" type="button" class="btn btn-soft btn-sm">Thử hoá đơn mờ (G10)</button>
+              </div>
+            </div>
+
+            <!-- Chế độ 1B: Tải ảnh từ app khác (bắt buộc chọn ngày) -->
+            <div id="panel-upload" class="capture-panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Tải ảnh chụp từ ứng dụng khác</h3>
+                  <p class="muted-sm">Hỗ trợ ảnh hoá đơn MoMo, ZaloPay, ngân hàng hoặc ảnh chụp sẵn trong máy.</p>
+                </div>
+                <span class="pill-required">Bắt buộc chọn ngày</span>
+              </div>
+
+              <div class="upload-date-box" id="upload-date-box">
+                <label for="upload-date" class="field-label">
+                  Hoá đơn này chi tiêu vào ngày nào? <span class="required-mark">*</span>
+                </label>
+                <div class="date-input-row">
+                  <input id="upload-date" type="date" class="input-control" required />
+                  <div class="quick-date-pills">
+                    <button type="button" class="chip-btn" data-quick-date="0">Hôm nay</button>
+                    <button type="button" class="chip-btn" data-quick-date="-1">Hôm qua</button>
+                    <button type="button" class="chip-btn" data-quick-date="-2">2 ngày trước</button>
+                  </div>
+                </div>
+                <p id="upload-date-hint" class="muted-sm">Phải chỉ rõ ngày chi tiêu để AI xếp đúng vào ô trên Lịch Locket và tính báo cáo tuần/tháng.</p>
+              </div>
+
+              <label id="dropzone" for="upload-file-input" class="dropzone">
+                <input id="upload-file-input" type="file" accept="image/*" class="sr-only" />
+                <img id="upload-preview" alt="Xem trước ảnh hoá đơn tải lên" class="hidden" />
+                <div id="upload-placeholder" class="dropzone-placeholder">
+                  <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                  <p class="placeholder-title">Chọn hoặc kéo thả ảnh hoá đơn vào đây</p>
+                  <p class="placeholder-sub">JPG, PNG, WEBP · Ảnh chỉ xử lý minh hoạ trên phiên hiện tại</p>
+                </div>
+              </label>
+
+              <div class="sample-strip">
+                <span class="muted-sm">Hoặc thử tải nhanh file mẫu:</span>
+                <button id="btn-upload-sample" type="button" class="btn btn-soft btn-sm">Nạp ảnh chuyển khoản/hoá đơn mẫu</button>
+              </div>
+            </div>
+
+            <div class="extract-bar">
+              <div class="extract-meta">
+                <span class="muted-sm">Ngày ghi nhận dự kiến:</span>
+                <strong id="active-target-date">—</strong>
+              </div>
+              <button id="btn-extract-ai" type="button" class="btn btn-primary">
+                Trích xuất hoá đơn bằng AI
+              </button>
+            </div>
+          </div>
+
+          <!-- Thẻ bản nháp AI chờ người dùng duyệt (DRAFT_PENDING_USER) -->
+          <div class="card draft-card" id="draft-card">
+            <div class="panel-head">
+              <div>
+                <h3>Bản nháp chờ bạn duyệt</h3>
+                <p class="muted-sm">AI điền sẵn từ ảnh, công cụ kiểm số học, bạn kiểm/sửa rồi mới lưu vào lịch.</p>
+              </div>
+              <span id="draft-status-badge" class="pill-tag">Chưa có bản nháp</span>
+            </div>
+
+            <div id="draft-empty" class="draft-empty">
+              <div class="empty-illustration" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="9" y1="13" x2="15" y2="13"></line>
+                  <line x1="9" y1="17" x2="13" y2="17"></line>
+                </svg>
+              </div>
+              <p>Chụp hoặc tải ảnh ở khung bên cạnh rồi bấm <strong>"Trích xuất hoá đơn bằng AI"</strong> để xem bản nháp chi tiết tại đây.</p>
+            </div>
+
+            <form id="draft-form" class="draft-form hidden">
+              <div id="draft-validation-box" class="validation-box"></div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="draft-merchant" class="field-label">Cửa hàng / Nơi chi</label>
+                  <input id="draft-merchant" type="text" class="input-control" placeholder="VD: Quán Cà Phê Mẫu" required />
+                </div>
+                <div class="form-group">
+                  <label for="draft-date" class="field-label">Ngày lưu vào lịch</label>
+                  <input id="draft-date" type="date" class="input-control" required />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="field-label">Danh mục chi tiêu</label>
+                <div id="draft-category-chips" class="category-chips"></div>
+              </div>
+
+              <div class="form-group">
+                <div class="items-head">
+                  <label class="field-label">Chi tiết các món / khoản chi</label>
+                  <button id="btn-add-item" type="button" class="btn btn-soft btn-xs">+ Thêm dòng</button>
+                </div>
+                <div id="draft-items-list" class="draft-items-list"></div>
+              </div>
+
+              <div class="total-summary-box">
+                <div>
+                  <span class="muted-sm">Tổng cộng (tính 100% bằng code)</span>
+                  <div id="draft-total-display" class="total-amount">0 ₫</div>
+                </div>
+                <div class="form-group note-inline">
+                  <label for="draft-note" class="field-label">Ghi chú nhanh</label>
+                  <input id="draft-note" type="text" class="input-control" placeholder="VD: Ăn trưa nhóm bạn" />
+                </div>
+              </div>
+
+              <div class="draft-actions">
+                <button id="btn-discard-draft" type="button" class="btn btn-ghost">Huỷ bản nháp</button>
+                <button id="btn-confirm-save" type="submit" class="btn btn-primary">Xác nhận lưu vào lịch ngày</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           VIEW 2: LỊCH CHI TIÊU KIỂU LOCKET (Giao diện chủ đạo 2)
+           ================================================================ -->
+      <section id="view-calendar" class="view" aria-label="Lịch chi tiêu Locket">
+        <div class="section-intro">
+          <div>
+            <span class="pill-tag">Giao diện 2 · Lịch Locket chi tiêu</span>
+            <h2>Lịch hoá đơn theo từng ngày</h2>
+            <p class="muted">Mỗi ô ngày thể hiện số hoá đơn và mức chi qua sắc độ xanh da trời. Bấm vào bất kỳ ngày nào để xem chi tiết.</p>
+          </div>
+          <div class="month-nav">
+            <button id="btn-prev-month" type="button" class="btn btn-outline btn-sm" aria-label="Tháng trước">&larr;</button>
+            <strong id="calendar-month-label" class="month-label">Tháng 11 2026</strong>
+            <button id="btn-next-month" type="button" class="btn btn-outline btn-sm" aria-label="Tháng sau">&rarr;</button>
+            <button id="btn-jump-today" type="button" class="btn btn-soft btn-sm">Hôm nay</button>
+          </div>
+        </div>
+
+        <div class="calendar-layout">
+          <!-- Khối Lịch Locket -->
+          <div class="card calendar-card">
+            <div class="weekdays-row" aria-hidden="true">
+              <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
+            </div>
+            <div id="calendar-grid" class="calendar-grid"></div>
+
+            <div class="calendar-legend">
+              <span class="muted-sm">Mức chi trong ngày:</span>
+              <div class="legend-scale">
+                <span class="muted-sm">Ít</span>
+                <span class="legend-dot level-0" title="0 ₫"></span>
+                <span class="legend-dot level-1" title="Dưới 150k"></span>
+                <span class="legend-dot level-2" title="150k – 400k"></span>
+                <span class="legend-dot level-3" title="400k – 800k"></span>
+                <span class="legend-dot level-4" title="Trên 800k"></span>
+                <span class="muted-sm">Nhiều</span>
+              </div>
+            </div>
+
+            <!-- Thanh chỉ số kiểu Locket phía dưới lịch -->
+            <div class="locket-streak-bar">
+              <div class="streak-stat">
+                <span class="streak-num" id="stat-total-receipts">0</span>
+                <span class="muted-sm">Hoá đơn đã lưu</span>
+              </div>
+              <div class="streak-divider"></div>
+              <div class="streak-stat">
+                <span class="streak-num" id="stat-streak-days">0 ngày</span>
+                <span class="muted-sm">Chuỗi ghi chép</span>
+              </div>
+              <div class="streak-divider"></div>
+              <div class="streak-stat">
+                <span class="streak-num" id="stat-month-spend">0 ₫</span>
+                <span class="muted-sm">Tổng chi tháng này</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel chi tiết ngày khi bấm vào 1 ô trên lịch -->
+          <aside id="day-detail-panel" class="card day-detail-card" aria-live="polite">
+            <div class="panel-head">
+              <div>
+                <span class="pill-tag" id="day-detail-badge">Ngày đã chọn</span>
+                <h3 id="day-detail-title">Chọn một ngày trên lịch</h3>
+              </div>
+              <button id="btn-add-for-day" type="button" class="btn btn-primary btn-sm">
+                + Thêm vào ngày này
+              </button>
+            </div>
+
+            <div class="day-kpis">
+              <div class="mini-kpi">
+                <span class="muted-sm">Số hoá đơn</span>
+                <strong id="day-receipt-count">0</strong>
+              </div>
+              <div class="mini-kpi">
+                <span class="muted-sm">Tổng chi ngày</span>
+                <strong id="day-total-spend">0 ₫</strong>
+              </div>
+            </div>
+
+            <div class="day-section">
+              <h4>Bảng tổng kết theo mục</h4>
+              <div id="day-category-breakdown" class="breakdown-list"></div>
+            </div>
+
+            <div class="day-section" id="day-photos-section">
+              <div class="items-head">
+                <h4>Ảnh hoá đơn hôm đó</h4>
+                <span id="day-photos-count" class="pill-tag">0 ảnh</span>
+              </div>
+              <div id="day-photos-gallery" class="day-photos-gallery"></div>
+            </div>
+
+            <div class="day-section">
+              <h4>Chi tiết từng hoá đơn trong ngày</h4>
+              <div id="day-receipts-list" class="receipt-cards-list"></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           VIEW 3: PHÂN TÍCH TUẦN / THÁNG / NĂM & XU HƯỚNG
+           ================================================================ -->
+      <section id="view-analytics" class="view" aria-label="Phân tích chi tiêu và xu hướng">
+        <div class="section-intro">
+          <div>
+            <span class="pill-tag">Giao diện bổ sung · Phân tích &amp; So sánh kỳ trước</span>
+            <h2>Tổng kết Tuần · Tháng · Năm &amp; Xu hướng</h2>
+            <p class="muted">Mọi phép cộng, phần trăm tăng/giảm do công cụ code tính chính xác 100%; AI chỉ diễn giải xu hướng từ bảng số liệu.</p>
+          </div>
+          <div class="period-controls">
+            <div class="capture-mode-switch" role="tablist" aria-label="Chọn chu kỳ tổng kết">
+              <button type="button" class="seg-btn period-tab" data-period="week">Tuần</button>
+              <button type="button" class="seg-btn period-tab active" data-period="month">Tháng</button>
+              <button type="button" class="seg-btn period-tab" data-period="year">Năm</button>
+            </div>
+            <div class="month-nav">
+              <button id="btn-period-prev" type="button" class="btn btn-outline btn-sm" aria-label="Kỳ trước">&larr;</button>
+              <strong id="analytics-period-label" class="month-label">Tháng 11/2026</strong>
+              <button id="btn-period-next" type="button" class="btn btn-outline btn-sm" aria-label="Kỳ sau">&rarr;</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="card kpi-card">
+            <span class="muted-sm">Tổng chi kỳ này</span>
+            <strong id="kpi-current-total" class="kpi-value">0 ₫</strong>
+            <span id="kpi-current-range" class="muted-xs">—</span>
+          </div>
+          <div class="card kpi-card">
+            <span class="muted-sm">So sánh với kỳ trước</span>
+            <strong id="kpi-delta-pct" class="kpi-value">—</strong>
+            <span id="kpi-delta-vnd" class="muted-xs">—</span>
+          </div>
+          <div class="card kpi-card">
+            <span class="muted-sm">Số hoá đơn đã lưu</span>
+            <strong id="kpi-receipt-count" class="kpi-value">0</strong>
+            <span id="kpi-prev-count" class="muted-xs">Kỳ trước: 0</span>
+          </div>
+          <div class="card kpi-card">
+            <span class="muted-sm">Trung bình mỗi ngày có chi</span>
+            <strong id="kpi-daily-avg" class="kpi-value">0 ₫</strong>
+            <span id="kpi-top-cat" class="muted-xs">Nhóm lớn nhất: —</span>
+          </div>
+        </div>
+
+        <div class="analytics-grid">
+          <div class="card">
+            <div class="panel-head">
+              <div>
+                <h3>Biểu đồ so sánh kỳ hiện tại vs kỳ trước</h3>
+                <p class="muted-sm">So sánh chi tiêu từng nhóm danh mục bằng sắc độ xanh da trời.</p>
+              </div>
+              <div class="chart-legend">
+                <span class="legend-item"><i class="swatch swatch-current"></i> Kỳ này</span>
+                <span class="legend-item"><i class="swatch swatch-prev"></i> Kỳ trước</span>
+              </div>
+            </div>
+            <div id="analytics-svg-wrap" class="svg-chart-wrap"></div>
+          </div>
+
+          <div class="card">
+            <div class="panel-head">
+              <div>
+                <h3>Bảng tổng kết &amp; biến động danh mục</h3>
+                <p class="muted-sm">Chi tiết mức tăng/giảm theo từng khoản chi tiêu.</p>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Danh mục</th>
+                    <th class="num">Kỳ này</th>
+                    <th class="num">Kỳ trước</th>
+                    <th class="num">Chênh lệch</th>
+                  </tr>
+                </thead>
+                <tbody id="analytics-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="analytics-grid bottom-analytics">
+          <div class="card insight-card">
+            <div class="panel-head">
+              <div>
+                <h3>Nhận xét xu hướng tiêu dùng</h3>
+                <p class="muted-sm">Tổng hợp trung lập dựa trên số liệu thật bạn đã lưu (G11).</p>
+              </div>
+              <span class="pill-tag">Phân tích theo dữ liệu</span>
+            </div>
+            <div id="trend-insights-body" class="insights-list"></div>
+          </div>
+
+          <div class="card qa-card">
+            <div class="panel-head">
+              <div>
+                <h3>Hỏi trợ lý chi tiêu (kết nối backend)</h3>
+                <p class="muted-sm">Hỏi về khoản chi, tháng so sánh; từ chối tư vấn đầu tư hay xem dữ liệu người khác.</p>
+              </div>
+            </div>
+            <form id="qa-form" class="qa-form">
+              <input id="qa-input" type="text" class="input-control" placeholder="VD: Tháng này mình tiêu gì nhiều nhất so với tháng trước?" />
+              <button type="submit" class="btn btn-primary">Hỏi AI</button>
+            </form>
+            <div class="qa-suggestions">
+              <button type="button" class="chip-btn qa-chip" data-q="Tháng này khoản nào tăng mạnh nhất so với kỳ trước?">Khoản nào tăng mạnh nhất?</button>
+              <button type="button" class="chip-btn qa-chip" data-q="Tóm tắt xu hướng chi tiêu của mình trong kỳ này">Tóm tắt xu hướng</button>
+              <button type="button" class="chip-btn qa-chip" data-q="Nên mua cổ phiếu nào từ tiền dư?">Thử câu ngoài phạm vi</button>
+            </div>
+            <div id="qa-answer-box" class="qa-answer-box">
+              Nhập câu hỏi hoặc bấm gợi ý phía trên để xem câu trả lời kèm số liệu đối chiếu.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           VIEW 4: TRANG HƯỚNG DẪN TỪNG BƯỚC (Tra nhanh từng phần nhỏ)
+           ================================================================ -->
+      <section id="view-guide" class="view" aria-label="Trang hướng dẫn sử dụng chi tiết">
+        <div class="card guide-hero">
+          <div>
+            <span class="pill-tag">Trợ giúp nhanh · Không cần xem lại từ đầu</span>
+            <h2>Hướng dẫn sử dụng từng thao tác</h2>
+            <p class="muted">Nếu bạn quên một bước nhỏ (như chọn ngày khi tải ảnh hay sửa mục chi), chỉ cần tìm đúng bước đó bên dưới hoặc bấm chạy lại Tour tương tác.</p>
+          </div>
+          <div class="guide-hero-actions">
+            <button id="btn-guide-restart-tour" type="button" class="btn btn-primary">
+              Khởi động lại Tour hướng dẫn (6 bước)
+            </button>
+            <button id="btn-reset-demo-data" type="button" class="btn btn-outline">
+              Khôi phục dữ liệu hoá đơn mẫu
+            </button>
+          </div>
+        </div>
+
+        <div class="guide-search-bar">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input id="guide-search" type="search" class="guide-search-input" placeholder="Tìm nhanh bước bạn quên: VD 'chọn ngày', 'chụp ảnh', 'bản nháp', 'tuần', 'xoá'..." />
+          <button id="btn-expand-all-guide" type="button" class="btn btn-soft btn-sm">Mở tất cả</button>
+        </div>
+
+        <div id="guide-steps-list" class="guide-steps-list"></div>
+      </section>
+    </main>
+
+    <!-- Bottom Dock kiểu Locket -->
+    <nav class="bottom-dock" aria-label="Điều hướng chính">
+      <button type="button" class="dock-btn active" data-view="capture" id="nav-capture">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+        <span>Chụp HĐ</span>
+      </button>
+      <button type="button" class="dock-btn" data-view="calendar" id="nav-calendar">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="3"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <span>Lịch</span>
+      </button>
+      <button type="button" class="dock-btn" data-view="analytics" id="nav-analytics">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="14"></line>
+        </svg>
+        <span>Phân tích</span>
+      </button>
+      <button type="button" class="dock-btn" data-view="guide" id="nav-guide">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <span>Hướng dẫn</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Interactive First-Time Onboarding Spotlight Tour -->
+  <div id="tour-overlay" class="tour-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+    <div id="tour-spotlight" class="tour-spotlight"></div>
+    <div id="tour-popover" class="tour-popover">
+      <div class="tour-head">
+        <span id="tour-step-badge" class="pill-tag">Bước 1 / 6</span>
+        <button id="tour-skip-btn" type="button" class="btn btn-ghost btn-xs">Bỏ qua</button>
+      </div>
+      <h3 id="tour-title">Chào mừng đến với SkyBill</h3>
+      <p id="tour-desc" class="muted"></p>
+      <div class="tour-footer">
+        <button id="tour-prev-btn" type="button" class="btn btn-outline btn-sm">Quay lại</button>
+        <div class="tour-dots" id="tour-dots"></div>
+        <button id="tour-next-btn" type="button" class="btn btn-primary btn-sm">Tiếp theo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal xem lại ảnh hoá đơn của ngày đã chọn -->
+  <div id="receipt-photo-modal" class="photo-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="photo-modal-title">
+    <div class="photo-modal-card">
+      <div class="photo-modal-head">
+        <div>
+          <span id="photo-modal-counter" class="pill-tag">Ảnh 1 / 1</span>
+          <h3 id="photo-modal-title">Ảnh hoá đơn</h3>
+        </div>
+        <div class="photo-modal-tools">
+          <button id="btn-photo-zoom" type="button" class="btn btn-outline btn-sm">Phóng to</button>
+          <button id="btn-photo-close" type="button" class="btn btn-soft btn-sm">Đóng</button>
+        </div>
+      </div>
+
+      <div class="photo-modal-body">
+        <div class="photo-modal-stage" id="photo-modal-stage">
+          <img id="photo-modal-img" src="" alt="Ảnh hoá đơn phóng lớn" class="photo-modal-img" />
+        </div>
+        <div class="photo-modal-side">
+          <div id="photo-modal-meta" class="photo-modal-meta"></div>
+          <div id="photo-modal-items" class="photo-modal-items"></div>
+          <div class="photo-modal-nav">
+            <button id="btn-photo-prev" type="button" class="btn btn-outline btn-sm">&larr; Ảnh trước</button>
+            <button id="btn-photo-next" type="button" class="btn btn-outline btn-sm">Ảnh sau &rarr;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast thông báo -->
+  <div id="toast-box" class="toast-box hidden" role="status" aria-live="polite"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

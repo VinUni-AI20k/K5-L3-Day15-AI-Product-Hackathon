@@ -1,0 +1,6 @@
+# Bộ khung (run.py, eval/run_eval.py, cost/simulate.py) chỉ dùng thư viện chuẩn của Python 3.10+.
+# Phần backend Quality Gate + ONNX OCR cho hoá đơn dùng thêm các gói sau:
+numpy
+opencv-python-headless
+pillow
+onnxruntime

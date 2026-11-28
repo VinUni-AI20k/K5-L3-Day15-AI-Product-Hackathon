@@ -1,0 +1,52 @@
+# Mô phỏng chi phí khi dùng thật — điền ở guide bước 4.2.
+# Ôn lại: ngày 13, ngày 1, ngày 14 · lab ngày 13, lab ngày 14.
+# Mọi số phải có nguồn (data / phỏng vấn / khảo sát / quy mô khoá có nguồn) hoặc ghi rõ "(tự ước tính)".
+# Chạy: python run.py simulate --try   (10 phiên, kiểm khung — làm trước CP3)
+#       python run.py simulate         (đủ số phiên dưới đây — bản nộp CP4)
+# Thay mọi dòng "(ví dụ)" bằng số và nguồn của nhóm; simulate nhắc nếu còn sót.
+
+sessions: 50        # số phiên mô phỏng — bản nộp ≥50
+seed: 42            # giữ cố định để chạy lại ra cùng chuỗi phiên
+
+users:              # số người dùng thật nếu đưa vào dùng — 3 kịch bản, ở quy mô thật của sản phẩm
+                    # Track E: người dùng cá nhân ghi chi tiêu từ hóa đơn
+  low: 30
+  base: 100
+  high: 300
+  source: "Kịch bản thấp 30 người theo nhóm thử trong spec.md §2; mức cơ sở 100 và cao 300 là (tự ước tính) cho sản phẩm nhật ký chi tiêu cá nhân"
+
+personas:           # ≥3 kiểu người dùng; share cộng lại = 1
+  - name: dung_it
+    share: 0.4              # tỉ lệ người dùng kiểu này
+    uses_per_month: 6       # số phiên / người / tháng
+    turns_per_session: 2    # số lượt hỏi trong một phiên
+    source: "(tự ước tính) người ít nhận hóa đơn hoặc chỉ tra cứu lại theo tuần"
+  - name: dung_vua
+    share: 0.4
+    uses_per_month: 12
+    turns_per_session: 3
+    source: "spec.md §2 giả định 12 hóa đơn/người/tháng, mỗi phiên gồm chụp/xem nhanh/Chốt hoặc tra cứu"
+  - name: dung_nhieu
+    share: 0.2
+    uses_per_month: 25
+    turns_per_session: 4
+    source: "(tự ước tính) người ghi hóa đơn hằng ngày và thường xuyên so sánh kỳ"
+# Mỗi lượt hỏi lấy ngẫu nhiên một đầu vào trong eval/benchmark.csv (type thuong và kho).
+# Persona hỏi kiểu riêng: thêm vào persona đó
+#     types: [thuong, kho, tu_choi]
+# hoặc
+#     inputs: ["câu hỏi kiểu 1", "câu hỏi kiểu 2"]
+
+prices:             # USD / 1 triệu token — chép từ further-reading/model-prices.md của repo đề. ≥2 mức model
+  - model: gemini-3.1-flash-lite
+    input: 0.25
+    output: 1.50
+    source: "further-reading/model-prices.md (https://ai.google.dev/gemini-api/docs/pricing, xem 25/11/2026)"
+  - model: gemini-4-hydrogen
+    input: 1.50
+    output: 7.50
+    source: "further-reading/model-prices.md (https://ai.google.dev/gemini-api/docs/pricing, xem 25/11/2026)"
+
+usd_to_vnd:         # tuỳ chọn: điền thì bản tóm tắt in thêm tiền Việt
+  rate: 25400
+  source: "(tự ước tính) tỷ giá quy đổi tham khảo 25.400 VND/USD"
