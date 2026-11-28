@@ -59,6 +59,10 @@ export const ASTRYX_VI: Catalog = {
   "@astryx.link.newTab": { defaultMessage: "(mở tab mới)" },
   "@astryx.button.loading": { defaultMessage: "Đang xử lý" },
 
+  // --- Toast ----------------------------------------------------------------
+  "@astryx.toast.viewport": { defaultMessage: "Thông báo" },
+  "@astryx.toast.dismiss": { defaultMessage: "Đóng thông báo" },
+
   // --- Fields ---------------------------------------------------------------
   "@astryx.field.required": { defaultMessage: "Bắt buộc" },
   "@astryx.field.optional": { defaultMessage: "Không bắt buộc" },

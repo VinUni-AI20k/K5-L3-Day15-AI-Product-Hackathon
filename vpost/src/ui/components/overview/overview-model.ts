@@ -5,6 +5,12 @@ import {
   channelSentenceName,
 } from "@/ui/components/channels/channel-option-labels";
 import type { Channel } from "@/ui/schemas/channel.schema";
+import {
+  displayCommentAuthor,
+  formatThreadLastMessageExcerpt,
+  type InboxThread,
+  type InboxThreadCounts,
+} from "@/ui/schemas/inbox.schema";
 
 /**
  * The rules behind the overview, kept out of the component so they can be
@@ -464,4 +470,130 @@ export function channelLabel(
   const id = normalizeChannelId(channelId);
   if (id.length === 0) return "—";
   return channelNameOf(id, channels);
+}
+
+// --- "Bình luận" (recent inbox threads on the overview) ---------------------
+
+/** Newest conversation rows shown inside the overview "Bình luận" card. */
+export const OVERVIEW_COMMENTS_LIMIT = 4;
+
+/** One conversation row reduced to what the overview "Bình luận" card displays. */
+export interface OverviewCommentItem {
+  readonly id: string;
+  readonly href: string;
+  readonly customerName: string;
+  readonly excerpt: string;
+  /** ISO instant of the latest activity on the thread. */
+  readonly timestamp: string;
+  readonly channelName: string;
+  readonly unread: boolean;
+  readonly needsAttention: boolean;
+  readonly attentionReason: string | null;
+}
+
+export type OverviewCommentsState =
+  | { readonly kind: "loading" }
+  | { readonly kind: "error"; readonly message: string }
+  | { readonly kind: "empty"; readonly canBanCount: number }
+  | {
+      readonly kind: "ready";
+      readonly items: readonly OverviewCommentItem[];
+      readonly totalCount: number;
+      readonly canBanCount: number;
+    };
+
+/** Builds the canonical deep link to open a single inbox thread. */
+export function buildOverviewCommentHref(threadId: string): string {
+  return `/comments?thread=${encodeURIComponent(threadId.trim())}`;
+}
+
+/** Sanitizes the server's "Cần bạn" attention total so invalid counts never surface. */
+export function overviewAttentionCount(
+  counts: Pick<InboxThreadCounts, "canBan"> | null | undefined,
+): number {
+  const value = counts?.canBan;
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return 0;
+  return Math.floor(value);
+}
+
+function newestOrder(iso: string): number {
+  const at = Date.parse(iso);
+  return Number.isNaN(at) ? Number.NEGATIVE_INFINITY : at;
+}
+
+/**
+ * Selects the newest conversation threads for the overview "Bình luận" card.
+ * Defensive against partial/unsorted inputs, blank ids, and duplicate entries.
+ */
+export function pickOverviewComments(
+  threads: readonly InboxThread[] | null | undefined,
+  limit = OVERVIEW_COMMENTS_LIMIT,
+): OverviewCommentItem[] {
+  if (!Array.isArray(threads) || !Number.isFinite(limit) || limit <= 0) return [];
+
+  const seen = new Set<string>();
+  const normalized: OverviewCommentItem[] = [];
+
+  for (const thread of threads) {
+    if (!thread) continue;
+    const id = trimmed(thread.id);
+    if (id.length === 0 || seen.has(id)) continue;
+    seen.add(id);
+
+    const timestamp = trimmed(thread.updatedAt) || trimmed(thread.lastMessage?.createdAt);
+    const attentionReason = trimmed(thread.attention?.reason) || null;
+
+    normalized.push({
+      id,
+      href: buildOverviewCommentHref(id),
+      customerName: displayCommentAuthor(thread.customer?.name),
+      excerpt: formatThreadLastMessageExcerpt(
+        thread.lastMessage ?? { fromPage: false, text: "" },
+      ),
+      timestamp,
+      channelName: trimmed(thread.channelName),
+      unread: thread.unread === true,
+      needsAttention: thread.attention !== null && thread.attention !== undefined,
+      attentionReason,
+    });
+  }
+
+  normalized.sort((a, b) => newestOrder(b.timestamp) - newestOrder(a.timestamp));
+  return normalized.slice(0, Math.floor(limit));
+}
+
+/**
+ * Resolves the overview "Bình luận" card state from the inbox threads query so
+ * loading and error states never render a false "Chưa có bình luận nào." message.
+ */
+export function resolveOverviewCommentsState(input: {
+  readonly hasData: boolean;
+  readonly isError: boolean;
+  readonly errorMessage?: string | null;
+  readonly threads?: readonly InboxThread[] | null;
+  readonly counts?: InboxThreadCounts | null;
+  readonly limit?: number;
+}): OverviewCommentsState {
+  if (input?.hasData !== true) {
+    if (input?.isError === true) {
+      const message =
+        trimmed(input.errorMessage) || "Không thể tải danh sách bình luận. Hãy thử lại.";
+      return { kind: "error", message };
+    }
+    return { kind: "loading" };
+  }
+
+  const canBanCount = overviewAttentionCount(input.counts);
+  const items = pickOverviewComments(input.threads, input.limit);
+  if (items.length === 0) {
+    return { kind: "empty", canBanCount };
+  }
+
+  const rawAll = input.counts?.all;
+  const totalCount =
+    typeof rawAll === "number" && Number.isFinite(rawAll) && rawAll >= 0
+      ? Math.max(Math.floor(rawAll), items.length)
+      : items.length;
+
+  return { kind: "ready", items, totalCount, canBanCount };
 }

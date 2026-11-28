@@ -14,7 +14,6 @@ import {
   ImageIcon,
   Layers,
   Link2,
-  MessageSquare,
   MessageSquarePlus,
   Moon,
   PenLine,
@@ -28,16 +27,28 @@ import {
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { resolveOverviewCommentsState } from "@/ui/components/overview/overview-model";
+import { OverviewCommentsWidget } from "@/ui/components/overview/OverviewCommentsWidget";
 import { useChannels } from "@/ui/hooks/useChannels";
+import { useInboxThreads } from "@/ui/hooks/useInbox";
 import { useMe } from "@/ui/hooks/useMe";
+import { useNowMs } from "@/ui/hooks/useNowMs";
 import { usePostJobLog } from "@/ui/hooks/usePostJobs";
 import { useScheduledJobs } from "@/ui/hooks/useScheduledJobs";
+import type { InboxListFilter } from "@/ui/schemas/inbox.schema";
 import { accountDisplayName } from "@/ui/schemas/me.schema";
 import type { JobLogFilter } from "@/ui/schemas/post-batch.schema";
 import type { ScheduledFilter } from "@/ui/schemas/scheduled.schema";
+import { ApiError } from "@/ui/services/api-error";
 
 const ALL_SCHEDULED: ScheduledFilter = { channelId: null, from: null, to: null };
 const ALL_JOBS: JobLogFilter = { status: null, batchId: null };
+const ALL_INBOX_THREADS: InboxListFilter = {
+  filter: "all",
+  channelId: null,
+  postJobId: null,
+  q: null,
+};
 
 const POST_TEMPLATES = [
   {
@@ -75,6 +86,8 @@ export function OverviewScreen() {
   const channels = useChannels();
   const scheduled = useScheduledJobs(ALL_SCHEDULED);
   const jobs = usePostJobLog(ALL_JOBS);
+  const threads = useInboxThreads(ALL_INBOX_THREADS);
+  const nowMs = useNowMs(60_000);
 
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [feedbackGoal, setFeedbackGoal] = useState("");
@@ -118,6 +131,19 @@ export function OverviewScreen() {
 
   const totalJobsCount = jobs.data?.pages[0]?.items.length ?? 0;
   const hasCreatedPosts = totalJobsCount > 0;
+
+  const firstThreadsPage = threads.data?.pages[0];
+  const commentsState = useMemo(
+    () =>
+      resolveOverviewCommentsState({
+        hasData: firstThreadsPage !== undefined,
+        isError: threads.isError,
+        errorMessage: ApiError.is(threads.error) ? threads.error.userMessage : null,
+        threads: firstThreadsPage?.items,
+        counts: firstThreadsPage?.counts,
+      }),
+    [firstThreadsPage, threads.error, threads.isError],
+  );
 
   const isFeedbackIncomplete = !feedbackGoal.trim() || !feedbackObstacle.trim();
 
@@ -344,31 +370,13 @@ export function OverviewScreen() {
           </div>
         </section>
 
-        <section className="space-y-4">
-          <Heading level={2}>Bình luận</Heading>
-
-          <div className="border-border bg-card flex min-h-56 flex-col items-center justify-center rounded-xl border p-6 text-center">
-            <span
-              aria-hidden="true"
-              className="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl"
-            >
-              <MessageSquare className="size-5" aria-hidden="true" />
-            </span>
-            <h3 className="text-foreground mt-4 text-base font-semibold">
-              Chưa có bình luận nào.
-            </h3>
-            <p className="text-muted-foreground mt-1.5 max-w-xs text-sm">
-              Các phản hồi và bình luận mới nhất sẽ hiển thị tại đây.
-            </p>
-            <Link
-              href="/comments"
-              className="bg-secondary text-secondary-foreground hover:bg-muted/80 active:bg-muted focus-visible:ring-ring mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-offset-2 motion-safe:transition-colors motion-safe:duration-150 motion-safe:ease-out"
-            >
-              <span>Mở hộp bình luận</span>
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
-          </div>
-        </section>
+        <OverviewCommentsWidget
+          state={commentsState}
+          nowMs={nowMs}
+          onRetry={() => {
+            void threads.refetch();
+          }}
+        />
       </div>
 
       <section className="space-y-4">
