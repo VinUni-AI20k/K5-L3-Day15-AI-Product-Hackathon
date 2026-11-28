@@ -8,7 +8,7 @@
 | Nguồn | Đạt ngưỡng? | File |
 |---|---|---|
 | Đào data (x/N, %, cách đếm chạy lại được, ≥5 ví dụ) | ☑ | `evidence/data-mining.md`, `evidence/data-mining-numbers.md` |
-| Phỏng vấn (≥3 người ngoài nhóm, đúng người dùng) | ☐ | *(chưa dùng)* |
+| Phỏng vấn (≥3 người ngoài nhóm, đúng người dùng) | ☑ | `evidence/interviews/P1.md`, `P2.md`, `P3.md` |
 | Khảo sát (bổ trợ kiểm lại, n = 8, 6 người trực tiếp làm bài) | ☐ *(n < 20, dùng kiểm chéo)* | `evidence/survey/results_summary.md` |
 
 ## 2. Số chính
@@ -18,11 +18,21 @@
   - `478/4671 (10.2%)` bài có câu mở đầu trùng lặp với bài khác.
   - `20/4650 (0.4%)` mã cuối bài (🔰) **không khớp** mã sản phẩm nào cùng dòng (`4483/4650` chỉ khớp phần đầu mã).
   - `62/4671 (1.3%)` bài đăng bị lỗi (`❌`); `14/299 (4.7%)` đơn tại quầy bị giảm lệch mức khuyến mãi.
+- **Phỏng vấn (3/3 người có kinh nghiệm đăng bài bán hàng online)**:
+  - `3/3` người đều từng tự đăng bài bán hàng trên mạng xã hội bằng phương pháp thủ công và đều gặp khó khăn: `P1` mất thời gian, `P2` bất tiện khi phải đăng nhiều bài, `P3` thao tác lặp lại tốn công sức.
 - **Khảo sát Google Form (kiểm lại với người dùng, n = 8; n = 6 người trực tiếp soạn/đăng bài)**:
   - `5/6` có hàng/mẫu đang tồn chưa kịp lên bài (`0/6` lên bài kịp hết; `1/6` tồn trên 30 sản phẩm).
   - `3/6` mất **20 đến trên 30 phút** cho 1 bài đăng; `3/6` bỏ dở hoặc phải gác lại đợt bài sang hôm sau.
   - `5/6` đang gửi thông tin/ảnh vào ChatGPT thủ công, `4/6` copy bài cũ sửa lại, `5/6` lưu dữ liệu gốc ở Excel / CSV / Google Sheet.
   - `3/6` từng đăng nhầm thông tin 1–2 lần trong 1 tháng qua; hậu quả: `2/3` khách bình luận/nhắn tin hỏi lại vì thông tin mâu thuẫn, `1/3` khách đặt theo thông tin sai phải xin lỗi/đổi trả.
+
+Phỏng vấn nhiều vai thì đếm theo từng vai, không cộng chung.
+
+| | Vai | Gặp pain? | Số lần / 1 tháng qua | Lần gần nhất mất | Đang xoay xở bằng |
+|---|---|---|---|---|---|
+| P1 | Người bán hàng online | Có (mất thời gian) | *(chưa ghi nhận)* | *(chưa ghi nhận)* | Đăng bài thủ công |
+| P2 | Người bán hàng online | Có (bất tiện khi đăng nhiều bài) | *(chưa ghi nhận)* | *(chưa ghi nhận)* | Đăng bài thủ công |
+| P3 | Người bán hàng online | Có (thao tác lặp lại, tốn công sức) | *(chưa ghi nhận)* | *(chưa ghi nhận)* | Đăng bài thủ công |
 
 ## 3. ≥5 trích dẫn hoặc ví dụ nguyên văn (có nguồn, bỏ tên)
 
