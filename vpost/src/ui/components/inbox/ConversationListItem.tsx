@@ -13,10 +13,15 @@ import {
   Tooltip,
   VisuallyHidden,
 } from "@astryxdesign/core";
-import { AlertCircle, MessageSquare, Sparkles } from "lucide-react";
+import { AlertCircle, MessageSquare, Ruler, Sparkles } from "lucide-react";
 import { useId, useState, type FocusEvent, type KeyboardEvent } from "react";
 
 import { AGENT_RUN_ROW_INDICATOR_LABEL } from "@/ui/components/inbox/agent-run-state";
+import {
+  AWAITING_MEASUREMENTS_BADGE_LABEL,
+  formatAwaitingMeasurementsTooltip,
+  resolveAwaitingMeasurements,
+} from "@/ui/components/inbox/auto-reply-state";
 import {
   formatInboxCustomerName,
   formatInboxThreadAccessibleContext,
@@ -98,6 +103,10 @@ export function ConversationListItem({
 
   const showUnreadBadge = thread.unread && thread.unreadCount > 0;
   const isAgentRunning = thread.agentRun?.status === "running";
+  const awaitingMeasurements = resolveAwaitingMeasurements(thread, nowMs);
+  const awaitingTooltip = awaitingMeasurements
+    ? formatAwaitingMeasurementsTooltip(awaitingMeasurements)
+    : null;
 
   const attention = thread.attention;
   const attentionReason = attention?.reason.trim() ?? "";
@@ -144,6 +153,7 @@ export function ConversationListItem({
       data-needs-reply={thread.needsReply ? "true" : "false"}
       data-attention={attention ? attention.tag : "none"}
       data-attention-reason={attentionReason || undefined}
+      data-awaiting-measurements={awaitingMeasurements ? "true" : "false"}
       data-agent-run-status={thread.agentRun?.status ?? "idle"}
       data-selected={isSelected ? "true" : "false"}
     >
@@ -289,6 +299,19 @@ export function ConversationListItem({
                     size="sm"
                   />
                 </span>
+              ) : null}
+
+              {awaitingMeasurements && awaitingTooltip ? (
+                <Tooltip content={awaitingTooltip} placement="above" focusTrigger="never">
+                  <span className="inline-flex" title={awaitingTooltip}>
+                    <Badge
+                      variant="info"
+                      icon={<Ruler className="size-4" aria-hidden="true" />}
+                      label={AWAITING_MEASUREMENTS_BADGE_LABEL}
+                      data-awaiting-measurements-badge="true"
+                    />
+                  </span>
+                </Tooltip>
               ) : null}
 
               {thread.needsReply ? (

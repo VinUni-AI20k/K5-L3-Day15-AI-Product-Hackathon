@@ -10,6 +10,10 @@ import {
   type AutoReplySetting,
   type AutoReplySettingUpdateInput,
 } from "@/ui/schemas/auto-reply.schema";
+import {
+  formatCommentAbsoluteTime,
+  type InboxThread,
+} from "@/ui/schemas/inbox.schema";
 
 /**
  * Pure draft state, validation, live-mode confirmation gate, and log filter
@@ -34,7 +38,7 @@ export interface AutoReplyDraftValidation {
   readonly capMismatchWarning: string | null;
 }
 
-/** Keeps only valid v1 intents (`price | size | color`) in canonical order. */
+/** Keeps only valid auto-reply intents (`price | size | color | size_advice`) in canonical order. */
 export function sanitizeAutoReplyIntents(
   intents: readonly string[],
 ): AutoReplyIntent[] {
@@ -84,7 +88,7 @@ export function validateAutoReplyDraft(
   const cleanIntents = sanitizeAutoReplyIntents(draft.intents);
   const intentsError =
     draft.enabled && cleanIntents.length === 0
-      ? "Chọn ít nhất một loại câu hỏi (Giá, Size hoặc Màu) khi bật tự động trả lời."
+      ? "Chọn ít nhất một loại câu hỏi (Giá, Size hoặc Màu, Tư vấn size) khi bật tự động trả lời."
       : null;
 
   const hourlyValid =
@@ -222,4 +226,79 @@ export function resolveAutoReplyLogEmptyKind(
   filter: AutoReplyLogFilter,
 ): "first-run" | "no-result" {
   return hasActiveAutoReplyLogFilters(filter) ? "no-result" : "first-run";
+}
+
+// --- Size advice: awaiting measurements thread state ------------------------
+
+export const AWAITING_MEASUREMENTS_STATE = "awaiting_measurements" as const;
+export const AWAITING_MEASUREMENTS_BADGE_LABEL = "Đang chờ số đo" as const;
+
+export interface AwaitingMeasurementsInfo {
+  readonly productCode: string | null;
+  readonly askedCommentId: string | null;
+  readonly expiresAt: string | null;
+}
+
+function isExpiredIso(expiresAt: string | null, nowMs: number | undefined): boolean {
+  if (!expiresAt || nowMs === undefined) return false;
+  const parsed = Date.parse(expiresAt);
+  if (Number.isNaN(parsed)) return false;
+  return parsed <= nowMs;
+}
+
+/**
+ * Resolves whether a thread is currently awaiting the customer's height/weight
+ * measurements (`awaiting_measurements`). Supports all plausible parallel
+ * backend wire fields (`threadState`, `sizeAdvice`, `autoReply.state`,
+ * `awaitingMeasurements`) and respects `expiresAt` when `nowMs` is supplied.
+ */
+export function resolveAwaitingMeasurements(
+  thread: Pick<
+    InboxThread,
+    "threadState" | "sizeAdvice" | "awaitingMeasurements" | "autoReply"
+  >,
+  nowMs?: number,
+): AwaitingMeasurementsInfo | null {
+  const structured = thread.threadState ?? thread.sizeAdvice ?? null;
+  if (structured && structured.state === AWAITING_MEASUREMENTS_STATE) {
+    if (isExpiredIso(structured.expiresAt, nowMs)) return null;
+    return {
+      productCode: structured.productCode,
+      askedCommentId: structured.askedCommentId,
+      expiresAt: structured.expiresAt,
+    };
+  }
+
+  if (thread.autoReply?.state === AWAITING_MEASUREMENTS_STATE) {
+    const expiresAt = thread.autoReply.expiresAt ?? null;
+    if (isExpiredIso(expiresAt, nowMs)) return null;
+    return {
+      productCode: null,
+      askedCommentId: null,
+      expiresAt,
+    };
+  }
+
+  if (thread.awaitingMeasurements === true) {
+    return {
+      productCode: null,
+      askedCommentId: null,
+      expiresAt: null,
+    };
+  }
+
+  return null;
+}
+
+export function formatAwaitingMeasurementsTooltip(
+  info: AwaitingMeasurementsInfo,
+): string {
+  const parts = ["Đang chờ khách gửi chiều cao và cân nặng để tư vấn size"];
+  if (info.productCode && info.productCode.trim().length > 0) {
+    parts.push(`Mã ${info.productCode.trim()}`);
+  }
+  if (info.expiresAt) {
+    parts.push(`Hết hạn lúc ${formatCommentAbsoluteTime(info.expiresAt)}`);
+  }
+  return parts.join(" · ");
 }

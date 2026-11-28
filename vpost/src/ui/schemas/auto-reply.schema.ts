@@ -34,9 +34,19 @@ export const AUTO_REPLY_MODES = ["dry_run", "live"] as const;
 export const AutoReplyModeSchema = z.enum(AUTO_REPLY_MODES);
 export type AutoReplyMode = z.infer<typeof AutoReplyModeSchema>;
 
-export const AUTO_REPLY_INTENTS = ["price", "size", "color"] as const;
+export const AUTO_REPLY_INTENTS = ["price", "size", "color", "size_advice"] as const;
 export const AutoReplyIntentSchema = z.enum(AUTO_REPLY_INTENTS);
 export type AutoReplyIntent = z.infer<typeof AutoReplyIntentSchema>;
+
+/**
+ * Default intents enabled when a Page has no saved setting yet.
+ * `size_advice` is strictly opt-in per Page (`.swarm/specs/size-advice.md`).
+ */
+export const AUTO_REPLY_DEFAULT_INTENTS: readonly AutoReplyIntent[] = [
+  "price",
+  "size",
+  "color",
+] as const;
 
 export const AUTO_REPLY_ACTIONS = ["sent", "would_send", "skipped", "failed"] as const;
 export const AutoReplyActionSchema = z.enum(AUTO_REPLY_ACTIONS);
@@ -73,12 +83,19 @@ export const AUTO_REPLY_INTENT_META: readonly AutoReplyIntentMeta[] = [
     description:
       "Tự động liệt kê các màu đang còn hàng của sản phẩm gắn với bài viết.",
   },
+  {
+    value: "size_advice",
+    label: "Tư vấn size (hỏi chiều cao, cân nặng)",
+    description:
+      "Khi khách nhờ tư vấn size, hệ thống hỏi chiều cao và cân nặng (nếu chưa có) rồi đối chiếu Bảng size với các size còn hàng. Tắt mặc định — cần bật riêng cho từng Fanpage.",
+  },
 ] as const;
 
 export const AUTO_REPLY_INTENT_LABELS: Record<AutoReplyIntent, string> = {
   price: "Giá",
   size: "Size",
   color: "Màu",
+  size_advice: "Tư vấn size",
 };
 
 export const AUTO_REPLY_MODE_LABELS: Record<AutoReplyMode, string> = {
@@ -115,6 +132,9 @@ export const InboxThreadAutoReplySchema = z.object({
     .optional()
     .transform((value) => value ?? null),
   at: z.iso.datetime({ offset: true }),
+  // Optional in zod so parallel backend rollouts may also carry thread state inside autoReply.
+  state: z.string().nullable().optional(),
+  expiresAt: z.iso.datetime({ offset: true }).nullable().optional(),
 });
 export type InboxThreadAutoReply = z.infer<typeof InboxThreadAutoReplySchema>;
 
@@ -129,7 +149,7 @@ export const AutoReplySettingSchema = z.object({
   intents: z
     .array(AutoReplyIntentSchema)
     .optional()
-    .default([...AUTO_REPLY_INTENTS]),
+    .default([...AUTO_REPLY_DEFAULT_INTENTS]),
   hourlyCap: z
     .number()
     .int()
@@ -185,7 +205,7 @@ export const AutoReplySettingUpdateInputSchema = z
         code: "custom",
         path: ["intents"],
         message:
-          "Chọn ít nhất một loại câu hỏi (Giá, Size hoặc Màu) khi bật tự động trả lời.",
+          "Chọn ít nhất một loại câu hỏi (Giá, Size hoặc Màu, Tư vấn size) khi bật tự động trả lời.",
       });
     }
   });

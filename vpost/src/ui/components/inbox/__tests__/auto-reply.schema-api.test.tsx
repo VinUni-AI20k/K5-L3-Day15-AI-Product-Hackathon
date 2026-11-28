@@ -13,8 +13,8 @@ import { useUpdateAutoReplySetting } from "@/ui/hooks/useAutoReply";
 import { useClearThreadAttention } from "@/ui/hooks/useInbox";
 import {
   AUTO_REPLY_DAILY_CAP_DEFAULT,
+  AUTO_REPLY_DEFAULT_INTENTS,
   AUTO_REPLY_HOURLY_CAP_DEFAULT,
-  AUTO_REPLY_INTENTS,
   AUTO_REPLY_LIVE_CONFIRM_COPY,
   AutoReplyLogResponseSchema,
   AutoReplySettingSchema,
@@ -180,11 +180,12 @@ describe("auto-reply & inbox schema backwards compatibility (missing optional fi
       pageName: "Shop A",
       enabled: false,
       mode: "dry_run",
-      intents: [...AUTO_REPLY_INTENTS],
+      intents: [...AUTO_REPLY_DEFAULT_INTENTS],
       hourlyCap: AUTO_REPLY_HOURLY_CAP_DEFAULT,
       dailyCap: AUTO_REPLY_DAILY_CAP_DEFAULT,
       updatedAt: null,
     });
+    expect(minimalSetting.intents).not.toContain("size_advice");
   });
 
   it("parses full attention, autoReply, sentBy, counts.canBan, updates needYou/autoReplied, settings, and log payloads", () => {

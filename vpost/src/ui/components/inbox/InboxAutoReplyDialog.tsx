@@ -63,7 +63,7 @@ export function InboxAutoReplyDialog({
           <div className="inbox-surface-page">
             <DialogHeader
               title="Tự động trả lời"
-              subtitle="Bật tự động trả lời giá, size, màu theo từng Fanpage với chế độ Chạy thử trước khi Chạy thật."
+              subtitle="Bật tự động trả lời giá, size, màu và tư vấn size theo từng Fanpage với chế độ Chạy thử trước khi Chạy thật."
               onOpenChange={(open) => {
                 if (!open) onClose();
               }}

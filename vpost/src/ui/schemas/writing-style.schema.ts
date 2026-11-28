@@ -235,3 +235,264 @@ export function formatWritingStyleDate(iso: string | null): string {
     timeStyle: "short",
   }).format(date);
 }
+
+// --- Size chart contracts (`.swarm/specs/size-advice.md`) -------------------
+
+export const SIZE_CHART_LIMITS = {
+  minRows: 1,
+  maxRows: 12,
+  sizeMaxChars: 20,
+  weightMin: 30,
+  weightMax: 150,
+  heightMin: 120,
+  heightMax: 210,
+  noteMaxChars: 300,
+  categoryMaxChars: 60,
+} as const;
+
+export const SizeChartRangeSchema = z.tuple([z.number().finite(), z.number().finite()]);
+export type SizeChartRange = z.infer<typeof SizeChartRangeSchema>;
+
+export const SizeChartRowSchema = z.object({
+  size: z
+    .string()
+    .trim()
+    .min(1, "Nhập tên size (ví dụ: S, M, L).")
+    .max(
+      SIZE_CHART_LIMITS.sizeMaxChars,
+      `Tên size tối đa ${SIZE_CHART_LIMITS.sizeMaxChars} ký tự.`,
+    ),
+  weightKg: SizeChartRangeSchema,
+  heightCm: SizeChartRangeSchema.nullable()
+    .optional()
+    .transform((value) => value ?? null),
+});
+export type SizeChartRow = z.infer<typeof SizeChartRowSchema>;
+
+export const SizeChartSchema = z.object({
+  rows: z
+    .array(SizeChartRowSchema)
+    .max(SIZE_CHART_LIMITS.maxRows, `Bảng size tối đa ${SIZE_CHART_LIMITS.maxRows} dòng.`),
+  note: z
+    .string()
+    .max(
+      SIZE_CHART_LIMITS.noteMaxChars,
+      `Ghi chú bảng size tối đa ${SIZE_CHART_LIMITS.noteMaxChars} ký tự.`,
+    )
+    .nullable()
+    .optional()
+    .transform((value) => {
+      if (typeof value !== "string") return null;
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }),
+});
+export type SizeChart = z.infer<typeof SizeChartSchema>;
+
+/**
+ * Default Vietnamese women's apparel size chart from `.swarm/specs/size-advice.md`.
+ * Seeded in the UI when the shop has not saved a custom chart yet ("Bảng size mẫu").
+ */
+export const DEFAULT_SIZE_CHART: SizeChart = {
+  rows: [
+    { size: "S", weightKg: [40, 46], heightCm: [145, 155] },
+    { size: "M", weightKg: [46, 52], heightCm: [150, 160] },
+    { size: "L", weightKg: [52, 58], heightCm: [155, 165] },
+    { size: "XL", weightKg: [58, 65], heightCm: [158, 168] },
+    { size: "2XL", weightKg: [65, 72], heightCm: [160, 170] },
+  ],
+  note: null,
+};
+
+export const FREESIZE_GUIDANCE_NOTE =
+  "Sản phẩm ghi Free / Freesize / FS tự động áp dụng mức 40–55 kg.";
+
+export interface SizeChartResponse {
+  readonly tenantId: string | null;
+  readonly category: string | null;
+  readonly chart: SizeChart;
+  /** True when this scope has an operator-saved custom chart on the server. */
+  readonly hasCustomChart: boolean;
+  /** True when showing the built-in sample chart ("Bảng size mẫu") on the default tab. */
+  readonly isSample: boolean;
+  /** True when a category tab currently inherits the company default chart. */
+  readonly isInherited: boolean;
+  /** Optional category override names returned by the backend, if provided. */
+  readonly categories: readonly string[];
+  readonly updatedAt: string | null;
+}
+
+const SizeChartOverrideEntrySchema = z.object({
+  category: z.string().trim().min(1),
+  chart: SizeChartSchema.optional(),
+  sizeChart: SizeChartSchema.optional(),
+  updatedAt: NullableTimestampSchema,
+});
+
+function normalizeCategoryName(raw: string | null | undefined): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (trimmed.length === 0 || trimmed.toLowerCase() === "default") return null;
+  return trimmed;
+}
+
+function collectResponseCategories(
+  categories: readonly string[] | undefined,
+  overrides:
+    | readonly z.infer<typeof SizeChartOverrideEntrySchema>[]
+    | Readonly<Record<string, SizeChart>>
+    | undefined,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (raw: string) => {
+    const normalized = normalizeCategoryName(raw);
+    if (!normalized) return;
+    const key = normalized.toLocaleLowerCase("vi");
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(normalized);
+  };
+
+  for (const item of categories ?? []) {
+    push(item);
+  }
+  if (Array.isArray(overrides)) {
+    for (const entry of overrides) {
+      push(entry.category);
+    }
+  } else if (overrides && typeof overrides === "object") {
+    for (const key of Object.keys(overrides)) {
+      push(key);
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Parses `GET`/`PUT /api/writing-style/size-chart` and
+ * `GET`/`PUT /api/writing-style/size-chart/{category}`.
+ *
+ * New envelope fields are optional in zod so the UI integrates cleanly with
+ * parallel backend rollouts whether the backend wraps the chart under `chart` /
+ * `sizeChart` or returns `{ rows, note }` directly.
+ */
+export const SizeChartResponseSchema: z.ZodType<SizeChartResponse> = z
+  .object({
+    tenantId: z.string().min(1).optional(),
+    category: z.string().nullable().optional(),
+    chart: SizeChartSchema.nullable().optional(),
+    sizeChart: SizeChartSchema.nullable().optional(),
+    effective: SizeChartSchema.nullable().optional(),
+    rows: z.array(SizeChartRowSchema).max(SIZE_CHART_LIMITS.maxRows).optional(),
+    note: z.string().nullable().optional(),
+    isDefault: z.boolean().optional(),
+    isSample: z.boolean().optional(),
+    isInherited: z.boolean().optional(),
+    source: z.string().optional(),
+    categories: z.array(z.string()).optional(),
+    overrides: z
+      .union([
+        z.array(SizeChartOverrideEntrySchema),
+        z.record(z.string(), SizeChartSchema),
+      ])
+      .optional(),
+    updatedAt: NullableTimestampSchema,
+  })
+  .refine(
+    (data) =>
+      data.chart !== undefined ||
+      data.sizeChart !== undefined ||
+      data.effective !== undefined ||
+      data.rows !== undefined ||
+      data.isDefault !== undefined ||
+      data.isSample !== undefined ||
+      data.isInherited !== undefined,
+    { message: "Thiếu dữ liệu bảng size trong phản hồi máy chủ." },
+  )
+  .transform((data): SizeChartResponse => {
+    const category = normalizeCategoryName(data.category);
+    const directNote =
+      typeof data.note === "string" && data.note.trim().length > 0
+        ? data.note.trim()
+        : null;
+    const rawChart: SizeChart | null =
+      data.chart !== undefined && data.chart !== null
+        ? data.chart
+        : data.sizeChart !== undefined && data.sizeChart !== null
+          ? data.sizeChart
+          : data.rows !== undefined
+            ? { rows: data.rows, note: directNote }
+            : null;
+    const effectiveChart =
+      data.effective && data.effective.rows.length > 0 ? data.effective : null;
+
+    const explicitSample =
+      typeof data.isSample === "boolean"
+        ? data.isSample
+        : typeof data.isDefault === "boolean"
+          ? data.isDefault
+          : data.source !== undefined
+            ? data.source === "sample" || data.source === "default"
+            : null;
+
+    const categories = collectResponseCategories(data.categories, data.overrides);
+    const updatedAt = data.updatedAt ?? null;
+
+    if (category === null) {
+      const hasRows = rawChart !== null && rawChart.rows.length > 0;
+      const chart = hasRows
+        ? rawChart
+        : (effectiveChart ?? {
+            rows: DEFAULT_SIZE_CHART.rows.map((row) => ({
+              size: row.size,
+              weightKg: [row.weightKg[0], row.weightKg[1]] as [number, number],
+              heightCm: row.heightCm
+                ? ([row.heightCm[0], row.heightCm[1]] as [number, number])
+                : null,
+            })),
+            note: DEFAULT_SIZE_CHART.note,
+          });
+      const isSample = !hasRows ? true : (explicitSample ?? updatedAt === null);
+      return {
+        tenantId: data.tenantId ?? null,
+        category: null,
+        chart,
+        hasCustomChart: hasRows && !isSample,
+        isSample,
+        isInherited: false,
+        categories,
+        updatedAt,
+      };
+    }
+
+    const hasOwnRows = rawChart !== null && rawChart.rows.length > 0;
+    const isInherited =
+      typeof data.isInherited === "boolean"
+        ? data.isInherited
+        : !hasOwnRows || explicitSample === true;
+    const chart = hasOwnRows
+      ? rawChart
+      : (effectiveChart ?? {
+          rows: DEFAULT_SIZE_CHART.rows.map((row) => ({
+            size: row.size,
+            weightKg: [row.weightKg[0], row.weightKg[1]] as [number, number],
+            heightCm: row.heightCm
+              ? ([row.heightCm[0], row.heightCm[1]] as [number, number])
+              : null,
+          })),
+          note: DEFAULT_SIZE_CHART.note,
+        });
+
+    return {
+      tenantId: data.tenantId ?? null,
+      category,
+      chart,
+      hasCustomChart: hasOwnRows && !isInherited,
+      isSample: false,
+      isInherited,
+      categories,
+      updatedAt,
+    };
+  });

@@ -26,7 +26,7 @@ import schedule
 import store
 import tools
 
-VALID_INTENTS = ("price", "size", "color")
+VALID_INTENTS = ("price", "size", "color", "size_advice")
 _VALID_INTENT_SET = frozenset(VALID_INTENTS)
 LOG_ACTIONS = ("sent", "would_send", "skipped", "failed")
 _LOG_ACTION_SET = frozenset(LOG_ACTIONS)

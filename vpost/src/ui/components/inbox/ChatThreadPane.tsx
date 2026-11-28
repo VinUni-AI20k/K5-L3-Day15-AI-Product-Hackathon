@@ -405,6 +405,7 @@ export function ChatThreadPane({
         <ChatHeader
           thread={thread}
           firstMessageAt={firstMessageAt}
+          nowMs={nowMs}
           readOnlyReason={readOnlyReason}
           isTogglingIgnore={isTogglingIgnore}
           showBackButton={showBackButton}
