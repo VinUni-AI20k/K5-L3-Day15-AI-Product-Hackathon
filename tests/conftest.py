@@ -6,6 +6,9 @@ import psycopg
 from psycopg import sql
 import pytest
 
+# Tests use the sample pages from data/pages.json as channel fixtures.
+os.environ.setdefault("VPOST_DEMO_PAGES", "1")
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CODEBASE = os.path.join(ROOT, "codebase")
 if CODEBASE not in sys.path:

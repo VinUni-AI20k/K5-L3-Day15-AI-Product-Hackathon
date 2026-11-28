@@ -98,8 +98,10 @@ def channels_list():
     if fb and not any(c["externalId"] == fb[0] for c in out):
         out.append({"channelId": FB_CHANNEL, "platform": "facebook", "externalId": fb[0], "status": "active",
                     "name": os.environ.get("FB_PAGE_NAME", "Fanpage thử (Facebook thật)"), "tokenExpiresAt": None})
-    out += [{"channelId": p["id"], "platform": "facebook", "name": p["name"] + " (chỉ lịch trong app)",
-             "externalId": p["id"], "status": "active", "tokenExpiresAt": None} for p in tools.PAGES.values()]
+    # Sample pages from data/pages.json are listed only when VPOST_DEMO_PAGES=1 (eval still uses the file).
+    if os.environ.get("VPOST_DEMO_PAGES", "").strip() == "1":
+        out += [{"channelId": p["id"], "platform": "facebook", "name": p["name"] + " (chỉ lịch trong app)",
+                 "externalId": p["id"], "status": "active", "tokenExpiresAt": None} for p in tools.PAGES.values()]
     statuses = store.channel_statuses()
     for c in out:
         c["status"] = statuses.get(c["channelId"], "active")
