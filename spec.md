@@ -7,7 +7,7 @@ Theo danh sách phân phòng, nhóm hiển thị là **404 ERROR**, đội **#5*
 
 Track E · Tài chính · Nhật ký chi tiêu cá nhân
 
-**Thay đổi đề tài:** Đổi từ Track D (Thương mại điện tử) ở CP1 sang Track E (Tài chính cá nhân), với lát cắt ghi khoản chi từ ảnh hóa đơn sau một lần bấm Chốt.
+**Lịch sử chọn track.** Nhóm chọn Track D (Thương mại điện tử) ban đầu rồi cập nhật CP1 sang Track E (Tài chính cá nhân). Ở CP2, nhóm thêm bước xem nhanh và bấm Chốt trước khi lưu khoản chi vào lịch. [Lát cắt ở bản CP1 đã sửa](README.md#cp1)
 
 ## §0. Hiện tại việc này diễn ra thế nào *(guide 1.1)*
 
@@ -40,8 +40,11 @@ Track E · Tài chính · Nhật ký chi tiêu cá nhân
 - **Một điều đáng né:** Tự động lưu khi đọc sai số tiền hoặc ghi thiếu/trùng gây lệch tổng (12/500 review ở hai app nêu lỗi ghi thiếu, trùng hoặc sai tổng), và thiếu chế độ xem chi tiết từng ngày (*“không hiện được từng ngày cụ thể”* — Money Lover · 147).
 - **Mình khác gì (theo pain 1.2):** Tập trung đúng một lát cắt: chụp một hóa đơn → xem nhanh số thực trả và ngày chi → bấm Chốt một lần (dùng mã lượt chụp chống cộng trùng), ảnh mờ đẩy sang **Cần đọc lại**, và chạm ngày trên lịch mở ngay từng khoản kèm ảnh hóa đơn gốc.
 
+<a id="lat-cat"></a>
 ## §4. Thiết kế *(guide 2.2, 3.2)*
-- **Lát cắt dự kiến:** Khi người dùng chụp một hóa đơn, AI đọc ngày mua và số tiền thực trả rồi phân loại khoản chi để người dùng xem nhanh và bấm Chốt một lần trước khi khoản chi xuất hiện trên lịch.
+
+- **Lát cắt MỘT CÂU** (1 người dùng · 1 việc · 1 quyết định AI · 1 kết quả). Khi người ghi chi tiêu cá nhân chụp một hóa đơn, AI chọn nhóm chi dựa trên nội dung hóa đơn để họ có một khoản chi trên lịch sau khi bấm Chốt.
+
 **Hình dạng: workflow cố định.** Các bước đọc ảnh, kiểm số tiền, xem nhanh, chốt và tổng hợp diễn ra theo thứ tự. Ở CP2, văn bản OCR giả đi qua đúng luồng CLI. Đọc ảnh và màn hình lịch dành cho bản tiếp theo.
 
 ```mermaid
@@ -113,7 +116,7 @@ flowchart TD
 ## §7. Đánh giá & chuẩn "đạt" *(guide 2.4, 4.1)*
 - Data Card: `data/DATA_CARD.md`. Benchmark CP2 có **20 câu** (8 thường, 8 khó, 4 từ chối) và **4 metric**. Có 7/20 tình huống chuyển thể từ review công khai (35%); giá, ngày và sổ mẫu là giả lập.
 - **Chuẩn đạt CP2 — đội trưởng đã xác nhận ngày 27/11/2026:** ít nhất **85% câu đạt**. Ca nhập đủ dữ liệu phải hiển thị đúng ngày và tổng thực trả, chỉ ghi sau khi Chốt, ca truy vấn ngày/tuần/tháng/năm có dữ liệu phải khớp số liệu, ca thiếu căn cứ không được ghi sai và **100% câu từ chối** phải từ chối đúng. Với 20 câu hiện tại, 85% tương đương **ít nhất 17/20 câu**. Giữ nguyên chuẩn sau khi nộp CP2.
-- Kết quả: lượt 1 __/__ (__%) · lượt 2 __/__ (__%) — run ID: __ / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
+- Kết quả: lượt 1 **20/20 (100%)** (thường 8/8 · khó 8/8 · từ chối 4/4, model `gpt-5.4-nano-2026-03-17`) · lượt 2 __/__ (__%) — run ID: `run-1@20261128-095527` / __ → chi tiết `eval/report.md`, hồ sơ `eval/README.md`
 
 ## §8. Chi phí khi dùng thật *(guide 4.2)*
 - Persona + giá: `cost/personas.yaml` · lượt mô phỏng: `cost/simulate-__.csv` (__ phiên)
@@ -136,7 +139,8 @@ flowchart TD
 
 | Thời điểm | Đổi gì | Vì sao (trỏ về câu thử / lỗi / bằng chứng nào) |
 |---|---|---|
-|  |  |  |
+| 28/11/2026 | Khôi phục nhãn Canvas theo mẫu, ghi rõ lát cắt Track E của CP1 và bước Chốt được thêm ở CP2. | Đối chiếu bản CP1 đã sửa tại commit `9cef839` và luồng Chốt tại commit `0cea24c`. |
+| 28/11/2026 (CP4, cải tiến trước lượt 2) | Đọc ảnh: OCR cục bộ ONNX (PP-OCRv3 + VieSVTR v7, trọng số Vũ đóng gói) thay Tesseract; model chỉ được gọi khi OCR chưa ra tổng; đọc được dòng tổng bị OCR gộp với "Tổng số lượng"; thước đo `check_ocr.py` chỉ chấm số đầy đủ trong nhãn. Commit `f1b47fd`, `99c0d91`, `c797c7c`. | Nhóm lỗi 1 "Cần đọc lại oan" (`eval/report.md` §2). 40 ảnh MC-OCR: trước `eval/image-check-before.jsonl` 25 đúng · 2 sai · 13 Cần đọc lại → sau `eval/image-check-after.jsonl` 35 đúng · 1 sai · 3 Cần đọc lại; token đọc ảnh 44.816 → 5.415. |
 
 **Sau CP4 (đến 23:59 Thứ Bảy 28/11)** (sửa theo góp ý — không sửa chuẩn "đạt", câu thử, số bằng chứng, kết quả các lượt đã chạy)
 

@@ -1,26 +1,39 @@
 # 404ERROR · Nhật ký chi tiêu từ ảnh
 
-**Lớp L3A · Track E (Tài chính).** [Thành viên](TEAMS.md) · [Canvas CP1](canvas.md)
+**Lớp L3A · Track E (Tài chính).** [Thành viên](TEAMS.md) · [Lát cắt CP1](#cp1) · [Canvas cập nhật CP2](canvas.md)
 
 **Bài toán dự kiến.** Người muốn theo dõi chi tiêu hằng ngày phải nhập lại thông tin từ từng hóa đơn, nên dễ bỏ sót khoản chi và mất thời gian khi xem lại đã tiêu vào đâu.
 
-**Lát cắt dự kiến.** Khi người dùng chụp một hóa đơn, AI đọc ngày mua và số tiền thực trả rồi phân loại khoản chi để người dùng xem nhanh và bấm Chốt một lần trước khi khoản chi xuất hiện trên lịch.
+**Lát cắt hiện tại (Track E).** Khi người ghi chi tiêu cá nhân chụp một hóa đơn, AI chọn nhóm chi dựa trên nội dung hóa đơn để họ có một khoản chi trên lịch sau khi bấm Chốt. [Canvas dòng 5](canvas.md) · [Thiết kế chi tiết trong spec §4](spec.md#lat-cat)
 
 **Trải nghiệm demo.** **Chụp hóa đơn → xem nhanh số tiền, ngày và nhóm chi → bấm Chốt.** App lưu và cập nhật lịch sau khi chốt. Chạm một ngày để xem tổng; chọn **Xem thêm** để mở từng khoản. **+** mở camera để ghi khoản mới. Kết quả tháng tính từ các khoản đã ghi.
 
 **Thiết kế giao diện.** Lịch tháng ưu tiên điện thoại với ô ngày hiện số tiền. Chạm ngày mở bảng tổng hợp và nút **Xem thêm**. Dùng bố cục và nhận diện riêng cho nhật ký chi tiêu.
 
-**Thay đổi đề tài.** Đổi từ Track D (Thương mại điện tử) ở CP1 sang Track E (Tài chính cá nhân), với lát cắt ghi khoản chi từ ảnh hóa đơn sau một lần bấm Chốt. Thực hiện theo mục đổi track của đề.
+**Lịch sử chọn track.** Nhóm chọn Track D (Thương mại điện tử) ban đầu rồi cập nhật CP1 sang Track E (Tài chính cá nhân).
 
-**Chạy thử CP2.** `python3 run.py check` kiểm bảng thành viên và bộ câu thử. Chạy `MODEL_PROVIDER=fake python3 run.py`, nhập ba dòng lần lượt:
+**Chạy thử (CP3).** Web và `answer()` dùng chung quy tắc (`tools.py`, `agent.choose_category`) và chung một sổ `CSDL/receipts.json` (khởi tạo từ `data/expenses.json`). Eval/simulate dùng sổ tạm riêng, mỗi câu một bản sao `data/expenses.json`, nên không đụng sổ thật.
 
-```text
-Chụp hóa đơn: Cửa hàng Mẫu | Ngày: 2026-11-27 | Tổng thanh toán: 55.000đ
-Chốt
-Ấn xem ngày 2026-11-27
+Cách 1 — Docker (khuyên dùng, đủ thư viện OCR):
+
+```bash
+docker compose up --build                                   # web: http://localhost:8080
+docker compose run --rm app python run.py eval --try        # mọi lệnh run.py chạy được như vậy
+docker compose run --rm app sh -c "cd codebase && python check_ocr.py --truth ../data/receipts/mcocr_sample_40.csv ../data/receipts/images/*.jpg"
 ```
 
-Đầu vào là văn bản OCR mô phỏng. Nếu đọc sai, có thể nhập `Sửa tiền: 50.000đ` hoặc `Sửa nhóm: Ăn uống` trước khi gõ Chốt. Khi xem báo cáo, có thể nhập `Xem tuần 2026-W47`, `Xem năm 2026` hoặc `So sánh tuần 2026-W47 với kỳ trước`. Sau khi gõ Chốt, CLI lưu khoản vào SQLite trong `data/runtime/` và lần tra sau thấy tổng đã cập nhật. Dùng biến `RECEIPT_JOURNAL` để chọn một sổ mới cho lần demo riêng. Phần camera, lịch bấm và model thật chưa được triển khai.
+Cách 2 — máy có sẵn Python 3.10+: `pip install -r requirements.txt` rồi `python run.py`.
+
+Model thật: tạo `.env` (`MODEL_PROVIDER`, `MODEL_NAME`, `API_KEY` — xem `docs/connect-model.md`), không commit. Đọc ảnh: OCR cục bộ ONNX (PP-OCRv3 + VieSVTR v7, trọng số trong `backend/weights/ocr-1/ppocrv3-viesvtr-v7/` — nguồn, SHA-256 và giấy phép trong `manifest.json`; VieSVTR là **CC-BY-NC-4.0, chỉ dùng học thuật/phi thương mại**). Model chỉ được gọi để đọc lại ảnh mà OCR cục bộ chưa ra số thực trả, và số đó phải có trong chữ OCR. Đo trên 40 ảnh mẫu: `python codebase/check_ocr.py --model --truth data/receipts/mcocr_sample_40.csv data/receipts/images/*.jpg`.
+
+Kiểm 3 ca ghép luồng (ảnh rõ → Chốt lưu đúng · ảnh mờ → Cần đọc lại, không đổi tổng · chụp lại cùng ảnh → không cộng trùng):
+
+```bash
+SKYBILL_STORAGE_DIR=/tmp/csdl-thu SKYBILL_NO_BROWSER=1 python run.py &
+python codebase/check_flow.py http://127.0.0.1:8080 data/receipts/images/mcocr_public_145013tupze.jpg
+```
+
+CLI văn bản (`python codebase/app.py --cli`) nhận `Chụp hóa đơn: … | Tổng thanh toán: 55.000đ`, `Sửa tiền: 50.000đ`, `Sửa nhóm: Ăn uống`, `Chốt`, `Ấn xem ngày 2026-11-27`, `Xem tuần 2026-W47`, `So sánh tuần 2026-W47 với kỳ trước`.
 
 ## Dùng AI vào việc gì
 
@@ -73,7 +86,10 @@ Bài của nhóm phải cân bằng hai nửa: **tư duy sản phẩm** (đúng 
 - Vẫn nộp phần đã có và khai thật phần còn thiếu.
 - Tự soát trước khi nộp: bước guide ghi ở từng mốc.
 
+<a id="cp1"></a>
 ### CP1 · 17:00 Thứ Sáu 27/11 · 3 điểm
+
+**Lát cắt dự kiến ở CP1 (Track E, Canvas dòng 5 tại commit `9cef839`).** Khi người dùng chụp một hóa đơn, AI đọc ngày mua và số tiền thực trả rồi phân loại khoản chi để ứng dụng tự lưu khoản chi vào lịch, giúp người dùng xem tổng tiền và từng khoản theo ngày.
 
 - `TEAMS.md` điền đủ thành viên + mã học viên, **đúng format** (đội trưởng ở dòng 1).
 - Track (A–F) + bài toán của nhóm trong 1–2 câu: ai, đang làm gì, vướng ở đâu. Không viết chữ AI. Track F kèm thẻ đề.
@@ -84,6 +100,8 @@ Bài của nhóm phải cân bằng hai nửa: **tư duy sản phẩm** (đúng 
 Tự soát: [guide 1.4](02-guide.md#b1-4) · **Link nộp CP1:** `________` *(BTC cập nhật)*
 
 ### CP2 · 19:30 Thứ Sáu 27/11 · 4 điểm
+
+Nhóm thêm bước xem nhanh và bấm **Chốt** trước khi lưu khoản chi. [Canvas CP2](canvas.md)
 
 - Canvas cập nhật + 1–3 dòng "đã đổi gì so với CP1".
 - Nguồn bằng chứng đang làm (đào data / phỏng vấn / khảo sát) và đã làm đến đâu.

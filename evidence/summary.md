@@ -11,7 +11,7 @@
 - **Thói quen với hóa đơn:** `16/24 (66,7%)` bỏ luôn không giữ lại; `3/24 (12,5%)` giữ dồn cuối tuần/tháng mới cộng; `2/24 (8,3%)` chụp ảnh để đó rồi quên xem lại.
 - **Điểm vướng chính (chọn nhiều):** `17/24 (70,8%)` chi tiêu rải rác khó gom theo từng ngày; `13/24 (54,2%)` quên khoản tiền mặt trong ngày; `12/24 (50,0%)` ngại nhập tay từng dòng hóa đơn vì tốn thời gian; `16/24 (66,7%)` tốn thời gian lục lại ảnh và lịch sử chuyển khoản.
 - **Lý do bỏ app quản lý chi tiêu:** `14/24 (58,3%)` hay quên nhập ngay lúc mua, tối về không nhớ nổi; `11/24 (45,8%)` phải nhập tay quá nhiều thao tác mỗi lần chi.
-- **Trích dẫn nguyên văn (ẩn danh):** *“Lười ghi một cái rồi quên bẵng đi, muốn dò lại thì ngại.”* · *“Mình hay quên nhập ngay lúc mua, tối về không nhớ hết các khoản tiền mặt nên dễ bỏ dở sau vài ngày.”* · *“Tốn thời gian tìm các mục chuyển khoản, nghĩ xem đã tiêu gì”* · *“quá nhiều khoản nhỏ lẻ, và t có thói quen hay ăn vặt, hay mua nước ngọt.”*
+- **Trích dẫn nguyên văn (ẩn danh, 6 câu, chép từ cột câu hỏi mở trong [results.csv](survey/results.csv)):** *“Lười ghi một cái rồi quên bẵng đi, muốn dò lại thì ngại.”* · *“Mình hay quên nhập ngay lúc mua, tối về không nhớ hết các khoản tiền mặt nên dễ bỏ dở sau vài ngày.”* · *“Tốn thời gian tìm các mục chuyển khoản, nghĩ xem đã tiêu gì”* · *“quá nhiều khoản nhỏ lẻ, và t có thói quen hay ăn vặt, hay mua nước ngọt.”* · *“Tốn thời gian ngồi nhớ lại / lục lại ảnh và lịch sử chuyển khoản”* · *“bị lười ghi, hay trì hoàn sang ngày tiếp theo”*
 
 ## Lịch phỏng vấn kiểm chứng CP3
 
