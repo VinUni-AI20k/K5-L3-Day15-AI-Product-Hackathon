@@ -25,12 +25,18 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 
 # --- build: Next.js standalone output ---------------------------------------
 FROM base AS build
+# Next.js evaluates next.config.ts rewrites() at build time and freezes them
+# into .next/standalone/server.js + .next/routes-manifest.json. Defaulting
+# VPOST_API_URL here ensures the containerised `web` image proxies /api/*
+# (except Next-owned routes) to the sibling Python `api` service.
+ARG VPOST_API_URL=http://api:8021
 # NODE_OPTIONS: `next build` type-checks the whole project in one process and
 # blows past Node's default old-space cap (~2 GB), dying with "Ineffective
 # mark-compacts near heap limit" — which reads like a hang, not a limit. 4 GB
 # fits a GitHub-hosted runner and an 8 GB Docker Desktop alike.
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    NODE_OPTIONS=--max-old-space-size=4096
+    NODE_OPTIONS=--max-old-space-size=4096 \
+    VPOST_API_URL=${VPOST_API_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build && test -f .next/standalone/server.js
@@ -74,7 +80,7 @@ CMD ["pnpm", "db:migrate"]
 # --- worker: BullMQ consumer -------------------------------------------------
 FROM base AS worker
 ENV NODE_ENV=production \
-    WORKER_HEARTBEAT_FILE=/tmp/mysp-worker-heartbeat
+    WORKER_HEARTBEAT_FILE=/tmp/vpost-worker-heartbeat
 # ffmpeg carries ffprobe, which the media adapter shells out to for video specs
 # (E5.3 contract: the probe expects `ffprobe` in PATH). Only the worker needs it —
 # the web image stays small because it never touches a media file.
@@ -89,7 +95,7 @@ USER node
 # Liveness without an HTTP port: the worker refreshes a heartbeat file every
 # WORKER_HEARTBEAT_INTERVAL_MS (default 15s). A blocked event loop stops it.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "const fs=require('node:fs');const p=process.env.WORKER_HEARTBEAT_FILE||'/tmp/mysp-worker-heartbeat';const age=Date.now()-fs.statSync(p).mtimeMs;if(age>60000){console.error('heartbeat stale '+age+'ms');process.exit(1);}"
+  CMD node -e "const fs=require('node:fs');const p=process.env.WORKER_HEARTBEAT_FILE||'/tmp/vpost-worker-heartbeat';const age=Date.now()-fs.statSync(p).mtimeMs;if(age>60000){console.error('heartbeat stale '+age+'ms');process.exit(1);}"
 # `node --import tsx` runs the loader IN-PROCESS: the worker is PID 1 and gets
 # SIGTERM directly (the tsx CLI would fork a child and swallow the signal).
 CMD ["node", "--import", "tsx", "src/worker/index.ts"]

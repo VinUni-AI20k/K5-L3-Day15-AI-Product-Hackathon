@@ -244,58 +244,6 @@ export interface PromptStore {
   }): Promise<PromptTemplate | null>;
 }
 
-/**
- * A stored template row. `PromptTemplate` is what the gateway renders;
- * this adds the bookkeeping the admin screen (E10.7) needs.
- */
-export interface PromptTemplateRecord extends PromptTemplate {
-  /** Human label of the version, e.g. "Tết 2027 voice". */
-  name: string;
-  /** Variable names found in the body when it was saved (UI hint + audit). */
-  variables: readonly string[];
-  createdBy: string | null;
-  createdAt: string;
-}
-
-export interface PromptTemplateQuery {
-  tenantId: TenantId;
-  task: AITask;
-  platform: string;
-}
-
-export interface NewPromptTemplate extends PromptTemplateQuery {
-  id: string;
-  name: string;
-  version: number;
-  systemPrompt: string;
-  userPromptTemplate: string;
-  variables: readonly string[];
-  changelog: string;
-  createdBy?: string | null;
-  /** Activating on create is one transaction: no window with two active rows. */
-  activate: boolean;
-}
-
-/**
- * Versioned prompt storage (docs/ai/prompt-versioning.md §1). Rows are
- * IMMUTABLE: there is no update method on purpose — editing means a new
- * version, so every past generation still points at the exact text used.
- */
-export interface PromptTemplateRepo {
-  /** Newest version first. */
-  listVersions(query: PromptTemplateQuery): Promise<readonly PromptTemplateRecord[]>;
-  getActive(query: PromptTemplateQuery): Promise<PromptTemplateRecord | null>;
-  getVersion(query: PromptTemplateQuery & { version: number }): Promise<PromptTemplateRecord | null>;
-  /** Highest stored version, 0 when the tenant has none yet. */
-  maxVersion(query: PromptTemplateQuery): Promise<number>;
-  /** Throws INVALID_INPUT (reason PROMPT_VERSION_TAKEN) on a version collision. */
-  create(input: NewPromptTemplate): Promise<PromptTemplateRecord>;
-  /** Atomically makes `version` the only active row. null = version not found. */
-  activate(
-    query: PromptTemplateQuery & { version: number },
-  ): Promise<PromptTemplateRecord | null>;
-}
-
 // ---------------------------------------------------------------------------
 // GenerationLog — one row per attempt (docs/ai/prompt-versioning.md §2)
 // ---------------------------------------------------------------------------

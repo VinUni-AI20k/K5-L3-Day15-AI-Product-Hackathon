@@ -26,8 +26,8 @@ function silentLogger(): Logger {
 }
 
 const clock: Clock = {
-  now: () => new Date("2026-08-20T05:00:00Z"),
-  nowMs: () => new Date("2026-08-20T05:00:00Z").getTime(),
+  now: () => new Date("2054-08-20T05:00:00Z"),
+  nowMs: () => new Date("2054-08-20T05:00:00Z").getTime(),
 };
 
 function harness(overrides: Partial<InviteRepo> = {}) {
@@ -115,7 +115,7 @@ describe("createInvite — the token", () => {
       }),
     );
     // 7-day TTL from the clock.
-    expect(created.expiresAt).toEqual(new Date("2026-08-27T05:00:00Z"));
+    expect(created.expiresAt).toEqual(new Date("2054-08-27T05:00:00Z"));
   });
 });
 

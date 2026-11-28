@@ -17,6 +17,10 @@ import {
   type UploadCatalogFileResponse,
 } from "@/ui/schemas/catalog.schema";
 import {
+  ProductDetailResponseSchema,
+  type ProductDetailResponse,
+} from "@/ui/schemas/product-detail.schema";
+import {
   RunSyncResponseSchema,
   SyncStatusResponseSchema,
   type RunSyncResponse,
@@ -54,6 +58,9 @@ export const catalogKeys = {
   /** Derived from the SAME filter object the URL produced — no second source. */
   products: (tenantKey: string, filter: ProductFilter) =>
     ["catalog", tenantKey, "products", filter.status ?? "all", filter.q ?? ""] as const,
+  /** Shares the `["catalog", tenantKey, "products"]` prefix so source/file invalidations clear it too. */
+  productDetail: (tenantKey: string, code: string) =>
+    ["catalog", tenantKey, "products", "detail", code] as const,
 };
 
 export async function fetchSyncStatus(signal?: AbortSignal): Promise<SyncStatusResponse> {
@@ -252,6 +259,28 @@ export async function listCatalogProducts(
     signal,
     malformedMessage:
       "Danh sách sản phẩm trả về không đúng định dạng. Hãy báo quản trị viên kiểm tra máy chủ.",
+  });
+}
+
+export async function fetchCatalogProductDetail(
+  code: string,
+  signal?: AbortSignal,
+): Promise<ProductDetailResponse> {
+  const normalized = code.trim();
+  if (normalized.length === 0) {
+    throw new ApiError({
+      code: "INVALID_INPUT",
+      status: 0,
+      message: "fetchCatalogProductDetail requires a non-empty product code",
+      userMessage: "Mã sản phẩm không hợp lệ.",
+    });
+  }
+
+  return apiRequest(`/api/catalog/products/${encodeURIComponent(normalized)}`, {
+    schema: ProductDetailResponseSchema,
+    signal,
+    malformedMessage:
+      "Chi tiết sản phẩm trả về không đúng định dạng. Hãy báo quản trị viên kiểm tra máy chủ.",
   });
 }
 

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 /**
  * The `/posts` hub was the last screen still hand-rolling its page container
  * (`<div className="space-y-6">` inside a `max-w-5xl` wrapper on the page),
- * while `/channels`, `/members`, `/bulk` and `/prompts` all stand in an Astryx
+ * while `/channels`, `/members` and `/bulk` all stand in an Astryx
  * `Layout` with a full-width header band (spec §3.2 — khung màn thống nhất).
  *
  * Two invariants, and the second one is a trap this repo has now been bitten by
@@ -74,14 +74,5 @@ describe("/posts page: the frame belongs to the hub, not to the route", () => {
   it("keeps the fallback on the same column as the loaded frame", () => {
     expect(page).toMatch(/mx-auto w-full max-w-5xl[^"]*px-6 py-4/);
     expect(page).toMatch(/mx-auto w-full max-w-5xl[^"]*px-6 py-8/);
-  });
-});
-
-describe("/prompts page: same split", () => {
-  const page = stripComments(readSource("../../../../app/(app)/prompts/page.tsx"));
-
-  it("renders the screen with no container of its own", () => {
-    expect(page).toMatch(/return <PromptTemplatesScreen \/>;/);
-    expect(page).not.toMatch(/max-w-5xl/);
   });
 });

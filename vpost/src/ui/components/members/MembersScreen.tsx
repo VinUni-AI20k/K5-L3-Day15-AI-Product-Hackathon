@@ -5,12 +5,12 @@ import {
   Button,
   Divider,
   EmptyState,
-  HStack,
   Heading,
   Stack,
   StackItem,
   Text,
 } from "@astryxdesign/core";
+import { Users } from "lucide-react";
 import { useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
@@ -136,12 +136,10 @@ export function MembersScreen({
       {/* The live region is ALWAYS mounted, empty most of the time: a region
           that appears together with its text is announced unreliably
           (web-feedback-states §4). */}
-      <Stack
-        direction="vertical"
+      <div
         role="status"
         aria-live="polite"
-        paddingInline={4}
-        paddingBlock={outcome ? 3 : 0}
+        className={outcome ? "px-4 pt-4 sm:px-6" : "px-4 sm:px-6"}
       >
         {outcome ? (
           <Banner
@@ -152,55 +150,62 @@ export function MembersScreen({
             description={outcome}
           />
         ) : null}
-      </Stack>
+      </div>
 
       {/* A refused write belongs next to the table it was aimed at — 403 (thiếu
           quyền) and 409 LAST_OWNER both land here, never as a toast that
           disappears before it is read. */}
       {updateRole.isError ? (
-        <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
+        <div className="px-4 pt-4 sm:px-6">
           <ApiErrorNotice error={updateRole.error} />
-        </Stack>
+        </div>
       ) : null}
       {remove.isError ? (
-        <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
+        <div className="px-4 pt-4 sm:px-6">
           <ApiErrorNotice error={remove.error} />
-        </Stack>
+        </div>
       ) : null}
 
       {showInvites ? (
-        <Stack direction="vertical" padding={4}>
+        <div className="px-4 py-6 sm:px-6">
           <InvitePanel actorRole={actorRole} />
-        </Stack>
+        </div>
       ) : null}
       {showInvites ? <Divider /> : null}
 
-      <HStack gap={3} paddingInline={4} paddingBlock={3} align="center" wrap="wrap">
-        {/* h2: the hub above owns the page's h1 (core-accessibility §1). */}
-        <Heading level={2}>Danh sách thành viên</Heading>
-        {/* Only once the list is real: "0 thành viên" while loading reads as an
-            answer, and an admin would act on it. */}
-        {members.data ? (
-          <Text type="supporting" role="status" aria-live="polite">
-            {items.length} thành viên
-          </Text>
-        ) : null}
-        <Button
-          variant="secondary"
-          size="sm"
-          label={members.isFetching ? "Đang tải…" : "Tải lại"}
-          isDisabled={members.isFetching}
-          onClick={() => void members.refetch()}
-        />
-        {/* Said once, above the rows: it explains every disabled button below
-            before the operator hovers one to find out. */}
+      <div className="space-y-2 px-4 py-4 sm:px-6 sm:py-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-baseline gap-3">
+            {/* h2: the hub above owns the page's h1 (core-accessibility §1). */}
+            <Heading level={2}>Danh sách thành viên</Heading>
+            {/* Only once the list is real: "0 thành viên" while loading reads as an
+                answer, and an admin would act on it. */}
+            {members.data ? (
+              <Text type="supporting" color="secondary" role="status" aria-live="polite">
+                {items.length} thành viên
+              </Text>
+            ) : null}
+          </div>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            label={members.isFetching ? "Đang tải…" : "Tải lại"}
+            isDisabled={members.isFetching}
+            onClick={() => void members.refetch()}
+          />
+        </div>
+
+        {/* Said once, directly below the heading: explains every disabled row
+            button before the operator hovers one to find out, without crowding
+            the heading and reload button onto one awkward line. */}
         {isResolved && !canManageMembers(actorRole) ? (
-          <Text type="supporting">
+          <Text type="supporting" color="secondary" className="max-w-prose">
             Vai trò của bạn ({actorRole ? MEMBERSHIP_ROLE_LABELS[actorRole] : "không rõ"}) chỉ xem
             được danh sách {tenant?.name ?? "công ty này"}.
           </Text>
         ) : null}
-      </HStack>
+      </div>
 
       <StackItem size="fill">
         <MemberListBody
@@ -252,9 +257,9 @@ function MemberListBody({
   // --- Error, with nothing to fall back on ---------------------------------
   if (isError && items.length === 0) {
     return (
-      <Stack direction="vertical" padding={4}>
+      <div className="px-4 pb-6 sm:px-6">
         <ApiErrorNotice error={error} onRetry={onRetry} />
-      </Stack>
+      </div>
     );
   }
 
@@ -262,14 +267,24 @@ function MemberListBody({
   // an empty list is a symptom, not a starting point.
   if (items.length === 0) {
     return (
-      <Stack direction="vertical" padding={4}>
-        <EmptyState
-          headingLevel={3}
-          title="Danh sách thành viên đang trống"
-          description="Kể cả bạn cũng không có trong danh sách, nên nhiều khả năng máy chủ trả về thiếu. Tải lại; nếu vẫn trống, báo quản trị viên hệ thống."
-          actions={<Button variant="secondary" label="Tải lại" onClick={onRetry} />}
-        />
-      </Stack>
+      <div className="px-4 pb-6 sm:px-6">
+        <div className="border-border bg-card rounded-xl border p-6">
+          <EmptyState
+            headingLevel={3}
+            icon={
+              <span
+                aria-hidden="true"
+                className="bg-accent text-accent-foreground inline-flex size-10 items-center justify-center rounded-lg"
+              >
+                <Users className="size-5" />
+              </span>
+            }
+            title="Danh sách thành viên đang trống"
+            description="Kể cả bạn cũng không có trong danh sách, nhiều khả năng máy chủ trả về thiếu — thử tải lại hoặc báo quản trị viên."
+            actions={<Button variant="secondary" label="Tải lại" onClick={onRetry} />}
+          />
+        </div>
+      </div>
     );
   }
 
@@ -280,32 +295,25 @@ function MemberListBody({
   return (
     <Stack direction="vertical" height="100%">
       {isError ? (
-        <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
+        <div className="px-4 pb-4 sm:px-6">
           <Banner
             status="warning"
             title="Danh sách bên dưới có thể đã cũ — chưa làm mới được"
             description={`${presentApiError(toApiError(error)).description} Những gì đang hiện là kết quả của lần tải gần nhất; hãy thử lại trước khi đổi quyền của ai.`}
             endContent={<Button variant="secondary" size="sm" label="Thử lại" onClick={onRetry} />}
           />
-        </Stack>
+        </div>
       ) : null}
 
-      {/* `paddingInline={4}` — the column every other block on this screen
-          stands in, the "Danh sách thành viên" heading included. Measured at
-          1440 in the T11 inspect round: the table started at x=256 against a
-          heading at x=272 and ran off the right edge of the window. Same shape
-          of miss, same fix, as the company table on /platform. */}
       <StackItem size="fill">
-        <Stack direction="vertical" height="100%" paddingInline={4}>
-          <MemberTable
-            members={items}
-            actorRole={actorRole}
-            busyMembershipId={busyMembershipId}
-            onChangeRole={onChangeRole}
-            onRemove={onRemove}
-            resetPassword={resetPassword}
-          />
-        </Stack>
+        <MemberTable
+          members={items}
+          actorRole={actorRole}
+          busyMembershipId={busyMembershipId}
+          onChangeRole={onChangeRole}
+          onRemove={onRemove}
+          resetPassword={resetPassword}
+        />
       </StackItem>
     </Stack>
   );

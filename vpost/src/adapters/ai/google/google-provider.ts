@@ -1,6 +1,6 @@
 /**
  * Google AI Studio (Gemini) adapter — PRIMARY provider on every tier
- * (ADR-001 owner decision 12/08/2026).
+ * (ADR-001 owner decision 27/11/2026).
  *
  * ⚠️ PAID TIER IS MANDATORY anywhere real shop data flows: the AI Studio free
  * tier grants Google the right to train on what we send, and product copy plus

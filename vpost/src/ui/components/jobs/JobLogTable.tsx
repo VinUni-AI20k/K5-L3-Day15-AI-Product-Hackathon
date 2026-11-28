@@ -9,6 +9,10 @@ import {
   channelSentenceName,
 } from "@/ui/components/channels/channel-option-labels";
 import { ChannelNameCell } from "@/ui/components/channels/ChannelNameCell";
+import {
+  DEFAULT_INBOX_URL_STATE,
+  buildInboxUrl,
+} from "@/ui/components/inbox/inbox-filters";
 import { JobStatusBadge } from "@/ui/components/post/PostStatusBadge";
 import { ColorChip } from "@/ui/components/posts/ColorChip";
 import { FoldToggle } from "@/ui/components/posts/FoldToggle";
@@ -135,12 +139,15 @@ function JobLogRows({
 
   return (
     <>
-      <tr data-row="job" className="align-top transition-colors hover:bg-accent/20">
+      <tr
+        data-row="job"
+        className="hover:bg-muted/40 align-top transition-colors duration-150 ease-out"
+      >
         {/* Timestamp */}
-        <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+        <td className="text-muted-foreground px-4 py-3.5 font-mono text-xs whitespace-nowrap tabular-nums">
           <div>{formatDateTime(job.updatedAt)}</div>
           {isFolded && !sameHour && (
-            <span className="text-[10px] text-muted-foreground/70 block">
+            <span className="text-muted-foreground mt-0.5 block text-xs">
               (mới nhất)
             </span>
           )}
@@ -149,17 +156,17 @@ function JobLogRows({
         {/* Product Code — the row's header: without `scope="row"` a status cell
             read on its own does not say which post it belongs to. */}
         <th scope="row" className="px-4 py-3.5 text-left">
-          <div className="flex flex-col gap-0.5">
-            <span className="font-mono text-xs font-bold text-foreground">
+          <div className="flex flex-col gap-1">
+            <span className="text-foreground font-mono text-sm font-semibold">
               {job.productCode}
             </span>
             {job.productOrigin === "manual" && (
-              <span className="inline-block font-mono text-[10px] text-turmeric-deep">
+              <span className="bg-warning/10 text-warning-foreground inline-flex w-fit items-center rounded-full px-2 py-0.5 font-mono text-xs font-medium">
                 {MANUAL_PRODUCT_BADGE}
               </span>
             )}
             {isFolded && (
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-muted-foreground text-xs font-normal">
                 {foldCountLabel(group)}
               </span>
             )}
@@ -182,7 +189,7 @@ function JobLogRows({
               srSuffix={` của bài ${job.productCode}`}
             />
           ) : (
-            <div className="font-medium text-foreground">
+            <div className="text-foreground font-medium">
               <ChannelNameCell channelId={job.channelId} label={channelLabels.get(job.channelId)} />
             </div>
           )}
@@ -194,7 +201,7 @@ function JobLogRows({
         </td>
 
         {/* Attempt count */}
-        <td className="px-4 py-3.5 text-center font-mono text-xs tabular-nums text-muted-foreground">
+        <td className="text-muted-foreground px-4 py-3.5 text-center font-mono text-xs tabular-nums">
           {job.attemptCount}
         </td>
 
@@ -203,11 +210,11 @@ function JobLogRows({
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <p
-                className={`text-xs leading-relaxed max-w-xl ${
+                className={`max-w-xl text-sm leading-relaxed ${
                   job.status === "published"
-                    ? "font-medium text-foreground"
+                    ? "text-foreground font-medium"
                     : job.status === "failed" || job.status === "blocked"
-                      ? "text-madder"
+                      ? "text-destructive"
                       : "text-muted-foreground"
                 }`}
               >
@@ -233,21 +240,21 @@ function JobLogRows({
             <div className="flex flex-wrap items-center gap-2 pt-0.5">
               {/* Direct Facebook Link */}
               {!isFolded && <PublishedLink job={job} />}
+              {!isFolded && <CommentsLink job={job} />}
 
               {/* Batch link */}
               <Link
                 href={`/batches/${encodeURIComponent(job.batchId)}`}
-                className="inline-flex items-center gap-1 rounded-md border border-border/80 bg-muted/40 px-2 py-0.5 font-mono text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="border-border bg-muted/60 text-foreground hover:bg-muted focus-visible:ring-ring inline-flex min-h-8 items-center gap-1 rounded-lg border px-2.5 py-1 font-mono text-xs font-medium transition-colors duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 title="Mở chi tiết lô đăng"
               >
                 <span>Xem lô</span>
               </Link>
 
               {/* The error code is what an operator reads out to support, so it
-                  keeps the body text size and the full-strength muted ink rather
-                  than the 10px/80% it was shrunk to. */}
+                  keeps a readable caption size and full-strength secondary ink. */}
               {job.lastErrorCode && (
-                <span className="font-mono text-xs text-muted-foreground">
+                <span className="text-muted-foreground font-mono text-xs">
                   Mã lỗi: {job.lastErrorCode}
                 </span>
               )}
@@ -258,29 +265,30 @@ function JobLogRows({
 
       {/* Expanded Folded Members */}
       {isFolded && (
-        <tr className="bg-muted/20 border-t" hidden={!isOpen}>
-          <td id={detailId} colSpan={7} className="px-6 py-3">
-            <div className="flex flex-col gap-2.5 rounded-lg border border-border/80 bg-card p-3.5 shadow-xs">
-              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Danh sách chi tiết {group.channelCount} kênh của bài này:
-              </span>
-              <ul className="divide-y divide-border/40">
+        <tr className="bg-muted/30 border-border border-t" hidden={!isOpen}>
+          <td id={detailId} colSpan={7} className="px-4 py-3 sm:px-6">
+            <div className="border-border bg-card flex flex-col gap-3 rounded-lg border p-4">
+              <p className="text-foreground text-sm font-medium">
+                Danh sách chi tiết {group.channelCount} kênh của bài này
+              </p>
+              <ul className="divide-border/60 divide-y">
                 {group.members.map((member) => (
                   <li
                     key={member.postJobId}
                     className="flex flex-wrap items-center justify-between gap-3 py-2.5 first:pt-1 last:pb-1"
                   >
                     <div className="flex flex-wrap items-center gap-3">
-                      <div className="min-w-44 font-medium text-xs text-foreground">
+                      <div className="text-foreground min-w-44 text-sm font-medium">
                         <ChannelNameCell
                           channelId={member.channelId}
                           label={channelLabels.get(member.channelId)}
                         />
                       </div>
-                      <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                      <span className="text-muted-foreground font-mono text-xs tabular-nums">
                         {formatDateTime(member.updatedAt)}
                       </span>
                       <PublishedLink job={member} />
+                      <CommentsLink job={member} />
                     </div>
 
                     {member.canRetry && (
@@ -312,11 +320,25 @@ function PublishedLink({ job }: { job: PostJobLogEntry }) {
       href={link}
       target="_blank"
       rel="noreferrer noopener"
-      className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+      className="bg-accent text-accent-foreground focus-visible:ring-ring inline-flex min-h-8 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-opacity duration-150 ease-out outline-none hover:opacity-85 focus-visible:ring-2 focus-visible:ring-offset-2"
     >
       <span>Mở trên Facebook</span>
-      <ExternalLink className="size-3" />
+      <ExternalLink aria-hidden="true" className="size-3.5" />
     </a>
+  );
+}
+
+function CommentsLink({ job }: { job: PostJobLogEntry }) {
+  if (job.status !== "published" || !job.publishedPostId?.trim()) return null;
+
+  return (
+    <Link
+      href={buildInboxUrl({ ...DEFAULT_INBOX_URL_STATE, postJobId: job.postJobId })}
+      className="border-border bg-muted/60 text-foreground hover:bg-muted focus-visible:ring-ring inline-flex min-h-8 items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+      title="Xem bình luận của bài đăng này"
+    >
+      <span>Xem bình luận</span>
+    </Link>
   );
 }
 
@@ -358,15 +380,15 @@ function RetryAction({
 }) {
   if (job.canRetry && readOnlyReason) {
     return (
-      <div className="flex items-center gap-1.5">
-        <Button type="button" size="sm" variant="outline" disabled className="text-xs h-7">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" variant="secondary" disabled className="min-h-10 text-xs sm:min-h-8">
           Chạy lại
           <span className="sr-only">
             {" "}
             bài {job.productCode} trên kênh {channelName}
           </span>
         </Button>
-        <span className="text-xs text-muted-foreground">{readOnlyReason}</span>
+        <span className="text-muted-foreground text-xs">{readOnlyReason}</span>
       </div>
     );
   }
@@ -376,12 +398,15 @@ function RetryAction({
       <Button
         type="button"
         size="sm"
-        variant="outline"
+        variant="secondary"
         disabled={isRetrying}
         onClick={() => onRetry(job.postJobId)}
-        className="gap-1 text-xs h-7"
+        className="min-h-10 gap-1.5 px-3 text-xs sm:min-h-8"
       >
-        <RotateCcw className={`size-3 ${isRetrying ? "animate-spin" : ""}`} />
+        <RotateCcw
+          aria-hidden="true"
+          className={`size-3.5 ${isRetrying ? "motion-safe:animate-spin" : ""}`}
+        />
         <span>{isRetrying ? "Đang xếp hàng…" : "Chạy lại"}</span>
         <span className="sr-only"> bài {job.productCode} trên kênh {channelName}</span>
       </Button>

@@ -31,8 +31,8 @@ function silentLogger(): Logger {
 }
 
 const clock: Clock = {
-  now: () => new Date("2026-08-21T05:00:00Z"),
-  nowMs: () => new Date("2026-08-21T05:00:00Z").getTime(),
+  now: () => new Date("2054-08-21T05:00:00Z"),
+  nowMs: () => new Date("2054-08-21T05:00:00Z").getTime(),
 };
 
 function harness(options: { takenSlugs?: string[]; rows?: PlatformTenantListItem[] } = {}) {
@@ -69,7 +69,7 @@ function harness(options: { takenSlugs?: string[]; rows?: PlatformTenantListItem
   return { usecase, platformTenants, invites, createdSlugs };
 }
 
-const ACTOR = { actorAccountId: "acc-root", actorEmail: "root@mysp.vn" };
+const ACTOR = { actorAccountId: "acc-root", actorEmail: "root@vpost.vn" };
 
 // --- Edge cases first ---------------------------------------------------------
 
@@ -99,15 +99,15 @@ describe("platform createTenant — the handover flow", () => {
 
     expect(result.tenant).toMatchObject({ id: TENANT, slug: "khach-a", plan: "standard" });
     expect(result.ownerInviteToken).toBe("p".repeat(64));
-    expect(result.inviteExpiresAt).toEqual(new Date("2026-08-28T05:00:00Z")); // 7 days
+    expect(result.inviteExpiresAt).toEqual(new Date("2054-08-28T05:00:00Z")); // 7 days
     expect(invites.createInvite).toHaveBeenCalledWith({
       tenantId: TENANT,
       role: "owner",
       tokenHash: `hash:${"p".repeat(64)}`,
-      expiresAt: new Date("2026-08-28T05:00:00Z"),
+      expiresAt: new Date("2054-08-28T05:00:00Z"),
       maxUses: 1,
       createdByAccountId: "acc-root",
-      actorEmail: "root@mysp.vn",
+      actorEmail: "root@vpost.vn",
     });
   });
 
@@ -118,9 +118,9 @@ describe("platform createTenant — the handover flow", () => {
     expect(result.tenant.slug).toBe("khach-a-ff00");
   });
 
-  it("passes the plan through (internal allowed for MYSP's own)", async () => {
+  it("passes the plan through (internal allowed for VPOST's own)", async () => {
     const { usecase, platformTenants } = harness();
-    await usecase.createTenant({ name: "MYSP Nội bộ", plan: "internal", ...ACTOR });
+    await usecase.createTenant({ name: "VPOST Nội bộ", plan: "internal", ...ACTOR });
     expect(platformTenants.createTenant).toHaveBeenCalledWith(
       expect.objectContaining({ plan: "internal" }),
     );
@@ -159,7 +159,7 @@ const row = (over: Partial<PlatformTenantListItem> = {}): PlatformTenantListItem
   plan: "standard",
   status: "active",
   memberCount: 1,
-  createdAt: new Date("2026-08-21T05:00:00Z"),
+  createdAt: new Date("2054-08-21T05:00:00Z"),
   survey: null,
   ...over,
 });
@@ -179,7 +179,7 @@ describe("platform listTenants — the survey aggregate", () => {
       rows: [
         row({ survey: null }),
         row({ survey: { sellerKind: null, currentTools: null, channelCount: null, focusChannels: null, completedAt: null } }),
-        row({ survey: { sellerKind: null, currentTools: [], channelCount: null, focusChannels: [], completedAt: new Date("2026-08-26T10:00:00Z") } }),
+        row({ survey: { sellerKind: null, currentTools: [], channelCount: null, focusChannels: [], completedAt: new Date("2054-08-26T10:00:00Z") } }),
       ],
     });
 

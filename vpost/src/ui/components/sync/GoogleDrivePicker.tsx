@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
@@ -192,7 +193,7 @@ export function GoogleDrivePicker({
           Kết nối Google không còn hiệu lực nên không đọc được Drive nữa. Hãy kết nối lại ở khối
           phía trên, rồi chọn thư mục và bảng.
         </p>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="secondary" className="min-h-10 px-4" onClick={onCancel}>
           Đóng
         </Button>
       </div>
@@ -239,7 +240,12 @@ export function GoogleDrivePicker({
                   title="Không có thư mục nào khớp"
                   description={`Không tìm thấy thư mục nào có tên chứa “${folderQuery}”.`}
                   action={
-                    <Button type="button" variant="outline" onClick={() => setFolderSearch("")}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="min-h-10 px-4"
+                      onClick={() => setFolderSearch("")}
+                    >
                       Xoá từ khoá
                     </Button>
                   }
@@ -255,11 +261,17 @@ export function GoogleDrivePicker({
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" onClick={chooseFolder} disabled={isAtRoot}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="min-h-10 px-4"
+              onClick={chooseFolder}
+              disabled={isAtRoot}
+            >
               Chọn thư mục này
             </Button>
             <LoadMoreButton query={folders} label="Tải thêm thư mục" />
-            <Button type="button" variant="ghost" onClick={onCancel}>
+            <Button type="button" variant="ghost" className="min-h-10 px-3.5" onClick={onCancel}>
               Huỷ
             </Button>
           </div>
@@ -302,7 +314,12 @@ export function GoogleDrivePicker({
                   title="Không có bảng nào khớp"
                   description={`Không tìm thấy bảng Google Sheet nào có tên chứa “${sheetQuery}”.`}
                   action={
-                    <Button type="button" variant="outline" onClick={() => setSheetSearch("")}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="min-h-10 px-4"
+                      onClick={() => setSheetSearch("")}
+                    >
                       Xoá từ khoá
                     </Button>
                   }
@@ -319,10 +336,15 @@ export function GoogleDrivePicker({
 
           <div className="flex flex-wrap items-center gap-2">
             <LoadMoreButton query={spreadsheets} label="Tải thêm bảng" />
-            <Button type="button" variant="outline" onClick={() => setStep("folder")}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="min-h-10 px-4"
+              onClick={() => setStep("folder")}
+            >
               Quay lại thư mục
             </Button>
-            <Button type="button" variant="ghost" onClick={onCancel}>
+            <Button type="button" variant="ghost" className="min-h-10 px-3.5" onClick={onCancel}>
               Huỷ
             </Button>
           </div>
@@ -347,10 +369,15 @@ export function GoogleDrivePicker({
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" onClick={() => setStep("spreadsheet")}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="min-h-10 px-4"
+              onClick={() => setStep("spreadsheet")}
+            >
               Chọn bảng khác
             </Button>
-            <Button type="button" variant="ghost" onClick={onCancel}>
+            <Button type="button" variant="ghost" className="min-h-10 px-3.5" onClick={onCancel}>
               Huỷ
             </Button>
           </div>
@@ -380,7 +407,7 @@ export function GoogleDrivePicker({
               onKeyDown={(event) => {
                 if (event.key === "Escape") setIsConfirming(false);
               }}
-              className="border-warning/40 bg-warning/5 space-y-3 rounded-xl border p-4"
+              className="border-warning/30 bg-warning/10 space-y-3 rounded-xl border p-4"
             >
               <p className="text-sm font-medium">Lưu nguồn dữ liệu cho đơn vị này?</p>
               <p className="text-muted-foreground text-sm">
@@ -388,10 +415,21 @@ export function GoogleDrivePicker({
                 lại. Lần đồng bộ kế tiếp sẽ xoá sản phẩm/ảnh không còn thuộc nguồn mới.
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button ref={confirmRef} type="button" onClick={save}>
+                <Button
+                  ref={confirmRef}
+                  type="button"
+                  variant="secondary"
+                  className="min-h-10 px-4"
+                  onClick={save}
+                >
                   Lưu nguồn
                 </Button>
-                <Button type="button" variant="outline" onClick={() => setIsConfirming(false)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="min-h-10 px-3.5"
+                  onClick={() => setIsConfirming(false)}
+                >
                   Xem lại
                 </Button>
               </div>
@@ -400,6 +438,8 @@ export function GoogleDrivePicker({
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
+                variant="secondary"
+                className="min-h-10 px-4"
                 onClick={() => setIsConfirming(true)}
                 disabled={update.isPending}
               >
@@ -407,7 +447,8 @@ export function GoogleDrivePicker({
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
+                className="min-h-10 px-4"
                 onClick={restart}
                 disabled={update.isPending}
               >
@@ -416,6 +457,7 @@ export function GoogleDrivePicker({
               <Button
                 type="button"
                 variant="ghost"
+                className="min-h-10 px-3.5"
                 onClick={onCancel}
                 disabled={update.isPending}
               >
@@ -461,19 +503,20 @@ function StepIndicator({ step }: { step: PickerStep }) {
               aria-current={index === current ? "step" : undefined}
               className={
                 index === current
-                  ? "text-foreground font-medium"
+                  ? "text-foreground font-semibold"
                   : index < current
                     ? "text-muted-foreground"
-                    : "text-muted-foreground/70"
+                    : "text-foreground-subtle"
               }
             >
               {index + 1}. {item.label}
               {index < current ? <span className="sr-only"> (đã chọn xong)</span> : null}
             </span>
             {index < STEP_LABELS.length - 1 ? (
-              <span aria-hidden="true" className="text-muted-foreground/50">
-                ›
-              </span>
+              <ChevronRight
+                aria-hidden="true"
+                className="text-foreground-subtle size-3.5 shrink-0"
+              />
             ) : null}
           </li>
         ))}
@@ -508,7 +551,7 @@ function FolderBreadcrumb({
                   type="button"
                   variant="link"
                   size="sm"
-                  className="h-auto px-0"
+                  className="text-accent-foreground h-auto px-0"
                   onClick={() => onNavigate(item)}
                 >
                   {label}
@@ -574,6 +617,7 @@ function SearchField({
         aria-describedby={hintId}
         autoComplete="off"
         spellCheck={false}
+        className="h-10"
       />
       <p id={hintId} className="text-muted-foreground text-xs">
         {hint}
@@ -641,7 +685,8 @@ function LoadMoreButton({ query, label }: { query: ListQueryLike; label: string 
   return (
     <Button
       type="button"
-      variant="outline"
+      variant="secondary"
+      className="min-h-10 px-4"
       onClick={() => void query.fetchNextPage()}
       disabled={query.isFetchingNextPage}
     >
@@ -686,7 +731,7 @@ function TabListBody({
         title="Bảng này không đọc được tab nào"
         description="Có thể bảng vừa bị đổi quyền chia sẻ, hoặc đây không phải bảng Google Sheet. Hãy chọn bảng khác."
         action={
-          <Button type="button" variant="outline" onClick={onBack}>
+          <Button type="button" variant="secondary" className="min-h-10 px-4" onClick={onBack}>
             Chọn bảng khác
           </Button>
         }

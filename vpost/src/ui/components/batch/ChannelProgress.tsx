@@ -41,7 +41,7 @@ export function ChannelProgress({
   const showLabel = progress.label !== statusMessage;
 
   return (
-    <div className="border-border/70 mt-2 space-y-1.5 rounded-lg border border-dashed px-2.5 py-2">
+    <div className="border-border bg-sidebar mt-2 space-y-2 rounded-xl border border-dashed px-3 py-2.5">
       <ProgressStepper
         steps={steps}
         currentIndex={progress.stepIndex}

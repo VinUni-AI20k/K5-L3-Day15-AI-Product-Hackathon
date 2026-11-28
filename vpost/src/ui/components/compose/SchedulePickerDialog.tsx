@@ -42,15 +42,18 @@ export function SchedulePickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md p-6 gap-5 rounded-2xl border border-border shadow-xl">
+      <DialogContent className="border-border bg-popover max-w-md gap-5 rounded-2xl border p-6 shadow-[var(--shadow-pop)]">
         <DialogHeader className="gap-2 text-left">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
-              <CalendarClock className="size-5" />
+          <div className="flex items-start gap-3">
+            <div
+              aria-hidden="true"
+              className="bg-accent text-accent-foreground flex size-10 shrink-0 items-center justify-center rounded-xl"
+            >
+              <CalendarClock className="size-5" aria-hidden="true" />
             </div>
-            <div>
-              <DialogTitle className="text-base font-bold">Hẹn lịch đăng bài</DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
+            <div className="min-w-0 space-y-1">
+              <DialogTitle className="text-lg font-semibold">Hẹn lịch đăng bài</DialogTitle>
+              <DialogDescription className="text-muted-foreground text-sm leading-relaxed">
                 Chọn ngày và giờ bạn muốn bài viết tự động xuất bản lên các kênh đã chọn.
               </DialogDescription>
             </div>
@@ -60,7 +63,7 @@ export function SchedulePickerDialog({
         <div className="flex flex-col gap-3 py-1">
           <ScheduleTimeField
             id="compose-schedule-time"
-            label="Ngày & Giờ hẹn đăng"
+            label="Ngày & giờ hẹn đăng"
             value={choice.value}
             onChange={choice.setValue}
             disabled={disabled}
@@ -70,11 +73,11 @@ export function SchedulePickerDialog({
           />
         </div>
 
-        <DialogFooter className="flex items-center justify-end gap-2.5 pt-2 border-t border-border/60">
+        <DialogFooter className="border-border flex items-center justify-end gap-2.5 border-t pt-4">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="h-10 cursor-pointer rounded-xl border border-input bg-card px-4 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all outline-none"
+            className="border-border bg-secondary text-secondary-foreground hover:bg-muted focus-visible:ring-ring focus-visible:ring-offset-background h-10 cursor-pointer rounded-lg border px-4 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
           >
             Thoát
           </button>
@@ -83,7 +86,7 @@ export function SchedulePickerDialog({
             type="button"
             disabled={!isValid || disabled}
             onClick={handleConfirm}
-            className="flex h-10 cursor-pointer items-center justify-center rounded-xl bg-primary px-5 text-xs font-bold text-primary-foreground shadow-xs transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed outline-none"
+            className="bg-primary text-primary-foreground focus-visible:ring-ring focus-visible:ring-offset-background flex h-10 cursor-pointer items-center justify-center rounded-lg px-5 text-sm font-medium shadow-[var(--shadow-button)] transition-colors duration-150 outline-none hover:bg-[var(--button-primary-hover-bg)] focus-visible:ring-2 focus-visible:ring-offset-2 active:bg-[var(--button-primary-pressed-bg)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Tiếp tục
           </button>

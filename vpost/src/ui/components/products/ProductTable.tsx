@@ -1,6 +1,17 @@
 "use client";
 
-import { Button, HStack, Stack, StatusDot, Table, Text, pixel, proportional } from "@astryxdesign/core";
+import {
+  Button,
+  HStack,
+  Stack,
+  StatusDot,
+  Table,
+  Text,
+  Tooltip,
+  pixel,
+  proportional,
+  useMediaQuery,
+} from "@astryxdesign/core";
 import type { TableColumn } from "@astryxdesign/core";
 
 import { stockCellText } from "@/ui/components/inventory/stock-check";
@@ -8,14 +19,9 @@ import { productStatus } from "@/ui/components/products/product-status";
 import { formatMediaCounts, type CatalogProduct } from "@/ui/schemas/catalog.schema";
 
 /**
- * The catalog as the operator sees it: which codes can be posted, and for the
- * rest, WHY not (business rule 5 — nothing is silently skipped).
- *
- * The "why" is deliberately NOT in the table. The shadcn version repeated the
- * same domain sentence in both the stock and the publish column, which cost half
- * the row width and made every row three lines tall. The reason now lives once,
- * in the inspector panel, and the row carries only what an operator scans:
- * status, code, name, category, stock, media count.
+ * The catalog as the operator sees it: which codes can be posted, core product
+ * attributes for quick fact-checking (giá bán, size, màu, chất liệu), and for
+ * blocked rows, why not (business rule 5 — nothing is silently skipped).
  *
  * `composable` is decided by the SERVER. The UI never re-derives it from stock +
  * photo counts: the day the rule changes (a video-only code, a new block), a
@@ -29,6 +35,48 @@ import { formatMediaCounts, type CatalogProduct } from "@/ui/schemas/catalog.sch
 /** Table's generic needs an index signature; the fields stay CatalogProduct's. */
 type ProductRow = CatalogProduct & Record<string, unknown>;
 
+function TruncatedCell({
+  value,
+  emptyLabel = "—",
+  color = "primary",
+  alignEnd = false,
+  tabular = false,
+}: {
+  value: string | null | undefined;
+  emptyLabel?: string;
+  color?: "primary" | "secondary";
+  alignEnd?: boolean;
+  tabular?: boolean;
+}) {
+  const trimmed = value?.trim() ?? "";
+  if (trimmed.length === 0) {
+    return (
+      <span className={alignEnd ? "block w-full text-right" : "block w-full"}>
+        <Text color="placeholder">{emptyLabel}</Text>
+      </span>
+    );
+  }
+
+  return (
+    <Tooltip content={trimmed} focusTrigger="always" placement="above" hasHoverIndication={false}>
+      <span
+        tabIndex={0}
+        title={trimmed}
+        aria-label={trimmed}
+        className={
+          alignEnd
+            ? "block w-full truncate rounded-xs text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            : "block w-full truncate rounded-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        }
+      >
+        <Text color={color} hasTabularNumbers={tabular}>
+          {trimmed}
+        </Text>
+      </span>
+    </Tooltip>
+  );
+}
+
 export function ProductTable({
   items,
   selectedCode,
@@ -38,11 +86,13 @@ export function ProductTable({
   selectedCode: string | null;
   onSelect: (code: string) => void;
 }) {
+  const isNarrow = useMediaQuery("(max-width: 1024px)");
+
   const columns: TableColumn<ProductRow>[] = [
     {
       key: "code",
       header: "Mã SP",
-      width: pixel(210),
+      width: pixel(isNarrow ? 164 : 184),
       renderCell: (product) => {
         const status = productStatus(product);
         const isSelected = selectedCode === product.code;
@@ -59,7 +109,7 @@ export function ProductTable({
                 aria-pressed alone would leave sighted users guessing. */}
             <Button
               variant={isSelected ? "secondary" : "ghost"}
-              size="sm"
+              size={isNarrow ? "md" : "sm"}
               label={product.code}
               aria-pressed={isSelected}
               onClick={() => onSelect(product.code)}
@@ -72,18 +122,42 @@ export function ProductTable({
       key: "name",
       header: "Tên sản phẩm",
       width: proportional(2),
-      renderCell: (product) =>
-        product.name.trim().length > 0 ? (
-          <Text>{product.name}</Text>
-        ) : (
-          <Text color="placeholder">(trống trên Sheet)</Text>
-        ),
+      renderCell: (product) => (
+        <TruncatedCell value={product.name} emptyLabel="(trống trên Sheet)" color="primary" />
+      ),
     },
     {
       key: "category",
       header: "Chủng loại",
       width: proportional(1),
-      renderCell: (product) => <Text color="secondary">{product.category ?? "—"}</Text>,
+      renderCell: (product) => <TruncatedCell value={product.category} color="secondary" />,
+    },
+    {
+      key: "price",
+      header: "Giá bán",
+      width: pixel(128),
+      align: "end",
+      renderCell: (product) => (
+        <TruncatedCell value={product.price} color="primary" alignEnd tabular />
+      ),
+    },
+    {
+      key: "sizes",
+      header: "Size",
+      width: pixel(120),
+      renderCell: (product) => <TruncatedCell value={product.sizes} color="secondary" />,
+    },
+    {
+      key: "colors",
+      header: "Màu",
+      width: pixel(148),
+      renderCell: (product) => <TruncatedCell value={product.colors} color="secondary" />,
+    },
+    {
+      key: "material",
+      header: "Chất liệu",
+      width: pixel(160),
+      renderCell: (product) => <TruncatedCell value={product.material} color="secondary" />,
     },
     {
       key: "stock",
@@ -102,11 +176,11 @@ export function ProductTable({
        */
       renderCell: (product) =>
         product.inventory.stockCheckSkipped ? (
-          <Text>{stockCellText(product.inventory)}</Text>
+          <Text hasTabularNumbers>{stockCellText(product.inventory)}</Text>
         ) : product.inventory.stock === null ? (
           <Text color="placeholder">—</Text>
         ) : (
-          <Text>{stockCellText(product.inventory)}</Text>
+          <Text hasTabularNumbers>{stockCellText(product.inventory)}</Text>
         ),
     },
     {
@@ -114,7 +188,7 @@ export function ProductTable({
       header: "Ảnh / video",
       width: pixel(140),
       renderCell: (product) => (
-        <Text color="secondary">
+        <Text color="secondary" hasTabularNumbers>
           {formatMediaCounts(product.mediaImageCount, product.mediaVideoCount)}
         </Text>
       ),
@@ -122,7 +196,7 @@ export function ProductTable({
   ];
 
   return (
-    <Stack direction="vertical" isScrollable height="100%">
+    <Stack direction="vertical" isScrollable height="100%" className="min-w-0 max-w-full scroll-cue-x">
       <Table
         data={items as ProductRow[]}
         columns={columns}

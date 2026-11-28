@@ -39,17 +39,10 @@ describe("isNavItemActive", () => {
     expect(isNavItemActive("/parent/child", "/parent/child")).toBe(true);
   });
 
-  it("lights exactly one row inside the platform group (M3.4)", () => {
+  it("lights the platform row on /platform", () => {
     const platform = NAV_SECTIONS.find((section) => section.title === "Nền tảng");
     const items = platform?.items ?? [];
-    expect(items).toHaveLength(2);
-
-    // The whole point of `isExact` on "/platform": standing on the appearance
-    // screen must not light "Công ty khách" too.
-    const litOnAppearance = items.filter((item) =>
-      isNavItemActive("/platform/appearance", item.href, { exact: item.isExact }),
-    );
-    expect(litOnAppearance.map((item) => item.href)).toEqual(["/platform/appearance"]);
+    expect(items).toHaveLength(1);
 
     const litOnRoot = items.filter((item) =>
       isNavItemActive("/platform", item.href, { exact: item.isExact }),
@@ -59,7 +52,7 @@ describe("isNavItemActive", () => {
 });
 
 describe("NAV_SECTIONS", () => {
-  it("has the wave-1 IA plus onboarding and appearance: 5 visible groups, 12 destinations, platform gated", () => {
+  it("has the wave-1 IA plus onboarding and writing-style: 5 visible groups, 12 destinations, platform gated", () => {
     const sections = visibleNavSections({ hasPlatformRole: true });
     expect(sections.map((s) => s.title)).toEqual([
       "Bàn làm việc",
@@ -70,27 +63,43 @@ describe("NAV_SECTIONS", () => {
       "Nền tảng",
     ]);
     expect(sections.flatMap((s) => s.items.map((i) => i.href))).toEqual([
-      "/",
+      "/overview",
       "/compose",
       "/bulk",
       "/posts",
+      "/comments",
       "/products",
       "/sync",
-      // Onboarding phase 1: teaching MYSP the shape of a customer's own
+      // Onboarding phase 1: teaching VPOST the shape of a customer's own
       // spreadsheet is a "Dữ liệu" job, and it is a destination of its own
       // rather than a tab of /sync — a salesperson opens it during a call.
       "/data-mapping",
       "/channels",
-      "/prompts",
+      "/writing-style",
       "/members",
       "/platform",
-      "/platform/appearance",
     ]);
+  });
+
+  it("places Phong cách viết in the Cài đặt group alongside Kênh and Thành viên", () => {
+    const flat = flattenNavItems();
+    expect(flat).toContainEqual({
+      href: "/writing-style",
+      label: "Phong cách viết",
+      section: "Cài đặt",
+    });
   });
 
   it("no longer routes retired destinations", () => {
     const hrefs = flattenNavItems().map((i) => i.href);
-    for (const legacy of ["/scheduled", "/jobs", "/channels/groups", "/access"]) {
+    for (const legacy of [
+      "/scheduled",
+      "/jobs",
+      "/channels/groups",
+      "/access",
+      "/platform/appearance",
+      "/prompts",
+    ]) {
       expect(hrefs).not.toContain(legacy);
     }
   });
@@ -120,7 +129,7 @@ describe("toSearchKey", () => {
   });
 
   it("handles text with no diacritics and the empty string", () => {
-    expect(toSearchKey("Mẫu prompt")).toBe("mau prompt");
+    expect(toSearchKey("plain text")).toBe("plain text");
     expect(toSearchKey("")).toBe("");
   });
 

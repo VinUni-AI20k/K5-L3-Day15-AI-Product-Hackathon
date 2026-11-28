@@ -16,7 +16,7 @@ import { AppError } from "@/core/domain/errors";
  * hiding it is how a stuck schedule stays invisible (business rule 5).
  *
  * `from`/`to` are INSTANTS (ISO), not days: the browser owns the operator's
- * timezone and converts "cả ngày 13/08" into the two instants that bound it.
+ * timezone and converts "cả ngày 27/11" into the two instants that bound it.
  */
 
 const ROUTE = "GET /api/posts/scheduled";

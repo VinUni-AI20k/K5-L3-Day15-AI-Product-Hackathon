@@ -230,14 +230,14 @@ export function FieldMapForm({
     <div className="flex flex-col gap-6">
       {/* Top Banner Status */}
       {hasStoredMap ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-border/80 bg-card p-3.5 shadow-xs">
+        <div className="border-border bg-card flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
           <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="size-4 text-leaf-deep shrink-0" />
-            <span className="text-sm font-medium text-foreground">
+            <CheckCircle2 className="text-success-foreground size-4 shrink-0" aria-hidden="true" />
+            <span className="text-foreground text-sm font-medium">
               Đang hiển thị cấu hình ánh xạ đã lưu của đơn vị này.
             </span>
           </div>
-          <span className="font-mono text-xs text-muted-foreground tabular-nums">
+          <span className="text-muted-foreground font-mono text-xs tabular-nums">
             {mappedCount}/8 trường đã gán
           </span>
         </div>
@@ -263,14 +263,14 @@ export function FieldMapForm({
 
       {/* Price Safety Warning Gate */}
       {warnings.length > 0 ? (
-        <div className="rounded-lg border border-turmeric/50 bg-turmeric/10 p-4">
+        <div className="border-warning/30 bg-warning/10 rounded-xl border p-5">
           <div className="flex items-start gap-3">
-            <AlertCircle className="mt-0.5 size-5 text-turmeric-deep shrink-0" />
+            <AlertCircle className="text-warning-foreground mt-0.5 size-5 shrink-0" aria-hidden="true" />
             <div className="flex flex-col gap-2">
-              <h4 className="text-sm font-semibold text-turmeric-deep">
+              <h4 className="text-warning-foreground text-sm font-semibold">
                 Phát hiện cột có vẻ là GIÁ TIỀN đang gán vào trường Caption
               </h4>
-              <p className="text-xs text-foreground/80 leading-relaxed">
+              <p className="text-foreground text-sm leading-relaxed">
                 {warnings.map((issue) => issue.message).join(" ")}
               </p>
               <div className="mt-1">
@@ -291,63 +291,65 @@ export function FieldMapForm({
       ) : null}
 
       {/* Navigation Tabs Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-        <div className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-muted/30 p-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab("mapping")}
-            className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-medium transition-all ${
-              activeTab === "mapping"
-                ? "bg-card text-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Layers className="size-3.5" />
-            <span>1. Ánh xạ cột</span>
-            <span
-              className={`rounded-full px-1.5 py-0.2 font-mono text-[10px] ${
-                requiredMapped
-                  ? "bg-leaf/15 text-leaf-deep"
-                  : "bg-madder/15 text-madder"
+      <div className="border-border flex flex-col gap-3 border-b pb-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="overflow-x-auto pb-1 sm:pb-0">
+          <div className="border-border bg-sidebar inline-flex min-w-max items-center gap-1 rounded-lg border p-1.5">
+            <button
+              type="button"
+              onClick={() => setActiveTab("mapping")}
+              className={`focus-visible:ring-ring flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-offset-2 motion-safe:transition-colors motion-safe:duration-150 motion-safe:ease-out ${
+                activeTab === "mapping"
+                  ? "bg-card text-foreground font-semibold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground active:bg-muted"
               }`}
             >
-              {mappedCount}/8
-            </span>
-          </button>
+              <Layers className="size-4 shrink-0" aria-hidden="true" />
+              <span>1. Ánh xạ cột</span>
+              <span
+                className={`rounded-full px-2 py-0.5 font-mono text-xs font-medium ${
+                  requiredMapped
+                    ? "bg-success/15 text-success-foreground"
+                    : "bg-destructive/10 text-destructive"
+                }`}
+              >
+                {mappedCount}/8
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("stock")}
-            className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-medium transition-all ${
-              activeTab === "stock"
-                ? "bg-card text-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Boxes className="size-3.5" />
-            <span>2. Quy tắc tồn kho</span>
-            <span className="rounded-full bg-muted px-1.5 py-0.2 font-mono text-[10px] text-muted-foreground">
-              {STOCK_POLICY_LABELS[stockForm.mode]}
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("stock")}
+              className={`focus-visible:ring-ring flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-offset-2 motion-safe:transition-colors motion-safe:duration-150 motion-safe:ease-out ${
+                activeTab === "stock"
+                  ? "bg-card text-foreground font-semibold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground active:bg-muted"
+              }`}
+            >
+              <Boxes className="size-4 shrink-0" aria-hidden="true" />
+              <span>2. Quy tắc tồn kho</span>
+              <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
+                {STOCK_POLICY_LABELS[stockForm.mode]}
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("media")}
-            className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-medium transition-all ${
-              activeTab === "media"
-                ? "bg-card text-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <ImageIcon className="size-3.5" />
-            <span>3. Nguồn ảnh Drive</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("media")}
+              className={`focus-visible:ring-ring flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-offset-2 motion-safe:transition-colors motion-safe:duration-150 motion-safe:ease-out ${
+                activeTab === "media"
+                  ? "bg-card text-foreground font-semibold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground active:bg-muted"
+              }`}
+            >
+              <ImageIcon className="size-4 shrink-0" aria-hidden="true" />
+              <span>3. Nguồn ảnh Drive</span>
+            </button>
+          </div>
         </div>
 
         {/* Quick Actions */}
         {activeTab === "mapping" && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="secondary"
               size="sm"
@@ -376,22 +378,23 @@ export function FieldMapForm({
           ) : (
             <div className="flex flex-col gap-6">
               {/* Group 1: Required Fields */}
-              <div className="flex flex-col gap-3 rounded-lg border-2 border-primary/20 bg-accent/15 p-4 md:p-5">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-sm bg-primary px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-primary-foreground">
-                      BẮT BUỘC
+              <div className="border-ring/30 bg-accent/30 flex flex-col gap-4 rounded-xl border p-5 sm:p-6">
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="bg-primary text-primary-foreground rounded-full px-2.5 py-0.5 text-xs font-medium">
+                      Bắt buộc
                     </span>
-                    <h3 className="text-sm font-semibold text-foreground">
+                    <h3 className="text-foreground text-base font-semibold">
                       Hai trường nhận diện chính của sản phẩm
                     </h3>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Bắt buộc phải chọn đúng cột trên bảng của bạn — nếu thiếu 1 trong 2 trường này, hệ thống không thể tạo bài đăng.
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    Bắt buộc phải chọn đúng cột trên bảng của bạn — nếu thiếu 1 trong 2 trường này,
+                    hệ thống không thể tạo bài đăng.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 pt-2">
+                <div className="grid grid-cols-1 gap-4 pt-1 md:grid-cols-2">
                   <FieldCard
                     field="code"
                     values={values}
@@ -424,20 +427,18 @@ export function FieldMapForm({
               </div>
 
               {/* Group 2: Content & Details */}
-              <div className="flex flex-col gap-3 rounded-lg border border-border/80 bg-card p-4 md:p-5">
-                <div className="flex flex-col gap-1">
-                  <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    NỘI DUNG BÀI ĐĂNG & TỒN KHO
-                  </span>
-                  <h3 className="text-sm font-semibold text-foreground">
+              <div className="border-border bg-card flex flex-col gap-4 rounded-xl border p-5 sm:p-6">
+                <div className="flex flex-col gap-1.5">
+                  <h3 className="text-foreground text-base font-semibold">
                     Các trường thông tin bổ trợ (Tùy chọn)
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Nếu bảng tính của bạn có những cột này, hãy chọn tương ứng để bài đăng có đầy đủ mô tả, màu sắc và kiểm tra tồn kho.
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    Nếu bảng tính của bạn có những cột này, hãy chọn tương ứng để bài đăng có đầy đủ
+                    mô tả, màu sắc và kiểm tra tồn kho.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 pt-2">
+                <div className="grid grid-cols-1 gap-4 pt-1 md:grid-cols-2">
                   {(["stock", "description", "category", "season", "colors", "note"] as const).map(
                     (field) => (
                       <FieldCard
@@ -466,11 +467,12 @@ export function FieldMapForm({
 
       {/* TAB 2: STOCK POLICY */}
       {activeTab === "stock" && (
-        <div className="flex flex-col gap-5 rounded-lg border border-border/80 bg-card p-4 md:p-6">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-base font-semibold text-foreground">Cách đọc ô tồn kho</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Hệ thống kiểm tồn hai lần cho mỗi bài: lúc soạn bài và ngay trước khi đăng. Hãy chọn cách đọc đúng với bảng tính của bạn để tránh bài bị chặn nhầm.
+        <div className="border-border bg-card flex flex-col gap-5 rounded-xl border p-5 sm:p-6">
+          <div className="flex flex-col gap-1.5">
+            <h3 className="text-foreground text-lg font-semibold">Cách đọc ô tồn kho</h3>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Hệ thống kiểm tồn hai lần cho mỗi bài: lúc soạn bài và ngay trước khi đăng. Hãy chọn
+              cách đọc đúng với bảng tính của bạn để tránh bài bị chặn nhầm.
             </p>
           </div>
 
@@ -492,7 +494,7 @@ export function FieldMapForm({
           </RadioList>
 
           {stockForm.mode === "textual" && (
-            <div className="flex flex-col gap-4 rounded-lg border border-border/60 bg-muted/20 p-4">
+            <div className="border-border bg-sidebar flex flex-col gap-4 rounded-xl border p-5">
               <TextInput
                 label="Giá trị nghĩa là CÒN hàng"
                 description="Cách nhau bằng dấu phẩy (không phân biệt hoa thường/dấu)."
@@ -515,7 +517,7 @@ export function FieldMapForm({
           )}
 
           {stockForm.mode === "disabled" && (
-            <div className="flex flex-col gap-3 rounded-lg border border-madder/30 bg-madder/10 p-4">
+            <div className="border-destructive/30 bg-destructive/10 flex flex-col gap-3 rounded-xl border p-5">
               <Banner
                 status="error"
                 title="Cảnh báo: Bỏ chốt chặn theo số tồn kho"
@@ -548,7 +550,7 @@ export function FieldMapForm({
 
       {/* TAB 3: MEDIA SOURCE */}
       {activeTab === "media" && (
-        <div className="rounded-lg border border-border/80 bg-card p-4 md:p-6">
+        <div className="border-border bg-card rounded-xl border p-5 sm:p-6">
           <MediaSourceFields
             report={report}
             storedKind={storedMediaProfile?.kind ?? null}
@@ -562,8 +564,8 @@ export function FieldMapForm({
       )}
 
       {/* Sticky Action Footer */}
-      <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card/95 p-4 shadow-lg backdrop-blur-md">
-        <div className="flex items-center gap-3">
+      <div className="border-border bg-card/95 sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 shadow-md backdrop-blur-md sm:p-5">
+        <div className="flex flex-wrap items-center gap-3">
           {onBack && (
             <Button
               variant="secondary"
@@ -574,23 +576,23 @@ export function FieldMapForm({
           )}
 
           <div className="flex flex-col">
-            <span className="text-xs font-medium text-foreground">
+            <span className="text-foreground text-sm font-medium">
               {isSaving
-                ? "Đang lưu ánh xạ..."
+                ? "Đang lưu ánh xạ…"
                 : isDirty
                   ? "Có thay đổi chưa lưu"
                   : "Cấu hình đã sẵn sàng"}
             </span>
-            <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
+            <span className="text-muted-foreground font-mono text-xs tabular-nums">
               {mappedCount}/8 trường · {requiredMapped ? "Đủ trường bắt buộc" : "Thiếu trường bắt buộc"}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="secondary"
-            label={preview.isPending ? "Đang chạy thử..." : "Chạy thử kiểm tra số liệu"}
+            label={preview.isPending ? "Đang chạy thử…" : "Chạy thử kiểm tra số liệu"}
             isLoading={preview.isPending}
             isDisabled={preview.isPending || isSaving || !hasColumns}
             onClick={runPreview}
@@ -628,27 +630,31 @@ export function FieldMapForm({
           for touch and for a screen reader. The reason is written out here, in
           the flow, for the one gate the operator can clear from this screen. */}
       {!isPriceConfirmed ? (
-        <p className="text-turmeric-deep text-xs leading-relaxed">
+        <p className="text-warning-foreground text-xs leading-relaxed font-medium">
           Chưa lưu được: cần tích xác nhận cột trông như cột giá ở phía trên.
         </p>
       ) : null}
 
       {saveError ? <ApiErrorNotice error={saveError} source="Lưu ánh xạ" /> : null}
       {preview.isError ? (
-        <ApiErrorNotice error={preview.error} onRetry={runPreview} source="Báo cáo thử nghiệm" />
+        <ApiErrorNotice
+          error={preview.error}
+          onRetry={runPreview}
+          source="Báo cáo thử nghiệm"
+        />
       ) : null}
 
       {/* Inline Preview Dry Run Results */}
       {previewReport && (
-        <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-accent/10 p-5">
-          <div className="flex items-center justify-between border-b border-border/60 pb-3">
+        <div className="border-ring/30 bg-accent/20 flex flex-col gap-4 rounded-xl border p-5 sm:p-6">
+          <div className="border-border flex flex-wrap items-center justify-between gap-2 border-b pb-3">
             <div className="flex items-center gap-2">
-              <Eye className="size-5 text-primary" />
-              <h3 className="text-base font-semibold text-foreground">
+              <Eye className="text-accent-foreground size-5 shrink-0" aria-hidden="true" />
+              <h3 className="text-foreground text-base font-semibold">
                 Kết quả chạy thử với ánh xạ bạn đang chỉnh
               </h3>
             </div>
-            <span className="font-mono text-xs text-muted-foreground">
+            <span className="text-muted-foreground font-mono text-xs">
               Bản xem trước · Chưa ghi đè vào hệ thống
             </span>
           </div>
@@ -698,57 +704,59 @@ function FieldCard({
 
   return (
     <div
-      className={`flex flex-col justify-between gap-3 rounded-lg border p-3.5 transition-all ${
+      className={`flex flex-col justify-between gap-3 rounded-xl border p-5 transition-colors duration-150 ease-out ${
         issue
-          ? "border-madder/50 bg-madder/5"
+          ? "border-destructive/40 bg-destructive/10"
           : isMapped
-            ? "border-border/80 bg-card shadow-xs"
-            : "border-dashed border-border/60 bg-muted/10"
+            ? "border-border bg-card"
+            : "border-border bg-sidebar border-dashed"
       }`}
     >
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-semibold text-foreground">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-foreground text-sm font-semibold">
               {CATALOG_FIELD_LABELS[field]}
             </span>
             {isRequired ? (
-              <span className="rounded-xs bg-madder/15 px-1 py-0.2 font-mono text-[10px] font-bold text-madder">
-                BẮT BUỘC
+              <span className="bg-destructive/10 text-destructive rounded-full px-2 py-0.5 text-xs font-medium">
+                Bắt buộc
               </span>
             ) : (
-              <span className="text-[11px] text-muted-foreground">(Tùy chọn)</span>
+              <span className="text-foreground-subtle text-xs">(Tùy chọn)</span>
             )}
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1.5">
             {goesIntoCaption && (
-              <span className="rounded-xs bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+              <span className="bg-accent text-accent-foreground rounded-full px-2 py-0.5 text-xs font-medium">
                 Caption
               </span>
             )}
             {isMapped ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-leaf-deep">
-                <CheckCircle2 className="size-3.5" />
+              <span className="text-success-foreground inline-flex items-center gap-1 text-xs font-medium">
+                <CheckCircle2 className="size-3.5" aria-hidden="true" />
                 Đã gán
               </span>
             ) : isRequired ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-madder">
-                <AlertCircle className="size-3.5" />
+              <span className="text-destructive inline-flex items-center gap-1 text-xs font-medium">
+                <AlertCircle className="size-3.5" aria-hidden="true" />
                 Chưa gán
               </span>
             ) : null}
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground leading-relaxed">
+        <p className="text-muted-foreground text-xs leading-relaxed">
           {CATALOG_FIELD_HINTS[field]}
         </p>
 
         {!hasStoredMap && suggestion?.column && (
-          <div className="flex items-center gap-1 pt-1 font-mono text-[11px] text-muted-foreground">
-            <Sparkles className="size-3 text-primary" />
-            <span>Gợi ý: Cột “{suggestion.column}” ({CONFIDENCE_LABELS[band]})</span>
+          <div className="text-muted-foreground flex items-center gap-1.5 pt-1 font-mono text-xs">
+            <Sparkles className="text-accent-foreground size-3.5 shrink-0" aria-hidden="true" />
+            <span>
+              Gợi ý: Cột “{suggestion.column}” ({CONFIDENCE_LABELS[band]})
+            </span>
           </div>
         )}
       </div>

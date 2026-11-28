@@ -43,7 +43,7 @@ const OTHER_TENANT = "00000000-0000-0000-0000-0000000000ff";
 const CONNECTED = {
   state: "connected",
   email: "kho@shop.vn",
-  connectedAt: "2026-08-01T03:00:00.000Z",
+  connectedAt: "2054-08-01T03:00:00.000Z",
   scopes: ["https://www.googleapis.com/auth/drive.readonly"],
   sourceAccess: { folder: "ok", spreadsheet: "ok" },
 };
@@ -51,7 +51,7 @@ const CONNECTED = {
 const EXPIRED = {
   state: "expired",
   email: "kho@shop.vn",
-  connectedAt: "2026-08-01T03:00:00.000Z",
+  connectedAt: "2054-08-01T03:00:00.000Z",
   reason: "GOOGLE_AUTH_EXPIRED",
 };
 

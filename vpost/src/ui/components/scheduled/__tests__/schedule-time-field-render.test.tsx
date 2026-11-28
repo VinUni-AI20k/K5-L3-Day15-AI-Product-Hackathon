@@ -8,7 +8,7 @@ import { ScheduleTimeField } from "../ScheduleTimeField";
  *
  * This is a regression lock, not a style preference. The field was once swapped
  * to a library picker that parses a typed date string; measured against that
- * parser, "1/9/2026" on a client left at en-US resolved to 9 January with no
+ * parser, "27/11/2026" on a client left at en-US resolved to 9 January with no
  * error shown, and a Vietnamese-locale client could not re-parse its own
  * rendered value. Both are silent wrong answers on a SCHEDULING field.
  *
@@ -65,7 +65,7 @@ describe("ScheduleTimeField", () => {
 
   it("stays quiet before the browser clock is known", () => {
     const html = renderToStaticMarkup(
-      <ScheduleTimeField {...BASE} value="2026-09-15T20:00" nowMs={0} />,
+      <ScheduleTimeField {...BASE} value="2054-09-15T20:00" nowMs={0} />,
     );
     expect(html).not.toContain("Sẽ đăng lúc");
   });

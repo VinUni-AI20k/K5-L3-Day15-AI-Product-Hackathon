@@ -22,7 +22,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { ReactNode } from "react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, GripVertical } from "lucide-react";
+import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
 
 import { cn } from "@/shared/utils";
@@ -416,6 +417,7 @@ function SortableTile(
     id,
     disabled,
   });
+  const dragStyle: CSSProperties = { transform: CSS.Transform.toString(transform), transition };
 
   return (
     <TileShell
@@ -426,17 +428,17 @@ function SortableTile(
       ordinal={index + 1}
       isDragging={isDragging}
       innerRef={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={dragStyle}
       handle={
         <button
           type="button"
-          className="bg-card/90 text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 flex size-6 cursor-grab touch-none items-center justify-center rounded-md text-xs outline-none focus-visible:ring-3 disabled:cursor-not-allowed"
+          className="bg-card/90 text-muted-foreground hover:text-foreground focus-visible:ring-ring flex size-7 cursor-grab touch-none items-center justify-center rounded-md transition-colors duration-150 outline-none focus-visible:ring-2 disabled:cursor-not-allowed"
           disabled={disabled}
           aria-label={`Kéo để đổi vị trí ${name}`}
           {...attributes}
           {...listeners}
         >
-          ⠿
+          <GripVertical className="size-4" aria-hidden="true" />
         </button>
       }
       controls={
@@ -450,7 +452,7 @@ function SortableTile(
             onClick={props.onMoveUp}
             aria-label={`Đưa ${name} lên trước`}
           >
-            ←
+            <ArrowLeft className="size-3.5" aria-hidden="true" />
           </Button>
           <Button
             type="button"
@@ -461,7 +463,7 @@ function SortableTile(
             onClick={props.onMoveDown}
             aria-label={`Đưa ${name} ra sau`}
           >
-            →
+            <ArrowRight className="size-3.5" aria-hidden="true" />
           </Button>
         </>
       }
@@ -507,22 +509,23 @@ function SortableRow(
     id,
     disabled,
   });
+  const dragStyle: CSSProperties = { transform: CSS.Transform.toString(transform), transition };
 
   return (
     <li
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={dragStyle}
       className={cn("flex items-center gap-3 p-3", isDragging && "bg-muted relative z-10")}
     >
       <button
         type="button"
-        className="text-muted-foreground hover:text-foreground cursor-grab touch-none px-1 disabled:cursor-not-allowed"
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex size-9 cursor-grab touch-none items-center justify-center rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 disabled:cursor-not-allowed"
         disabled={disabled}
         aria-label={`Kéo để đổi vị trí ${name}`}
         {...attributes}
         {...listeners}
       >
-        ⠿
+        <GripVertical className="size-4" aria-hidden="true" />
       </button>
 
       <span className="text-muted-foreground w-6 shrink-0 text-sm tabular-nums">{index + 1}</span>
@@ -540,7 +543,7 @@ function SortableRow(
           onClick={props.onMoveUp}
           aria-label={`Đưa ${name} lên trên`}
         >
-          ↑
+          <ArrowUp className="size-4" aria-hidden="true" />
         </Button>
         <Button
           type="button"
@@ -550,7 +553,7 @@ function SortableRow(
           onClick={props.onMoveDown}
           aria-label={`Đưa ${name} xuống dưới`}
         >
-          ↓
+          <ArrowDown className="size-4" aria-hidden="true" />
         </Button>
         <Button
           type="button"

@@ -170,17 +170,22 @@ export function CreateTenantForm({
               // somebody. Errors still surface here: SLUG_TAKEN is about this
               // value even when there is no box to fix it in.
               <Stack direction="vertical" gap={1}>
-                <Text type="supporting" className="text-muted-foreground text-xs" aria-live="polite">
+                <Text
+                  type="supporting"
+                  size="xsm"
+                  color="secondary"
+                  aria-live="polite"
+                >
                   Đường dẫn{" "}
                   <span className="text-foreground font-mono">
-                    mysp.vn/{field.value || "…"}
+                    vpost.vn/{field.value || "…"}
                   </span>{" "}
                   · tự sinh từ tên
                 </Text>
                 {fieldState.error ? (
-                  <Text type="supporting" role="alert" className="text-destructive text-xs">
+                  <p role="alert" className="text-destructive text-xs leading-4 font-medium">
                     {fieldState.error.message}
-                  </Text>
+                  </p>
                 ) : null}
               </Stack>
             )

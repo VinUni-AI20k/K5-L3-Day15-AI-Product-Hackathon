@@ -63,6 +63,7 @@ export function RunSyncButton({
           ref={triggerRef}
           type="button"
           size="lg"
+          className="min-h-10 px-4"
           onClick={() => setIsConfirming(true)}
           disabled={disabled || isRunning}
           aria-describedby={
@@ -88,19 +89,19 @@ export function RunSyncButton({
       onKeyDown={(event) => {
         if (event.key === "Escape") cancel();
       }}
-      className="border-warning/40 bg-warning/5 w-full max-w-xl space-y-3 rounded-xl border p-4"
+      className="border-warning/30 bg-warning/10 w-full max-w-xl space-y-3 rounded-xl border p-4"
     >
-      <p className="text-sm font-medium">Chạy đồng bộ toàn bộ dữ liệu?</p>
+      <p className="text-foreground text-sm font-semibold">Chạy đồng bộ toàn bộ dữ liệu?</p>
       <p className="text-muted-foreground text-sm">
         Hệ thống sẽ đọc lại toàn bộ thư mục Drive và bảng Sheet, ghi đè dữ liệu sản phẩm/ảnh hiện có
         và xoá những mục không còn trên nguồn. Quá trình có thể mất vài phút — đừng đóng tab cho tới
         khi có kết quả.
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button ref={confirmRef} type="button" onClick={confirm}>
+        <Button ref={confirmRef} type="button" className="min-h-10 px-4" onClick={confirm}>
           Chạy ngay
         </Button>
-        <Button type="button" variant="outline" onClick={cancel}>
+        <Button type="button" variant="secondary" className="min-h-10 px-4" onClick={cancel}>
           Huỷ
         </Button>
       </div>

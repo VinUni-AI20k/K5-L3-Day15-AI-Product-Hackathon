@@ -50,7 +50,7 @@ describe("stage 1 — schema", () => {
   });
 
   /**
-   * Measured live 15/08/2026: gpt-4.1-mini returned mojibake carrying U+0000.
+   * Measured live 27/11/2026: gpt-4.1-mini returned mojibake carrying U+0000.
    * It used to pass stage 1, get rejected at stage 3 with a confusing "source
    * not found", and then break the ai_generation INSERT (Postgres cannot store
    * NUL). Rejecting it here makes the escalation carry an honest reason.
@@ -193,7 +193,7 @@ describe("stage 3 — claims", () => {
   });
 
   /**
-   * Regression from real runs on 15/08/2026: the prompt lists the product as
+   * Regression from real runs on 27/11/2026: the prompt lists the product as
    * "- Chủng loại: Đầm", the model quotes the whole line, and stage 3 blocked
    * 3 of 4 real generations for it.
    */

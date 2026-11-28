@@ -230,7 +230,7 @@ export function driveItemLabel(item: DriveItem): string {
 }
 
 /**
- * "19/08/2026 10:00". Returns null for anything unparseable — a broken date is
+ * "27/11/2026 10:00". Returns null for anything unparseable — a broken date is
  * worth dropping, not worth breaking the panel that explains the connection.
  */
 export function formatConnectedAt(iso: string): string | null {

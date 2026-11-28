@@ -32,7 +32,7 @@ import "./onboarding-motion.css";
  * THE CHOSEN CARD GETS A TICK, not just the green border Buffer uses (spec
  * section 9.3). `--foreground` against `--border` is a colour difference, and a
  * colour difference alone is not allowed to be the only carrier of meaning.
- * Since 26/08/2026 the tick is a 26px badge on the card's top-right corner
+ * Since 27/11/2026 the tick is a 26px badge on the card's top-right corner
  * rather than a glyph in the row (animation spec section 5.2); it still has to
  * be ABSENT until the card is chosen, which is the part that carries meaning.
  */
@@ -86,11 +86,11 @@ export interface OptionChoice {
  * `rounded-lg` IS `--radius`, i.e. exactly the 16px the prototype rounds a card
  * to — no arithmetic and no new token. It was `rounded-md` (12.8px), measured
  * off the Buffer screenshots; the PM chose the prototype over those on
- * 26/08/2026, and the theme already held the right value.
+ * 27/11/2026, and the theme already held the right value.
  *
  * AT REST THERE IS STILL NO SHADOW — that part of the Buffer measurement holds,
  * and a resting card is told apart by its 1px border alone. What changed on
- * 26/08/2026, by the PM's decision over the earlier note, is that HOVER now
+ * 27/11/2026, by the PM's decision over the earlier note, is that HOVER now
  * lifts the card 3px onto `--shadow-med` (animation spec section 5.1). The lift,
  * the press and the dimming of the cards that were not chosen all live in
  * `onboarding-motion.css` behind `prefers-reduced-motion: no-preference`; this
@@ -203,7 +203,7 @@ export function OptionCheckBadge() {
 
 /**
  * The 40px emoji well — the prototype's size, up from the 32px measured off the
- * Buffer shots (PM 26/08/2026). `rounded-md` (`--radius` * 0.8 = 12.8px) is the
+ * Buffer shots (PM 27/11/2026). `rounded-md` (`--radius` * 0.8 = 12.8px) is the
  * token nearest the prototype's 11px corner; `rounded-sm` (9.6px) went with the
  * smaller well.
  *

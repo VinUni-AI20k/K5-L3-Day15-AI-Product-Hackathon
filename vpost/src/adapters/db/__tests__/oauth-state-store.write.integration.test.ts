@@ -40,7 +40,7 @@ describe.skipIf(!url)("DrizzleOAuthStateStore — the write path", () => {
   // Branded once: the schema columns take TenantId since M1.3a.
   const tenantId = testTenantId(randomUUID());
   let accountId = "";
-  const NOW = new Date("2026-08-20T04:00:00.000Z");
+  const NOW = new Date("2054-08-20T04:00:00.000Z");
   const LATER = new Date(NOW.getTime() + 10 * 60 * 1000);
 
   /** 64-hex like a real sha256; unique per call. */

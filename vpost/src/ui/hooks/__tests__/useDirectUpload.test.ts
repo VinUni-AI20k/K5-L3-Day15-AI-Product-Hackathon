@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { runDirectUpload, type DirectUploadServices } from "@/ui/hooks/useDirectUpload";
+import {
+  executeDirectUpload,
+  runDirectUpload,
+  type DirectUploadServices,
+  type DirectUploadState,
+} from "@/ui/hooks/useDirectUpload";
+import { abortWithReason } from "@/ui/services/abort";
 import type { TicketsResponse } from "@/ui/services/upload.api";
 import type { UploadResponse } from "@/ui/schemas/compose.schema";
 
@@ -175,6 +181,104 @@ describe("runDirectUpload — I1 rejection merge", () => {
       runDirectUpload({ productCode: "MG0AD6112", files }, noopProgress, controller, services),
     ).rejects.toBe(postFailure);
     expect(controller.signal.aborted).toBe(true);
+    expect((controller.signal.reason as DOMException).name).toBe("AbortError");
+    expect((controller.signal.reason as DOMException).message).toContain("failed");
     expect(services.confirmUpload).not.toHaveBeenCalled();
+  });
+});
+
+describe("executeDirectUpload — intentional abort vs real failure", () => {
+  it("treats operator cancel / unmount AbortError as a clean null no-op with no error state or unhandledRejection", async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+
+    const states: DirectUploadState[] = [];
+    let currentState: DirectUploadState = { isUploading: false, progress: 0, error: null };
+    const onStateChange = (
+      updater: DirectUploadState | ((prev: DirectUploadState) => DirectUploadState),
+    ) => {
+      currentState = typeof updater === "function" ? updater(currentState) : updater;
+      states.push(currentState);
+    };
+
+    const controller = new AbortController();
+    const services = fakeServices({
+      requestUploadTickets: vi.fn(
+        (_params, signal) =>
+          new Promise<TicketsResponse>((_resolve, reject) => {
+            signal?.addEventListener("abort", () => {
+              reject(signal.reason ?? new DOMException("signal is aborted without reason", "AbortError"));
+            });
+          }),
+      ),
+    });
+
+    try {
+      const uploadPromise = executeDirectUpload({
+        productCode: "MG0AD6112",
+        files: [fakeFile("a.jpg")],
+        controller,
+        onStateChange,
+        services,
+      });
+
+      abortWithReason(controller, "direct-upload: cancelled by operator");
+      const result = await uploadPromise;
+
+      expect(result).toBeNull();
+      expect(currentState).toEqual({ isUploading: false, progress: 0, error: null });
+      expect(states.every((s) => s.error === null)).toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(unhandled).toHaveLength(0);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
+  it("still surfaces real upload errors even when the failing worker aborts sibling uploads", async () => {
+    const files = [fakeFile("a.jpg"), fakeFile("b.jpg")];
+    const tickets: TicketsResponse = {
+      issued: [0, 1].map((sourceIndex) => ({
+        assetId: `asset_${sourceIndex}`,
+        fileName: files[sourceIndex].name,
+        sourceIndex,
+        postUrl: "https://minio.local/upload",
+        formFields: {},
+        expiresAt: new Date().toISOString(),
+      })),
+      rejected: [],
+    };
+    const networkFailure = new Error("MinIO unreachable");
+    const services = fakeServices({
+      requestUploadTickets: vi.fn(async () => tickets),
+      postFileToStorage: vi.fn(async ({ file }, signal) => {
+        if (file.name === "a.jpg") throw networkFailure;
+        return new Promise<void>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(signal.reason));
+        });
+      }),
+    });
+
+    let currentState: DirectUploadState = { isUploading: false, progress: 0, error: null };
+    const controller = new AbortController();
+
+    await expect(
+      executeDirectUpload({
+        productCode: "MG0AD6112",
+        files,
+        controller,
+        onStateChange: (updater) => {
+          currentState = typeof updater === "function" ? updater(currentState) : updater;
+        },
+        services,
+      }),
+    ).rejects.toBe(networkFailure);
+
+    expect(currentState).toEqual({
+      isUploading: false,
+      progress: 0,
+      error: "MinIO unreachable",
+    });
   });
 });

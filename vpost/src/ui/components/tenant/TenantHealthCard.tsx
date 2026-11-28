@@ -1,4 +1,7 @@
-import { cn } from "@/shared/utils";
+"use client";
+
+import { Badge, Card, HStack, Heading, Stack, Text } from "@astryxdesign/core";
+
 import type { TenantHealth } from "@/ui/schemas/tenant-health.schema";
 
 /**
@@ -12,9 +15,9 @@ const STATUS_LABELS: Record<TenantHealth["status"], string> = {
   suspended: "Tạm ngưng",
 };
 
-const STATUS_STYLES: Record<TenantHealth["status"], string> = {
-  active: "bg-primary/10 text-foreground border-primary/20",
-  suspended: "bg-destructive/10 text-destructive border-destructive/30",
+const STATUS_VARIANTS: Record<TenantHealth["status"], "success" | "error"> = {
+  active: "success",
+  suspended: "error",
 };
 
 /**
@@ -42,39 +45,36 @@ export interface TenantHealthCardProps {
 
 export function TenantHealthCard({ data, isRefreshing = false }: TenantHealthCardProps) {
   return (
-    <div className="bg-card space-y-4 rounded-xl border p-5" aria-busy={isRefreshing}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-base font-semibold">{data.name}</h3>
-        <span
-          className={cn(
-            "rounded-full border px-2.5 py-0.5 text-xs font-medium",
-            STATUS_STYLES[data.status],
-          )}
-        >
-          {STATUS_LABELS[data.status]}
-        </span>
-      </div>
+    <Card padding={5} aria-busy={isRefreshing}>
+      <Stack direction="vertical" gap={4}>
+        <HStack gap={3} justify="between" align="center" wrap="wrap">
+          <Heading level={3}>{data.name}</Heading>
+          <Badge variant={STATUS_VARIANTS[data.status]} label={STATUS_LABELS[data.status]} />
+        </HStack>
 
-      <dl className="grid gap-2 text-sm sm:grid-cols-[10rem_1fr]">
-        <dt className="text-muted-foreground">Mã đơn vị</dt>
-        <dd className="font-mono text-xs break-all sm:text-sm">{data.tenantId}</dd>
+        <dl className="grid gap-x-4 gap-y-2.5 text-sm sm:grid-cols-[10rem_1fr]">
+          <dt className="text-muted-foreground font-medium">Mã đơn vị</dt>
+          <dd className="text-foreground font-mono text-xs break-all sm:text-sm">
+            {data.tenantId}
+          </dd>
 
-        <dt className="text-muted-foreground">Kiểm tra lúc</dt>
-        <dd>
-          <time dateTime={data.checkedAt}>{formatCheckedAt(data.checkedAt)}</time>
-        </dd>
+          <dt className="text-muted-foreground font-medium">Kiểm tra lúc</dt>
+          <dd className="text-foreground">
+            <time dateTime={data.checkedAt}>{formatCheckedAt(data.checkedAt)}</time>
+          </dd>
 
-        <dt className="text-muted-foreground">Chuỗi kiểm tra</dt>
-        <dd className="text-muted-foreground">
-          Giao diện → API nội bộ → usecase → cơ sở dữ liệu: thông suốt.
-        </dd>
-      </dl>
+          <dt className="text-muted-foreground font-medium">Chuỗi kiểm tra</dt>
+          <dd className="text-muted-foreground">
+            Giao diện → API nội bộ → usecase → cơ sở dữ liệu: thông suốt.
+          </dd>
+        </dl>
 
-      {isRefreshing ? (
-        <p className="text-muted-foreground text-xs" aria-live="polite">
-          Đang làm mới…
-        </p>
-      ) : null}
-    </div>
+        {isRefreshing ? (
+          <Text type="supporting" size="xsm" color="secondary" aria-live="polite">
+            Đang làm mới…
+          </Text>
+        ) : null}
+      </Stack>
+    </Card>
   );
 }

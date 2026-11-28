@@ -46,8 +46,8 @@ describe("withTabParam", () => {
   });
 
   it("keeps every other param, in order, exactly once", () => {
-    expect(withTabParam("channelId=c1&month=2026-08&day=2026-08-21", "scheduled")).toBe(
-      "tab=scheduled&channelId=c1&month=2026-08&day=2026-08-21",
+    expect(withTabParam("channelId=c1&month=2054-08&day=2054-08-21", "scheduled")).toBe(
+      "tab=scheduled&channelId=c1&month=2054-08&day=2054-08-21",
     );
     // A stale `tab` inside the rebuilt query loses to the one the URL has now.
     expect(withTabParam("tab=scheduled&status=failed", "log")).toBe("tab=log&status=failed");
@@ -77,7 +77,7 @@ describe("the query a child screen writes while inside the hub", () => {
   it("keeps the scheduled tab across filter, month and dialog writes", () => {
     const params = scheduledSearchParams(
       { channelId: "c1", from: null, to: null },
-      { view: "calendar", month: "2026-08", day: "2026-08-21" },
+      { view: "calendar", month: "2054-08", day: "2054-08-21" },
     );
     params.set(SCHEDULED_DIALOG_PARAMS.reschedule, "job-9");
     const query = withTabParam(params.toString(), "scheduled");

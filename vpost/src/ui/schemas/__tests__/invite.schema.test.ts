@@ -23,15 +23,15 @@ import {
 const LIVE_INVITE = {
   id: "95a6d9dd-6b5c-4ebc-b6af-3da6548c508d",
   role: "editor",
-  expiresAt: "2026-08-27T05:12:47.308Z",
+  expiresAt: "2054-08-27T05:12:47.308Z",
   maxUses: 1,
   usedCount: 0,
   revokedAt: null,
   createdByEmail: "dev@localhost",
 };
 
-const BEFORE_EXPIRY = Date.parse("2026-08-20T05:12:47.308Z");
-const AFTER_EXPIRY = Date.parse("2026-08-28T05:12:47.308Z");
+const BEFORE_EXPIRY = Date.parse("2054-08-20T05:12:47.308Z");
+const AFTER_EXPIRY = Date.parse("2054-08-28T05:12:47.308Z");
 
 function invite(overrides: Partial<Invite> = {}): Invite {
   return { ...(LIVE_INVITE as Invite), ...overrides };
@@ -49,7 +49,7 @@ describe("InviteListResponseSchema", () => {
 
   it("accepts a revoked link: revoked links stay in the list", () => {
     const parsed = InviteListResponseSchema.safeParse({
-      items: [{ ...LIVE_INVITE, revokedAt: "2026-08-20T05:13:05.707Z" }],
+      items: [{ ...LIVE_INVITE, revokedAt: "2054-08-20T05:13:05.707Z" }],
     });
     expect(parsed.success).toBe(true);
   });
@@ -58,7 +58,7 @@ describe("InviteListResponseSchema", () => {
     // Not a schema failure (unknown keys are stripped), but the parsed row must
     // not carry it: a credential has no business in a cached list.
     const parsed = InviteListResponseSchema.parse({
-      items: [{ ...LIVE_INVITE, url: "https://mysp.vn/join/leaked" }],
+      items: [{ ...LIVE_INVITE, url: "https://vpost.vn/join/leaked" }],
     });
     expect("url" in parsed.items[0]).toBe(false);
   });
@@ -68,7 +68,7 @@ describe("InviteListResponseSchema", () => {
       InviteListResponseSchema.safeParse({ items: [{ ...LIVE_INVITE, role: "superuser" }] }).success,
     ).toBe(false);
     expect(
-      InviteListResponseSchema.safeParse({ items: [{ ...LIVE_INVITE, expiresAt: "27/08/2026" }] })
+      InviteListResponseSchema.safeParse({ items: [{ ...LIVE_INVITE, expiresAt: "27/08/2054" }] })
         .success,
     ).toBe(false);
   });
@@ -79,7 +79,7 @@ describe("CreateInviteResponseSchema", () => {
     id: "95a6d9dd-6b5c-4ebc-b6af-3da6548c508d",
     role: "editor",
     url: "http://localhost:3000/join/c29230bb40c02419fada7bcf376f9128f",
-    expiresAt: "2026-08-27T05:12:47.308Z",
+    expiresAt: "2054-08-27T05:12:47.308Z",
   };
 
   it("accepts the answer the API actually returns", () => {
@@ -113,7 +113,7 @@ describe("inviteStatus", () => {
 
   it("puts revoked ahead of every other reason", () => {
     // Someone ACTED on this link; the clock is not the answer the operator needs.
-    const revokedAndExpired = invite({ revokedAt: "2026-08-20T05:13:05.707Z" });
+    const revokedAndExpired = invite({ revokedAt: "2054-08-20T05:13:05.707Z" });
     expect(inviteStatus(revokedAndExpired, AFTER_EXPIRY)).toBe("revoked");
   });
 

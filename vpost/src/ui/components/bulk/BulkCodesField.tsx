@@ -47,9 +47,9 @@ export function BulkCodesField({
   const hasContent = parsed.codes.length > 0 || parsed.invalid.length > 0;
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label htmlFor={id} className="text-sm font-medium">
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={id} className="text-foreground text-sm font-medium">
           Mã sản phẩm cần đăng
         </label>
         {hasContent ? (
@@ -69,10 +69,10 @@ export function BulkCodesField({
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         placeholder={"MGKVX6310\nMGKVX6311\nMGKVX6312"}
-        className="font-mono text-sm leading-relaxed tracking-tight"
+        className="rounded-lg font-mono text-sm leading-relaxed"
       />
 
-      <p id={hintId} className="text-muted-foreground text-xs leading-normal">
+      <p id={hintId} className="text-muted-foreground text-xs leading-relaxed">
         Mỗi dòng một mã, hoặc dán thẳng một cột từ Sheet. Nhiều mã trên cùng một dòng thì ngăn bằng
         dấu phẩy. Tối đa {MAX_BULK_CODES} mã mỗi lượt; mã trùng nhau chỉ chạy một lần.
       </p>
@@ -94,25 +94,25 @@ export function BulkCodesField({
 
       {/* Parsed code chips preview for quick visual inspection */}
       {parsed.codes.length > 0 ? (
-        <div className="space-y-1.5 pt-1">
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span className="font-medium text-foreground">
+        <div className="space-y-2 pt-1">
+          <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="text-foreground font-medium">
               Mã đã nhận diện ({parsed.codes.length}):
             </span>
             <span>Hiển thị tối đa 12 mã đầu</span>
           </div>
-          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto rounded-lg border border-border/70 bg-muted/20 p-2">
+          <div className="border-border bg-sidebar flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-xl border p-3">
             {parsed.codes.slice(0, 12).map((item, idx) => (
               <span
                 key={`${item.code}-${idx}`}
-                className="bg-card border-border/80 text-foreground font-mono text-[11px] font-medium px-2 py-0.5 rounded-md border shadow-xs inline-flex items-center gap-1"
+                className="border-border bg-card text-foreground inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-xs font-medium"
               >
-                <span className="text-muted-foreground text-[9px]">#{idx + 1}</span>
+                <span className="text-foreground-subtle text-xs">#{idx + 1}</span>
                 {item.code}
               </span>
             ))}
             {parsed.codes.length > 12 ? (
-              <span className="text-muted-foreground text-[11px] px-1.5 py-0.5 font-medium self-center">
+              <span className="text-muted-foreground self-center px-1.5 py-0.5 text-xs font-medium">
                 +{parsed.codes.length - 12} mã khác…
               </span>
             ) : null}
@@ -129,14 +129,14 @@ export function BulkCodesField({
       {parsed.invalid.length > 0 ? (
         <div
           id={issuesId}
-          className="border-warning/40 bg-warning/10 max-h-48 overflow-auto rounded-lg border p-3"
+          className="border-warning/40 bg-warning/10 max-h-48 overflow-auto rounded-xl border p-3.5"
         >
           <p className="text-warning-foreground text-xs font-medium">
             Các dòng sau không phải mã sản phẩm:
           </p>
           <ul className="mt-1.5 space-y-1">
             {parsed.invalid.map((issue, index) => (
-              <li key={`${issue.line}-${index}`} className="text-xs">
+              <li key={`${issue.line}-${index}`} className="text-warning-foreground text-xs">
                 <span className="font-medium tabular-nums">Dòng {issue.line}:</span>{" "}
                 <span className="font-mono break-all">{issue.raw}</span> — {issue.message}
               </li>

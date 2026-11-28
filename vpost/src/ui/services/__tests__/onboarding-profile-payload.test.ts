@@ -105,7 +105,7 @@ describe("saveOnboardingStep", () => {
 
 describe("completeOnboarding", () => {
   it("POSTs with no body at all", async () => {
-    respondWith({ ...PROFILE, completedAt: "2026-08-26T02:00:00.000Z" });
+    respondWith({ ...PROFILE, completedAt: "2054-08-26T02:00:00.000Z" });
 
     const finished = await completeOnboarding();
 
@@ -113,7 +113,7 @@ describe("completeOnboarding", () => {
     expect(path).toBe("/api/tenants/onboarding-profile");
     expect(init.method).toBe("POST");
     expect(init.body).toBeUndefined();
-    expect(finished.completedAt).toBe("2026-08-26T02:00:00.000Z");
+    expect(finished.completedAt).toBe("2054-08-26T02:00:00.000Z");
   });
 });
 

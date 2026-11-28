@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  EmptyState,
   Heading,
   Layout,
   LayoutContent,
@@ -9,6 +8,9 @@ import {
   Stack,
   Text,
 } from "@astryxdesign/core";
+import { ShieldAlert } from "lucide-react";
+
+import { EmptyState } from "@/ui/components/feedback/EmptyState";
 
 /**
  * What someone without a platform role sees at `/platform`.
@@ -27,19 +29,27 @@ export function PlatformForbidden({ email }: { email: string }) {
       height="fill"
       header={
         <LayoutHeader hasDivider>
-          <Stack direction="vertical" gap={1} padding={4}>
-            <Heading level={1}>Không mở được mục này</Heading>
-            <Text type="supporting">Mục này dành cho quản trị hệ thống VPOST.</Text>
-          </Stack>
+          <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6">
+            <Stack direction="vertical" gap={1}>
+              <Heading level={1}>Không mở được mục này</Heading>
+              <Text type="supporting" color="secondary">
+                Mục này dành cho quản trị hệ thống VPOST.
+              </Text>
+            </Stack>
+          </div>
         </LayoutHeader>
       }
       content={
-        <LayoutContent padding={4}>
-          <EmptyState
-            headingLevel={2}
-            title="Bạn không có quyền xem mục này"
-            description={`Tài khoản ${email} đang đăng nhập bình thường và dùng được mọi màn hình của công ty bạn — riêng mục này thuộc về đội vận hành VPOST. Nếu bạn cho rằng đây là nhầm lẫn, liên hệ VPOST.`}
-          />
+        <LayoutContent padding={0}>
+          <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
+            <EmptyState
+              kind="idle"
+              headingLevel={2}
+              icon={<ShieldAlert className="size-5" aria-hidden="true" />}
+              title="Bạn không có quyền xem mục này"
+              description={`Tài khoản ${email} đang đăng nhập bình thường và dùng được mọi màn hình của công ty bạn — riêng mục này thuộc về đội vận hành VPOST. Nếu bạn cho rằng đây là nhầm lẫn, liên hệ VPOST.`}
+            />
+          </div>
         </LayoutContent>
       }
     />

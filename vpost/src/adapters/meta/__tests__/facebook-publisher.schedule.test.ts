@@ -447,7 +447,7 @@ describe("getPostState — the reconciliation read", () => {
         id: "555000111_777",
         is_published: true,
         permalink_url: "https://www.facebook.com/555000111/posts/777",
-        created_time: "2026-08-13T09:00:00+0000",
+        created_time: "2054-08-13T09:00:00+0000",
       }),
     );
     const { scheduled } = makePublisher(fetchImpl as unknown as typeof fetch);
@@ -462,7 +462,7 @@ describe("getPostState — the reconciliation read", () => {
       state: "published",
       postId: "555000111_777",
       url: "https://www.facebook.com/555000111/posts/777",
-      publishedAt: new Date("2026-08-13T09:00:00+0000"),
+      publishedAt: new Date("2054-08-13T09:00:00+0000"),
     });
   });
 

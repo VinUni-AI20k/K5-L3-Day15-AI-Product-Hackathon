@@ -1088,7 +1088,7 @@ function isObjectNotReadable(error: unknown): boolean {
   return context.graph_code === 100 && context.graph_subcode === OBJECT_NOT_READABLE_SUBCODE;
 }
 
-/** ISO 8601 with an offset, e.g. "2026-08-17T12:00:00+0000". */
+/** ISO 8601 with an offset, e.g. "2026-11-27T12:00:00+0000". */
 function parseGraphTime(value: string | undefined): Date | null {
   if (typeof value !== "string" || value.trim().length === 0) return null;
   const at = new Date(value);

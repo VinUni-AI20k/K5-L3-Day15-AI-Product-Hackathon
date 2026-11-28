@@ -1,0 +1,98 @@
+/**
+ * Slash quick-reply menu & management dialog styles (`QuickReplyMenu`,
+ * `QuickReplyManageDialog`).
+ *
+ * Uses semantic design system / Astryx CSS custom properties only (zero raw hex/rgb,
+ * zero inline styles). Declared inside `@layer components`.
+ */
+
+@layer components {
+  .quick-reply-menu-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-default);
+    background-color: var(--color-background-popover);
+    box-shadow: var(--shadow-float);
+  }
+
+  .quick-reply-header {
+    padding-inline: var(--spacing-4);
+    padding-block: var(--spacing-3);
+    background-color: var(--color-background-popover);
+  }
+
+  .quick-reply-footer {
+    padding-inline: var(--spacing-4);
+    padding-block: var(--spacing-2);
+    background-color: var(--bg-subtle);
+  }
+
+  .quick-reply-option {
+    position: relative;
+    cursor: pointer;
+    padding-inline: var(--spacing-4);
+    padding-block: var(--spacing-3);
+    background-color: transparent;
+    color: var(--text-primary);
+    transition: var(--transition-interactive);
+  }
+
+  .quick-reply-option:hover {
+    background-color: var(--bg-subtle);
+  }
+
+  .quick-reply-option:active {
+    background-color: var(--bg-muted);
+  }
+
+  .quick-reply-option[data-active="true"] {
+    background-color: var(--state-selected-bg);
+  }
+
+  .quick-reply-option[data-active="true"]::before {
+    content: "";
+    position: absolute;
+    inset-block: var(--spacing-1-5);
+    inset-inline-start: 0;
+    width: var(--spacing-1);
+    border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+    background-color: var(--state-selected-bar);
+  }
+
+  .quick-reply-meta-text {
+    font-size: var(--text-caption-size);
+    line-height: var(--text-caption-leading);
+    color: var(--text-tertiary);
+  }
+
+  .quick-reply-preview {
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+    background-color: var(--bg-page);
+    padding: var(--spacing-3);
+  }
+
+  @media (max-width: 767px), (pointer: coarse) {
+    .quick-reply-touch-target {
+      min-height: var(--spacing-10);
+      min-width: var(--spacing-10);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .quick-reply-menu-card {
+      animation: quick-reply-enter var(--motion-hover) var(--ease-out) backwards;
+    }
+  }
+
+  @keyframes quick-reply-enter {
+    from {
+      opacity: 0;
+      transform: translateY(var(--motion-item-slide));
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}

@@ -16,6 +16,7 @@ import type { PublishForm } from "@/ui/hooks/usePublishForm";
 import type { ComposeDraftPayload } from "@/ui/schemas/post-draft.schema";
 import { useActiveTenant } from "@/ui/hooks/useMe";
 import { TENANT_ID_PATTERN } from "@/ui/schemas/tenant-health.schema";
+import { abortWithReason, isAbortError } from "@/ui/services/abort";
 import { ApiError } from "@/ui/services/api-error";
 import { ANONYMOUS_OWNER_KEY, composeDraftBuffer } from "@/ui/services/compose-draft-buffer";
 import {
@@ -82,6 +83,44 @@ export interface ComposeDraftState {
   discard: () => void;
   /** True when the buffer on this machine refuses to store (quota, private mode). */
   localBufferFailed: boolean;
+}
+
+export interface ComposeDraftSaveOutcome {
+  readonly kind: "saved" | "local-only" | "aborted" | "error";
+  readonly updatedAt?: string | null;
+  readonly errorMessage?: string;
+}
+
+/**
+ * Pure save runner shared by `useComposeDraft` and unit tests:
+ * treats intentional/navigation aborts as a clean `"aborted"` no-op without
+ * leaking an unhandled rejection or entering an error state, while surfacing
+ * real server/network failures.
+ */
+export async function executeComposeDraftSave(params: {
+  readonly payload: ComposeDraftPayload;
+  readonly signal: AbortSignal;
+  readonly save?: typeof saveComposeDraft;
+}): Promise<ComposeDraftSaveOutcome> {
+  const save = params.save ?? saveComposeDraft;
+  try {
+    const result = await save({ payload: params.payload }, params.signal);
+    if (params.signal.aborted) return { kind: "aborted" };
+    if (result.persisted) {
+      return { kind: "saved", updatedAt: result.updatedAt };
+    }
+    return { kind: "local-only" };
+  } catch (error) {
+    if (isAbortError(error, params.signal)) {
+      return { kind: "aborted" };
+    }
+    return {
+      kind: "error",
+      errorMessage: ApiError.is(error)
+        ? error.userMessage
+        : "Không lưu được nháp lên máy chủ. Nháp vẫn được giữ trên máy này.",
+    };
+  }
 }
 
 export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): ComposeDraftState {
@@ -245,19 +284,32 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
       if (tenantId.length === 0) return;
 
       const generation = generationRef.current;
+      abortWithReason(saveAbortRef.current, "compose-draft: superseded by newer save");
       const controller = new AbortController();
       saveAbortRef.current = controller;
       setPhase("saving");
 
       const attempt = (async () => {
         try {
-          const result = await saveComposeDraft({ payload: next }, controller.signal);
+          const outcome = await executeComposeDraftSave({
+            payload: next,
+            signal: controller.signal,
+          });
           if (!mountedRef.current || generationRef.current !== generation) return;
+          if (outcome.kind === "aborted") return;
+          if (outcome.kind === "error") {
+            setPhase("error");
+            setErrorMessage(
+              outcome.errorMessage ??
+                "Không lưu được nháp lên máy chủ. Nháp vẫn được giữ trên máy này.",
+            );
+            return;
+          }
           lastSavedRef.current = next;
           everSavedRef.current = true;
           setErrorMessage(null);
-          if (result.persisted) {
-            setUpdatedAt(result.updatedAt);
+          if (outcome.kind === "saved") {
+            setUpdatedAt(outcome.updatedAt ?? null);
             setPhase("saved");
           } else {
             // NOT a failure: this environment has no `app_user` row for the
@@ -265,16 +317,6 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
             // a save that did not happen.
             setPhase("local-only");
           }
-        } catch (error) {
-          if (!mountedRef.current || generationRef.current !== generation) return;
-          // An abort is our own doing (discard), not something to report.
-          if (controller.signal.aborted) return;
-          setPhase("error");
-          setErrorMessage(
-            ApiError.is(error)
-              ? error.userMessage
-              : "Không lưu được nháp lên máy chủ. Nháp vẫn được giữ trên máy này.",
-          );
         } finally {
           if (saveAbortRef.current === controller) saveAbortRef.current = null;
         }
@@ -291,6 +333,7 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
   useEffect(() => {
     mountedRef.current = true;
     let cancelled = false;
+    const hydrateController = new AbortController();
 
     /** The restore is over (applied or not): release the URL, wake autosave. */
     function settle(nextPhase: ComposeDraftPhase): void {
@@ -333,13 +376,17 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
       // are. Reading the buffer before that would mean reading a bucket we
       // cannot yet attribute to anybody.
       try {
-        const response = await fetchComposeDraft();
+        const response = await fetchComposeDraft(hydrateController.signal);
         server = response.draft;
         serverUpdatedAt = response.updatedAt;
         serverPersisted = response.persisted;
         ownerKey = response.ownerKey ?? ANONYMOUS_OWNER_KEY;
         ownerKeyRef.current = ownerKey;
       } catch (error) {
+        if (cancelled || isAbortError(error, hydrateController.signal)) {
+          if (!hydrationDoneRef.current) hydrationStartedRef.current = false;
+          return;
+        }
         serverUnreachable = true;
         // The server copy is unreachable. Staying silent would hide why only
         // half the work came back — but say it AFTER the cancelled guard below,
@@ -351,7 +398,7 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
 
       // Cancelled = this run is the one React threw away on the extra mount.
       // The cleanup has already handed the slot back, so the next run redoes it.
-      if (cancelled) return;
+      if (cancelled || hydrateController.signal.aborted) return;
       if (unreachableMessage !== null) setErrorMessage(unreachableMessage);
 
       // A draft left behind by a publish whose cleanup failed: drop it before it
@@ -361,6 +408,7 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
         serverUpdatedAt = null;
         void discardComposeDraft().catch((error: unknown) => {
           composeDraftBuffer.markPendingDiscard({ tenantId, ownerKey });
+          if (isAbortError(error)) return;
           console.warn("[useComposeDraft] retry of the post-publish cleanup failed", {
             scope: "ui/useComposeDraft",
             action: "retry-discard",
@@ -435,6 +483,10 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
     // `settle` in the failure path too: an unexpected throw must not leave the
     // screen restoring forever with no way out.
     void hydrate().catch((error: unknown) => {
+      if (cancelled || isAbortError(error, hydrateController.signal)) {
+        if (!hydrationDoneRef.current) hydrationStartedRef.current = false;
+        return;
+      }
       console.error("[useComposeDraft] restoring the draft failed", {
         scope: "ui/useComposeDraft",
         action: "hydrate",
@@ -450,6 +502,7 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
 
     return () => {
       cancelled = true;
+      abortWithReason(hydrateController, "compose-draft: hydrate cancelled");
       // A run that never got as far as applying must hand the slot back, or the
       // extra mount React does in development leaves nobody to restore anything.
       if (!hydrationDoneRef.current) hydrationStartedRef.current = false;
@@ -539,16 +592,18 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
 
     suspendedRef.current = true;
     generationRef.current += 1;
-    saveAbortRef.current?.abort();
+    abortWithReason(saveAbortRef.current, "compose-draft: batch published");
+    saveAbortRef.current = null;
     clearTimers();
     composeDraftBuffer.clear({ tenantId, ownerKey });
 
     void discardComposeDraft().catch((error: unknown) => {
       // The lô exists, so this is not the operator's failure to see — but it is
       // NOT nothing either: the row left behind would be offered back as "nháp
-      // đang soạn" of a post that has already gone out. The marker makes the
+      // đang soạn" of a post that already went out. The marker makes the
       // next mount retry the delete instead of restoring it.
       composeDraftBuffer.markPendingDiscard({ tenantId, ownerKey });
+      if (isAbortError(error)) return;
       console.warn("[useComposeDraft] draft cleanup after publish failed", {
         scope: "ui/useComposeDraft",
         action: "discard-after-publish",
@@ -561,6 +616,8 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
   useEffect(() => {
     return () => {
       mountedRef.current = false;
+      abortWithReason(saveAbortRef.current, "compose-draft: component unmounted");
+      saveAbortRef.current = null;
       if (localTimerRef.current) clearTimeout(localTimerRef.current);
       if (serverTimerRef.current) clearTimeout(serverTimerRef.current);
     };
@@ -582,7 +639,7 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
     // the row back — the operator asked for a delete, saw it happen, and the
     // draft returns on the next visit.
     generationRef.current += 1;
-    saveAbortRef.current?.abort();
+    abortWithReason(saveAbortRef.current, "compose-draft: draft discarded");
     saveAbortRef.current = null;
 
     lastSavedRef.current = null;
@@ -603,10 +660,10 @@ export function useComposeDraft(wizard: ComposeWizard, publish: PublishForm): Co
         .catch(() => undefined)
         .then(() => discardComposeDraft())
         .catch((error: unknown) => {
-          if (!mountedRef.current) return;
+          composeDraftBuffer.markPendingDiscard({ tenantId, ownerKey });
+          if (!mountedRef.current || isAbortError(error)) return;
           // The operator asked for this one, so a failure is theirs to see —
           // and the marker makes the next mount try again.
-          composeDraftBuffer.markPendingDiscard({ tenantId, ownerKey });
           setPhase("error");
           setErrorMessage(
             ApiError.is(error)

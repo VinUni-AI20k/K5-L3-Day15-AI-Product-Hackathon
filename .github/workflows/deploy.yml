@@ -1,0 +1,262 @@
+# Build container images to GHCR and deploy VPOST to https://vpost.vannt.asia.
+name: Deploy
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+# Never overlap two deployments against the same production stack.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  context:
+    name: Resolve image prefix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      image_prefix: ${{ steps.meta.outputs.image_prefix }}
+    steps:
+      - id: meta
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # GHCR requires an all-lowercase repository path.
+          image_prefix="ghcr.io/$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          printf 'image_prefix=%s\n' "$image_prefix" >> "$GITHUB_OUTPUT"
+          printf 'Deploying %s using %s/{web,worker,migrate,api}:%s\n' \
+            "$SHA" "$image_prefix" "$SHA" >> "$GITHUB_STEP_SUMMARY"
+
+  verify:
+    name: Verify
+    uses: ./.github/workflows/verify.yml
+
+  build:
+    name: Build and push images
+    needs: [context]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push web
+        uses: docker/build-push-action@v6
+        with:
+          context: vpost
+          file: vpost/Dockerfile
+          target: web
+          build-args: |
+            VPOST_API_URL=http://api:8021
+          push: true
+          tags: ${{ needs.context.outputs.image_prefix }}/web:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+          provenance: false
+
+      - name: Build and push worker
+        uses: docker/build-push-action@v6
+        with:
+          context: vpost
+          file: vpost/Dockerfile
+          target: worker
+          push: true
+          tags: ${{ needs.context.outputs.image_prefix }}/worker:${{ github.sha }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker
+          provenance: false
+
+      - name: Build and push migrate
+        uses: docker/build-push-action@v6
+        with:
+          context: vpost
+          file: vpost/Dockerfile
+          target: migrate
+          push: true
+          tags: ${{ needs.context.outputs.image_prefix }}/migrate:${{ github.sha }}
+          cache-from: type=gha,scope=migrate
+          cache-to: type=gha,mode=max,scope=migrate
+          provenance: false
+
+      - name: Build and push api
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.api
+          push: true
+          tags: ${{ needs.context.outputs.image_prefix }}/api:${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+          provenance: false
+
+  deploy:
+    name: Deploy to production
+    needs: [context, verify, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for var in VPS_HOST VPS_SSH_USER VPS_SSH_KEY; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::Secret $var is not set"
+              exit 1
+            fi
+          done
+
+          ssh_port="${VPS_SSH_PORT:-22}"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+          if [ -n "$VPS_SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "::warning::VPS_SSH_KNOWN_HOSTS is not set; falling back to ssh-keyscan"
+            ssh-keyscan -p "$ssh_port" -H "$VPS_HOST" > ~/.ssh/known_hosts 2>/dev/null
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+          cat > ~/.ssh/config <<EOF
+          Host deploy-target
+            HostName $VPS_HOST
+            Port $ssh_port
+            User $VPS_SSH_USER
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+          EOF
+          chmod 600 ~/.ssh/config
+
+          ssh -o BatchMode=yes deploy-target 'echo "ssh ok: $(hostname)"'
+
+      - name: Ship deploy files via tar over SSH
+        env:
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+        run: |
+          set -euo pipefail
+          app_dir="${VPS_APP_DIR:-/srv/vpost}"
+          if [[ ! "$app_dir" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::VPS_APP_DIR must be a clean absolute path (got: $app_dir)"
+            exit 1
+          fi
+
+          # Ship only the compose definition and deploy script so the VPS's .env
+          # is never overwritten.
+          # shellcheck disable=SC2029
+          tar czf - deploy/docker-compose.prod.yml deploy/remote-deploy.sh \
+            | ssh -o BatchMode=yes deploy-target \
+                "mkdir -p '$app_dir' && tar xzf - -C '$app_dir' && chmod +x '$app_dir/deploy/remote-deploy.sh'"
+
+      - name: Run remote deploy
+        env:
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+          IMAGE_PREFIX: ${{ needs.context.outputs.image_prefix }}
+          IMAGE_TAG: ${{ github.sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          app_dir="${VPS_APP_DIR:-/srv/vpost}"
+          # Pass variables and credentials through stdin exports, never argv
+          # (argv is visible to other processes via ps on the VPS).
+          {
+            printf 'export VPS_APP_DIR=%q\n' "$app_dir"
+            printf 'export IMAGE_PREFIX=%q\n' "$IMAGE_PREFIX"
+            printf 'export IMAGE_TAG=%q\n' "$IMAGE_TAG"
+            printf 'export GHCR_USER=%q\n' "$GHCR_USER"
+            printf 'export GHCR_TOKEN=%q\n' "$GHCR_TOKEN"
+            cat deploy/remote-deploy.sh
+          } | ssh -o BatchMode=yes deploy-target 'bash -s'
+
+      - name: Smoke test public health endpoint
+        env:
+          HEALTH_URL: https://vpost.vannt.asia/api/health
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          body="$(mktemp)"
+          trap 'rm -f "$headers" "$body"' EXIT
+
+          for attempt in $(seq 1 10); do
+            http_code="$(curl -sS --max-time 15 -D "$headers" -o "$body" -w '%{http_code}' "$HEALTH_URL" || echo 000)"
+            content_type="$(grep -i '^content-type:' "$headers" | tail -n 1 | tr -d '\r' || true)"
+            if [ "$http_code" = "200" ] \
+              && printf '%s' "$content_type" | grep -qi 'application/json' \
+              && python3 -c 'import json, sys; d = json.load(sys.stdin); assert d.get("status") == "ok", d' < "$body"; then
+              echo "$HEALTH_URL -> $http_code ($content_type): $(cat "$body")"
+              exit 0
+            fi
+            echo "attempt $attempt failed (status=$http_code, $content_type): $(head -c 200 "$body" 2>/dev/null || true); retrying in 10s"
+            sleep 10
+          done
+
+          echo "::error::$HEALTH_URL did not return 200 JSON with status=ok — check DNS, edge Caddy, and vpost-web"
+          exit 1
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Move prod convenience tag
+        env:
+          IMAGE_PREFIX: ${{ needs.context.outputs.image_prefix }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          status=0
+          for image in web worker migrate api; do
+            docker buildx imagetools create \
+              -t "$IMAGE_PREFIX/$image:prod" \
+              "$IMAGE_PREFIX/$image:$SHA" || status=$?
+          done
+          if [ "$status" -ne 0 ]; then
+            echo "::warning::not all :prod tags moved; the release itself is live"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### ${{ job.status }} — production"
+            echo ""
+            echo "- commit: \`${{ github.sha }}\`"
+            echo "- images: \`${{ needs.context.outputs.image_prefix }}/{web,worker,migrate,api}:${{ github.sha }}\`"
+            echo "- url: https://vpost.vannt.asia"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -210,7 +210,7 @@ describe("summarizeOnboardingSurvey — the known code list", () => {
 describe("summarizeOnboardingSurvey — completion", () => {
   it("counts finished surveys, and an all-skipped-but-finished one is still finished", () => {
     const summary = summarizeOnboardingSurvey([
-      answers({ completedAt: new Date("2026-08-26T10:00:00.000Z") }),
+      answers({ completedAt: new Date("2054-08-26T10:00:00.000Z") }),
       answers({ completedAt: null }),
       null,
     ]);
@@ -222,7 +222,7 @@ describe("summarizeOnboardingSurvey — completion", () => {
   it("does not count an invalid date as finished", () => {
     const summary = summarizeOnboardingSurvey([
       answers({ completedAt: new Date("not a date") }),
-      answers({ completedAt: "2026-08-26T10:00:00.000Z" as never }),
+      answers({ completedAt: "2054-08-26T10:00:00.000Z" as never }),
     ]);
 
     // An ISO string is accepted (a JSON round trip is a real caller); NaN is not.

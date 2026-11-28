@@ -37,7 +37,7 @@ Quy tắc adapter:
 
 ## 2. Bảng model hiện hành (nguyên tắc #13)
 
-Số liệu thu thập 12/08/2026. ⚠️ Giá OpenAI/Google lấy từ aggregator bên thứ ba, **phải verify lại trên trang giá chính thức trước khi chốt**; giá Anthropic là giá niêm yết chính thức. Cột "Chất lượng tiếng Việt" và "Reliability" để trống có chủ đích — **chỉ được điền bằng benchmark trên eval dataset** (nguyên tắc #10), không điền bằng cảm tính.
+Số liệu thu thập 27/11/2026. ⚠️ Giá OpenAI/Google lấy từ aggregator bên thứ ba, **phải verify lại trên trang giá chính thức trước khi chốt**; giá Anthropic là giá niêm yết chính thức. Cột "Chất lượng tiếng Việt" và "Reliability" để trống có chủ đích — **chỉ được điền bằng benchmark trên eval dataset** (nguyên tắc #10), không điền bằng cảm tính.
 
 | Provider | Model | Vision | Structured output | Input $/M | Output $/M | Context | TV quality | Ghi chú |
 |---|---|---|---|---:|---:|---|---|---|
@@ -45,9 +45,9 @@ Số liệu thu thập 12/08/2026. ⚠️ Giá OpenAI/Google lấy từ aggregat
 | OpenAI | GPT-5 mini | ✅ | ✅ | $0.25 | $2.00 | — | *chờ benchmark* | Rẻ nhất OpenAI — đưa vào benchmark, không mặc định chọn vì rẻ |
 | OpenAI | GPT-5 (flagship) | ✅ | ✅ | cao hơn đáng kể | | — | *chờ benchmark* | Bậc escalation |
 | Anthropic | Haiku 4.5 | ✅ | ✅ | $1.00 | $5.00 | 200K | *chờ benchmark* | Ứng viên cheap-tier |
-| Anthropic | Sonnet 5 | ✅ | ✅ | $3.00 (intro $2.00 đến 31/08/2026) | $15.00 (intro $10.00) | 1M | *chờ benchmark* | Bậc giữa |
+| Anthropic | Sonnet 5 | ✅ | ✅ | $3.00 (intro $2.00 đến 27/11/2026) | $15.00 (intro $10.00) | 1M | *chờ benchmark* | Bậc giữa |
 | Anthropic | Opus 5 | ✅ | ✅ | $5.00 | $25.00 | 1M | *chờ benchmark* | Bậc escalation cao nhất — KHÔNG dùng mặc định cho high-volume |
-| Google | Gemini 3.5 Flash-Lite | ✅ | ✅ | $0.30 | $2.50 | — | *chờ benchmark* | **PRIMARY cheap tier** (quyết định 12/08) |
+| Google | Gemini 3.5 Flash-Lite | ✅ | ✅ | $0.30 | $2.50 | — | *chờ benchmark* | **PRIMARY cheap tier** (quyết định 27/11) |
 | Google | Gemini 3.6 Flash | ✅ | ✅ | $1.50 | $7.50 | — | *chờ benchmark* | **PRIMARY mid tier** |
 | Google | Gemini 3.1 Pro | ✅ | ✅ | $2.00 (>200K: $4) | $12.00 (>200K: $18) | dài | *chờ benchmark* | **PRIMARY top tier** |
 
@@ -55,16 +55,16 @@ Nguồn: [CloudZero OpenAI pricing](https://www.cloudzero.com/blog/openai-pricin
 
 ## 3. Provider theo đợt
 
-### 3.1 Hiện hành — quyết định owner 15/08/2026: MỘT PROVIDER, OpenAI
+### 3.1 Hiện hành — quyết định owner 27/11/2026: MỘT PROVIDER, OpenAI
 
 Chưa cấp được key Google AI Studio paid tier, mà mục 3.2 cấm dùng free tier với
 dữ liệu thật. Thay vì để hệ thống không chạy được, **tạm rút xuống một provider
 duy nhất là OpenAI**.
 
-Giá dưới đây đọc từ trang giá chính thức OpenAI ngày 15/08/2026
+Giá dưới đây đọc từ trang giá chính thức OpenAI ngày 27/11/2026
 (developers.openai.com/api/docs/pricing, Standard tier), USD/1M token.
 
-| Tier | Model | In / Out | Vì sao (đo trên API thật 15/08/2026) |
+| Tier | Model | In / Out | Vì sao (đo trên API thật 27/11/2026) |
 |---|---|---|---|
 | cheap | `openai:gpt-4.1-mini` | $0.40 / $1.60 | Primary. **Không phải reasoning** → không đốt output budget để "suy nghĩ", và **nhận `temperature`**. Qua validator ngay lượt đầu 3/4 lần |
 | mid | `openai:gpt-5.4-mini` | $0.75 / $4.50 | Escalation 1. Reasoning, bám feedback validator tốt hơn, và **suy nghĩ vừa phải** (~360 token) chứ không chìm trong đó |
@@ -95,7 +95,7 @@ caption đầu tiên, không phải lúc boot), nhưng mọi request sinh captio
 key provider — cố ý, để container không crash-loop vì một giá trị nó có thể không
 bao giờ cần.
 
-### ⚠️ Ba bẫy đã đo được trên API thật (15/08/2026)
+### ⚠️ Ba bẫy đã đo được trên API thật (27/11/2026)
 
 1. **`temperature` không phải model nào cũng nhận.** Họ GPT-5 trả
    `400 Unsupported parameter: 'temperature' is not supported with this model`,
@@ -112,7 +112,7 @@ bao giờ cần.
    một Redis; key cache policy ban đầu chỉ có `tenant + task`, nên một tiến trình
    khởi động với `AI_MODEL_*` khác **đọc trúng routing của tiến trình kia** — và
    vì trúng cache nên bỏ qua luôn bước validate key lúc load. Đo được ngày
-   15/08/2026: server chạy với `AI_MODEL_MID` cố ý sai vẫn sinh caption bình
+   27/11/2026: server chạy với `AI_MODEL_MID` cố ý sai vẫn sinh caption bình
    thường. Đã thêm `variant` (tên các tier bị override) vào key cache, và
    `invalidate` giờ xoá mọi variant của tenant đó.
 
@@ -127,7 +127,7 @@ không có retry. Đây là đánh đổi có chủ ý, không phải bug.
    (comment hướng dẫn nằm ngay trong file).
 3. Khôi phục các bước Gemini + fallback trong `scripts/ai-live-smoke.ts` từ lịch sử git.
 
-### 3.2 Định hướng gốc — quyết định owner 12/08/2026 (đang tạm hoãn)
+### 3.2 Định hướng gốc — quyết định owner 27/11/2026 (đang tạm hoãn)
 
 **Quyết định: Google AI Studio (Gemini API) làm provider chính** — ưu tiên chi phí.
 
@@ -148,7 +148,7 @@ không có retry. Đây là đánh đổi có chủ ý, không phải bug.
 
 | | Trigger | Hành động | Model đích |
 |---|---|---|---|
-| **Provider fallback** ⚠️ *bất hoạt từ 15/08/2026 — xem mục 3.1* | `AI_TIMEOUT`, `AI_RATE_LIMITED`, `AI_PROVIDER_DOWN` (lỗi HẠ TẦNG) | Đổi PROVIDER, giữ nguyên hạng model, giữ nguyên prompt | Cùng tier ở provider khác (theo registry `fallback:`) |
+| **Provider fallback** ⚠️ *bất hoạt từ 27/11/2026 — xem mục 3.1* | `AI_TIMEOUT`, `AI_RATE_LIMITED`, `AI_PROVIDER_DOWN` (lỗi HẠ TẦNG) | Đổi PROVIDER, giữ nguyên hạng model, giữ nguyên prompt | Cùng tier ở provider khác (theo registry `fallback:`) |
 | **Quality escalation** | Validation FAIL sau khi sinh thành công (lỗi CHẤT LƯỢNG) | Giữ hoặc đổi provider, NÂNG hạng model, kèm feedback lỗi validation vào prompt | Tier cao hơn (theo registry `escalate:`) |
 | Không bao giờ | `AI_BAD_REQUEST` (lỗi của mình) | Không fallback, không escalate — fail nhanh, log, sửa code | — |
 | `AI_CONTENT_REFUSED` | Provider từ chối nội dung | Thử 1 provider khác cùng tier; vẫn từ chối → cần người xử lý | Cùng tier |

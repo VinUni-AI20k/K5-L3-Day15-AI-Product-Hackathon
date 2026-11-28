@@ -30,9 +30,9 @@ export function DetectedCodeNotice(props: DetectedCodeNoticeProps) {
     <div
       role="status"
       aria-live="polite"
-      className="border-border bg-card space-y-3 rounded-lg border p-3"
+      className="border-border bg-card space-y-3 rounded-xl border p-4"
     >
-      <p className="text-sm">{view.title}</p>
+      <p className="text-foreground text-sm font-medium">{view.title}</p>
 
       <div className="flex flex-wrap gap-2">
         {view.actions.map((action) => (
@@ -40,9 +40,10 @@ export function DetectedCodeNotice(props: DetectedCodeNoticeProps) {
             key={`${action.kind}:${action.code}:${action.label}`}
             type="button"
             size="sm"
-            variant={action.variant === "outline" ? "outline" : "default"}
+            variant={action.variant === "outline" ? "secondary" : "default"}
             disabled={props.isPending}
             onClick={() => props.onAction(action)}
+            className="min-h-10 px-3.5"
           >
             {action.label}
           </Button>

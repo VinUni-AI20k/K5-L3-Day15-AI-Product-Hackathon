@@ -1,10 +1,11 @@
 "use client";
 
+import { EmptyState as AstryxEmptyState } from "@astryxdesign/core";
+import { CheckCircle2 } from "lucide-react";
 import { useId, useState } from "react";
 
 import { cn } from "@/shared/utils";
-import { EmptyState } from "@/ui/components/feedback/EmptyState";
-import { formatCount, percentOf, segmentWidth } from "@/ui/components/sync/sync-format";
+import { formatCount, percentOf, segmentPercent } from "@/ui/components/sync/sync-format";
 import {
   fromIssueGroups,
   groupSyncIssues,
@@ -35,10 +36,10 @@ const SEVERITY_DOT: Record<SyncIssueSeverity, string> = {
   error: "bg-destructive",
 };
 
-const SEVERITY_BAR: Record<SyncIssueSeverity, string> = {
-  neutral: "bg-muted-foreground/40",
-  warning: "bg-warning",
-  error: "bg-destructive",
+const SEVERITY_FILL: Record<SyncIssueSeverity, string> = {
+  neutral: "fill-muted-foreground/40",
+  warning: "fill-warning",
+  error: "fill-destructive",
 };
 
 /** Never colour alone: the dot is decorative, this word is what is announced. */
@@ -75,9 +76,9 @@ export function SyncIssuesTable({
   const countsDisagree = hasExactGroups && groups.length > 0 && groupSum !== total;
 
   return (
-    <section aria-labelledby={headingId} className="@container space-y-2.5">
+    <section aria-labelledby={headingId} className="@container space-y-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 id={headingId} className="text-base font-semibold">
+        <h2 id={headingId} className="text-foreground text-lg font-semibold">
           Cần xử lý
         </h2>
         <p className="text-muted-foreground text-sm">
@@ -90,7 +91,7 @@ export function SyncIssuesTable({
       {truncated && !hasExactGroups ? (
         <p
           role="status"
-          className="border-warning/40 bg-warning/10 text-warning-foreground rounded-xl border px-3.5 py-2.5 text-sm"
+          className="border-warning/30 bg-warning/10 text-warning-foreground rounded-xl border px-4 py-3 text-sm"
         >
           Hệ thống chỉ lưu {formatCount(shown)} vấn đề đầu tiên, tổng thật là {formatCount(total)}.
           Số theo từng lý do bên dưới{" "}
@@ -102,7 +103,7 @@ export function SyncIssuesTable({
       {countsDisagree ? (
         <p
           role="status"
-          className="border-warning/40 bg-warning/10 text-warning-foreground rounded-xl border px-3.5 py-2.5 text-sm"
+          className="border-warning/30 bg-warning/10 text-warning-foreground rounded-xl border px-4 py-3 text-sm"
         >
           Cộng số theo từng lý do được {formatCount(groupSum)}, khác với tổng {formatCount(total)}{" "}
           mà lần chạy ghi nhận. Lấy con số theo từng lý do làm chuẩn và báo quản trị viên kiểm tra
@@ -114,17 +115,28 @@ export function SyncIssuesTable({
         total > 0 ? (
           <p
             role="status"
-            className="border-warning/40 bg-warning/10 text-warning-foreground rounded-xl border px-3.5 py-2.5 text-sm"
+            className="border-warning/30 bg-warning/10 text-warning-foreground rounded-xl border px-4 py-3 text-sm"
           >
             Lần chạy này ghi nhận {formatCount(total)} vấn đề nhưng không lưu được ví dụ nào. Chạy
             đồng bộ lại để lấy danh sách chi tiết.
           </p>
         ) : (
-          <EmptyState
-            kind="done"
-            title="Không có gì cần xử lý"
-            description="Không file hay dòng nào bị bỏ qua trong lần chạy này. Toàn bộ dữ liệu đọc được đã vào hệ thống."
-          />
+          <div className="border-border bg-card rounded-xl border p-6">
+            <AstryxEmptyState
+              isCompact
+              headingLevel={3}
+              icon={
+                <span
+                  aria-hidden="true"
+                  className="bg-success/15 text-success-foreground flex size-11 items-center justify-center rounded-xl"
+                >
+                  <CheckCircle2 className="size-5" aria-hidden="true" />
+                </span>
+              }
+              title="Không có gì cần xử lý"
+              description="Không file hay dòng nào bị bỏ qua trong lần chạy này. Toàn bộ dữ liệu đọc được đã vào hệ thống."
+            />
+          </div>
         )
       ) : (
         <div
@@ -133,7 +145,7 @@ export function SyncIssuesTable({
           // give a screen-reader user no way to tell them apart.
           aria-label="Bảng vấn đề — cuộn ngang để xem hết cột"
           tabIndex={0}
-          className="border-border overflow-x-auto rounded-xl border"
+          className="border-border bg-card scroll-cue-x overflow-x-auto rounded-xl border"
         >
           {/* `table-fixed` + fixed column widths: with `auto` every run would
               lay the columns out differently and the eye has to re-aim. */}
@@ -229,16 +241,20 @@ function IssueGroupRows({ group, shown }: { group: IssueGroup; shown: number }) 
 
         <td className="px-3 py-2.5">
           <span className="flex items-center gap-2">
-            <span
+            <svg
               aria-hidden="true"
-              className="bg-muted flex h-1.5 min-w-0 flex-1 overflow-hidden rounded-full"
+              viewBox="0 0 100 6"
+              preserveAspectRatio="none"
+              className="bg-muted h-1.5 min-w-0 flex-1 overflow-hidden rounded-full"
             >
-              <span
-                className={cn("h-full", SEVERITY_BAR[group.severity])}
-                // Runtime share of a group; not expressible as a static class.
-                style={{ width: segmentWidth(group.count, shown) }}
+              <rect
+                x={0}
+                y={0}
+                width={segmentPercent(group.count, shown)}
+                height={6}
+                className={SEVERITY_FILL[group.severity]}
               />
-            </span>
+            </svg>
             <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
               {share ?? "—"}
             </span>
@@ -257,7 +273,7 @@ function IssueGroupRows({ group, shown }: { group: IssueGroup; shown: number }) 
             // Only while the panel exists: pointing at a missing id is worse
             // than saying nothing.
             aria-controls={isOpen ? panelId : undefined}
-            className="text-primary focus-visible:ring-ring/50 rounded-sm whitespace-nowrap underline underline-offset-4 focus-visible:ring-3 focus-visible:outline-none"
+            className="text-accent-foreground focus-visible:ring-ring inline-flex min-h-10 items-center rounded-sm px-1.5 text-sm font-medium whitespace-nowrap underline-offset-4 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:min-h-9 motion-safe:transition-colors motion-safe:duration-150"
           >
             {isOpen ? "Ẩn ví dụ" : "Xem ví dụ"}
             <span className="sr-only"> của {group.errorCode}</span>

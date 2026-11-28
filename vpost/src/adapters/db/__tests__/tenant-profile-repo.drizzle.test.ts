@@ -33,8 +33,8 @@ const EMPTY_ROW: StoredRow = {
   channelCount: null,
   focusChannels: null,
   completedAt: null,
-  createdAt: new Date("2026-08-26T00:00:00.000Z"),
-  updatedAt: new Date("2026-08-26T00:00:00.000Z"),
+  createdAt: new Date("2054-08-26T00:00:00.000Z"),
+  updatedAt: new Date("2054-08-26T00:00:00.000Z"),
 };
 
 function stubDb(initial: StoredRow | null) {
@@ -224,7 +224,7 @@ describe("upsert — undefined keeps, null clears", () => {
   });
 
   it("stamps completedAt when the flow finishes, and can clear it again", async () => {
-    const finishedAt = new Date("2026-08-26T09:30:00.000Z");
+    const finishedAt = new Date("2054-08-26T09:30:00.000Z");
     const { db } = stubDb({ sellerKind: "solo_seller" });
     const repo = new DrizzleTenantProfileRepo(db);
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 
@@ -191,8 +192,8 @@ export function ChannelGroupPicker({
             return (
               <li key={row.channelId}>
                 <label
-                  className={`bg-card border-border has-checked:border-primary has-checked:bg-accent/20 has-focus-visible:ring-ring/50 flex items-center gap-2.5 rounded-xl border p-3 transition-colors has-focus-visible:ring-3 ${
-                    blocked ? "opacity-70" : "cursor-pointer"
+                  className={`bg-card border-border has-checked:border-ring has-checked:bg-accent/50 has-focus-visible:ring-ring flex items-center gap-2.5 rounded-xl border p-3.5 transition-colors duration-150 has-focus-visible:ring-2 ${
+                    blocked ? "opacity-60" : "hover:bg-[var(--bg-subtle)] cursor-pointer"
                   }`}
                 >
                   <input
@@ -248,11 +249,9 @@ function CheckBox() {
   return (
     <span
       aria-hidden="true"
-      className="border-input bg-card peer-checked:bg-primary peer-checked:border-primary peer-indeterminate:bg-primary/40 peer-indeterminate:border-primary peer-disabled:opacity-50 text-primary-foreground peer-checked:[&>span]:inline flex size-4 shrink-0 items-center justify-center rounded-sm border-2 text-xs transition-colors"
+      className="border-input bg-card peer-checked:bg-ring peer-checked:border-ring peer-indeterminate:bg-ring/40 peer-indeterminate:border-ring peer-disabled:opacity-40 text-primary-foreground flex size-5 shrink-0 items-center justify-center rounded-sm border transition-colors duration-150 peer-checked:[&>svg]:block"
     >
-      {/* Written from the box's own rule: the tick is a descendant of the
-          peer's sibling, which `peer-checked:` alone would never reach. */}
-      <span className="hidden">✓</span>
+      <Check className="hidden size-3.5" strokeWidth={3} aria-hidden="true" />
     </span>
   );
 }

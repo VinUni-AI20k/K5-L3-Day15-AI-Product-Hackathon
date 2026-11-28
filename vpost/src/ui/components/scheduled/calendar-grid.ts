@@ -96,7 +96,7 @@ function mondayFirstIndex(date: Date): number {
   return (date.getDay() + 6) % 7;
 }
 
-/** "2026-08-13" -> "2026-08". `null` for anything that is not a real day. */
+/** "2026-11-27" -> "2026-11". `null` for anything that is not a real day. */
 export function monthKeyOfDayKey(dayKey: unknown): string | null {
   return isDateOnly(dayKey) ? dayKey.slice(0, 7) : null;
 }
@@ -116,8 +116,8 @@ export function todayKeyOfMs(nowMs: number): string {
 }
 
 /**
- * Walks the month counter, not the day counter: "2026-01" minus one month is
- * "2025-12", and December plus one is next January. Junk in returns junk out
+ * Walks the month counter, not the day counter: "2026-11" minus one month is
+ * "2026-11", and December plus one is next January. Junk in returns junk out
  * unchanged rather than producing a plausible-looking wrong month.
  */
 export function shiftMonthKey(monthKey: string, delta: number): string {
@@ -194,7 +194,7 @@ export function edgeNavigationDayKey(
 
 /**
  * The same day number inside another month, clamped to that month's last day —
- * PageUp from 31/08 lands on 31/07, but from 31/03 it lands on 28/02 rather
+ * PageUp from 27/11 lands on 27/11, but from 27/11 it lands on 27/11 rather
  * than silently rolling into March.
  */
 export function sameDayInMonth(dayKey: string, monthKey: string): string | null {
@@ -222,7 +222,7 @@ export function resolveMonthKey(
   return monthKeyOfDayKey(day) ?? monthKeyOfMs(nowMs);
 }
 
-/** "Tháng 8 năm 2026". Built from the string — no `Date`, so no zone to get wrong. */
+/** "Tháng 11 năm 2026". Built from the string — no `Date`, so no zone to get wrong. */
 export function formatMonthHeading(monthKey: string): string {
   if (!isMonthKey(monthKey)) return monthKey;
   const [year, month] = monthKey.split("-");

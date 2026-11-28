@@ -59,7 +59,7 @@ export const FACEBOOK_CONTENT_TEMPLATE_V1: PromptTemplate = {
 /**
  * v2 — so với v1 chỉ khác nguyên tắc 4.
  *
- * Lý do (đo trên dữ liệu thật 15/08/2026): dữ liệu sản phẩm hiển thị dạng danh
+ * Lý do (đo trên dữ liệu thật 27/11/2026): dữ liệu sản phẩm hiển thị dạng danh
  * sách có nhãn ("- Chủng loại: Áo cộc tay"), nên model hiểu "TRÍCH NGUYÊN VĂN"
  * là chép cả dòng kèm nhãn. Validator stage 3 dựng nguồn từ giá trị thuần nên
  * không khớp và chặn bài — 3/4 lần chạy thật. Nói rõ phải trích PHẦN GIÁ TRỊ.

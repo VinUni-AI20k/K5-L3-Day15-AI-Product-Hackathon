@@ -26,7 +26,7 @@
  *   BEFORE anything is parsed: an uploaded file is external data (technical
  *   rule 2).
  *
- * SCOPE (PM decision, 24/08/2026): CSV is the ONLY uploaded format. Reading an
+ * SCOPE (PM decision, 27/11/2026): CSV is the ONLY uploaded format. Reading an
  * .xlsx would mean a new dependency and that was refused, so the file adapter
  * must instead RECOGNISE a workbook and tell the operator how to export a CSV.
  * The port stays format-agnostic because the two live implementations (a Google

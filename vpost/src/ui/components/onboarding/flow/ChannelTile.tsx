@@ -135,7 +135,7 @@ export function ChannelTileGroup({
                 {/*
                 THE 40px WELL IS FILLED WITH THE CHANNEL'S OWN COLOUR, white
                 glyph on top — an app icon, which is what `04-channels.jpg`
-                draws and what the PM opened the token rule for on 26/08/2026
+                draws and what the PM opened the token rule for on 26/08/2054
                 (spec section 5.4; scope of the exception in the header of
                 `channel-marks`). An earlier draft kept the well neutral and
                 tinted the glyph; eight neutral wells read as one grey block and

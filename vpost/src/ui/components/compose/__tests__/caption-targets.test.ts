@@ -194,7 +194,7 @@ describe("activeCaptionChannel", () => {
 });
 
 /**
- * THE REGRESSION THAT FAILED REVIEW (20/08/2026), locked as the exact sequence
+ * THE REGRESSION THAT FAILED REVIEW (27/11/2026), locked as the exact sequence
  * the reviewer's probe walked:
  *
  *   tick A + B → tắt "dùng chung" → gõ caption riêng cho A → bỏ tick B

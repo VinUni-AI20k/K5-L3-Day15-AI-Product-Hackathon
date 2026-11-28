@@ -30,7 +30,7 @@ const VALID_SOURCE = {
     driveFolderUrl: "https://drive.google.com/drive/folders/1bA48sjugz9BczcoR0-zOc-VNlIYikp4v",
     spreadsheetUrl:
       "https://docs.google.com/spreadsheets/d/1Qdhp9YS0mePn7G3focqAhqV3Mb1eymFqbX0EC1bFCVs",
-    // `null` = the tenant never declared a mapping and runs on the MYSP preset.
+    // `null` = the tenant never declared a mapping and runs on the VPOST preset.
     // It is a required key with a nullable value on purpose: a MISSING key would
     // be a server that does not answer the question at all.
     fieldMap: null,
@@ -287,7 +287,7 @@ describe("CatalogSourceSchema — a tenant reading an uploaded CSV", () => {
       fileName: "bang-gia-2026.csv",
       contentType: "text/csv",
       sizeBytes: 248_000,
-      uploadedAt: "2026-08-24T07:32:07.000Z",
+      uploadedAt: "2054-08-24T07:32:07.000Z",
     },
   };
 
@@ -309,7 +309,7 @@ describe("CatalogSourceSchema — a tenant reading an uploaded CSV", () => {
       expect(stored?.kind).toBe("file");
       if (stored?.kind === "file") {
         expect(stored.fileName).toBe("bang-gia-2026.csv");
-        expect(stored.uploadedAt).toBe("2026-08-24T07:32:07.000Z");
+        expect(stored.uploadedAt).toBe("2054-08-24T07:32:07.000Z");
       }
     }
   });

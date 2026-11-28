@@ -7,8 +7,8 @@ function makeRun(overrides: Partial<RecentSyncRun> = {}): RecentSyncRun {
   return {
     syncRunId: "run-1",
     status: "succeeded",
-    startedAt: "2026-08-22T03:00:00.000Z",
-    finishedAt: "2026-08-22T03:04:12.000Z",
+    startedAt: "2054-08-22T03:00:00.000Z",
+    finishedAt: "2054-08-22T03:04:12.000Z",
     issuesTotal: 0,
     errorCode: null,
     ...overrides,

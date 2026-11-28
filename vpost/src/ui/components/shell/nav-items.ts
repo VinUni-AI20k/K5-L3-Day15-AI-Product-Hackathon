@@ -10,9 +10,6 @@ export interface NavItem {
    * Set when another nav entry lives UNDER this one: prefix matching would
    * light both at once and the operator could not tell which screen they are
    * on.
-   *
-   * `/platform` is the first entry to need it (M3.4 put "Màu giao diện" at
-   * `/platform/appearance`) — the case the mechanism was kept for.
    */
   readonly isExact?: boolean;
 }
@@ -52,7 +49,13 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { href: "/bulk", label: "Chạy hàng loạt" },
     ],
   },
-  { title: "Theo dõi", items: [{ href: "/posts", label: "Bài đăng" }] },
+  {
+    title: "Theo dõi",
+    items: [
+      { href: "/posts", label: "Bài đăng" },
+      { href: "/comments", label: "Bình luận" },
+    ],
+  },
   {
     title: "Dữ liệu",
     items: [
@@ -65,21 +68,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Cài đặt",
     items: [
       { href: "/channels", label: "Kênh" },
-      { href: "/prompts", label: "Mẫu prompt" },
+      { href: "/writing-style", label: "Phong cách viết" },
       { href: "/members", label: "Thành viên" },
     ],
   },
   {
     title: "Nền tảng",
     requiresPlatformRole: true,
-    items: [
-      // `isExact` earns its keep here: "/platform/appearance" lives UNDER
-      // "/platform", so prefix matching would light both rows at once and the
-      // operator could not tell which screen they are on. This is the nested
-      // destination the mechanism was built for (M3.4).
-      { href: "/platform", label: "Công ty khách", isExact: true },
-      { href: "/platform/appearance", label: "Màu giao diện" },
-    ],
+    items: [{ href: "/platform", label: "Công ty khách" }],
   },
 ] as const;
 

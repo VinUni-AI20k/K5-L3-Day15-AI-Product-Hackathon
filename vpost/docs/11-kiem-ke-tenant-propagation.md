@@ -1,6 +1,6 @@
 # M1.0 — Kiểm kê tenant propagation
 
-> Deliverable của M1.0 (doc 09 §4). HEAD `3bcc0ad`, đo bằng grep thật 19/08/2026. Là căn cứ estimate và checklist cho M1.3a/M1.3b.
+> Deliverable của M1.0 (doc 09 §4). HEAD `3bcc0ad`, đo bằng grep thật 27/11/2026. Là căn cứ estimate và checklist cho M1.3a/M1.3b.
 
 ## 1. Khối lượng chốt
 
@@ -23,7 +23,7 @@
 
 **`tenantId` là chuỗi thô ở biên — brand sai vẫn chạy đúng, compiler không cứu:**
 - Payload HMAC media: `core/domain/media-url.ts:118` (phần tử #2 chuỗi ký) — tầng P, giữ nguyên, unbrand có tên.
-- Khoá Redis: `adapters/queue/redis-job-progress.ts:258-263` (`mysp:progress:{tenantId}:{postJobId}`).
+- Khoá Redis: `adapters/queue/redis-job-progress.ts:258-263` (`vpost:progress:{tenantId}:{postJobId}`).
 - Segment đường dẫn file: `adapters/media/local-blob-store.ts:57,147-155` · `local-media-cache.ts:311,469-473`.
 - Khoá Map cache: `adapters/google/tenant-google-auth.ts:93-105` · `adapters/ai/prompt-store/static-prompt-store.ts:23-24`.
 - `PromptTemplate.tenantId: string | null` (`ports/ai.ts:229`) — built-in dùng chung → `TenantId | null`.

@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown, ExternalLink } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
@@ -212,16 +213,11 @@ export function CatalogSourceCard({
     >
       <div
         className={cn(
-          "flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5",
+          "flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-4",
           isCollapsed ? null : "border-border border-b",
         )}
       >
-        {/* Eyebrow styling on a real heading: the block needs a title in the
-            outline, and <Eyebrow> is a <p> by design. */}
-        <h2
-          id={headingId}
-          className="text-foreground-subtle font-mono text-xs tracking-widest uppercase"
-        >
+        <h2 id={headingId} className="text-foreground text-base font-semibold">
           Nguồn đang đọc
         </h2>
 
@@ -230,12 +226,12 @@ export function CatalogSourceCard({
             urls and `sheetName` only), and inventing one — or fetching it from
             Drive in the browser — is not on the table. */}
         {isCollapsed && configured !== null ? (
-          <p className="text-muted-foreground min-w-0 flex-1 text-xs">
-            <span className="font-mono" title={configured.driveFolderId}>
+          <p className="text-muted-foreground min-w-0 flex-1 text-sm">
+            <span className="font-mono text-xs" title={configured.driveFolderId}>
               Drive {shortenId(configured.driveFolderId)}
             </span>
             <span aria-hidden="true"> · </span>
-            <span className="font-mono" title={configured.spreadsheetId}>
+            <span className="font-mono text-xs" title={configured.spreadsheetId}>
               Sheet {shortenId(configured.spreadsheetId)}
             </span>
             <span aria-hidden="true"> · </span>
@@ -248,17 +244,11 @@ export function CatalogSourceCard({
             <Badge tone="neutral">Đang làm mới…</Badge>
           ) : null}
 
-          {/* One control for the whole card, and it names what it does. In
-              read-only support mode it promises READING, because that is all it
-              can deliver — the editors behind it are gated off (M3.3).
-              `aria-controls` is dropped while folded: the panel it names is
-              unmounted, and pointing at an absent id is worse than pointing at
-              nothing. `aria-expanded` is valid on its own. */}
           {canCollapse ? (
             <Button
               type="button"
-              variant="outline"
-              size="sm"
+              variant="secondary"
+              className="min-h-10 px-3.5 sm:min-h-8"
               aria-expanded={isExpanded}
               aria-controls={isCollapsed ? undefined : detailsId}
               onClick={() => setIsExpanded((open) => !open)}
@@ -266,18 +256,12 @@ export function CatalogSourceCard({
               {isExpanded ? "Thu gọn" : gate.isDisabled ? "Xem chi tiết nguồn" : "Đổi nguồn"}
             </Button>
           ) : null}
-          {/* Only for the tenants the picker cannot serve, and only once the
-              status is known — offering it while the answer is still loading
-              would flash a button at everyone. Suppressed while the card can
-              collapse: the control above already carries this label, and two
-              buttons reading "Đổi nguồn" side by side is a coin toss. The
-              manual editor is still one click away as its own disclosure at the
-              foot of the opened card. */}
+
           {!canCollapse && configured !== null && needsManualEntry && !isPicking && !gate.isDisabled ? (
             <Button
               type="button"
-              variant="outline"
-              size="sm"
+              variant="secondary"
+              className="min-h-10 px-3.5 sm:min-h-8"
               aria-expanded={isManualOpen}
               aria-controls={manualPanelId}
               onClick={() => setIsManualOpen((open) => !open)}
@@ -303,7 +287,7 @@ export function CatalogSourceCard({
           />
 
           {isPicking ? (
-            <div className="border-border space-y-3 border-b p-4">
+            <div className="border-border space-y-3 border-b p-5">
               <p className="text-muted-foreground max-w-prose text-sm">
                 Chọn thư mục ảnh, bảng Google Sheet và tab dữ liệu ngay tại đây. Nguồn chỉ được lưu
                 ở bước cuối, sau khi bạn xác nhận.
@@ -343,25 +327,17 @@ export function CatalogSourceCard({
         </div>
       )}
 
-      {/* OUTSIDE the fold, on purpose: a disconnect that failed left the token
-          stored, and that fact must not disappear with the panel that started
-          it. `canCollapse` also refuses to fold while it is on screen, so this
-          renders inside an open card — never orphaned under a summary row.
-
-          …which is why it needs a way OUT (B-4). A mutation keeps its error
-          until it is reset or fired again, so without this button one failed
-          disconnect pinned the whole card open for the rest of the session,
-          long after the operator had read it — and the fold exists precisely so
-          settled configuration stops covering the run's numbers. Dismissing is
-          local UI state, not a write, so it is not gated in support mode; the
-          RETRY is the panel's own "Ngắt kết nối" above, which still asks for
-          confirmation and is still gated. */}
       {disconnect.isError ? (
-        <div className="border-border border-t p-4">
+        <div className="border-border border-t p-5">
           <ApiErrorNotice
             error={disconnect.error}
             extraAction={
-              <Button type="button" variant="outline" size="sm" onClick={() => disconnect.reset()}>
+              <Button
+                type="button"
+                variant="secondary"
+                className="min-h-10 px-3.5"
+                onClick={() => disconnect.reset()}
+              >
                 Đã đọc, ẩn cảnh báo
               </Button>
             }
@@ -405,8 +381,8 @@ function SourceRegion({
 
   if (isError) {
     return (
-      <div className="border-border border-b p-4">
-        <ApiErrorNotice error={error} onRetry={onRetry} />
+      <div className="border-border border-b p-5">
+        <ApiErrorNotice error={error} shouldFocus={false} onRetry={onRetry} />
       </div>
     );
   }
@@ -422,7 +398,7 @@ function SourceRegion({
     }
 
     return (
-      <div className="border-border space-y-3 border-b p-4">
+      <div className="border-border space-y-3 border-b p-5">
         <p className="text-muted-foreground max-w-prose text-sm">
           Chưa cấu hình nguồn Drive/Sheet cho đơn vị này, nên chưa chạy đồng bộ được.
           {readOnlyReason
@@ -435,7 +411,7 @@ function SourceRegion({
             company, not to the person reading over their shoulder. */}
         <ReadOnlyNotice reason={readOnlyReason} className="max-w-prose" />
         {canPick ? (
-          <Button type="button" onClick={onPick}>
+          <Button type="button" variant="secondary" className="min-h-10 px-4" onClick={onPick}>
             Chọn thư mục và bảng
           </Button>
         ) : null}
@@ -470,7 +446,7 @@ function SourceFacts({ source }: { source: CatalogSource }) {
         />
       </dl>
 
-      <p className="text-muted-foreground border-border border-t border-b px-4 py-2 text-xs">
+      <p className="text-muted-foreground border-border bg-sidebar/50 border-t border-b px-5 py-3 text-xs leading-relaxed">
         Hệ thống chỉ đọc đúng hai nguồn trên. Đổi nguồn xong phải chạy đồng bộ lại — lần đồng bộ kế
         tiếp sẽ xoá sản phẩm/ảnh không còn thuộc nguồn mới.
       </p>
@@ -495,12 +471,12 @@ function SourceColumn({
 }) {
   return (
     // One <div> per dt/dd pair — the only wrapper a <dl> may contain.
-    <div className={cn("space-y-1 px-4 py-3", className)}>
-      <dt className="text-muted-foreground text-xs">
+    <div className={cn("space-y-1.5 px-5 py-4", className)}>
+      <dt className="text-muted-foreground text-xs font-medium">
         {label}
         {extra ? <> · {extra}</> : null}
       </dt>
-      <dd className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {/* `title` keeps the full id reachable without pasting 44 chars. */}
         <span className="text-muted-foreground font-mono text-xs break-all" title={id}>
           {shortenId(id)}
@@ -510,10 +486,11 @@ function SourceColumn({
           target="_blank"
           // noopener: an external tab must not get a handle on this one.
           rel="noopener noreferrer"
-          className="text-primary text-sm whitespace-nowrap underline underline-offset-4"
+          className="text-accent-foreground focus-visible:ring-ring inline-flex min-h-9 items-center gap-1 rounded-sm text-sm font-medium whitespace-nowrap underline-offset-4 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         >
-          {linkLabel}
-          <span className="sr-only"> (mở tab mới)</span> <span aria-hidden="true">↗</span>
+          <span>{linkLabel}</span>
+          <span className="sr-only"> (mở tab mới)</span>
+          <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
         </a>
       </dd>
     </div>
@@ -546,20 +523,24 @@ function ManualSourceDisclosure({
           aria-expanded={isOpen}
           aria-controls={panelId}
           onClick={onToggle}
-          className="focus-visible:ring-ring/50 hover:bg-muted/50 flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium outline-none focus-visible:ring-3"
+          className="text-foreground focus-visible:ring-ring hover:bg-sidebar active:bg-muted flex min-h-12 w-full items-center justify-between gap-3 px-5 py-3.5 text-left text-sm font-semibold transition-colors duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-inset"
         >
           <span>Hoặc nhập link/ID thủ công</span>
-          <span aria-hidden="true" className="text-muted-foreground text-xs">
-            {isOpen ? "▲" : "▼"}
-          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn(
+              "text-muted-foreground size-4 shrink-0 motion-safe:transition-transform motion-safe:duration-150 motion-safe:ease-out",
+              isOpen && "rotate-180",
+            )}
+          />
         </button>
       </h3>
 
       {/* Unmounted when closed on purpose: a hidden form keeps draft values and
           server errors alive where nobody can see them. */}
       {isOpen ? (
-        <div id={panelId} className="space-y-3 px-4 pb-4">
-          <p className="text-muted-foreground max-w-prose text-sm">
+        <div id={panelId} className="space-y-4 px-5 pb-5">
+          <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">
             Dùng khi đơn vị đọc Drive bằng Service Account, hoặc khi bạn đã có sẵn link/ID. Không
             cần kết nối Google cho cách này.
           </p>
@@ -579,13 +560,13 @@ function SourceEmptySkeleton() {
   return (
     <div
       aria-hidden="true"
-      className="border-border space-y-3 border-b p-4 motion-safe:animate-pulse"
+      className="border-border space-y-3 border-b p-5 motion-safe:animate-pulse"
     >
       <div className="space-y-2">
         <div className="bg-muted h-4 w-full max-w-prose rounded" />
         <div className="bg-muted h-4 w-2/3 max-w-prose rounded" />
       </div>
-      <div className="bg-muted h-9 w-44 rounded-lg" />
+      <div className="bg-muted h-10 w-44 rounded-lg" />
     </div>
   );
 }
@@ -601,13 +582,13 @@ function SourceFactsSkeleton() {
     <div aria-hidden="true" className="border-border border-b motion-safe:animate-pulse">
       <div className="grid grid-cols-1 @lg:grid-cols-2">
         {[0, 1].map((cell) => (
-          <div key={cell} className="space-y-2 px-4 py-3">
+          <div key={cell} className="space-y-2 px-5 py-4">
             <div className="bg-muted h-3 w-28 rounded" />
             <div className="bg-muted h-4 w-44 rounded" />
           </div>
         ))}
       </div>
-      <div className="border-border border-t px-4 py-2">
+      <div className="border-border border-t px-5 py-3">
         <div className="bg-muted h-3 w-full rounded" />
       </div>
     </div>

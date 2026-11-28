@@ -23,7 +23,7 @@ import type { ProductRepo } from "@/core/ports/product-repo";
  *
  * KHÔNG tự chọn khi một lô có hai mã (rule nghiệp vụ 5): trả `conflict` kèm
  * danh sách để màn hình bắt người quyết. Gom nhóm đa mã thành nhiều bài là
- * việc của đợt sau (spec 2026-08-26-upload-triage-multi-code-design.md).
+ * việc của đợt sau (spec upload-triage-multi-code-design.md).
  */
 
 export interface DetectUploadCodeInput {

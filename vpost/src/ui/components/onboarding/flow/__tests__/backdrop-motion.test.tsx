@@ -110,7 +110,7 @@ describe("backdrop motion markup", () => {
   });
 
   it("brings the greeting and its button in on the flow's shared entrance timeline", () => {
-    // They used to have a private rule in this stylesheet. Since 26/08/2026
+    // They used to have a private rule in this stylesheet. Since 27/11/2026
     // they ride `onboarding-motion.css` like the four questions do — the
     // heading on row 4 of the spec's table, the button in the slot where the
     // first card would be. What had to survive the move is the FINDING, not the

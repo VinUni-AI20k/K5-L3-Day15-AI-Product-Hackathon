@@ -40,6 +40,7 @@ export function SupportModeBanner() {
 
   return (
     <Banner
+      container="section"
       role="status"
       status="warning"
       title={`Đang hỗ trợ ${supportSession.tenantName} — chỉ đọc`}

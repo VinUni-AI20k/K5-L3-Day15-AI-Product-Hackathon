@@ -27,15 +27,15 @@ const LIVE_LIST_PAYLOAD = {
     {
       channelId: "fb-page-alpha",
       platform: "facebook",
-      name: "MYSP Hàng Thiết Kế",
+      name: "VPOST Hàng Thiết Kế",
       externalId: "102938475610293",
       status: "active",
-      tokenExpiresAt: "2026-11-30T10:00:00.000Z",
+      tokenExpiresAt: "2054-11-30T10:00:00.000Z",
     },
     {
       channelId: "fb-page-beta",
       platform: "facebook",
-      name: "MYSP Sỉ Toàn Quốc",
+      name: "VPOST Sỉ Toàn Quốc",
       externalId: "559182736450192",
       status: "disabled",
       tokenExpiresAt: null,

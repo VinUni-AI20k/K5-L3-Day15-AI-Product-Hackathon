@@ -11,22 +11,19 @@ export function SyncFallback() {
     <div aria-hidden="true" className="@container bg-background h-full min-h-0">
       <div className="flex h-full min-h-0 flex-col overflow-y-auto @5xl:flex-row @5xl:overflow-hidden">
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="border-border flex flex-wrap items-end justify-between gap-x-4 gap-y-3 border-b px-6 py-4 motion-safe:animate-pulse">
-            <div className="min-w-0 space-y-2">
-              <div className="bg-muted h-7 w-56 rounded" />
-              <div className="bg-muted h-4 w-96 max-w-full rounded" />
-            </div>
-            <div className="bg-muted h-9 w-36 rounded-lg" />
+          <div className="border-border flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b px-4 py-3 sm:px-6 motion-safe:animate-pulse">
+            <div className="bg-muted h-8 w-56 rounded-lg" />
+            <div className="bg-muted h-10 w-36 rounded-lg" />
           </div>
 
-          <div className="flex min-w-0 flex-col gap-5 px-6 py-5">
-            <div className="bg-muted h-9 w-72 max-w-full rounded-lg motion-safe:animate-pulse" />
-            <div className="border-border h-40 rounded-xl border motion-safe:animate-pulse" />
+          <div className="flex min-w-0 flex-col gap-6 px-4 py-5 sm:px-6">
+            <div className="bg-muted h-5 w-96 max-w-full rounded motion-safe:animate-pulse" />
+            <div className="border-border bg-card h-44 rounded-xl border motion-safe:animate-pulse" />
             <SyncStatusSkeleton />
           </div>
         </div>
 
-        <div className="border-border bg-card shrink-0 border-t px-5 py-5 @5xl:w-90 @5xl:border-t-0 @5xl:border-l">
+        <div className="border-border bg-sidebar shrink-0 border-t px-4 py-5 sm:px-6 @5xl:w-96 @5xl:border-t-0 @5xl:border-l">
           <SyncRailSkeleton />
         </div>
       </div>

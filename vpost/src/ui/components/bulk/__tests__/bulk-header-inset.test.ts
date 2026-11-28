@@ -17,11 +17,11 @@ import { describe, expect, it } from "vitest";
  *
  * An earlier version of this test added the two, "proved" 40px, and let /bulk
  * ship `px-10`: measured in the browser at 1440 its h1 stood at x=376 while
- * /posts and /prompts stood at x=360, and /bulk's own content column below it
+ * /posts stood at x=360, and /bulk's own content column below it
  * (`px-6`) started at 360 too. Nothing on the screen says so — you have to
  * switch tabs, or measure, to see it.
  *
- * Compared against /posts and /prompts specifically: those three build the same
+ * Compared against /posts specifically: those two build the same
  * centred `max-w-5xl` header column, so they are the ones an operator sees one
  * after another. Screens without such a column are a different construction and
  * are not this test's business.
@@ -36,7 +36,6 @@ const TAILWIND_STEP_PX = 4;
 const SCREENS = {
   "/bulk": "../BulkRunScreen.tsx",
   "/posts": "../../posts/PostsHub.tsx",
-  "/prompts": "../../prompts/PromptTemplatesScreen.tsx",
 } as const;
 
 /**
@@ -61,20 +60,23 @@ function headerColumnInsetPx(relative: string): number {
     /\bmx-auto\b[\s\S]*\bmax-w-5xl\b|\bmax-w-5xl\b[\s\S]*\bmx-auto\b/,
   );
 
-  const inline = /(?:^|\s)p[xl]?-(\d+)(?:\s|$)/.exec(box);
+  // Desktop gutter (1440px): responsive `sm:px-6` / `md:px-6` / `lg:px-6` wins
+  // over the mobile `px-4` fallback (screen pass rule 5: 24px desktop, 16px mobile).
+  const desktopInline = /(?:^|\s)(?:sm|md|lg):p[xl]?-(\d+)(?:\s|$)/.exec(box);
+  const baseInline = /(?:^|\s)p[xl]?-(\d+)(?:\s|$)/.exec(box);
+  const inline = desktopInline ?? baseInline;
   return inline ? Number(inline[1]) * TAILWIND_STEP_PX : 0;
 }
 
 describe("the /bulk header band lines up with the other header bands", () => {
-  it("starts on the same inline edge as /posts and /prompts", () => {
+  it("starts on the same inline edge as /posts", () => {
     const bulk = headerColumnInsetPx(SCREENS["/bulk"]);
 
     expect(bulk).toBe(headerColumnInsetPx(SCREENS["/posts"]));
-    expect(bulk).toBe(headerColumnInsetPx(SCREENS["/prompts"]));
   });
 
-  it("is the 24px that puts all three titles at x=360 on a 1440 screen", () => {
-    // Spelled out so the test still fails the day all three drift together —
+  it("is the 24px that puts both titles at x=360 on a 1440 screen", () => {
+    // Spelled out so the test still fails the day both drift together —
     // which would be the same regression, just uniform.
     for (const relative of Object.values(SCREENS)) {
       expect(headerColumnInsetPx(relative)).toBe(24);

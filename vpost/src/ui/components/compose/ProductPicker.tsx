@@ -235,11 +235,15 @@ export function ProductPicker({
           placeholder={placeholder}
           autoComplete="off"
           spellCheck={false}
-          className={cn("h-12 font-mono text-base uppercase", inputClassName)}
+          className={cn(
+            "placeholder:text-foreground-subtle h-11 text-sm placeholder:font-sans placeholder:font-normal placeholder:normal-case",
+            value.trim().length > 0 && "font-mono font-medium uppercase",
+            inputClassName,
+          )}
         />
 
         {isOpen ? (
-          <div className="border-border bg-popover absolute inset-x-0 top-[calc(100%+0.375rem)] z-20 flex max-h-90 flex-col overflow-hidden rounded-xl border shadow-lg">
+          <div className="border-border bg-popover absolute inset-x-0 top-full z-20 mt-1.5 flex max-h-90 flex-col overflow-hidden rounded-xl border shadow-[var(--shadow-float)]">
             <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
               {isLoading ? (
                 <ul aria-hidden="true" className="flex flex-col gap-1 motion-safe:animate-pulse">
@@ -286,8 +290,8 @@ export function ProductPicker({
                       onMouseEnter={() => setHighlight(index)}
                       onClick={() => pick(item)}
                       className={cn(
-                        "flex cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2",
-                        index === highlight && "bg-muted",
+                        "flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-150",
+                        index === highlight ? "bg-accent text-foreground" : "hover:bg-[var(--bg-subtle)]",
                       )}
                     >
                       {/* The CODE is the line that matters: it is what the
@@ -295,9 +299,7 @@ export function ProductPicker({
                           types next time, so it is read first and at full size.
                           The name is what confirms the pick, and sits under it. */}
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="font-mono text-sm font-medium tracking-wide uppercase">
-                          {item.code}
-                        </span>
+                        <span className="font-mono text-sm font-medium">{item.code}</span>
                         <span className="text-muted-foreground truncate text-xs">{item.name}</span>
                       </span>
 

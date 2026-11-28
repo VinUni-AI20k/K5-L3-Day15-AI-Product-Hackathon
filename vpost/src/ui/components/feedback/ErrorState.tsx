@@ -1,7 +1,11 @@
 "use client";
 
-import { Banner, Button, Stack, Text } from "@astryxdesign/core";
+import { Button } from "@astryxdesign/core";
+import { AlertCircle } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useRef } from "react";
+
+import { cn } from "@/shared/utils";
 
 export interface ErrorStateProps {
   title: string;
@@ -15,7 +19,7 @@ export interface ErrorStateProps {
   onRetry?: () => void;
   retryLabel?: string;
   /** Extra action rendered next to retry (e.g. "Về trang chủ"). */
-  secondaryAction?: React.ReactNode;
+  secondaryAction?: ReactNode;
   /**
    * Whether to pull focus onto the message when it appears. Default `true`,
    * which is what every caller relied on before this prop existed.
@@ -34,8 +38,9 @@ export interface ErrorStateProps {
  * Shared error block for route/segment/widget boundaries.
  * Presentational only: no fetching, no business branching.
  *
- * The props are unchanged from the shadcn version on purpose — every screen
- * still calls it the same way while the migration runs.
+ * Follows the design system icon tile + sentence + one action pattern: calm surface,
+ * semantic error icon tile, readable hierarchy, and keyboard-only focus ring so
+ * programmatic focus never draws an unexpected border around the card on mount.
  */
 export function ErrorState({
   title,
@@ -49,7 +54,6 @@ export function ErrorState({
   className,
 }: ErrorStateProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const hasBody = (details && details.length > 0) || referenceCode !== undefined;
 
   // Move focus to the alert so keyboard/screen-reader users land on the message.
   //
@@ -65,42 +69,55 @@ export function ErrorState({
   }, [shouldFocus]);
 
   return (
-    <Banner
+    <div
       ref={containerRef}
       role="alert"
       tabIndex={-1}
-      className={className}
-      status="error"
-      title={title}
-      description={description}
-      // Children sit in a collapsed area by default; the reference code and the
-      // per-reason lines are part of the message, not an optional detail.
-      defaultIsExpanded={hasBody}
-      endContent={
-        onRetry || secondaryAction ? (
-          <Stack direction="horizontal" gap={2}>
+      className={cn(
+        "bg-card border-border focus-visible:ring-ring focus-visible:ring-offset-background flex flex-col gap-4 rounded-xl border p-5 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:flex-row sm:items-start sm:p-6",
+        className,
+      )}
+    >
+      <div
+        aria-hidden="true"
+        className="bg-destructive/10 text-destructive flex size-10 shrink-0 items-center justify-center rounded-lg"
+      >
+        <AlertCircle className="size-5" aria-hidden="true" />
+      </div>
+
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <p className="text-foreground text-base leading-6 font-semibold">{title}</p>
+        <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">{description}</p>
+
+        {details && details.length > 0 ? (
+          <ul className="text-muted-foreground mt-2 list-disc space-y-1 ps-5 text-sm leading-relaxed">
+            {details.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        ) : null}
+
+        {referenceCode ? (
+          <p className="text-foreground-subtle pt-1 font-mono text-xs leading-4">
+            Mã tham chiếu: {referenceCode}
+          </p>
+        ) : null}
+
+        {onRetry || secondaryAction ? (
+          <div className="flex flex-wrap items-center gap-2 pt-3">
             {onRetry ? (
-              <Button type="button" variant="primary" size="sm" label={retryLabel} onClick={onRetry} />
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                label={retryLabel}
+                onClick={onRetry}
+              />
             ) : null}
             {secondaryAction}
-          </Stack>
-        ) : undefined
-      }
-    >
-      {hasBody ? (
-        <Stack direction="vertical" gap={1}>
-          {details?.map((line) => (
-            <Text key={line} type="supporting" display="block">
-              {line}
-            </Text>
-          ))}
-          {referenceCode ? (
-            <Text type="code" color="secondary" display="block">
-              Mã tham chiếu: {referenceCode}
-            </Text>
-          ) : null}
-        </Stack>
-      ) : null}
-    </Banner>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }

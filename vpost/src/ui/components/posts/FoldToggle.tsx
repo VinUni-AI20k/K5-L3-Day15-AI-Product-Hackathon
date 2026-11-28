@@ -36,12 +36,12 @@ export function FoldToggle({
       onClick={onToggle}
       aria-expanded={isOpen}
       aria-controls={controls}
-      className="text-foreground focus-visible:ring-ring -mx-1.5 inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-3"
+      className="text-foreground hover:bg-muted/60 active:bg-muted focus-visible:ring-ring -mx-2 inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium transition-colors duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:min-h-8"
     >
       <ChevronDown
         aria-hidden="true"
         className={cn(
-          "size-4 shrink-0 motion-safe:transition-transform",
+          "text-muted-foreground size-4 shrink-0 duration-150 ease-out motion-safe:transition-transform",
           isOpen ? "" : "-rotate-90",
         )}
       />

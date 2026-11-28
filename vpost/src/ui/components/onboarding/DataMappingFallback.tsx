@@ -1,4 +1,4 @@
-import { Skeleton, Stack } from "@astryxdesign/core";
+import { Skeleton } from "@astryxdesign/core";
 
 /**
  * What the page shows while `useSearchParams()` suspends (the screen reads the
@@ -10,13 +10,20 @@ import { Skeleton, Stack } from "@astryxdesign/core";
  */
 export function DataMappingFallback() {
   return (
-    <Stack direction="vertical" gap={5} padding={4} maxWidth={960} aria-hidden="true">
-      <Stack direction="vertical" gap={1}>
-        <Skeleton height={32} width={220} />
-        <Skeleton height={20} width="60%" />
-      </Stack>
-      <Skeleton height={168} />
+    <div
+      aria-hidden="true"
+      className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-6 sm:px-6"
+    >
+      <div className="border-border flex flex-col gap-2 border-b pb-5">
+        <Skeleton height={32} width={260} />
+        <Skeleton height={20} width="70%" />
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Skeleton height={108} />
+        <Skeleton height={108} />
+        <Skeleton height={108} />
+      </div>
       <Skeleton height={260} />
-    </Stack>
+    </div>
   );
 }

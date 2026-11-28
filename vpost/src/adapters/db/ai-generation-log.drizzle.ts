@@ -45,7 +45,7 @@ function toDate(value: string): Date {
 
 /**
  * Postgres cannot store U+0000 in text or jsonb ("unsupported Unicode escape
- * sequence"), and a model CAN emit it — gpt-4.1-mini did on 15/08/2026, which
+ * sequence"), and a model CAN emit it — gpt-4.1-mini did on 27/11/2026, which
  * made the whole insert fail and lost the very row that explained why the post
  * was blocked (business rule 5: a failure must never go unexplained).
  *

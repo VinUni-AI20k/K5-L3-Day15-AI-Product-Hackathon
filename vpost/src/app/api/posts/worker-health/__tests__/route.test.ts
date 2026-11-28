@@ -36,7 +36,7 @@ const { ACTIVE_TENANT_COOKIE } = await import("@/app/_lib/active-tenant-cookie")
 
 const TENANT = testTenantId("00000000-0000-0000-0000-000000000001");
 const OTHER_TENANT = "00000000-0000-0000-0000-0000000000ff";
-const CHECKED_AT = new Date("2026-08-20T03:00:00.000Z");
+const CHECKED_AT = new Date("2054-08-20T03:00:00.000Z");
 
 /** What the usecase returns; the route projects a subset of it. */
 function health(overrides: Record<string, unknown> = {}) {

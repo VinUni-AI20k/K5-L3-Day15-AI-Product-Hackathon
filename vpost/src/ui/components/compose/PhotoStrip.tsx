@@ -90,11 +90,8 @@ export function PhotoStrip({
           <div
             key={asset.driveFileId}
             className={cn(
-              "relative h-32 w-24 shrink-0 overflow-hidden rounded-md bg-[var(--media-empty)]",
-              "shadow-[inset_0_0_0_1px_var(--border)]",
-              index === 0 &&
-                !isVideo &&
-                "shadow-[inset_0_0_0_2.5px_var(--primary)]",
+              "ring-border relative h-32 w-24 shrink-0 overflow-hidden rounded-lg bg-[var(--media-empty)] ring-1 ring-inset",
+              index === 0 && !isVideo && "ring-ring ring-2 ring-inset",
             )}
           >
             <button
@@ -132,14 +129,14 @@ export function PhotoStrip({
                 onClick={() => drop(index)}
                 disabled={disabled}
                 aria-label={`Bỏ ${asset.fileName} khỏi bài`}
-                className="focus-visible:ring-ring bg-foreground/65 text-background absolute top-1.5 right-1.5 z-1 flex size-5.5 cursor-pointer items-center justify-center rounded-full outline-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-50"
+                className="focus-visible:ring-ring bg-inverse-surface/80 text-inverse-foreground absolute top-1.5 right-1.5 z-1 flex size-7 cursor-pointer items-center justify-center rounded-full transition-opacity duration-150 outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <X aria-hidden="true" className="size-3" strokeWidth={2.5} />
               </button>
             ) : null}
 
             {index === 0 && !isVideo ? (
-              <span className="pointer-events-none absolute bottom-1.5 left-1.5 z-1 rounded-sm bg-[var(--card)] px-2 py-0.5 text-[10px] font-semibold text-[var(--primary)]">
+              <span className="bg-card text-accent-foreground pointer-events-none absolute bottom-1.5 left-1.5 z-1 rounded-sm px-2 py-0.5 text-xs font-semibold">
                 Bìa
               </span>
             ) : null}
@@ -147,14 +144,14 @@ export function PhotoStrip({
             {asset.needsReview ? (
               <span
                 aria-hidden="true"
-                className="absolute right-1.5 bottom-1.5 z-1 size-2 rounded-full bg-[var(--warning)]"
+                className="bg-warning absolute right-1.5 bottom-1.5 z-1 size-2 rounded-full"
                 title="File cần rà soát tên"
               />
             ) : null}
           </div>
         ))}
 
-        <span className="shrink-0 text-[13px] text-[var(--muted-foreground)]">
+        <span className="text-muted-foreground shrink-0 text-sm">
           {isVideo ? "1 clip" : `${media.length} ảnh`}
         </span>
       </div>
@@ -163,10 +160,10 @@ export function PhotoStrip({
         {announcement}
       </p>
 
-      <p className="text-xs leading-relaxed text-[var(--muted-foreground)]">
+      <p className="text-muted-foreground text-xs leading-relaxed">
         {isVideo
           ? "Bài video dùng đúng một clip — chưa xem trước được clip trên màn hình này."
-          : "Bấm vào một ô để đặt làm ảnh bìa, ✕ để bỏ ảnh khỏi bài. Ô nào báo “không tải được ảnh” là file đã bị xoá hoặc hỏng trên Drive."}
+          : "Bấm vào một ô để đặt làm ảnh bìa, nút đóng để bỏ ảnh khỏi bài. Ô nào báo “không tải được ảnh” là file đã bị xoá hoặc hỏng trên Drive."}
       </p>
     </section>
   );

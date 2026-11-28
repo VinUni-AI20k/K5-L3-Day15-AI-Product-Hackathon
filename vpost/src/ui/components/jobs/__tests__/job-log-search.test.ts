@@ -21,8 +21,8 @@ function job(overrides: Partial<PostJobLogEntry> = {}): PostJobLogEntry {
     publishedUrl: null,
     publishedAt: null,
     scheduledAt: null,
-    createdAt: new Date(2026, 7, 13, 9, 0).toISOString(),
-    updatedAt: new Date(2026, 7, 13, 10, 0).toISOString(),
+    createdAt: new Date(2054, 7, 13, 9, 0).toISOString(),
+    updatedAt: new Date(2054, 7, 13, 10, 0).toISOString(),
     canRetry: true,
     ...overrides,
   };

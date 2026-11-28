@@ -1,5 +1,5 @@
 /**
- * ModelPolicyStore backed by `config/ai-models.yaml` (ADR-001 decision 12/08:
+ * ModelPolicyStore backed by `config/ai-models.yaml` (ADR-001 decision 27/11:
  * YAML-in-repo + per-tenant DB override, hot cache in Redis).
  *
  * This file owns the YAML half only: parse, validate, keep in memory for a

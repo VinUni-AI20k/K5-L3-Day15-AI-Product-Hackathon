@@ -23,7 +23,7 @@ import type { ScheduledJobEntry } from "@/ui/schemas/scheduled.schema";
  * this file covers the structure those depend on.
  */
 
-const NOW = new Date(2026, 7, 13, 10, 0).getTime();
+const NOW = new Date(2054, 7, 13, 10, 0).getTime();
 
 function entry(overrides: Partial<ScheduledJobEntry> = {}): ScheduledJobEntry {
   return {
@@ -34,7 +34,7 @@ function entry(overrides: Partial<ScheduledJobEntry> = {}): ScheduledJobEntry {
     channelId: "fbpage-a",
     format: "image_post",
     status: "queued",
-    scheduledAt: new Date(2026, 7, 13, 9, 0).toISOString(),
+    scheduledAt: new Date(2054, 7, 13, 9, 0).toISOString(),
     startsInMs: 3_600_000,
     overdue: false,
     captionPreview: "Váy hoa mùa hè…",
@@ -42,7 +42,7 @@ function entry(overrides: Partial<ScheduledJobEntry> = {}): ScheduledJobEntry {
     userMessage: "Chờ tới giờ đăng.",
     canReschedule: true,
     canCancel: true,
-    createdAt: new Date(2026, 7, 12, 9, 0).toISOString(),
+    createdAt: new Date(2054, 7, 12, 9, 0).toISOString(),
     ...overrides,
   };
 }
@@ -54,7 +54,7 @@ function render(
 ): string {
   return renderToStaticMarkup(
     <ScheduledCalendar
-      monthKey="2026-08"
+      monthKey="2054-08"
       selectedDayKey={selectedDayKey}
       items={items}
       nowMs={NOW}
@@ -92,9 +92,9 @@ describe("ScheduledCalendar markup", () => {
   });
 
   it("names a cell by its full date and its count, not by the bare day number", () => {
-    const html = render([entry({ scheduledAt: new Date(2026, 7, 13, 9, 0).toISOString() })]);
+    const html = render([entry({ scheduledAt: new Date(2054, 7, 13, 9, 0).toISOString() })]);
 
-    expect(html).toContain("Thứ Năm, 13/08/2026 — 1 bài đã hẹn");
+    expect(html).toContain("Thứ Năm, 13/08/2054 — 1 bài đã hẹn");
     expect(html).toContain("không có bài nào");
     // Monday first, and the weekday headers carry their full name for a reader.
     expect(html).toContain('aria-label="Thứ Hai"');
@@ -104,7 +104,7 @@ describe("ScheduledCalendar markup", () => {
     const html = render([]);
 
     expect(html).toContain("Hôm nay");
-    // 2026-08-01 is a Saturday, so the first row borrows from July and says so.
+    // 2026-11-27 is a Saturday, so the first row borrows from July and says so.
     expect(html).toContain("(tháng khác)");
     expect(html).toContain("27/7");
   });
@@ -114,7 +114,7 @@ describe("ScheduledCalendar markup", () => {
       [1, 2, 3, 4, 5].map((index) =>
         entry({
           postJobId: `job-${index}`,
-          scheduledAt: new Date(2026, 7, 20, 8 + index, 0).toISOString(),
+          scheduledAt: new Date(2054, 7, 20, 8 + index, 0).toISOString(),
         }),
       ),
     );
@@ -126,26 +126,26 @@ describe("ScheduledCalendar markup", () => {
   it("announces the month and the count in a live region", () => {
     const html = render([entry()]);
     expect(html).toContain('role="status"');
-    expect(html).toContain("Tháng 8 năm 2026 · 1 bài đã hẹn trong tháng này");
+    expect(html).toContain("Tháng 8 năm 2054 · 1 bài đã hẹn trong tháng này");
   });
 
   it("hands an open day to the caller's detail renderer", () => {
-    const html = render([entry()], "2026-08-13");
-    expect(html).toContain("chi tiết 2026-08-13: 1 bài");
+    const html = render([entry()], "2054-08-13");
+    expect(html).toContain("chi tiết 2054-08-13: 1 bài");
     expect(html).toContain('aria-selected="true"');
   });
 
   it("says an open day with nothing on it is empty instead of rendering a bare table", () => {
-    const html = render([entry()], "2026-08-21");
+    const html = render([entry()], "2054-08-21");
     expect(html).toContain("Ngày này chưa có bài nào được hẹn");
   });
 
   it("tells an empty month apart from an empty schedule", () => {
     const withPostsElsewhere = render([
-      entry({ scheduledAt: new Date(2026, 8, 4, 9, 0).toISOString() }),
+      entry({ scheduledAt: new Date(2054, 8, 4, 9, 0).toISOString() }),
     ]);
     expect(withPostsElsewhere).toContain("Tháng này chưa có bài nào được hẹn");
-    expect(withPostsElsewhere).toContain("Tới Tháng 9 năm 2026");
+    expect(withPostsElsewhere).toContain("Tới Tháng 9 năm 2054");
 
     const nothingAnywhere = render([]);
     expect(nothingAnywhere).toContain("Chưa có bài nào được hẹn giờ");
@@ -186,7 +186,7 @@ describe("ScheduledCalendar markup", () => {
   });
 
   it("softens the other-month count too while a page is outstanding", () => {
-    const partial = render([entry({ scheduledAt: new Date(2026, 8, 4, 9, 0).toISOString() })], null, true);
+    const partial = render([entry({ scheduledAt: new Date(2054, 8, 4, 9, 0).toISOString() })], null, true);
     expect(partial).toContain("Trong số đã tải, tháng này chưa có bài nào");
     expect(partial).toContain("bấm “Tải thêm” trước khi kết luận");
   });

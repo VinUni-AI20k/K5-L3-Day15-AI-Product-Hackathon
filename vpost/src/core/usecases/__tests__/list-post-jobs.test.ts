@@ -47,7 +47,7 @@ function item(overrides: Partial<PostJobListItem> = {}): PostJobListItem {
     lastErrorMessage: null,
     publishedPostId: "100_200",
     publishedUrl: "https://facebook.com/100_200",
-    publishedAt: new Date("2026-08-13T02:03:00.000Z"),
+    publishedAt: new Date("2054-08-13T02:03:00.000Z"),
     scheduledPostId: null,
     captionText: "caption",
     media: [],
@@ -56,8 +56,8 @@ function item(overrides: Partial<PostJobListItem> = {}): PostJobListItem {
   };
   return {
     ...base,
-    createdAt: new Date("2026-08-13T02:00:00.000Z"),
-    updatedAt: new Date("2026-08-13T02:03:00.000Z"),
+    createdAt: new Date("2054-08-13T02:00:00.000Z"),
+    updatedAt: new Date("2054-08-13T02:03:00.000Z"),
     ...overrides,
   };
 }
@@ -149,9 +149,9 @@ describe("listPostJobs — query building", () => {
   });
 
   it("decodes the cursor it produced (round trip)", async () => {
-    const cursor = { createdAt: new Date("2026-08-13T02:00:00.000Z"), id: "job-9" };
+    const cursor = { createdAt: new Date("2054-08-13T02:00:00.000Z"), id: "job-9" };
     const encoded = encodePostJobCursor(cursor);
-    expect(encoded).toBe("2026-08-13T02:00:00.000Z_job-9");
+    expect(encoded).toBe("2054-08-13T02:00:00.000Z_job-9");
     expect(decodePostJobCursor(encoded)).toEqual(cursor);
 
     const { listPostJobs, queries } = harness([]);
@@ -166,7 +166,7 @@ describe("listPostJobs — query building", () => {
   });
 
   it("returns the repo cursor encoded for the caller", async () => {
-    const next = { createdAt: new Date("2026-08-13T01:00:00.000Z"), id: "job-5" };
+    const next = { createdAt: new Date("2054-08-13T01:00:00.000Z"), id: "job-5" };
     const postJobs = {
       async listJobs() {
         return { items: [item()], nextCursor: next };
@@ -174,7 +174,7 @@ describe("listPostJobs — query building", () => {
     } as unknown as PostJobRepo;
     const listPostJobs = makeListPostJobs({ postJobs, logger: silentLogger() });
     const result = await listPostJobs({ tenantId: TENANT });
-    expect(result.nextCursor).toBe("2026-08-13T01:00:00.000Z_job-5");
+    expect(result.nextCursor).toBe("2054-08-13T01:00:00.000Z_job-5");
   });
 });
 
@@ -236,7 +236,7 @@ describe("listPostJobs — entries", () => {
         lastErrorCode: "HANDOFF_FAILED",
         lastErrorMessage:
           "Không xác nhận được kết quả giao lịch cho Facebook — bài hẹn CÓ THỂ đã được tạo trên Trang.",
-        scheduledAt: new Date("2026-08-13T03:00:00.000Z"),
+        scheduledAt: new Date("2054-08-13T03:00:00.000Z"),
         publishedPostId: null,
         publishedUrl: null,
         publishedAt: null,
@@ -256,7 +256,7 @@ describe("listPostJobs — entries", () => {
         status: "failed",
         lastErrorCode: "PUBLISH_FAILED",
         lastErrorMessage: "lỗi",
-        scheduledAt: new Date("2026-08-13T03:00:00.000Z"),
+        scheduledAt: new Date("2054-08-13T03:00:00.000Z"),
       }),
     ]);
     expect((await listPostJobs({ tenantId: TENANT })).items[0].canRetry).toBe(true);
@@ -265,8 +265,8 @@ describe("listPostJobs — entries", () => {
   it("keeps the row timestamps so the log can be read chronologically", async () => {
     const { listPostJobs } = harness([item()]);
     const result = await listPostJobs({ tenantId: TENANT });
-    expect(result.items[0].createdAt).toEqual(new Date("2026-08-13T02:00:00.000Z"));
-    expect(result.items[0].updatedAt).toEqual(new Date("2026-08-13T02:03:00.000Z"));
+    expect(result.items[0].createdAt).toEqual(new Date("2054-08-13T02:00:00.000Z"));
+    expect(result.items[0].updatedAt).toEqual(new Date("2054-08-13T02:03:00.000Z"));
   });
 });
 

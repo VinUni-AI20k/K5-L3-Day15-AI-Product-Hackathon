@@ -1,12 +1,12 @@
 "use client";
 
+import { EmptyState, Heading } from "@astryxdesign/core";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useId, useMemo, useState } from "react";
-import { RefreshCw, Search, CheckCircle2, X } from "lucide-react";
+import { CheckCircle2, FileText, RefreshCw, Search, X } from "lucide-react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
-import { EmptyState } from "@/ui/components/feedback/EmptyState";
 import { JobLogSkeleton } from "@/ui/components/jobs/JobLogSkeleton";
 import { filterJobsBySearch } from "@/ui/components/jobs/job-log-search";
 import { JobLogTable } from "@/ui/components/jobs/JobLogTable";
@@ -98,34 +98,38 @@ export function JobLogScreen() {
   }
 
   return (
-    <section className="flex flex-col gap-6" aria-labelledby="jobs-heading">
+    <section className="flex flex-col gap-6 sm:gap-8" aria-labelledby="jobs-heading">
       {/* Header */}
-      <header className="flex flex-col gap-1.5 border-b border-border/60 pb-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 id="jobs-heading" className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+      <header className="border-border flex flex-col gap-1.5 border-b pb-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <Heading level={2} id="jobs-heading">
             Nhật ký đăng bài
-          </h2>
+          </Heading>
           {/* "đã tải", not "đã ghi nhận": this is the number of rows fetched so
               far, not the tenant's total — the list is paged. */}
-          <span className="font-mono text-xs text-muted-foreground tabular-nums">
+          <span className="text-muted-foreground font-mono text-xs tabular-nums">
             {rawItems.length} bài đã tải
           </span>
         </div>
-        <p className="text-xs text-muted-foreground leading-relaxed max-w-3xl">
-          Theo dõi lịch sử từng bài đăng trên từng kênh Facebook. Bạn có thể mở bài đã đăng, xem lý do bài lỗi và chạy lại riêng từng kênh.
+        <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">
+          Theo dõi lịch sử từng bài đăng trên từng kênh Facebook. Bạn có thể mở bài đã đăng, xem lý
+          do bài lỗi và chạy lại riêng từng kênh.
         </p>
       </header>
 
       {/* Rules Disclosure */}
       <RulesDisclosure>
         <p>
-          Tồn kho được kiểm tra lại ngay trước khi đăng, kể cả khi chạy lại — một mã vừa hết hàng sẽ bị chặn thay vì lên bài.
+          Tồn kho được kiểm tra lại ngay trước khi đăng, kể cả khi chạy lại — một mã vừa hết hàng sẽ
+          bị chặn thay vì lên bài.
         </p>
         <p>
-          Bài ở trạng thái “Facebook giữ lịch” đã nằm trên Facebook và Facebook sẽ tự đăng vào giờ đã hẹn; hệ thống chỉ theo dõi và cập nhật lại kết quả.
+          Bài ở trạng thái “Facebook giữ lịch” đã nằm trên Facebook và Facebook sẽ tự đăng vào giờ
+          đã hẹn; hệ thống chỉ theo dõi và cập nhật lại kết quả.
         </p>
         <p>
-          Một bài đăng lên nhiều kênh với cùng kết quả được gộp thành một dòng “× N kênh”. Mở dòng đó để xem từng kênh, mở bài trên Facebook hoặc chạy lại riêng.
+          Một bài đăng lên nhiều kênh với cùng kết quả được gộp thành một dòng “× N kênh”. Mở dòng đó
+          để xem từng kênh, mở bài trên Facebook hoặc chạy lại riêng.
         </p>
       </RulesDisclosure>
 
@@ -137,83 +141,95 @@ export function JobLogScreen() {
       />
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Status Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground mr-1">
-              Trạng thái:
-            </span>
-            <button
-              type="button"
-              onClick={() => applyStatus(null)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                filter.status === null
-                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                  : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
+      <div className="border-border bg-card flex flex-col gap-4 rounded-xl border p-4 sm:p-5">
+        <div className="flex flex-col gap-3">
+          {/* Status Filter Chips — single scrollable row so mobile never wraps into 3 lines */}
+          <div className="flex flex-col gap-2">
+            <span className="text-muted-foreground text-sm font-medium">Trạng thái</span>
+            <div
+              role="group"
+              aria-label="Lọc theo trạng thái"
+              className="scroll-cue-x -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1"
             >
-              Tất cả
-            </button>
-            {POST_JOB_STATUSES.map((status) => {
-              const isSelected = filter.status === status;
-              return (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => applyStatus(status)}
-                  className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                    isSelected
-                      ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                      : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  {POST_JOB_STATUS_LABELS[status]}
-                </button>
-              );
-            })}
+              <button
+                type="button"
+                aria-pressed={filter.status === null}
+                onClick={() => applyStatus(null)}
+                className={`focus-visible:ring-ring inline-flex min-h-10 shrink-0 cursor-pointer items-center rounded-full px-3.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:min-h-9 ${
+                  filter.status === null
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-foreground hover:bg-muted/80 active:opacity-80"
+                }`}
+              >
+                Tất cả
+              </button>
+              {POST_JOB_STATUSES.map((status) => {
+                const isSelected = filter.status === status;
+                return (
+                  <button
+                    key={status}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => applyStatus(status)}
+                    className={`focus-visible:ring-ring inline-flex min-h-10 shrink-0 cursor-pointer items-center rounded-full px-3.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:min-h-9 ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-foreground hover:bg-muted/80 active:opacity-80"
+                    }`}
+                  >
+                    {POST_JOB_STATUS_LABELS[status]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Search Box & Refresh */}
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-xs">
               <label htmlFor={searchId} className="sr-only">
                 Tìm trong {rawItems.length} bài đã tải
               </label>
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search
+                aria-hidden="true"
+                className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+              />
               <input
                 id={searchId}
                 type="text"
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}
                 placeholder="Tìm mã SP, kênh, lỗi..."
-                className="h-8 w-44 rounded-lg border border-border/80 bg-card pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary md:w-56"
+                className="border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring h-10 w-full rounded-lg border pr-10 pl-9 text-sm transition-colors duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:h-9 sm:pr-9"
               />
               {localSearch && (
                 <button
                   type="button"
                   onClick={() => setLocalSearch("")}
                   title="Xoá từ khoá tìm kiếm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Xoá từ khoá tìm kiếm"
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute top-1/2 right-1 inline-flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md transition-colors duration-150 ease-out outline-none focus-visible:ring-2"
                 >
-                  <X className="size-3" />
-                  <span className="sr-only">Xoá từ khoá tìm kiếm</span>
+                  <X aria-hidden="true" className="size-4" />
                 </button>
               )}
             </div>
 
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => {
                 void log.refetch();
                 void workerHealth.refetch();
               }}
               disabled={log.isFetching}
-              className="gap-1.5 text-xs h-8"
+              className="min-h-10 gap-1.5 self-start px-3.5 text-sm sm:min-h-9 sm:self-auto"
             >
-              <RefreshCw className={`size-3.5 ${log.isFetching ? "animate-spin" : ""}`} />
+              <RefreshCw
+                aria-hidden="true"
+                className={`size-4 ${log.isFetching ? "motion-safe:animate-spin" : ""}`}
+              />
               <span>{log.isFetching ? "Đang tải…" : "Làm mới"}</span>
             </Button>
           </div>
@@ -221,15 +237,15 @@ export function JobLogScreen() {
 
         {/* Active Filter Tags */}
         {(filter.batchId || hasFilter || localSearch) && (
-          <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
-            <span className="text-xs text-muted-foreground">Đang lọc:</span>
+          <div className="border-border flex flex-wrap items-center gap-2 border-t pt-3">
+            <span className="text-muted-foreground text-xs font-medium">Đang lọc:</span>
 
             {filter.batchId && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-accent/30 px-2.5 py-0.5 font-mono text-xs text-primary">
+              <span className="border-border bg-accent text-accent-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-xs font-medium">
                 <span>Lô: {filter.batchId}</span>
                 <Link
                   href={`/batches/${encodeURIComponent(filter.batchId)}`}
-                  className="ml-1 text-primary underline underline-offset-2 hover:opacity-80"
+                  className="text-accent-foreground focus-visible:ring-ring rounded-xs underline underline-offset-2 outline-none hover:opacity-80 focus-visible:ring-2"
                   title="Mở chi tiết lô này"
                 >
                   (chi tiết)
@@ -237,36 +253,41 @@ export function JobLogScreen() {
                 <button
                   type="button"
                   onClick={clearBatchFilter}
-                  className="ml-1 hover:text-madder"
+                  className="hover:text-destructive focus-visible:ring-ring inline-flex size-5 cursor-pointer items-center justify-center rounded-full transition-colors duration-150 ease-out outline-none focus-visible:ring-2"
                   title="Bỏ lọc theo lô"
+                  aria-label="Bỏ lọc theo lô"
                 >
-                  <X className="size-3" />
+                  <X aria-hidden="true" className="size-3.5" />
                 </button>
               </span>
             )}
 
             {filter.status && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs text-foreground">
+              <span className="border-border bg-muted text-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium">
                 <span>Trạng thái: {POST_JOB_STATUS_LABELS[filter.status]}</span>
                 <button
                   type="button"
                   onClick={() => applyStatus(null)}
-                  className="hover:text-madder"
+                  className="text-muted-foreground hover:text-destructive focus-visible:ring-ring inline-flex size-5 cursor-pointer items-center justify-center rounded-full transition-colors duration-150 ease-out outline-none focus-visible:ring-2"
+                  title="Bỏ lọc trạng thái"
+                  aria-label="Bỏ lọc trạng thái"
                 >
-                  <X className="size-3" />
+                  <X aria-hidden="true" className="size-3.5" />
                 </button>
               </span>
             )}
 
             {localSearch && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs text-foreground">
+              <span className="border-border bg-muted text-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium">
                 <span>Từ khóa: “{localSearch}”</span>
                 <button
                   type="button"
                   onClick={() => setLocalSearch("")}
-                  className="hover:text-madder"
+                  className="text-muted-foreground hover:text-destructive focus-visible:ring-ring inline-flex size-5 cursor-pointer items-center justify-center rounded-full transition-colors duration-150 ease-out outline-none focus-visible:ring-2"
+                  title="Xoá lọc từ khoá"
+                  aria-label="Xoá lọc từ khoá"
                 >
-                  <X className="size-3" />
+                  <X aria-hidden="true" className="size-3.5" />
                 </button>
               </span>
             )}
@@ -274,7 +295,7 @@ export function JobLogScreen() {
             <button
               type="button"
               onClick={clearFilters}
-              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 ml-1"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring ml-1 cursor-pointer rounded-md px-2 py-1 text-xs font-medium underline underline-offset-4 transition-colors duration-150 ease-out outline-none focus-visible:ring-2"
             >
               Xóa tất cả bộ lọc
             </button>
@@ -287,9 +308,9 @@ export function JobLogScreen() {
         <div
           role="status"
           aria-live="polite"
-          className="flex items-center gap-2 rounded-lg border border-leaf/40 bg-leaf/10 p-3 text-xs font-medium text-leaf-deep"
+          className="border-success/40 bg-success/10 text-success-foreground flex items-center gap-2.5 rounded-xl border p-4 text-sm font-medium"
         >
-          <CheckCircle2 className="size-4 shrink-0" />
+          <CheckCircle2 aria-hidden="true" className="size-5 shrink-0" />
           <span>{retryNotice}</span>
         </div>
       )}
@@ -315,70 +336,96 @@ export function JobLogScreen() {
       {log.isError && items.length > 0 ? (
         <p
           role="status"
-          className="rounded-lg border border-turmeric/50 bg-turmeric/10 p-3 text-xs text-turmeric-deep"
+          className="border-warning/40 bg-warning/10 text-warning-foreground rounded-xl border p-4 text-sm"
         >
-          Lần tải gần nhất thất bại — danh sách bên dưới có thể còn thiếu bài cũ hơn. Bấm “Làm
-          mới” để thử lại.
+          Lần tải gần nhất thất bại — danh sách bên dưới có thể còn thiếu bài cũ hơn. Bấm “Làm mới”
+          để thử lại.
         </p>
       ) : null}
 
       {/* Empty States */}
       {!isFirstLoad && !log.isError && items.length === 0 ? (
         hasFilter || localSearch ? (
-          <EmptyState
-            kind="no-result"
-            title={
-              localSearch && log.hasNextPage
-                ? `Chưa thấy “${localSearch.trim()}” trong ${rawItems.length} bài đã tải`
-                : "Không có bài đăng nào khớp bộ lọc"
-            }
-            description={
-              // The search only sees the pages already fetched. Saying "không có
-              // bài nào khớp" over a paged list is a false negative: the code may
-              // sit in a page nobody has asked for yet, and this screen is the one
-              // that must answer "vì sao bài này không lên".
-              localSearch && log.hasNextPage
-                ? "Ô tìm kiếm chỉ tìm trong các bài đã tải về. Bấm “Tải thêm các bài cũ hơn” rồi tìm lại, hoặc xoá bộ lọc để xem toàn bộ."
-                : "Không tìm thấy bài nào ở trạng thái hoặc từ khóa đang chọn. Dữ liệu vẫn còn nguyên — bấm bên dưới để hiển thị toàn bộ."
-            }
-            action={
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                {localSearch && log.hasNextPage ? (
+          <div className="border-border bg-card rounded-xl border p-6">
+            <EmptyState
+              headingLevel={3}
+              icon={
+                <span
+                  aria-hidden="true"
+                  className="bg-accent text-accent-foreground inline-flex size-10 items-center justify-center rounded-lg"
+                >
+                  <Search className="size-5" />
+                </span>
+              }
+              title={
+                localSearch && log.hasNextPage
+                  ? `Chưa thấy “${localSearch.trim()}” trong ${rawItems.length} bài đã tải`
+                  : "Không có bài đăng nào khớp bộ lọc"
+              }
+              description={
+                // The search only sees the pages already fetched. Saying "không có
+                // bài nào khớp" over a paged list is a false negative: the code may
+                // sit in a page nobody has asked for yet, and this screen is the one
+                // that must answer "vì sao bài này không lên".
+                localSearch && log.hasNextPage
+                  ? "Ô tìm kiếm chỉ tìm trong các bài đã tải về — tải thêm bài cũ hơn hoặc xóa bộ lọc để xem toàn bộ."
+                  : "Không tìm thấy bài nào khớp bộ lọc đang chọn — xóa bộ lọc để hiển thị toàn bộ danh sách."
+              }
+              actions={
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {localSearch && log.hasNextPage ? (
+                    <Button
+                      type="button"
+                      onClick={() => void log.fetchNextPage()}
+                      disabled={log.isFetchingNextPage}
+                      className="min-h-10 px-4 sm:min-h-9"
+                    >
+                      {log.isFetchingNextPage ? "Đang tải thêm…" : "Tải thêm các bài cũ hơn"}
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
-                    onClick={() => void log.fetchNextPage()}
-                    disabled={log.isFetchingNextPage}
+                    variant={localSearch && log.hasNextPage ? "secondary" : "default"}
+                    onClick={clearFilters}
+                    className="min-h-10 px-4 sm:min-h-9"
                   >
-                    {log.isFetchingNextPage ? "Đang tải thêm…" : "Tải thêm các bài cũ hơn"}
+                    Xóa bộ lọc
                   </Button>
-                ) : null}
-                <Button type="button" variant="outline" onClick={clearFilters}>
-                  Xóa bộ lọc
-                </Button>
-              </div>
-            }
-          />
+                </div>
+              }
+            />
+          </div>
         ) : (
-          <EmptyState
-            kind="first-run"
-            title="Chưa có bài đăng nào"
-            description="Chưa có lô đăng nào được tạo cho đơn vị này. Soạn một bài, chọn kênh rồi bấm “Tạo lô đăng” — mọi bài sẽ xuất hiện ở đây."
-            action={
-              <Button asChild>
-                <Link href="/compose">Soạn bài mới</Link>
-              </Button>
-            }
-          />
+          <div className="border-border bg-card rounded-xl border p-6">
+            <EmptyState
+              headingLevel={3}
+              icon={
+                <span
+                  aria-hidden="true"
+                  className="bg-accent text-accent-foreground inline-flex size-10 items-center justify-center rounded-lg"
+                >
+                  <FileText className="size-5" />
+                </span>
+              }
+              title="Chưa có bài đăng nào"
+              description="Chưa có lô đăng nào được tạo cho đơn vị này — soạn bài mới rồi chọn kênh để bắt đầu theo dõi tại đây."
+              actions={
+                <Button asChild className="min-h-10 px-4 sm:min-h-9">
+                  <Link href="/compose">Soạn bài mới</Link>
+                </Button>
+              }
+            />
+          </div>
         )
       ) : null}
 
       {/* Log Data Table */}
       {items.length > 0 && (
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p role="status" aria-live="polite" className="text-muted-foreground text-sm">
               Đang hiển thị{" "}
-              <strong className="font-mono text-foreground font-semibold">
+              <strong className="text-foreground font-mono font-semibold tabular-nums">
                 {items.length.toLocaleString("vi-VN")}
               </strong>{" "}
               bài
@@ -389,7 +436,7 @@ export function JobLogScreen() {
               .
             </p>
             {channels.isError && (
-              <span className="text-xs text-turmeric-deep">
+              <span className="text-warning-foreground text-xs">
                 * Đang hiển thị mã kênh thay cho tên Page do không tải được danh mục kênh.
               </span>
             )}
@@ -408,15 +455,15 @@ export function JobLogScreen() {
             <div className="flex justify-center pt-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 onClick={() => void log.fetchNextPage()}
                 disabled={log.isFetchingNextPage}
-                className="gap-2"
+                className="min-h-10 gap-2 px-4 sm:min-h-9"
               >
                 {log.isFetchingNextPage ? (
                   <>
-                    <RefreshCw className="size-3.5 animate-spin" />
-                    <span>Đang tải thêm...</span>
+                    <RefreshCw aria-hidden="true" className="size-4 motion-safe:animate-spin" />
+                    <span>Đang tải thêm…</span>
                   </>
                 ) : (
                   <span>Tải thêm các bài cũ hơn</span>
@@ -424,7 +471,7 @@ export function JobLogScreen() {
               </Button>
             </div>
           ) : (
-            <p className="text-center text-xs text-muted-foreground py-2 font-mono">
+            <p className="text-muted-foreground py-2 text-center font-mono text-xs">
               — Đã tải toàn bộ danh sách —
             </p>
           )}

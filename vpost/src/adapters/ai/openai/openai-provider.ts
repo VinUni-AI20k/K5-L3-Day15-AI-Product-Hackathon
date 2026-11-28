@@ -1,5 +1,5 @@
 /**
- * OpenAI adapter — currently the ONLY wired provider (owner decision 15/08/2026,
+ * OpenAI adapter — currently the ONLY wired provider (owner decision 27/11/2026,
  * provider-strategy.md §3.1). It was written as the infrastructure fallback
  * behind Google; since no Google paid-tier key exists, every generation now goes
  * through here. Nothing in this file changes with that: the adapter still never

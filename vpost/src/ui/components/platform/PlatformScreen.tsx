@@ -4,7 +4,6 @@ import {
   Badge,
   Banner,
   Button,
-  EmptyState,
   HStack,
   Heading,
   Layout,
@@ -14,9 +13,11 @@ import {
   StackItem,
   Text,
 } from "@astryxdesign/core";
+import { Building2, Plus, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
+import { EmptyState } from "@/ui/components/feedback/EmptyState";
 import { presentApiError, toApiError } from "@/ui/components/feedback/present-api-error";
 import { CreatePlatformTenantDialog } from "@/ui/components/platform/CreatePlatformTenantDialog";
 import { PlatformTenantTable } from "@/ui/components/platform/PlatformTenantTable";
@@ -113,107 +114,110 @@ export function PlatformScreen() {
       height="fill"
       header={
         <LayoutHeader hasDivider>
-          <Stack direction="vertical" gap={3} padding={4}>
-            <Stack direction="vertical" gap={1}>
-              <HStack gap={2} align="center" wrap="wrap">
-                <Heading level={1}>Công ty khách</Heading>
-                <Badge
-                  variant={canAdminister ? "purple" : "neutral"}
-                  label={platformRoleLabel(platformRole)}
-                />
-              </HStack>
-              <Text type="supporting">
-                Toàn bộ công ty đang chạy trên VPOST. Màn này đứng ngoài mọi công ty — thao tác ở đây
-                ảnh hưởng tới khách, không tới công ty bạn đang làm việc.
-              </Text>
-            </Stack>
+          <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6">
+            <Stack direction="vertical" gap={3}>
+              <HStack gap={3} justify="between" align="center" wrap="wrap">
+                <HStack gap={2} align="center" wrap="wrap">
+                  <Heading level={1}>Công ty khách</Heading>
+                  <Badge
+                    variant={canAdminister ? "purple" : "neutral"}
+                    label={platformRoleLabel(platformRole)}
+                  />
+                </HStack>
 
-            <HStack gap={3} align="center" wrap="wrap">
-              <Button
-                variant="secondary"
-                size="sm"
-                label={tenants.isFetching ? "Đang tải…" : "Tải lại"}
-                isDisabled={tenants.isFetching}
-                onClick={() => void tenants.refetch()}
-              />
-              {canAdminister ? (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  label="Tạo công ty cho khách"
-                  onClick={() => setIsCreateOpen(true)}
-                />
-              ) : null}
+                <HStack gap={2} align="center" wrap="wrap">
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    icon={<RefreshCw className="size-4" aria-hidden="true" />}
+                    label={tenants.isFetching ? "Đang tải…" : "Tải lại"}
+                    isLoading={tenants.isFetching}
+                    isDisabled={tenants.isFetching}
+                    onClick={() => void tenants.refetch()}
+                  />
+                  {canAdminister ? (
+                    <Button
+                      variant="primary"
+                      size="md"
+                      icon={<Plus className="size-4" aria-hidden="true" />}
+                      label="Tạo công ty cho khách"
+                      onClick={() => setIsCreateOpen(true)}
+                    />
+                  ) : null}
+                </HStack>
+              </HStack>
+
+              <Text type="supporting" color="secondary" className="max-w-prose">
+                Toàn bộ công ty đang chạy trên VPOST. Màn này đứng ngoài mọi công ty — thao tác ở
+                đây ảnh hưởng tới khách, không tới công ty bạn đang làm việc.
+              </Text>
+
               {/* Said once, at the top, instead of a column of dead buttons. */}
-              {supportNotice ? <Text type="supporting">{supportNotice}</Text> : null}
-            </HStack>
-          </Stack>
+              {supportNotice ? (
+                <Text type="supporting" color="secondary">
+                  {supportNotice}
+                </Text>
+              ) : null}
+            </Stack>
+          </div>
         </LayoutHeader>
       }
       content={
         <LayoutContent padding={0} isScrollable>
-          <Stack direction="vertical" height="100%">
-            {/* The live region is ALWAYS mounted, empty most of the time: a
-                region that appears together with its text is announced
-                unreliably (web-feedback-states §4). */}
-            <Stack
-              direction="vertical"
-              role="status"
-              aria-live="polite"
-              paddingInline={4}
-              paddingBlock={outcome ? 3 : 0}
-            >
-              {outcome ? (
-                <Banner
-                  status="success"
-                  isDismissable
-                  onDismiss={() => setOutcome(null)}
-                  title="Đã lưu thay đổi"
-                  description={outcome}
-                />
-              ) : null}
-            </Stack>
+          <div className="mx-auto flex h-full w-full max-w-7xl flex-col px-4 py-6 sm:px-6">
+            <Stack direction="vertical" gap={5} height="100%">
+              {/* The live region is ALWAYS mounted, empty most of the time: a
+                  region that appears together with its text is announced
+                  unreliably (web-feedback-states §4). */}
+              <div role="status" aria-live="polite" className={outcome ? undefined : "sr-only"}>
+                {outcome ? (
+                  <Banner
+                    status="success"
+                    isDismissable
+                    onDismiss={() => setOutcome(null)}
+                    title="Đã lưu thay đổi"
+                    description={outcome}
+                  />
+                ) : null}
+              </div>
 
-            {/* A refused write belongs next to the table it was aimed at. */}
-            {suspend.isError ? (
-              <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
+              {/* A refused write belongs next to the table it was aimed at. */}
+              {suspend.isError ? (
                 <ApiErrorNotice error={suspend.error} operation="platform" />
-              </Stack>
-            ) : null}
-            {activate.isError ? (
-              <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
-                <ApiErrorNotice error={activate.error} operation="platform" />
-              </Stack>
-            ) : null}
-
-            <HStack gap={3} paddingInline={4} paddingBlock={3} align="center" wrap="wrap">
-              <Heading level={2}>Danh sách công ty</Heading>
-              {/* Only once the list is real: "0 công ty" while loading reads as
-                  an answer, and somebody would act on it. */}
-              {tenants.data ? (
-                <Text type="supporting" role="status" aria-live="polite">
-                  {items.length} công ty
-                </Text>
               ) : null}
-            </HStack>
+              {activate.isError ? (
+                <ApiErrorNotice error={activate.error} operation="platform" />
+              ) : null}
 
-            <StackItem size="fill">
-              <PlatformListBody
-                isFirstLoad={isFirstLoad}
-                showSkeleton={showSkeleton}
-                isError={tenants.isError}
-                error={tenants.error}
-                onRetry={() => void tenants.refetch()}
-                items={items}
-                canAdminister={canAdminister}
-                canSupport={canViewPlatform(platformRole)}
-                busyTenantId={busyTenantId}
-                onSuspend={handleSuspend}
-                onActivate={handleActivate}
-                onEnterSupport={setSupportTarget}
-              />
-            </StackItem>
-          </Stack>
+              <HStack gap={3} align="center" wrap="wrap">
+                <Heading level={2}>Danh sách công ty</Heading>
+                {/* Only once the list is real: "0 công ty" while loading reads as
+                    an answer, and somebody would act on it. */}
+                {tenants.data ? (
+                  <Text type="supporting" color="secondary" role="status" aria-live="polite">
+                    {items.length} công ty
+                  </Text>
+                ) : null}
+              </HStack>
+
+              <StackItem size="fill">
+                <PlatformListBody
+                  isFirstLoad={isFirstLoad}
+                  showSkeleton={showSkeleton}
+                  isError={tenants.isError}
+                  error={tenants.error}
+                  onRetry={() => void tenants.refetch()}
+                  items={items}
+                  canAdminister={canAdminister}
+                  canSupport={canViewPlatform(platformRole)}
+                  busyTenantId={busyTenantId}
+                  onSuspend={handleSuspend}
+                  onActivate={handleActivate}
+                  onEnterSupport={setSupportTarget}
+                />
+              </StackItem>
+            </Stack>
+          </div>
 
           {canAdminister ? (
             <CreatePlatformTenantDialog isOpen={isCreateOpen} onOpenChange={setIsCreateOpen} />
@@ -264,24 +268,20 @@ function PlatformListBody({
 
   // --- Error, with nothing to fall back on ---------------------------------
   if (isError && items.length === 0) {
-    return (
-      <Stack direction="vertical" padding={4}>
-        <ApiErrorNotice error={error} onRetry={onRetry} operation="platform" />
-      </Stack>
-    );
+    return <ApiErrorNotice error={error} onRetry={onRetry} operation="platform" />;
   }
 
   // --- Empty: VPOST always operates at least its own workspace --------------
   if (items.length === 0) {
     return (
-      <Stack direction="vertical" padding={4}>
-        <EmptyState
-          headingLevel={3}
-          title="Chưa có công ty nào"
-          description="Ngay cả công ty nội bộ của VPOST cũng không có trong danh sách, nên nhiều khả năng máy chủ trả về thiếu. Tải lại; nếu vẫn trống, kiểm tra dữ liệu nền tảng."
-          actions={<Button variant="secondary" label="Tải lại" onClick={onRetry} />}
-        />
-      </Stack>
+      <EmptyState
+        kind="idle"
+        headingLevel={3}
+        icon={<Building2 className="size-5" aria-hidden="true" />}
+        title="Chưa có công ty nào"
+        description="Ngay cả công ty nội bộ của VPOST cũng không có trong danh sách, nên nhiều khả năng máy chủ trả về thiếu. Tải lại; nếu vẫn trống, kiểm tra dữ liệu nền tảng."
+        action={<Button variant="secondary" size="md" label="Tải lại" onClick={onRetry} />}
+      />
     );
   }
 
@@ -290,27 +290,18 @@ function PlatformListBody({
   // Hiding that would let someone suspend a company against a list the server
   // no longer agrees with.
   return (
-    <Stack direction="vertical" height="100%">
+    <Stack direction="vertical" gap={4} height="100%">
       {isError ? (
-        <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
-          <Banner
-            status="warning"
-            title="Danh sách bên dưới có thể đã cũ — chưa làm mới được"
-            description={`${presentApiError(toApiError(error), { operation: "platform" }).description} Những gì đang hiện là kết quả của lần tải gần nhất; hãy thử lại trước khi khoá công ty nào.`}
-            endContent={<Button variant="secondary" size="sm" label="Thử lại" onClick={onRetry} />}
-          />
-        </Stack>
+        <Banner
+          status="warning"
+          title="Danh sách bên dưới có thể đã cũ — chưa làm mới được"
+          description={`${presentApiError(toApiError(error), { operation: "platform" }).description} Những gì đang hiện là kết quả của lần tải gần nhất; hãy thử lại trước khi khoá công ty nào.`}
+          endContent={<Button variant="secondary" size="sm" label="Thử lại" onClick={onRetry} />}
+        />
       ) : null}
 
-      {/* `paddingInline={4}` — the same 16px every other block on this screen
-          stands on (the live region, the notices, the "Danh sách công ty"
-          heading). Without it the table sat flush against the side nav on one
-          edge and ran off the window on the other, 16px out of line with the
-          heading that names it: measured at 1440 in the T11 inspect round,
-          table x=256 against a heading at x=272. The table stays bare on the
-          cloth — it only has to stand in the same column as its title. */}
       <StackItem size="fill">
-        <Stack direction="vertical" height="100%" paddingInline={4}>
+        <div className="bg-card border-border min-w-0 overflow-hidden rounded-xl border">
           <PlatformTenantTable
             tenants={items}
             canAdminister={canAdminister}
@@ -320,7 +311,7 @@ function PlatformListBody({
             onActivate={onActivate}
             onEnterSupport={onEnterSupport}
           />
-        </Stack>
+        </div>
       </StackItem>
     </Stack>
   );

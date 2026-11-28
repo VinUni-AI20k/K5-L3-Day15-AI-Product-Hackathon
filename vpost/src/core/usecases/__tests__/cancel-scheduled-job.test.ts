@@ -38,7 +38,7 @@ import { testTenantId } from "@/core/domain/tenant-context.testing";
 
 const TENANT = testTenantId("00000000-0000-0000-0000-000000000001");
 const JOB_ID = "11111111-1111-1111-1111-111111111111";
-const SCHEDULED_AT = new Date("2026-08-13T09:00:00.000Z");
+const SCHEDULED_AT = new Date("2054-08-13T09:00:00.000Z");
 
 interface LogLine {
   level: string;
@@ -148,7 +148,7 @@ function makeRepo(job: PostJob | null, options: { rejectTransition?: boolean } =
           failed: 0,
           blocked: 0,
         },
-        startedAt: new Date("2026-08-13T02:00:00.000Z"),
+        startedAt: new Date("2054-08-13T02:00:00.000Z"),
         finishedAt: null,
         jobs: current ? [current] : [],
       };

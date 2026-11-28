@@ -1,9 +1,8 @@
 /**
- * PromptStore over the templates shipped in the repo.
+ * PromptStore over the built-in templates shipped in the repo.
  *
- * This is the FLOOR every tenant starts on: `db-prompt-store.ts` looks up the
- * tenant's own active version first and falls back here when there is none
- * (docs/ai/prompt-versioning.md §1).
+ * Serves the default built-in prompt template for each (task, platform)
+ * without database storage (shop-specific prompting lives in "Phong cách viết").
  */
 
 import { AppError } from "@/core/domain/errors";

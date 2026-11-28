@@ -7,24 +7,23 @@ import {
   SideNav,
   SideNavItem,
   SideNavSection,
-  Text,
   useAnnounce,
   useSideNavCollapse,
 } from "@astryxdesign/core";
 import {
   Building2,
+  Feather,
   FolderSync,
   Layers,
   LayoutDashboard,
   ListChecks,
   LogOut,
+  MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
-  Palette,
   PenLine,
   Radio,
   ScrollText,
-  Sparkles,
   TableProperties,
   Users,
 } from "lucide-react";
@@ -59,14 +58,14 @@ export const NAV_ICONS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> =
   "/compose": PenLine,
   "/bulk": Layers,
   "/posts": ScrollText,
+  "/comments": MessageSquare,
   "/products": ListChecks,
   "/sync": FolderSync,
   "/data-mapping": TableProperties,
   "/channels": Radio,
-  "/prompts": Sparkles,
+  "/writing-style": Feather,
   "/members": Users,
   "/platform": Building2,
-  "/platform/appearance": Palette,
 };
 
 export function AppSideNav({
@@ -141,7 +140,7 @@ export function AppSideNav({
       // overlay badge covers it. The nav owns a toggle of its own at the top
       // instead (see NavCollapseToggle).
       collapsible={{ hasButton: false, isCollapsed, onCollapsedChange: handleCollapsedChange }}
-      resizable={{ defaultWidth: 256, minWidth: 240, maxWidth: 280, autoSaveId: "mysp-nav" }}
+      resizable={{ defaultWidth: 256, minWidth: 240, maxWidth: 280, autoSaveId: "vpost-nav" }}
       // AppShell renders the top bar as a second navigation landmark, and a
       // screen reader lists both by name — "Side navigation" next to a
       // Vietnamese UI names neither one usefully.
@@ -301,13 +300,19 @@ function NavAccountBlock({
   // and the button goes icon-only. Nothing is dropped, only relabelled.
   if (isCollapsed) {
     return (
-      <>
+      <div
+        className={
+          onSignOut
+            ? "border-border flex flex-col items-center gap-2 border-t pt-3 pb-2"
+            : "border-border flex flex-col items-center gap-2 border-t pt-3 pb-16"
+        }
+      >
         <Avatar name={operatorLabel} size="sm" tooltip={operatorLabel} />
         {onSignOut ? (
           <Button
             label={signOutLabel}
             tooltip={hasFailed ? failureHint : signOutLabel}
-            icon={<LogOut aria-hidden="true" />}
+            icon={<LogOut className="size-4" aria-hidden="true" />}
             isIconOnly
             size="sm"
             variant={hasFailed ? "destructive" : "ghost"}
@@ -315,12 +320,18 @@ function NavAccountBlock({
             onClick={() => signOut(onSignOut)}
           />
         ) : null}
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div
+      className={
+        onSignOut
+          ? "border-border flex flex-col gap-2 border-t pt-3 pb-2"
+          : "border-border flex flex-col gap-2 border-t pt-3 pb-16"
+      }
+    >
       <Item
         density="compact"
         startContent={<Avatar name={operatorLabel} size="sm" tooltip={false} />}
@@ -332,7 +343,7 @@ function NavAccountBlock({
       {onSignOut ? (
         <Button
           label={signOutLabel}
-          icon={<LogOut aria-hidden="true" />}
+          icon={<LogOut className="size-4" aria-hidden="true" />}
           variant={hasFailed ? "destructive" : "ghost"}
           size="sm"
           width="100%"
@@ -342,10 +353,12 @@ function NavAccountBlock({
       ) : (
         // No control, because there is nothing to sign out of — a disabled
         // button here would only invite clicks that can never work.
-        <Text type="supporting" color="disabled">
+        // Generous bottom clearance on the footer container keeps this caption
+        // clear of Next's bottom-left dev indicator badge.
+        <p className="text-foreground-subtle px-2 text-xs leading-4 font-medium">
           Phiên phát triển — không có đăng xuất
-        </Text>
+        </p>
       )}
-    </>
+    </div>
   );
 }

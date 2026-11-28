@@ -77,7 +77,7 @@ describe("requireTenant — refusals", () => {
   it("401s a session with no account behind it (bootstrap without a row)", async () => {
     const { gate } = harness();
     await expect(
-      gate.requireTenant({ accountId: null, email: "boss@mysp.vn" }, TENANT_X, { tier: "R" }),
+      gate.requireTenant({ accountId: null, email: "boss@vpost.vn" }, TENANT_X, { tier: "R" }),
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
@@ -294,7 +294,7 @@ describe("requireTenant — cache tiers", () => {
 
 describe("requireTenant — support sessions (doc 10 §8.1: read-only)", () => {
   const SUPPORT_SESSION = "99999999-8888-7777-6666-555555555555";
-  const liveVisit = { tenantId: TENANT_Y as never, expiresAt: new Date("2026-08-22T06:00:00Z") };
+  const liveVisit = { tenantId: TENANT_Y as never, expiresAt: new Date("2054-08-22T06:00:00Z") };
 
   it("grants a READ context for the visited tenant when every membership missed", async () => {
     const { gate, findSupportSession } = harness([accountRecord({ memberships: [] })]);
@@ -384,7 +384,7 @@ describe("requireTenant — super_admin (stealth mode)", () => {
   it("grants owner context to super_admin on any selected tenant even without a membership row", async () => {
     const superAdminRecord = accountRecord({
       accountId: "acc-super",
-      sessionEmail: "super@mysp.vn",
+      sessionEmail: "super@vpost.vn",
       memberships: [],
     });
     superAdminRecord.summary = {
@@ -394,7 +394,7 @@ describe("requireTenant — super_admin (stealth mode)", () => {
 
     const { gate } = harness([superAdminRecord]);
     const context = await gate.requireTenant(
-      { accountId: "acc-super", email: "super@mysp.vn" },
+      { accountId: "acc-super", email: "super@vpost.vn" },
       TENANT_X,
       { tier: "S", minRole: "owner" },
     );
@@ -407,7 +407,7 @@ describe("requireTenant — super_admin (stealth mode)", () => {
   it("elevates existing membership to owner and bypasses minRole check for super_admin", async () => {
     const superAdminRecord = accountRecord({
       accountId: "acc-super",
-      sessionEmail: "super@mysp.vn",
+      sessionEmail: "super@vpost.vn",
       memberships: [membershipRow({ tenantId: TENANT_X, role: "viewer" })],
     });
     superAdminRecord.summary = {
@@ -417,7 +417,7 @@ describe("requireTenant — super_admin (stealth mode)", () => {
 
     const { gate } = harness([superAdminRecord]);
     const context = await gate.requireTenant(
-      { accountId: "acc-super", email: "super@mysp.vn" },
+      { accountId: "acc-super", email: "super@vpost.vn" },
       TENANT_X,
       { tier: "S", minRole: "owner" },
     );

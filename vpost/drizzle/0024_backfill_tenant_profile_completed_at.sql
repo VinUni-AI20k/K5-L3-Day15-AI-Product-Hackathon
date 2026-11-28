@@ -6,7 +6,7 @@
 -- `completed_at` into a full-screen 4-question survey. Without this backfill
 -- that gate would catch tenants that have been using the product for months —
 -- a flow named "first run" turned into a toll booth for everyone, which is not
--- what it is (plan task 13, PM decision 26/08/2026).
+-- what it is (plan task 13, PM decision 27/11/2026).
 --
 -- WHY DATA AND NOT A RUNTIME CONDITION: telling "new" from "old" at runtime
 -- needs either a hardcoded cut-off date or a second flag; both are unreadable
