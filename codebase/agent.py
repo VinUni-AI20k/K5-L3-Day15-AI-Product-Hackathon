@@ -93,15 +93,21 @@ def _shrink_image(image_bytes: bytes, max_side: int = 1600) -> bytes:
 
 
 def read_receipt_image(scan: dict, image_bytes: bytes, capture_date: str) -> dict:
-    """Model đọc ảnh hóa đơn; code kiểm số tiền có thật trên ảnh trước khi cho xem nhanh.
+    """Model "cứu" ảnh mà OCR cục bộ chưa đọc ra số thực trả; code kiểm số đó có thật trên ảnh.
 
     - Ảnh không đạt chất lượng (mờ/lóa) hoặc đã bị chặn: giữ nguyên kết quả OCR, không gọi model.
+    - OCR cục bộ ONNX đã đọc ra tổng chắc chắn: không gọi model.
     - Số model đọc phải trùng tổng OCR cục bộ đọc được; nếu OCR chưa đọc ra tổng thì số đó phải
       xuất hiện trong chữ OCR của chính ảnh. Không thỏa → Cần đọc lại.
     - Ngày sau ngày chụp → Cần đọc lại. Không có ngày → dùng ngày chụp.
     Hàm không ghi sổ; chỉ người dùng bấm Chốt mới ghi.
     """
     if scan.get("blocked") or scan.get("quality_report", {}).get("quality_status") == "fail":
+        return scan
+    # Rẻ + chính xác: OCR cục bộ đã đọc ra tổng chắc chắn thì không gọi model (đo trên 40 ảnh mẫu:
+    # gọi model cho mọi ảnh không bắt thêm lỗi nào mà còn đẩy 3 ảnh đúng sang Cần đọc lại).
+    if scan.get("printed_total") and not scan.get("is_uncertain"):
+        note("OCR cục bộ đủ căn cứ, không gọi model đọc ảnh")
         return scan
     try:
         reply = call_model_image("Trích dữ liệu hóa đơn thành JSON.", RECEIPT_IMAGE_PROMPT, _shrink_image(image_bytes))["text"]
