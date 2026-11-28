@@ -6,7 +6,12 @@
 
 **Bước kiểm chứng bổ sung:** nếu nhóm phỏng vấn, hỏi người từng tự theo dõi chi tiêu về lần gần nhất nhận hóa đơn, cách họ ghi, số bước, số phút, việc họ phải mở lại để tổng hợp và có từng bỏ sót khoản không. Ghi từng cuộc bằng mã P1, P2, P3. [Mẫu phỏng vấn](interviews/TEMPLATE.md)
 
-**Khảo sát:** đã soạn [10 câu hỏi Track E](survey/questions.md) về hành vi ghi hóa đơn, khoản bỏ sót và thời gian xem lại. Chưa ghi nhận link, thời điểm gửi hay phản hồi. Mục tiêu là ít nhất 20 người phù hợp ngoài nhóm.
+**Khảo sát:** Đã thu **24 phản hồi** từ `27/11/2026 18:22` đến `27/11/2026 23:49` (đạt ngưỡng ≥20 người). Bản xuất đã bỏ cột SĐT/liên hệ cá nhân lưu tại [results.csv](survey/results.csv).
+- **Tần suất & ma sát nhập:** `9/24 (37,5%)` phát sinh 10–20 lượt chi/tuần, `9/24 (37,5%)` từ 20 lượt/tuần trở lên; `8/24 (33,3%)` bỏ không ghi nữa vì lười/quên và `8/24 (33,3%)` mất từ 5 phút đến trên 15 phút mỗi lần tự tổng hợp.
+- **Thói quen với hóa đơn:** `16/24 (66,7%)` bỏ luôn không giữ lại; `3/24 (12,5%)` giữ dồn cuối tuần/tháng mới cộng; `2/24 (8,3%)` chụp ảnh để đó rồi quên xem lại.
+- **Điểm vướng chính (chọn nhiều):** `17/24 (70,8%)` chi tiêu rải rác khó gom theo từng ngày; `13/24 (54,2%)` quên khoản tiền mặt trong ngày; `12/24 (50,0%)` ngại nhập tay từng dòng hóa đơn vì tốn thời gian; `16/24 (66,7%)` tốn thời gian lục lại ảnh và lịch sử chuyển khoản.
+- **Lý do bỏ app quản lý chi tiêu:** `14/24 (58,3%)` hay quên nhập ngay lúc mua, tối về không nhớ nổi; `11/24 (45,8%)` phải nhập tay quá nhiều thao tác mỗi lần chi.
+- **Trích dẫn nguyên văn (ẩn danh):** *“Lười ghi một cái rồi quên bẵng đi, muốn dò lại thì ngại.”* · *“Mình hay quên nhập ngay lúc mua, tối về không nhớ hết các khoản tiền mặt nên dễ bỏ dở sau vài ngày.”* · *“Tốn thời gian tìm các mục chuyển khoản, nghĩ xem đã tiêu gì”* · *“quá nhiều khoản nhỏ lẻ, và t có thói quen hay ăn vặt, hay mua nước ngọt.”*
 
 ## Lịch phỏng vấn kiểm chứng CP3
 
