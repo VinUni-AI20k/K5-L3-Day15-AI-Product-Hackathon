@@ -158,7 +158,9 @@ def teardown_function(_):
     client.cookies.clear()
 
 
-def test_poller_tick_syncs_drafts_updates_drafts_ready_and_never_sends(caplog):
+def test_poller_tick_syncs_drafts_updates_drafts_ready_and_never_sends(caplog, monkeypatch):
+    # Isolate auto-draft assertions from default-on AI moderation calls
+    monkeypatch.setenv("VPOST_AUTO_MODERATION_DISABLED", "1")
     seed_page_and_post()
     secret_msg = "UNIQUE_CUSTOMER_SECRET_TEXT_999 mẫu này giá bao nhiêu ạ?"
 
@@ -233,6 +235,8 @@ def test_poller_tick_syncs_drafts_updates_drafts_ready_and_never_sends(caplog):
 
 
 def test_poller_respects_max_drafts_per_tick(monkeypatch):
+    # Isolate auto-draft cap assertions from default-on AI moderation calls
+    monkeypatch.setenv("VPOST_AUTO_MODERATION_DISABLED", "1")
     seed_page_and_post()
     monkeypatch.setenv("VPOST_AUTO_DRAFT_MAX_PER_TICK", "2")
     facebook.list_comments = lambda fb_post_id, token, since=None: [
@@ -344,6 +348,9 @@ def test_poller_loop_survives_exceptions(monkeypatch):
 
 def test_finding14_auto_draft_no_clock_skew_loop_and_drafts_late_synced_replies(monkeypatch):
     """#14: Auto-draft freshness tracks covered customer comment id (immune to clock skew and late-synced replies)."""
+    # Isolate auto-draft freshness assertions from default-on live auto-reply and auto-moderation
+    monkeypatch.setenv("VPOST_AUTO_REPLY_DISABLED", "1")
+    monkeypatch.setenv("VPOST_AUTO_MODERATION_DISABLED", "1")
     seed_page_and_post()
     send_calls = []
     facebook.reply_comment = lambda *a, **kw: (send_calls.append(a), "never")[1]
@@ -426,6 +433,8 @@ def test_finding14_auto_draft_no_clock_skew_loop_and_drafts_late_synced_replies(
 
 def test_poller_checks_stop_event_between_auto_draft_calls(monkeypatch):
     """Suspicion: comment_poller checks stop_event between auto-draft calls for fast shutdown."""
+    # Isolate stop_event check in the auto-draft loop from default-on AI moderation calls
+    monkeypatch.setenv("VPOST_AUTO_MODERATION_DISABLED", "1")
     seed_page_and_post()
     monkeypatch.setenv("VPOST_AUTO_DRAFT_MAX_PER_TICK", "5")
     facebook.list_comments = lambda fb_post_id, token, since=None: [

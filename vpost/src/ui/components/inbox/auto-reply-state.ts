@@ -6,7 +6,6 @@ import {
   AUTO_REPLY_INTENTS,
   type AutoReplyIntent,
   type AutoReplyLogFilter,
-  type AutoReplyMode,
   type AutoReplySetting,
   type AutoReplySettingUpdateInput,
 } from "@/ui/schemas/auto-reply.schema";
@@ -16,15 +15,13 @@ import {
 } from "@/ui/schemas/inbox.schema";
 
 /**
- * Pure draft state, validation, live-mode confirmation gate, and log filter
- * helpers for `AutoReplySettingsPanel` and `AutoReplyLogPanel`.
+ * Pure draft state, validation, and log filter helpers for
+ * `AutoReplySettingsPanel` and `AutoReplyLogPanel`.
  */
 
 const VALID_INTENT_SET = new Set<string>(AUTO_REPLY_INTENTS);
 
 export interface AutoReplySettingDraft {
-  readonly enabled: boolean;
-  readonly mode: AutoReplyMode;
   readonly intents: readonly AutoReplyIntent[];
   readonly hourlyCap: number | null;
   readonly dailyCap: number | null;
@@ -56,8 +53,6 @@ export function settingToAutoReplyDraft(
   setting: AutoReplySetting,
 ): AutoReplySettingDraft {
   return {
-    enabled: setting.enabled,
-    mode: setting.mode,
     intents: sanitizeAutoReplyIntents(setting.intents),
     hourlyCap: setting.hourlyCap,
     dailyCap: setting.dailyCap,
@@ -69,8 +64,6 @@ export function isAutoReplyDraftDirty(
   draft: AutoReplySettingDraft,
 ): boolean {
   const baseline = settingToAutoReplyDraft(serverSetting);
-  if (baseline.enabled !== draft.enabled) return true;
-  if (baseline.mode !== draft.mode) return true;
   if (baseline.hourlyCap !== draft.hourlyCap) return true;
   if (baseline.dailyCap !== draft.dailyCap) return true;
   const nextIntents = sanitizeAutoReplyIntents(draft.intents);
@@ -79,16 +72,16 @@ export function isAutoReplyDraftDirty(
 }
 
 /**
- * Validates intents (at least one required when enabled) and hourly/daily caps
- * (`1..200` and `1..2000`, integer only).
+ * Validates intents (at least one required since auto-reply is always active)
+ * and hourly/daily caps (`1..200` and `1..2000`, integer only).
  */
 export function validateAutoReplyDraft(
   draft: AutoReplySettingDraft,
 ): AutoReplyDraftValidation {
   const cleanIntents = sanitizeAutoReplyIntents(draft.intents);
   const intentsError =
-    draft.enabled && cleanIntents.length === 0
-      ? "Chọn ít nhất một loại câu hỏi (Giá, Size hoặc Màu, Tư vấn size) khi bật tự động trả lời."
+    cleanIntents.length === 0
+      ? "Chọn ít nhất một loại câu hỏi (Giá, Size, Màu hoặc Tư vấn size)."
       : null;
 
   const hourlyValid =
@@ -128,33 +121,19 @@ export function validateAutoReplyDraft(
 }
 
 /**
- * True whenever saving `draft` transitions a Page into live public auto-replying:
- * - switching `mode` from `dry_run` to `live`, OR
- * - turning `enabled` from `false` to `true` while `mode === "live"`.
- */
-export function needsLiveModeConfirm(
-  serverSetting: Pick<AutoReplySetting, "enabled" | "mode">,
-  draft: Pick<AutoReplySettingDraft, "enabled" | "mode">,
-): boolean {
-  if (draft.mode !== "live") return false;
-  return serverSetting.mode !== "live" || (!serverSetting.enabled && draft.enabled);
-}
-
-/**
  * Builds the `PUT /api/comments/auto-reply-settings/{pageId}` body from a validated draft.
- * Includes `confirmLive: true` ONLY when `draft.mode === "live"` AND `confirmedLive === true`.
+ * Always targets active live mode (`enabled: true, mode: "live", confirmLive: true`).
  */
 export function buildAutoReplyUpdatePayload(
   draft: AutoReplySettingDraft,
-  options: { readonly confirmedLive: boolean },
 ): AutoReplySettingUpdateInput {
   return {
-    enabled: draft.enabled,
-    mode: draft.mode,
+    enabled: true,
+    mode: "live",
     intents: sanitizeAutoReplyIntents(draft.intents),
     ...(typeof draft.hourlyCap === "number" ? { hourlyCap: draft.hourlyCap } : {}),
     ...(typeof draft.dailyCap === "number" ? { dailyCap: draft.dailyCap } : {}),
-    ...(draft.mode === "live" && options.confirmedLive ? { confirmLive: true } : {}),
+    confirmLive: true,
   };
 }
 

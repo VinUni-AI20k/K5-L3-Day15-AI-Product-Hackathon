@@ -317,11 +317,12 @@ describe("ModerationSettingsView rendering", () => {
     expect(errorHtml).toContain("Thử lại");
   });
 
-  it("renders per-Page controls, dry-run explanation, 4 selectable categories, non-selectable complaint row, pending/error/read-only states", () => {
+  it("renders always-live status without enable/mode controls, 4 selectable categories, non-selectable complaint row, threshold, and pending/error/read-only states", () => {
+    // Even if server returns legacy enabled=false & mode=dry_run, UI ignores them and shows "Đang bật · chạy thật"
     const populatedHtml = renderToStaticMarkup(
       <ModerationSettingsView
         {...settingsProps({
-          items: [sampleSetting()],
+          items: [sampleSetting({ enabled: false, mode: "dry_run" })],
           savingPageId: "123",
           saveErrorByPageId: {
             "123": new ApiError({
@@ -333,14 +334,16 @@ describe("ModerationSettingsView rendering", () => {
           savedMessageByPageId: {
             "123": "Đã lưu cài đặt kiểm duyệt cho Dịu Mây Boutique.",
           },
+          onOpenLog: () => {},
         })}
       />,
     );
 
     expect(populatedHtml).toContain("Dịu Mây Boutique");
-    expect(populatedHtml).toContain("Chạy thử");
-    expect(populatedHtml).toContain("Chạy thật");
-    expect(populatedHtml).toContain("Chế độ Chạy thử không tác động lên Facebook");
+    expect(populatedHtml).toContain("Đang bật · chạy thật");
+    expect(populatedHtml).toContain('data-moderation-status="active"');
+    expect(populatedHtml).toContain("Nhật ký kiểm duyệt");
+    expect(populatedHtml).toContain("Xem nhật ký kiểm duyệt");
     expect(populatedHtml).toContain("Spam / quảng cáo");
     expect(populatedHtml).toContain("Lừa đảo / liên kết lạ");
     expect(populatedHtml).toContain("Xúc phạm / thô tục");
@@ -351,20 +354,47 @@ describe("ModerationSettingsView rendering", () => {
     expect(populatedHtml).toContain("INVALID_INPUT");
     expect(populatedHtml).toContain("Đã lưu cài đặt kiểm duyệt cho Dịu Mây Boutique.");
 
+    // Removed enable toggle and dry-run/live mode radio must never render
+    expect(populatedHtml).not.toContain('role="switch"');
+    expect(populatedHtml).not.toContain('type="radio"');
+    expect(populatedHtml).not.toContain("Bật tự kiểm duyệt bình luận mới");
+    expect(populatedHtml).not.toContain("Chế độ hoạt động");
+    expect(populatedHtml).not.toContain("Chạy thử");
+    expect(populatedHtml).not.toContain("Đang tắt");
+    expect(populatedHtml).not.toContain("Chế độ Chạy thử không tác động lên Facebook");
+
     // Complaint is rendered strictly as an informational row — never as a checkbox option
     expect(populatedHtml).toContain('data-moderation-policy="complaint-flag-only"');
     expect(populatedHtml).toContain("Chỉ đánh dấu, không tự ẩn");
     expect(populatedHtml).toContain("chỉ đánh dấu, không tự ẩn");
     expect(populatedHtml).not.toContain('value="complaint"');
 
+    // Empty categories warning still appears (since moderation is always enabled)
+    const emptyCategoriesHtml = renderToStaticMarkup(
+      <ModerationSettingsView
+        {...settingsProps({
+          items: [
+            sampleSetting({
+              enabled: undefined,
+              mode: undefined,
+              categories: [],
+            }),
+          ],
+        })}
+      />,
+    );
+    expect(emptyCategoriesHtml).toContain("Đang bật · chạy thật");
+    expect(emptyCategoriesHtml).toContain("Chưa chọn nhóm tự ẩn nào");
+
     const readOnlyHtml = renderToStaticMarkup(
       <ModerationSettingsView
         {...settingsProps({
-          items: [sampleSetting()],
+          items: [sampleSetting({ enabled: undefined, mode: undefined })],
           readOnlyReason: READ_ONLY_REASON,
         })}
       />,
     );
+    expect(readOnlyHtml).toContain("Đang bật · chạy thật");
     expect(readOnlyHtml).toContain(READ_ONLY_REASON);
     expect(readOnlyHtml).toContain('aria-disabled="true"');
   });

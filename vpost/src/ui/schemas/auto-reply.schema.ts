@@ -13,16 +13,13 @@ import { z } from "zod";
 
 export const AUTO_REPLY_HOURLY_CAP_MIN = 1;
 export const AUTO_REPLY_HOURLY_CAP_MAX = 200;
-export const AUTO_REPLY_HOURLY_CAP_DEFAULT = 30;
+export const AUTO_REPLY_HOURLY_CAP_DEFAULT = 200;
 
 export const AUTO_REPLY_DAILY_CAP_MIN = 1;
 export const AUTO_REPLY_DAILY_CAP_MAX = 2000;
-export const AUTO_REPLY_DAILY_CAP_DEFAULT = 200;
+export const AUTO_REPLY_DAILY_CAP_DEFAULT = 2000;
 
 export const AUTO_REPLY_LOG_DEFAULT_LIMIT = 20;
-
-export const AUTO_REPLY_LIVE_CONFIRM_COPY =
-  "Bật chạy thật: câu trả lời sẽ được đăng công khai lên Facebook";
 
 // --- Enums & schemas --------------------------------------------------------
 
@@ -39,13 +36,14 @@ export const AutoReplyIntentSchema = z.enum(AUTO_REPLY_INTENTS);
 export type AutoReplyIntent = z.infer<typeof AutoReplyIntentSchema>;
 
 /**
- * Default intents enabled when a Page has no saved setting yet.
- * `size_advice` is strictly opt-in per Page (`.swarm/specs/size-advice.md`).
+ * Default intents enabled when a Page has no saved setting yet (all four intents
+ * including `size_advice` are active by default).
  */
 export const AUTO_REPLY_DEFAULT_INTENTS: readonly AutoReplyIntent[] = [
   "price",
   "size",
   "color",
+  "size_advice",
 ] as const;
 
 export const AUTO_REPLY_ACTIONS = ["sent", "would_send", "skipped", "failed"] as const;
@@ -87,7 +85,7 @@ export const AUTO_REPLY_INTENT_META: readonly AutoReplyIntentMeta[] = [
     value: "size_advice",
     label: "Tư vấn size (hỏi chiều cao, cân nặng)",
     description:
-      "Khi khách nhờ tư vấn size, hệ thống hỏi chiều cao và cân nặng (nếu chưa có) rồi đối chiếu Bảng size với các size còn hàng. Tắt mặc định — cần bật riêng cho từng Fanpage.",
+      "Khi khách nhờ tư vấn size, hệ thống hỏi chiều cao và cân nặng (nếu chưa có) rồi đối chiếu Bảng size với các size còn hàng.",
   },
 ] as const;
 
@@ -96,11 +94,6 @@ export const AUTO_REPLY_INTENT_LABELS: Record<AutoReplyIntent, string> = {
   size: "Size",
   color: "Màu",
   size_advice: "Tư vấn size",
-};
-
-export const AUTO_REPLY_MODE_LABELS: Record<AutoReplyMode, string> = {
-  dry_run: "Chạy thử",
-  live: "Chạy thật",
 };
 
 export const AUTO_REPLY_ACTION_LABELS: Record<AutoReplyAction, string> = {
@@ -144,8 +137,9 @@ export const AutoReplySettingSchema = z.object({
   pageId: z.string().min(1),
   channelId: z.string().min(1),
   pageName: z.string(),
-  enabled: z.boolean().optional().default(false),
-  mode: AutoReplyModeSchema.optional().default("dry_run"),
+  // Optional legacy fields; auto-reply is always active in live mode and UI ignores these for display.
+  enabled: z.boolean().optional(),
+  mode: AutoReplyModeSchema.optional(),
   intents: z
     .array(AutoReplyIntentSchema)
     .optional()
@@ -180,35 +174,30 @@ export type AutoReplySettingsListResponse = z.infer<
   typeof AutoReplySettingsListResponseSchema
 >;
 
-export const AutoReplySettingUpdateInputSchema = z
-  .object({
-    enabled: z.boolean(),
-    mode: AutoReplyModeSchema,
-    intents: z.array(AutoReplyIntentSchema),
-    hourlyCap: z
-      .number()
-      .int()
-      .min(AUTO_REPLY_HOURLY_CAP_MIN)
-      .max(AUTO_REPLY_HOURLY_CAP_MAX)
-      .optional(),
-    dailyCap: z
-      .number()
-      .int()
-      .min(AUTO_REPLY_DAILY_CAP_MIN)
-      .max(AUTO_REPLY_DAILY_CAP_MAX)
-      .optional(),
-    confirmLive: z.boolean().optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.enabled && data.intents.length === 0) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["intents"],
-        message:
-          "Chọn ít nhất một loại câu hỏi (Giá, Size hoặc Màu, Tư vấn size) khi bật tự động trả lời.",
-      });
-    }
-  });
+export const AutoReplySettingUpdateInputSchema = z.object({
+  // Optional and strictly live/active only: never allow sending enabled=false or mode=dry_run.
+  enabled: z.literal(true).optional(),
+  mode: z.literal("live").optional(),
+  intents: z
+    .array(AutoReplyIntentSchema)
+    .min(
+      1,
+      "Chọn ít nhất một loại câu hỏi (Giá, Size, Màu hoặc Tư vấn size).",
+    ),
+  hourlyCap: z
+    .number()
+    .int()
+    .min(AUTO_REPLY_HOURLY_CAP_MIN)
+    .max(AUTO_REPLY_HOURLY_CAP_MAX)
+    .optional(),
+  dailyCap: z
+    .number()
+    .int()
+    .min(AUTO_REPLY_DAILY_CAP_MIN)
+    .max(AUTO_REPLY_DAILY_CAP_MAX)
+    .optional(),
+  confirmLive: z.boolean().optional(),
+});
 export type AutoReplySettingUpdateInput = z.infer<
   typeof AutoReplySettingUpdateInputSchema
 >;

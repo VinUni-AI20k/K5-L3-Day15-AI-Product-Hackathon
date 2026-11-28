@@ -157,10 +157,11 @@ export async function updateModerationSetting(
 
   // PHASE2(complaint-autohide): Strip/reject any non-v1 auto-hide categories before
   // calling the strict backend route (`COMPLAINT_AUTOHIDE_DISABLED`).
+  // Also reject any attempt to send enabled=false or mode=dry_run.
   const dedupedCategories = Array.from(new Set(input.categories));
   const validated = ModerationSettingUpdateInputSchema.safeParse({
-    enabled: input.enabled,
-    mode: input.mode,
+    ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
+    ...(input.mode !== undefined ? { mode: input.mode } : {}),
     categories: dedupedCategories,
     threshold: input.threshold,
   });
@@ -176,9 +177,16 @@ export async function updateModerationSetting(
     });
   }
 
+  const body = {
+    enabled: true as const,
+    mode: "live" as const,
+    categories: validated.data.categories,
+    threshold: validated.data.threshold,
+  };
+
   return apiRequest(`/api/comments/moderation-settings/${encodeURIComponent(safePageId)}`, {
     method: "PUT",
-    body: validated.data,
+    body,
     schema: ModerationSettingUpdateResponseSchema,
     signal,
     malformedMessage:

@@ -296,11 +296,11 @@ SCHEMA_STATEMENTS = (
     create table if not exists auto_reply_setting(
       tenant_id text not null,
       page_id text not null,
-      enabled integer not null default 0,
-      mode text not null default 'dry_run',
-      intents text not null default '["price","size","color"]',
-      hourly_cap integer not null default 30,
-      daily_cap integer not null default 200,
+      enabled integer not null default 1,
+      mode text not null default 'live',
+      intents text not null default '["price","size","color","size_advice"]',
+      hourly_cap integer not null default 200,
+      daily_cap integer not null default 2000,
       updated_by text not null default '',
       updated_at text not null default '',
       primary key (tenant_id, page_id)
@@ -2364,10 +2364,16 @@ def list_comment_updates_since(tenant_id, comment_seq, draft_seq, limit=50):
 
 # ---------------- VPOST: tự động trả lời & nhãn "Cần bạn" (auto_reply_setting, auto_reply_log, attention) ----------------
 
-AUTO_REPLY_DEFAULT_INTENTS = ("price", "size", "color")
-AUTO_REPLY_DEFAULT_MODE = "dry_run"
-AUTO_REPLY_DEFAULT_HOURLY_CAP = 30
-AUTO_REPLY_DEFAULT_DAILY_CAP = 200
+AUTO_REPLY_DEFAULT_INTENTS = ("price", "size", "color", "size_advice")
+AUTO_REPLY_DEFAULT_MODE = "live"
+AUTO_REPLY_DEFAULT_HOURLY_CAP = 200
+AUTO_REPLY_DEFAULT_DAILY_CAP = 2000
+AUTO_REPLY_DISABLED_SKIP_PREFIX = "Chưa bật tự động trả lời"
+
+
+def is_disabled_auto_reply_reason(reason):
+    """True nếu lý do bỏ qua chỉ do Fanpage chưa bật tự động trả lời."""
+    return str(reason or "").strip().startswith(AUTO_REPLY_DISABLED_SKIP_PREFIX)
 
 
 def _parse_json_str_list(raw):
@@ -2384,11 +2390,12 @@ def _parse_json_str_list(raw):
 
 def _decode_auto_reply_setting(r):
     d = dict(r)
+    # Luôn coi mọi dòng cài đặt (kể cả dòng cũ lưu enabled=0/mode='dry_run') là đang bật ở chế độ live.
     return {
         "tenant_id": d["tenant_id"],
         "page_id": str(d["page_id"]),
-        "enabled": bool(d["enabled"]),
-        "mode": d.get("mode") or AUTO_REPLY_DEFAULT_MODE,
+        "enabled": True,
+        "mode": AUTO_REPLY_DEFAULT_MODE,
         "intents": _parse_json_str_list(d.get("intents")),
         "hourly_cap": int(d["hourly_cap"]) if d.get("hourly_cap") is not None else AUTO_REPLY_DEFAULT_HOURLY_CAP,
         "daily_cap": int(d["daily_cap"]) if d.get("daily_cap") is not None else AUTO_REPLY_DEFAULT_DAILY_CAP,
@@ -2401,7 +2408,7 @@ def default_auto_reply_setting(tenant_id, page_id):
     return {
         "tenant_id": tenant_id,
         "page_id": str(page_id),
-        "enabled": False,
+        "enabled": True,
         "mode": AUTO_REPLY_DEFAULT_MODE,
         "intents": list(AUTO_REPLY_DEFAULT_INTENTS),
         "hourly_cap": AUTO_REPLY_DEFAULT_HOURLY_CAP,
@@ -2437,9 +2444,9 @@ def upsert_auto_reply_setting(
     tenant_id,
     page_id,
     *,
-    enabled,
-    mode,
-    intents,
+    enabled=True,
+    mode=AUTO_REPLY_DEFAULT_MODE,
+    intents=AUTO_REPLY_DEFAULT_INTENTS,
     hourly_cap=AUTO_REPLY_DEFAULT_HOURLY_CAP,
     daily_cap=AUTO_REPLY_DEFAULT_DAILY_CAP,
     updated_by="operator",
@@ -2450,6 +2457,9 @@ def upsert_auto_reply_setting(
     intents_json = json.dumps(clean_intents, ensure_ascii=False)
     hcap = int(hourly_cap)
     dcap = int(daily_cap)
+    # Luôn lưu enabled=1 và mode='live' (không hỗ trợ tắt hay dry_run theo Page).
+    eff_enabled = True
+    eff_mode = AUTO_REPLY_DEFAULT_MODE
     with connect() as c:
         c.execute(
             """insert into auto_reply_setting(
@@ -2463,13 +2473,13 @@ def upsert_auto_reply_setting(
                  daily_cap=excluded.daily_cap,
                  updated_by=excluded.updated_by,
                  updated_at=excluded.updated_at""",
-            (tenant_id, str(page_id), 1 if enabled else 0, mode, intents_json, hcap, dcap, updated_by or "", ts),
+            (tenant_id, str(page_id), 1, eff_mode, intents_json, hcap, dcap, updated_by or "", ts),
         )
     return {
         "tenant_id": tenant_id,
         "page_id": str(page_id),
-        "enabled": bool(enabled),
-        "mode": mode,
+        "enabled": eff_enabled,
+        "mode": eff_mode,
         "intents": clean_intents,
         "hourly_cap": hcap,
         "daily_cap": dcap,
@@ -2588,6 +2598,70 @@ def has_sent_auto_reply_for_comment(tenant_id, comment_id):
             (tenant_id, "auto:" + cid),
         ).fetchone()
     return bool(d)
+
+
+def list_retryable_disabled_auto_reply_comments(tenant_id, *, now_dt=None, max_age_hours=24):
+    """Lấy bình luận khách (< `max_age_hours` giờ, không bị ẩn/bỏ qua/xoá, chưa có phản hồi Page/nhân viên)
+    từng bị bỏ qua DUY NHẤT vì lý do 'Chưa bật tự động trả lời…' và chưa từng được đánh giá lại hay tự trả lời.
+    """
+    ref_dt = _parse_utc_ts(now_dt) if now_dt is not None else datetime.now(timezone.utc)
+    if ref_dt is None:
+        ref_dt = datetime.now(timezone.utc)
+    cutoff = ref_dt - timedelta(hours=float(max_age_hours))
+    now_ts = _iso_utc(ref_dt)
+    prefix_like = AUTO_REPLY_DISABLED_SKIP_PREFIX + "%"
+
+    with connect() as c:
+        rows = c.execute(
+            """select c.*
+               from fb_comment c
+               where c.tenant_id = %s
+                 and c.is_from_page = 0
+                 and c.status not in ('deleted', 'ignored', 'replied')
+                 and c.is_hidden = 0
+                 and exists (
+                   select 1
+                   from auto_reply_log l
+                   where l.tenant_id = c.tenant_id
+                     and l.comment_id = c.id
+                     and l.action = 'skipped'
+                     and trim(l.reason) like %s
+                 )
+                 and not exists (
+                   select 1
+                   from auto_reply_log l2
+                   where l2.tenant_id = c.tenant_id
+                     and l2.comment_id = c.id
+                     and (l2.action != 'skipped' or trim(l2.reason) not like %s)
+                 )
+                 and not exists (
+                   select 1
+                   from comment_draft d
+                   where d.tenant_id = c.tenant_id
+                     and d.client_id = ('auto:' || c.id)
+                     and d.status = 'sent'
+                 )
+               order by c.created_time asc, c.id asc""",
+            (tenant_id, prefix_like, prefix_like),
+        ).fetchall()
+
+    out = []
+    for raw in rows:
+        item = _comment_row(raw)
+        cdt = _parse_utc_ts(item.get("created_time"))
+        if cdt is None or cdt <= cutoff:
+            continue
+        if has_thread_reply_or_operator_activity(tenant_id, item, now_ts=now_ts):
+            continue
+        tid = resolve_thread_root_id(tenant_id, item)
+        if tid != item["id"]:
+            root = get_comment(tenant_id, tid)
+            if not root or root.get("status") in ("deleted", "ignored") or root.get("is_hidden"):
+                continue
+        if thread_has_any_page_reply_or_operator_activity(tenant_id, tid, now_ts=now_ts):
+            continue
+        out.append(item)
+    return out
 
 
 def count_auto_replies_since(tenant_id, page_id, since_dt):

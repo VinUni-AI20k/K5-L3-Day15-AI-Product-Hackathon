@@ -445,7 +445,7 @@ export function ModerationLogView({
           <InboxEmptyState
             kind="first-run"
             title="Chưa có nhật ký kiểm duyệt"
-            description="Khi bạn dùng thao tác hàng loạt hoặc bật tự kiểm duyệt cho Fanpage, mọi hành động sẽ được ghi lại tại đây."
+            description="Khi bạn dùng thao tác hàng loạt hoặc hệ thống tự kiểm duyệt bình luận cho Fanpage, mọi hành động sẽ được ghi lại tại đây."
           />
         )
       ) : (

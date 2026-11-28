@@ -139,22 +139,22 @@ function sampleSizeAdviceRun(overrides: Partial<AgentRun> = {}): AgentRun {
   };
 }
 
-describe("auto-reply size_advice opt-in setting and UI", () => {
+describe("auto-reply size_advice setting and UI", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
-  it("keeps size_advice opt-in by default, supports saving it via PUT, and renders the checkbox + log token", async () => {
+  it("includes size_advice in defaults, supports saving it via PUT, and renders the checkbox + log token", async () => {
     expect(AUTO_REPLY_INTENTS).toContain("size_advice");
-    expect(AUTO_REPLY_DEFAULT_INTENTS).not.toContain("size_advice");
+    expect(AUTO_REPLY_DEFAULT_INTENTS).toContain("size_advice");
 
     const parsedDefault = AutoReplySettingSchema.parse({
       pageId: "123",
       channelId: "fb-123",
       pageName: "WorkHardToday",
     });
-    expect(parsedDefault.intents).toEqual(["price", "size", "color"]);
+    expect(parsedDefault.intents).toEqual(["price", "size", "color", "size_advice"]);
 
     expect(sanitizeAutoReplyIntents(["size_advice", "price", "unknown"])).toEqual([
       "price",
@@ -174,8 +174,6 @@ describe("auto-reply size_advice opt-in setting and UI", () => {
     vi.stubGlobal("fetch", fetchSpy);
 
     const saved = await updateAutoReplySetting("123", {
-      enabled: true,
-      mode: "dry_run",
       intents: ["size_advice", "price"],
       hourlyCap: 30,
       dailyCap: 200,
@@ -183,10 +181,11 @@ describe("auto-reply size_advice opt-in setting and UI", () => {
     expect(saved.setting.intents).toContain("size_advice");
     expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body ?? "{}"))).toEqual({
       enabled: true,
-      mode: "dry_run",
+      mode: "live",
       intents: ["price", "size_advice"],
       hourlyCap: 30,
       dailyCap: 200,
+      confirmLive: true,
     });
 
     // Settings panel shows checkbox "Tư vấn size (hỏi chiều cao, cân nặng)" and link to /writing-style

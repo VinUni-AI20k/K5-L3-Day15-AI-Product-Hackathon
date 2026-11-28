@@ -18,7 +18,8 @@ from psycopg import sql as pg_sql
 import schedule
 import store
 
-DEFAULT_MODE = "dry_run"
+DEFAULT_MODE = "live"
+DEFAULT_CATEGORIES = ("spam", "scam", "abusive", "pii")
 DEFAULT_THRESHOLD = 0.85
 
 FB_COMMENT_MODERATION_COLUMNS = (
@@ -37,9 +38,9 @@ _MODERATION_TABLE_DDL = (
     create table if not exists moderation_setting(
       tenant_id text not null,
       page_id text not null,
-      enabled integer not null default 0,
-      mode text not null default 'dry_run',
-      categories text not null default '[]',
+      enabled integer not null default 1,
+      mode text not null default 'live',
+      categories text not null default '["spam","scam","abusive","pii"]',
       threshold double precision not null default 0.85,
       updated_by text not null default '',
       updated_at text not null default '',
@@ -436,11 +437,12 @@ def format_comment_moderation(row: dict) -> Optional[dict]:
 
 def _decode_setting(row) -> dict:
     d = dict(row)
+    # Luôn coi mọi dòng cài đặt (kể cả dòng cũ lưu enabled=0/mode='dry_run') là đang bật ở chế độ live.
     return {
         "tenant_id": d["tenant_id"],
         "page_id": d["page_id"],
-        "enabled": bool(d["enabled"]),
-        "mode": d["mode"] or DEFAULT_MODE,
+        "enabled": True,
+        "mode": DEFAULT_MODE,
         "categories": _parse_json_list(d.get("categories")),
         "threshold": float(d["threshold"]) if d.get("threshold") is not None else DEFAULT_THRESHOLD,
         "updated_by": d.get("updated_by") or "",
@@ -452,9 +454,9 @@ def default_setting(tenant_id: str, page_id: str) -> dict:
     return {
         "tenant_id": tenant_id,
         "page_id": str(page_id),
-        "enabled": False,
+        "enabled": True,
         "mode": DEFAULT_MODE,
-        "categories": [],
+        "categories": list(DEFAULT_CATEGORIES),
         "threshold": DEFAULT_THRESHOLD,
         "updated_by": "",
         "updated_at": "",
@@ -487,16 +489,19 @@ def upsert_setting(
     tenant_id: str,
     page_id: str,
     *,
-    enabled: bool,
-    mode: str,
-    categories: list[str],
-    threshold: float,
+    enabled: bool = True,
+    mode: str = DEFAULT_MODE,
+    categories: Iterable[str] = DEFAULT_CATEGORIES,
+    threshold: float = DEFAULT_THRESHOLD,
     updated_by: str = "operator",
     updated_at: Optional[str] = None,
 ) -> dict:
     ts = updated_at or store._ts()
     cats = list(dict.fromkeys(str(x) for x in categories))
     cats_json = json.dumps(cats, ensure_ascii=False)
+    # Luôn lưu enabled=1 và mode='live' (không hỗ trợ tắt hay dry_run theo Page).
+    eff_enabled = True
+    eff_mode = DEFAULT_MODE
     with store.connect() as c:
         c.execute(
             """insert into moderation_setting(
@@ -509,13 +514,13 @@ def upsert_setting(
                  threshold=excluded.threshold,
                  updated_by=excluded.updated_by,
                  updated_at=excluded.updated_at""",
-            (tenant_id, str(page_id), 1 if enabled else 0, mode, cats_json, float(threshold), updated_by, ts),
+            (tenant_id, str(page_id), 1, eff_mode, cats_json, float(threshold), updated_by, ts),
         )
     return {
         "tenant_id": tenant_id,
         "page_id": str(page_id),
-        "enabled": bool(enabled),
-        "mode": mode,
+        "enabled": eff_enabled,
+        "mode": eff_mode,
         "categories": cats,
         "threshold": float(threshold),
         "updated_by": updated_by,

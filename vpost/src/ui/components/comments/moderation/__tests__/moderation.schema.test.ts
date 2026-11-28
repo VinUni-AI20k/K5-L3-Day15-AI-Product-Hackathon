@@ -205,6 +205,27 @@ describe("moderation.schema", () => {
       expect(putParsed.data.setting.mode).toBe("live");
       expect(putParsed.data.setting.threshold).toBe(0.9);
     }
+
+    // Settings response with omitted optional enabled/mode fields parses cleanly
+    const minimalList = ModerationSettingsListResponseSchema.safeParse({
+      tenantId: TENANT_ID,
+      items: [
+        {
+          pageId: "789",
+          pageName: "Minimal Page",
+          channelId: "fb-789",
+          categories: ["spam"],
+          threshold: 0.85,
+          updatedBy: null,
+          updatedAt: null,
+        },
+      ],
+    });
+    expect(minimalList.success).toBe(true);
+    if (minimalList.success) {
+      expect(minimalList.data.items[0].enabled).toBeUndefined();
+      expect(minimalList.data.items[0].mode).toBeUndefined();
+    }
   });
 
   it("parses POST /api/comments/bulk payloads (all-ok, mixed failures, and RATE_LIMITED notProcessed)", () => {
@@ -276,11 +297,45 @@ describe("moderation.schema", () => {
     expect(lastPage.success).toBe(true);
   });
 
-  it("rejects complaint in auto-hide categories (v1 DECIDED policy) and out-of-range settings", () => {
+  it("rejects complaint, enabled=false, mode=dry_run, and out-of-range settings while making enabled/mode optional", () => {
     expect(AUTO_HIDE_CATEGORIES).toEqual(["spam", "scam", "abusive", "pii"]);
     expect(AutoHideCategorySchema.safeParse("complaint").success).toBe(false);
     expect(AutoHideCategorySchema.safeParse("neutral").success).toBe(false);
     expect(AutoHideCategorySchema.safeParse("positive").success).toBe(false);
+
+    // Omitted enabled/mode or explicit enabled=true & mode=live are accepted
+    expect(
+      ModerationSettingUpdateInputSchema.safeParse({
+        categories: ["spam"],
+        threshold: 0.85,
+      }).success,
+    ).toBe(true);
+
+    expect(
+      ModerationSettingUpdateInputSchema.safeParse({
+        enabled: true,
+        mode: "live",
+        categories: [],
+        threshold: 0.85,
+      }).success,
+    ).toBe(true);
+
+    // Never allow enabled=false or mode=dry_run
+    expect(
+      ModerationSettingUpdateInputSchema.safeParse({
+        enabled: false,
+        categories: ["spam"],
+        threshold: 0.85,
+      }).success,
+    ).toBe(false);
+
+    expect(
+      ModerationSettingUpdateInputSchema.safeParse({
+        mode: "dry_run",
+        categories: ["spam"],
+        threshold: 0.85,
+      }).success,
+    ).toBe(false);
 
     expect(
       ModerationSettingUpdateInputSchema.safeParse({
@@ -293,8 +348,6 @@ describe("moderation.schema", () => {
 
     expect(
       ModerationSettingUpdateInputSchema.safeParse({
-        enabled: true,
-        mode: "dry_run",
         categories: ["spam"],
         threshold: 0.49,
       }).success,
@@ -302,8 +355,6 @@ describe("moderation.schema", () => {
 
     expect(
       ModerationSettingUpdateInputSchema.safeParse({
-        enabled: true,
-        mode: "dry_run",
         categories: ["spam"],
         threshold: 1.01,
       }).success,

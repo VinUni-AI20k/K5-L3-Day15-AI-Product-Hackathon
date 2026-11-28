@@ -99,8 +99,8 @@ def _setting_view(page_info: dict, s: dict) -> dict:
         "pageId": page_info["pageId"],
         "channelId": page_info["channelId"],
         "pageName": page_info["pageName"],
-        "enabled": bool(s["enabled"]),
-        "mode": s["mode"],
+        "enabled": True,
+        "mode": store.AUTO_REPLY_DEFAULT_MODE,
         "intents": list(s["intents"]),
         "hourlyCap": int(s["hourly_cap"]),
         "dailyCap": int(s["daily_cap"]),
@@ -147,8 +147,8 @@ def _decode_log_cursor(token: str) -> tuple[str, int]:
 
 class AutoReplySettingIn(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    enabled: bool
-    mode: Literal["dry_run", "live"]
+    enabled: Optional[bool] = None
+    mode: Optional[Literal["dry_run", "live"]] = None
     intents: list[str]
     hourlyCap: Optional[int] = Field(default=None, ge=1, le=200)
     dailyCap: Optional[int] = Field(default=None, ge=1, le=2000)
@@ -171,7 +171,7 @@ class AutoReplySettingIn(BaseModel):
 
 @router.get("/comments/auto-reply-settings")
 def get_auto_reply_settings():
-    """Trả cài đặt tự động trả lời cho mọi Fanpage đã nối (mặc định tắt, chạy thử, đủ 3 nhóm, trần 30/200)."""
+    """Trả cài đặt tự động trả lời cho mọi Fanpage đã nối (luôn bật ở chế độ live, mặc định đủ 4 nhóm, trần 200/2000)."""
     tenant_id = _tenant_id()
     saved = {s["page_id"]: s for s in store.list_auto_reply_settings(tenant_id)}
     items = []
@@ -183,12 +183,19 @@ def get_auto_reply_settings():
 
 @router.put("/comments/auto-reply-settings/{page_id}")
 def put_auto_reply_setting(page_id: str, body: AutoReplySettingIn):
-    """Cập nhật cài đặt tự động trả lời cho một Fanpage đã nối; chuyển sang `live` bắt buộc `confirmLive: true`."""
+    """Cập nhật nhóm câu hỏi và trần tự động trả lời cho một Fanpage đã nối (luôn bật live, không thể tắt hay đặt dry_run)."""
     tenant_id = _tenant_id()
     pages = {p["pageId"]: p for p in _connected_pages()}
     page_info = pages.get(page_id)
     if not page_info:
         raise ApiError(404, "NOT_FOUND", "Không tìm thấy Fanpage đã kết nối với mã '%s'." % page_id)
+
+    if body.enabled is False or body.mode == "dry_run":
+        raise ApiError(
+            400,
+            "INVALID_INPUT",
+            "Tự động trả lời luôn bật ở chế độ chạy thật (live) cho mọi Fanpage và không thể tắt hay chuyển sang chạy thử (dry_run) qua cài đặt.",
+        )
 
     invalid = [i for i in body.intents if i not in _VALID_INTENT_SET]
     if invalid:
@@ -199,16 +206,6 @@ def put_auto_reply_setting(page_id: str, body: AutoReplySettingIn):
         )
 
     existing = store.get_auto_reply_setting(tenant_id, page_id)
-    prev_mode = existing["mode"] if existing else store.AUTO_REPLY_DEFAULT_MODE
-    prev_enabled = bool(existing["enabled"]) if existing else False
-    needs_confirm = body.mode == "live" and (prev_mode != "live" or (not prev_enabled and body.enabled))
-    if needs_confirm and body.confirmLive is not True:
-        raise ApiError(
-            400,
-            "CONFIRM_REQUIRED",
-            "Chuyển sang hoặc bật chế độ chạy thật (live) cần xác nhận confirmLive=true vì câu trả lời sẽ được đăng công khai trên Facebook.",
-        )
-
     hourly_cap = (
         body.hourlyCap
         if body.hourlyCap is not None
@@ -223,8 +220,8 @@ def put_auto_reply_setting(page_id: str, body: AutoReplySettingIn):
     saved = store.upsert_auto_reply_setting(
         tenant_id,
         page_id,
-        enabled=body.enabled,
-        mode=body.mode,
+        enabled=True,
+        mode=store.AUTO_REPLY_DEFAULT_MODE,
         intents=body.intents,
         hourly_cap=hourly_cap,
         daily_cap=daily_cap,

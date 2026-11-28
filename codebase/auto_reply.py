@@ -9,8 +9,8 @@ Nguyên tắc cốt lõi:
   khớp TRỌN VẸN một mẫu trong `allow` của `data/auto_reply_rules.json` (tối đa 80 ký tự, đúng 1 câu).
 - Mọi trường hợp khác (châm biếm, khen, cảm ơn, khiếu nại, câu hỏi hỗn hợp, số đo, sản phẩm/mã khác, trích dẫn,
   chỉ emoji, bình luận phản hồi trong chuỗi...) đều gắn nhãn 'Cần bạn' cho nhân viên xử lý.
-- Các lớp bảo vệ an toàn được giữ nguyên và mở rộng cho khách thật (Facebook ẩn `from.id`): kill switch, chế độ dry-run,
-  trần giờ/ngày theo Page, idempotency theo bình luận (`auto:<comment_id>`), cooldown theo hội thoại (1 lần/10 phút),
+- Các lớp bảo vệ an toàn được giữ nguyên và mở rộng cho khách thật (Facebook ẩn `from.id`): công tắc khẩn cấp toàn hệ thống (`VPOST_AUTO_REPLY_DISABLED`),
+  trần giờ/ngày theo Page (mặc định tối đa 200/giờ, 2000/ngày), idempotency theo bình luận (`auto:<comment_id>`), cooldown theo hội thoại (1 lần/10 phút),
   giới hạn tốc độ theo bài đăng (tối đa 10 lần/bài/10 phút), chống spam lặp nguyên văn theo bài đăng trong 10 phút
   không phân biệt tác giả, giữ thêm lớp cooldown/spam theo khách khi có `from_id`, khoá tư vấn theo Page (kiểm tra lại
   cả danh sách intents dưới khoá), kiểm tra đầu ra (`verify_post`), cùng lớp phát hiện URL và prompt-injection bổ sung.
@@ -627,9 +627,37 @@ def _normalize_polite_list(items: Iterable[str]) -> list[str]:
     return out
 
 
+def _known_color_lists() -> tuple[list[str], list[str]]:
+    """Dựng danh sách tên màu hợp lệ (có dấu NFC và không dấu ASCII) trực tiếp từ `rules.COLORS`, dài trước ngắn sau."""
+    vi_seen: set[str] = set()
+    vi_list: list[str] = []
+    ascii_seen: set[str] = set()
+    ascii_list: list[str] = []
+    for raw in rules.COLORS:
+        c_vi = re.sub(r"\s+", " ", unicodedata.normalize("NFC", str(raw or "").strip().lower()))
+        if c_vi and c_vi not in vi_seen:
+            vi_seen.add(c_vi)
+            vi_list.append(c_vi)
+        c_ascii = re.sub(r"\s+", " ", _strip_diacritics(c_vi)).strip()
+        if c_ascii and c_ascii not in ascii_seen:
+            ascii_seen.add(c_ascii)
+            ascii_list.append(c_ascii)
+    vi_list.sort(key=len, reverse=True)
+    ascii_list.sort(key=len, reverse=True)
+    return vi_list, ascii_list
+
+
+def _color_alternation_regex(items: Iterable[str]) -> str:
+    parts = [r"\s+".join(re.escape(tok) for tok in item.split()) for item in items if item]
+    return "(?:" + "|".join(parts) + ")"
+
+
 def _compile_rules(raw: dict) -> dict:
     pl = raw.get("polite_leading") if isinstance(raw.get("polite_leading"), dict) else {}
     pt = raw.get("polite_trailing") if isinstance(raw.get("polite_trailing"), dict) else {}
+    known_colors_vi_list, known_colors_ascii_list = _known_color_lists()
+    color_vi_re_str = _color_alternation_regex(known_colors_vi_list)
+    color_ascii_re_str = _color_alternation_regex(known_colors_ascii_list)
 
     compiled_allow: list[dict] = []
     for entry in raw.get("allow") or ():
@@ -642,6 +670,10 @@ def _compile_rules(raw: dict) -> dict:
         ascii_pat = str(entry.get("ascii") or "").strip()
         if not vi_pat and not ascii_pat:
             continue
+        if "__COLOR_VI__" in vi_pat:
+            vi_pat = vi_pat.replace("__COLOR_VI__", color_vi_re_str)
+        if "__COLOR_ASCII__" in ascii_pat:
+            ascii_pat = ascii_pat.replace("__COLOR_ASCII__", color_ascii_re_str)
         compiled_allow.append({
             "id": str(entry.get("id") or "allow"),
             "intents": tuple(intents),
@@ -664,6 +696,8 @@ def _compile_rules(raw: dict) -> dict:
         "polite_leading_ascii": _normalize_polite_list(pl.get("ascii") or ()),
         "polite_trailing_vi": _normalize_polite_list(pt.get("vi") or ()),
         "polite_trailing_ascii": _normalize_polite_list(pt.get("ascii") or ()),
+        "known_colors_vi": frozenset(known_colors_vi_list),
+        "known_colors_ascii": frozenset(known_colors_ascii_list),
         "allow": compiled_allow,
     }
 
@@ -853,12 +887,33 @@ def _strip_polite_trailing(text: str, compiled: dict) -> str:
     return core
 
 
-def _is_invalid_color_capture(color_text: str, *, is_ascii_only: bool) -> bool:
-    tokens = color_text.split()
+def _is_invalid_color_capture(
+    color_text: str,
+    *,
+    is_ascii_only: bool,
+    has_item_ref: bool = False,
+    known_colors_vi: Optional[frozenset[str]] = None,
+    known_colors_ascii: Optional[frozenset[str]] = None,
+) -> bool:
+    norm = re.sub(r"\s+", " ", unicodedata.normalize("NFC", str(color_text or "").strip().lower()))
+    tokens = norm.split()
     if not tokens or len(tokens) > 4:
         return True
-    invalid_set = _INVALID_COLOR_TOKENS_ASCII if is_ascii_only else _INVALID_COLOR_TOKENS_VI
-    return any(tok in invalid_set for tok in tokens)
+    if known_colors_vi is None or known_colors_ascii is None:
+        vi_list, ascii_list = _known_color_lists()
+        known_colors_vi = frozenset(vi_list)
+        known_colors_ascii = frozenset(ascii_list)
+    if is_ascii_only:
+        if norm not in known_colors_ascii:
+            return True
+        # R3: không dấu 'co mau do khong' / 'mau do con khong' dễ nhầm với 'mẫu đó';
+        # chỉ nhận 'do' khi đã có cụm chỉ định sản phẩm hiện tại (vd 'ma nay co mau do khong').
+        if norm == "do" and not has_item_ref:
+            return True
+        return any(tok in _INVALID_COLOR_TOKENS_ASCII and tok != "do" for tok in tokens)
+    if norm not in known_colors_vi:
+        return True
+    return any(tok in _INVALID_COLOR_TOKENS_VI for tok in tokens)
 
 
 # ---------------- Quantity ("lấy 2 bộ giá bao nhiêu", "size M còn 2 cái không") ----------------
@@ -994,8 +1049,8 @@ _WEIGHT_LABELLED_RE = re.compile(
 )
 _BARE_NUM_RE = re.compile(_WB_L + r"(?P<num>\d{1,4}(?:[.,]\d{1,2})?)" + _WB_R)
 
-_ITEM_REF_PREFIX_VI_RE = re.compile(r"^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\s+này)(?:\s+|,\s*)")
-_ITEM_REF_PREFIX_ASCII_RE = re.compile(r"^(?:(?:mau|bo|vay|dam|cai|set|chiec)\s+nay)(?:\s+|,\s*)")
+_ITEM_REF_PREFIX_VI_RE = re.compile(r"^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\s+này)(?:\s+|,\s*)")
+_ITEM_REF_PREFIX_ASCII_RE = re.compile(r"^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\s+nay)(?:\s+|,\s*)")
 _THI_PREFIX_RE = re.compile(r"^(?:thì|thi)\s+")
 
 _FOLLOWUP_POLITE_PHRASES_VI = tuple(sorted((
@@ -1774,8 +1829,15 @@ def classify_intent_rules(
                 continue
             gd = m.groupdict()
             asked_size = (gd.get("size") or "").strip() or None
-            asked_color = (gd.get("color") or "").strip() or None
-            if asked_color is not None and _is_invalid_color_capture(asked_color, is_ascii_only=is_ascii_only):
+            asked_color = re.sub(r"\s+", " ", (gd.get("color") or "").strip()) or None
+            has_item_ref = bool((gd.get("item_ref") or "").strip())
+            if asked_color is not None and _is_invalid_color_capture(
+                asked_color,
+                is_ascii_only=is_ascii_only,
+                has_item_ref=has_item_ref,
+                known_colors_vi=compiled["known_colors_vi"],
+                known_colors_ascii=compiled["known_colors_ascii"],
+            ):
                 continue
             return {
                 "ok": True,
@@ -1828,11 +1890,20 @@ def render_template(
     style: Optional[dict] = None,
     qty: Optional[int] = None,
     unit: str = "cái",
+    unavailable_color_status: Optional[str] = None,
+    unavailable_color_label: Optional[str] = None,
+    unavailable_size_status: Optional[str] = None,
+    unavailable_size_label: Optional[str] = None,
 ) -> str:
     """Sinh câu trả lời xác định hoàn toàn từ dữ liệu sản phẩm và phong cách viết (KHÔNG gọi LLM).
 
     qty > 1: giá nêu theo đơn vị ("giá X mỗi bộ") và xác nhận còn đủ số lượng — không tự tính tổng
     hay hứa giảm giá (bộ kiểm tra đầu ra chỉ chấp nhận đúng giá bán).
+    unavailable_*_status:
+    - "oos": biến thể có trong danh mục nhưng hết tồn (`dropped_*`) → nêu rõ "hiện hết màu/size {label}"
+      (khớp luật phủ định của `rules.verify_post(..., is_comment=True)`).
+    - "not_offered": mẫu không có màu/size đó → nêu "hiện không có màu này" / "hiện không có size này"
+      và liệt kê màu/size đang còn hàng từ dữ liệu sản phẩm.
     """
     intent_set = {i for i in intents if i in _VALID_INTENT_SET}
     if not intent_set:
@@ -1848,6 +1919,16 @@ def render_template(
         max_emoji = 0
 
     parts: list[str] = []
+    if unavailable_color_status == "oos" and str(unavailable_color_label or "").strip():
+        parts.append("hiện hết màu %s" % str(unavailable_color_label).strip())
+    elif unavailable_color_status in ("oos", "not_offered"):
+        parts.append("hiện không có màu này")
+
+    if unavailable_size_status == "oos" and str(unavailable_size_label or "").strip():
+        parts.append("hiện hết size %s" % str(unavailable_size_label).strip())
+    elif unavailable_size_status in ("oos", "not_offered"):
+        parts.append("hiện không có size này")
+
     if "price" in intent_set:
         if price is None:
             raise ValueError("Thiếu giá bán để ghép mẫu trả lời")
@@ -1875,7 +1956,7 @@ def render_template(
         parts.append("còn size %s" % ", ".join(size_list))
     elif "color" in intent_set:
         parts.append("còn màu %s" % ", ".join(color_list))
-    if qty and qty > 1:
+    if qty and qty > 1 and not unavailable_color_status and not unavailable_size_status:
         parts.append("còn đủ %d %s" % (qty, unit))
 
     fact_str = ", ".join(parts)
@@ -2014,6 +2095,63 @@ def _build_stock_matrix(
         for s in in_stock_sizes
     )
     return instock_pairs, pairs_by_color, is_full
+
+
+def _resolve_named_variant(
+    *,
+    asked_size: Optional[str],
+    asked_color: Optional[str],
+    in_stock_colors: list[str],
+    in_stock_sizes: list[str],
+    dropped_colors: list[str],
+    dropped_sizes: list[str],
+    has_color: bool,
+) -> dict[str, Optional[str]]:
+    """Phân loại trạng thái size/màu định danh khách hỏi (khớp chính xác, không substring):
+    in_stock / oos (nằm trong dropped_*) / not_offered (không có trong danh mục).
+    """
+    out: dict[str, Optional[str]] = {
+        "size_status": None,
+        "size_label": None,
+        "color_status": None,
+        "color_label": None,
+    }
+    if asked_size:
+        asked_canon = _canonical_size(asked_size)
+        asked_fold = _fold_exact(asked_size)
+        in_sizes_canon = {_canonical_size(s) for s in in_stock_sizes}
+        in_sizes_fold = {_fold_exact(s) for s in in_stock_sizes}
+        if asked_canon in in_sizes_canon or asked_fold in in_sizes_fold:
+            out["size_status"] = "in_stock"
+        else:
+            matched_dropped = next(
+                (s for s in dropped_sizes if _canonical_size(s) == asked_canon or _fold_exact(s) == asked_fold),
+                None,
+            )
+            if matched_dropped is not None:
+                out["size_status"] = "oos"
+                out["size_label"] = matched_dropped
+            else:
+                out["size_status"] = "not_offered"
+
+    if asked_color:
+        asked_fold = _fold_exact(asked_color)
+        in_colors_fold = {_fold_exact(c) for c in in_stock_colors}
+        if has_color and asked_fold in in_colors_fold:
+            out["color_status"] = "in_stock"
+        else:
+            matched_dropped = (
+                next((c for c in dropped_colors if _fold_exact(c) == asked_fold), None)
+                if has_color
+                else None
+            )
+            if matched_dropped is not None:
+                out["color_status"] = "oos"
+                out["color_label"] = matched_dropped
+            else:
+                out["color_status"] = "not_offered"
+
+    return out
 
 
 def _check_named_variant_in_stock(
@@ -2160,7 +2298,7 @@ def _evaluate_comment(
             "Tạm dừng tự động trả lời trên Fanpage trong lượt này do lỗi Facebook trước đó",
         )
 
-    if not setting["enabled"]:
+    if not setting.get("enabled", True):
         return _reject("safety", "Chưa bật tự động trả lời cho Fanpage này")
 
     enabled_intents = set(setting.get("intents") or ()) & _VALID_INTENT_SET
@@ -2455,6 +2593,8 @@ def _evaluate_comment(
         )
 
     in_stock_colors = list(allowed.get("colors") or [])
+    dropped_colors = list(allowed.get("dropped_colors") or [])
+    dropped_sizes = list(allowed.get("dropped_sizes") or [])
     has_color = bool(allowed.get("has_color"))
     if "color" in intents and (not has_color or not in_stock_colors):
         return _reject(
@@ -2463,17 +2603,28 @@ def _evaluate_comment(
             sorted_ints,
         )
 
-    # Kiểm tra size/màu định danh khớp CHÍNH XÁC với giá trị còn hàng của sản phẩm bài đăng (không substring)
-    named_err = _check_named_variant_in_stock(
-        product_code,
+    # Đối chiếu size/màu định danh chính xác (không substring): còn hàng / hết tồn (dropped_*) / không có
+    named_variant = _resolve_named_variant(
         asked_size=asked_size,
         asked_color=asked_color,
         in_stock_colors=in_stock_colors,
         in_stock_sizes=in_stock_sizes,
+        dropped_colors=dropped_colors,
+        dropped_sizes=dropped_sizes,
         has_color=has_color,
     )
-    if named_err:
-        return _reject("facts", named_err, sorted_ints)
+    unavailable_color_status = (
+        named_variant["color_status"]
+        if named_variant["color_status"] in ("oos", "not_offered")
+        else None
+    )
+    unavailable_color_label = named_variant["color_label"] if unavailable_color_status == "oos" else None
+    unavailable_size_status = (
+        named_variant["size_status"]
+        if named_variant["size_status"] in ("oos", "not_offered")
+        else None
+    )
+    unavailable_size_label = named_variant["size_label"] if unavailable_size_status == "oos" else None
 
     if asked_qty is not None:
         if asked_qty < 1:
@@ -2581,6 +2732,10 @@ def _evaluate_comment(
             style=resolved_style,
             qty=asked_qty,
             unit=asked_unit,
+            unavailable_color_status=unavailable_color_status,
+            unavailable_color_label=unavailable_color_label,
+            unavailable_size_status=unavailable_size_status,
+            unavailable_size_label=unavailable_size_label,
         )
         _emit("compose", "ok", "Soạn từ mẫu dữ liệu sản phẩm (%d ký tự, không dùng AI)" % len(reply_text))
 
@@ -2775,17 +2930,6 @@ def process_comment(
         res["agentRunId"] = run_id
         return res
 
-    def _finish_would_send(res: dict) -> dict:
-        _add_step(
-            "action",
-            "ok",
-            "Chế độ chạy thử — đã tạo câu trả lời mẫu, chưa gửi lên Facebook",
-            label="Chạy thử",
-        )
-        agent_runs.finish_run(tenant_id, run_id, status="done", outcome="would_send", now_dt=_step_now())
-        res["agentRunId"] = run_id
-        return res
-
     def _finish_failed(res: dict) -> dict:
         _clear_pending_if_followup()
         _add_step("action", "error", res.get("reason") or "Gửi tự động lên Facebook thất bại", label="Gửi")
@@ -2865,8 +3009,13 @@ def process_comment(
         pending_bot_reply_id = ev.get("pending_bot_reply_id") if is_followup_send else None
 
         # Nếu hội thoại đang mang nhãn 'can_ban' chưa được nhân viên xử lý → không tự động trả lời đè lên
+        # (ngoại lệ duy nhất: nhãn cũ chỉ gắn do Fanpage trước đó chưa bật tự động trả lời)
         existing_att = store.get_thread_attentions(tenant_id, [thread_id]).get(thread_id)
-        if existing_att and existing_att.get("tag") == "can_ban":
+        if (
+            existing_att
+            and existing_att.get("tag") == "can_ban"
+            and not store.is_disabled_auto_reply_reason(existing_att.get("reason"))
+        ):
             reason = "Hội thoại đang gắn nhãn 'Cần bạn' chờ nhân viên xử lý"
             return _finish_can_ban(
                 _record_rejection(
@@ -2939,39 +3088,7 @@ def process_comment(
                 action_detail=reason,
             )
 
-        if setting["mode"] != "live":
-            store.append_auto_reply_log(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                action="would_send",
-                reason="",
-                text=reply_text,
-                created_at=ts,
-            )
-            log.info(
-                "comment_auto_reply tenant=%s page_id=%s thread_id=%s comment_id=%s action=would_send intents=%s",
-                tenant_id,
-                page_id,
-                thread_id,
-                cid,
-                ",".join(sorted_ints),
-            )
-            return _finish_would_send({
-                "action": "would_send",
-                "tagged": False,
-                "threadId": thread_id,
-                "commentId": cid,
-                "intents": sorted_ints,
-                "reason": None,
-                "text": reply_text,
-            })
-
-        # Mode live: giữ khoá tư vấn theo (tenant_id, page_id) để tuần tự hoá kiểm tra đã trả lời,
+        # Luôn chạy thật (live): giữ khoá tư vấn theo (tenant_id, page_id) để tuần tự hoá kiểm tra đã trả lời,
         # phạm vi hội thoại, intents đang bật (N11), cooldown hội thoại/bài đăng/khách, trần giờ/ngày, gửi FB và ghi log.
         cooldown_minutes = compiled["cooldown_minutes"]
         post_rate_limit = compiled["post_rate_limit"]
@@ -3068,7 +3185,12 @@ def process_comment(
                 )
 
             att_now = store.get_thread_attentions(tenant_id, [thread_id]).get(thread_id)
-            if att_now and att_now.get("tag") == "can_ban":
+            att_now_is_disabled_skip = bool(
+                att_now
+                and att_now.get("tag") == "can_ban"
+                and store.is_disabled_auto_reply_reason(att_now.get("reason"))
+            )
+            if att_now and att_now.get("tag") == "can_ban" and not att_now_is_disabled_skip:
                 reason = "Hội thoại đang gắn nhãn 'Cần bạn' chờ nhân viên xử lý"
                 return _finish_can_ban(
                     _record_rejection(
@@ -3110,7 +3232,8 @@ def process_comment(
                 if page_id
                 else setting
             )
-            if not live_setting["enabled"]:
+
+            if not live_setting.get("enabled", True):
                 reason = "Chưa bật tự động trả lời cho Fanpage này"
                 return _finish_can_ban(
                     _record_rejection(
@@ -3149,30 +3272,6 @@ def process_comment(
                     action_status="blocked",
                     action_detail=reason,
                 )
-
-            if live_setting["mode"] != "live":
-                store.append_auto_reply_log(
-                    tenant_id,
-                    page_id=page_id,
-                    fb_post_id=fb_post_id,
-                    thread_id=thread_id,
-                    comment_id=cid,
-                    from_id=from_id,
-                    intents=sorted_ints,
-                    action="would_send",
-                    reason="",
-                    text=reply_text,
-                    created_at=ts,
-                )
-                return _finish_would_send({
-                    "action": "would_send",
-                    "tagged": False,
-                    "threadId": thread_id,
-                    "commentId": cid,
-                    "intents": sorted_ints,
-                    "reason": None,
-                    "text": reply_text,
-                })
 
             # Kiểm tra lại cooldown theo hội thoại, tốc độ theo bài đăng và (khi có from_id) cooldown theo khách dưới khoá
             if store.has_recent_auto_reply_for_thread(
@@ -3283,7 +3382,7 @@ def process_comment(
                     client_id,
                     tenant_id=tenant_id,
                     sent_by="auto",
-                    clear_attention=False,
+                    clear_attention=att_now_is_disabled_skip,
                     agent_run_id=run_id,
                     allow_pending_size_advice_id=pending_asked_id,
                 )
@@ -3536,6 +3635,48 @@ def process_comment(
         except Exception:
             pass
         raise
+
+
+AUTO_REPLY_DISABLED_RETRY_MAX_AGE_HOURS = 24
+
+
+def find_retryable_disabled_comments(
+    tenant_id: str,
+    *,
+    now_dt: Optional[datetime] = None,
+    max_age_hours: int = AUTO_REPLY_DISABLED_RETRY_MAX_AGE_HOURS,
+) -> list[str]:
+    """Trả danh sách `comment_id` đủ điều kiện đánh giá lại đúng 1 lần khi Fanpage đã bật tự động trả lời.
+
+    Điều kiện:
+    - Hệ thống tự động trả lời đang bật (không bật công tắc khẩn cấp) và Page đang bật chế độ `live` có ít nhất 1 intent.
+    - Bình luận trước đó bị bỏ qua DUY NHẤT vì lý do 'Chưa bật tự động trả lời…', dưới 24 giờ tuổi,
+      chưa bị ẩn/bỏ qua/xoá, chưa từng tự động trả lời và chưa có phản hồi của Page/nhân viên.
+    """
+    if is_kill_switch_enabled():
+        return []
+    ref_dt = now_dt or _now()
+    candidates = store.list_retryable_disabled_auto_reply_comments(
+        tenant_id,
+        now_dt=ref_dt,
+        max_age_hours=max_age_hours,
+    )
+    setting_cache: dict[str, dict] = {}
+    out: list[str] = []
+    for c in candidates:
+        pid = _comment_page_id(c)
+        if pid not in setting_cache:
+            setting_cache[pid] = (
+                store.get_auto_reply_setting_or_default(tenant_id, pid)
+                if pid
+                else store.default_auto_reply_setting(tenant_id, "")
+            )
+        st = setting_cache[pid]
+        enabled_intents = set(st.get("intents") or ()) & _VALID_INTENT_SET
+        if not st.get("enabled", True) or st.get("mode") != "live" or not enabled_intents:
+            continue
+        out.append(c["id"])
+    return out
 
 
 def run_auto_reply(

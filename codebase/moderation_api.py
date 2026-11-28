@@ -48,6 +48,12 @@ AUTO_HIDE_DAILY_CAP = 100
 FB_WRITE_PAUSE_SEC = 0.05
 _sleep = time.sleep
 
+
+def is_kill_switch_enabled() -> bool:
+    """True nếu biến môi trường VPOST_AUTO_MODERATION_DISABLED được bật (1/true/yes/on)."""
+    raw = (os.environ.get("VPOST_AUTO_MODERATION_DISABLED") or "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
 # Fallback cục bộ cho `detect_pii` nếu `rules.scrub_pii` chưa sẵn sàng hoặc bị thiếu.
 _FALLBACK_EMAIL_RE = re.compile(
     r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,10}(?![A-Za-z0-9-])"
@@ -243,8 +249,8 @@ def _setting_view(page_info: dict, s: dict) -> dict:
         "pageId": page_info["pageId"],
         "pageName": page_info["pageName"],
         "channelId": page_info["channelId"],
-        "enabled": bool(s["enabled"]),
-        "mode": s["mode"],
+        "enabled": True,
+        "mode": moderation_store.DEFAULT_MODE,
         "categories": list(s["categories"]),
         "threshold": float(s["threshold"]),
         "updatedBy": s["updated_by"] or None,
@@ -348,15 +354,17 @@ class BulkCommentsIn(BaseModel):
 
 class ModerationSettingIn(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    enabled: bool
-    mode: Literal["dry_run", "live"]
+    enabled: Optional[bool] = None
+    mode: Optional[Literal["dry_run", "live"]] = None
     categories: list[str]
-    threshold: float = Field(ge=0.5, le=1.0)
+    threshold: Optional[float] = Field(default=None, ge=0.5, le=1.0)
     acknowledgeComplaintRisk: Optional[bool] = None
 
     @field_validator("threshold")
     @classmethod
-    def _validate_threshold(cls, v: float) -> float:
+    def _validate_threshold(cls, v: Optional[float]) -> Optional[float]:
+        if v is None:
+            return None
         if not math.isfinite(v):
             raise ValueError("threshold phải là số hữu hạn trong khoảng 0.5..1")
         return float(v)
@@ -383,8 +391,9 @@ def run_auto_moderation(
 ) -> dict:
     """Chạy tự kiểm duyệt cho danh sách `comment_ids` mới đồng bộ thuộc `tenant_id`.
 
-    - Áp dụng cài đặt từng Page (mặc định TẮT), ngưỡng `threshold`, giới hạn 20/lần và 100/ngày mỗi Page.
-    - Chỉ được phép ẨN (hoặc ghi `would_hide` ở chế độ `dry_run`), không bao giờ xoá hay tự trả lời.
+    - Luôn bật ở chế độ `live` cho mọi Fanpage (trừ khi công tắc khẩn cấp `VPOST_AUTO_MODERATION_DISABLED=1` được bật),
+      áp dụng nhóm phân loại và ngưỡng `threshold` từng Page, giới hạn 20/lần và 100/ngày mỗi Page.
+    - Chỉ được phép ẨN nhóm vi phạm đã bật (khiếu nại `complaint` không bao giờ bị tự ẩn), không bao giờ xoá hay tự trả lời.
     - Bỏ qua bình luận của chính Page, bình luận đã có trả lời từ Page, và bình luận đã bị ẩn/xoá.
     - Không bao giờ ném ngoại lệ ra ngoài khi một bình luận gặp lỗi.
     """
@@ -401,6 +410,10 @@ def run_auto_moderation(
         "stoppedByRateLimit": False,
     }
     if not ids:
+        return summary
+
+    if is_kill_switch_enabled():
+        summary["skipped"] = len(ids)
         return summary
 
     active_model = model if model is not None else MODEL
@@ -439,10 +452,6 @@ def run_auto_moderation(
             if page_id not in settings_cache:
                 settings_cache[page_id] = moderation_store.get_setting_or_default(tenant_id, page_id)
             setting = settings_cache[page_id]
-
-            if not setting["enabled"]:
-                summary["skipped"] += 1
-                continue
 
             if page_id in rate_limited_pages:
                 summary["skipped"] += 1
@@ -542,8 +551,7 @@ def run_auto_moderation(
                 summary["flagged"] += 1
                 continue
 
-            mode = setting["mode"]
-            cap_actions = ("would_hide",) if mode == "dry_run" else ("hide",)
+            cap_actions = ("hide",)
             run_used = run_counts.get(page_id, 0)
 
             if run_used >= AUTO_HIDE_RUN_CAP:
@@ -562,7 +570,7 @@ def run_auto_moderation(
                     tenant_id,
                     page_id=page_id,
                     comment_id=cid,
-                    action="would_hide" if mode == "dry_run" else "hide",
+                    action="hide",
                     actor="auto",
                     category=category,
                     reason=cap_msg,
@@ -575,6 +583,10 @@ def run_auto_moderation(
 
             # Khoá tư vấn theo (tenant_id, page_id) để đếm giới hạn ngày và ghi hành động tự động không race.
             with moderation_store.daily_cap_tx(tenant_id, page_id) as tx:
+                if is_kill_switch_enabled():
+                    summary["skipped"] += 1
+                    continue
+
                 daily_used = moderation_store._count_auto_actions_since_in_tx(
                     tx, tenant_id, page_id, day_start, actions=cap_actions
                 )
@@ -596,7 +608,7 @@ def run_auto_moderation(
                         tenant_id,
                         page_id=page_id,
                         comment_id=cid,
-                        action="would_hide" if mode == "dry_run" else "hide",
+                        action="hide",
                         actor="auto",
                         category=category,
                         reason=cap_msg,
@@ -607,36 +619,7 @@ def run_auto_moderation(
                     summary["flagged"] += 1
                     continue
 
-                if mode == "dry_run":
-                    # Chế độ chạy thử: tuyệt đối không gọi Facebook.
-                    moderation_store._update_comment_moderation_in_tx(
-                        tx,
-                        tenant_id,
-                        cid,
-                        category=category,
-                        confidence=confidence,
-                        reasons=reasons,
-                        source=source,
-                        action="would_hide",
-                        moderated_at=ts,
-                    )
-                    moderation_store._append_moderation_log_in_tx(
-                        tx,
-                        tenant_id,
-                        page_id=page_id,
-                        comment_id=cid,
-                        action="would_hide",
-                        actor="auto",
-                        category=category,
-                        reason=reason_text,
-                        result="ok",
-                        created_at=ts,
-                    )
-                    run_counts[page_id] = run_used + 1
-                    summary["wouldHide"] += 1
-                    continue
-
-                # Chế độ live: chỉ gọi qua tools.hide_fb_comment (tra cứu động bằng getattr).
+                # Luôn chạy thật (live): chỉ gọi qua tools.hide_fb_comment (tra cứu động bằng getattr).
                 hide_fn = getattr(tools, "hide_fb_comment", None)
                 if not callable(hide_fn):
                     moderation_store._update_comment_moderation_in_tx(
@@ -1091,7 +1074,7 @@ def bulk_comments(body: BulkCommentsIn):
 
 @router.get("/comments/moderation-settings")
 def get_moderation_settings():
-    """Trả cài đặt tự kiểm duyệt cho mọi Fanpage đã nối (mặc định tắt, chạy thử, ngưỡng 0.85)."""
+    """Trả cài đặt tự kiểm duyệt cho mọi Fanpage đã nối (luôn bật ở chế độ live, mặc định đủ 4 nhóm, ngưỡng 0.85)."""
     moderation_store.init_moderation()
     tenant_id = _tenant_id()
     saved = {s["page_id"]: s for s in moderation_store.list_settings(tenant_id)}
@@ -1104,13 +1087,20 @@ def get_moderation_settings():
 
 @router.put("/comments/moderation-settings/{page_id}")
 def put_moderation_setting(page_id: str, body: ModerationSettingIn):
-    """Cập nhật cài đặt tự kiểm duyệt cho một Fanpage đã nối."""
+    """Cập nhật nhóm phân loại và ngưỡng tự kiểm duyệt cho một Fanpage đã nối (luôn bật live, không thể tắt hay đặt dry_run)."""
     moderation_store.init_moderation()
     tenant_id = _tenant_id()
     pages = {p["pageId"]: p for p in _connected_pages()}
     page_info = pages.get(page_id)
     if not page_info:
         raise ApiError(404, "NOT_FOUND", "Không tìm thấy Fanpage đã kết nối với mã '%s'." % page_id)
+
+    if body.enabled is False or body.mode == "dry_run":
+        raise ApiError(
+            400,
+            "INVALID_INPUT",
+            "Bộ lọc ngôn từ (tự kiểm duyệt) luôn bật ở chế độ chạy thật (live) cho mọi Fanpage và không thể tắt hay chuyển sang chạy thử (dry_run) qua cài đặt.",
+        )
 
     cats = list(dict.fromkeys(body.categories))
 
@@ -1132,13 +1122,20 @@ def put_moderation_setting(page_id: str, body: ModerationSettingIn):
             % (", ".join(invalid), ", ".join(AUTO_HIDE_CATEGORIES)),
         )
 
+    existing = moderation_store.get_setting(tenant_id, page_id)
+    threshold = (
+        body.threshold
+        if body.threshold is not None
+        else (existing["threshold"] if existing else moderation_store.DEFAULT_THRESHOLD)
+    )
+
     saved = moderation_store.upsert_setting(
         tenant_id,
         page_id,
-        enabled=body.enabled,
-        mode=body.mode,
+        enabled=True,
+        mode=moderation_store.DEFAULT_MODE,
         categories=cats,
-        threshold=body.threshold,
+        threshold=threshold,
         updated_by="operator",
         updated_at=_now_z(),
     )

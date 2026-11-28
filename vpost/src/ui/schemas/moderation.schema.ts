@@ -140,11 +140,6 @@ export const MODERATION_SOURCE_LABELS: Record<ModerationSource, string> = {
   ai: "Phân loại AI",
 };
 
-export const MODERATION_MODE_LABELS: Record<ModerationMode, string> = {
-  dry_run: "Chạy thử",
-  live: "Chạy thật",
-};
-
 export const BULK_ACTION_LABELS: Record<BulkCommentAction, string> = {
   hide: "Ẩn",
   unhide: "Hiện lại",
@@ -230,12 +225,21 @@ export const ModerationSettingSchema = z.object({
   pageId: z.string().min(1),
   pageName: z.string(),
   channelId: z.string().min(1),
-  enabled: z.boolean(),
-  mode: ModerationModeSchema,
+  // Optional legacy fields; moderation is always active in live mode and UI ignores these for display.
+  enabled: z.boolean().optional(),
+  mode: ModerationModeSchema.optional(),
   categories: z.array(AutoHideCategorySchema),
   threshold: z.number().min(MODERATION_THRESHOLD_MIN).max(MODERATION_THRESHOLD_MAX),
-  updatedBy: z.string().nullable(),
-  updatedAt: z.iso.datetime({ offset: true }).nullable(),
+  updatedBy: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  updatedAt: z.iso
+    .datetime({ offset: true })
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
 });
 export type ModerationSetting = z.infer<typeof ModerationSettingSchema>;
 
@@ -246,8 +250,9 @@ export const ModerationSettingsListResponseSchema = z.object({
 export type ModerationSettingsListResponse = z.infer<typeof ModerationSettingsListResponseSchema>;
 
 export const ModerationSettingUpdateInputSchema = z.object({
-  enabled: z.boolean(),
-  mode: ModerationModeSchema,
+  // Optional and strictly live/active only: never allow sending enabled=false or mode=dry_run.
+  enabled: z.literal(true).optional(),
+  mode: z.literal("live").optional(),
   categories: z.array(AutoHideCategorySchema),
   threshold: z
     .number()
