@@ -3,6 +3,7 @@ import type { z } from "zod";
 import { ApiErrorBodySchema } from "@/ui/schemas/tenant-health.schema";
 
 import {
+  cancelResponseBody,
   createRequestSignal,
   isAbortError,
   isCallerSignalAborted,
@@ -66,6 +67,7 @@ async function readJson(
   fallbackReason: string,
 ): Promise<unknown> {
   if (isCallerSignalAborted(callerSignal)) {
+    cancelResponseBody(response);
     throw normalizeAbortError(callerSignal?.reason, callerSignal, fallbackReason);
   }
   try {
@@ -129,6 +131,10 @@ async function sendRequest(
   fallbackReason: string,
 ): Promise<Response> {
   const method = options.method ?? "GET";
+
+  if (isCallerSignalAborted(options.signal)) {
+    throw normalizeAbortError(options.signal?.reason, options.signal, fallbackReason);
+  }
 
   let response: Response;
   try {

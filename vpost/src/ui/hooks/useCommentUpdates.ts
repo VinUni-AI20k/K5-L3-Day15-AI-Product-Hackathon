@@ -11,7 +11,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import { inboxKeys } from "@/ui/hooks/inbox-keys";
 import { useActiveTenant } from "@/ui/hooks/useMe";
 import type { CommentUpdatesResponse } from "@/ui/schemas/inbox-updates.schema";
-import { isAbortError } from "@/ui/services/abort";
+import { isAbortError, suppressAbortRejection } from "@/ui/services/abort";
 import { ApiError } from "@/ui/services/api-error";
 import {
   fetchCommentUpdates,
@@ -223,9 +223,15 @@ export function invalidateInboxOnUpdates(
     for (const threadId of previousRunningThreadIds) affectedThreadIds.add(threadId);
   }
 
-  void queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) });
+  suppressAbortRejection(
+    queryClient.invalidateQueries({ queryKey: inboxKeys.threads(tenantKey) }),
+    isCommentUpdatesCancellation,
+  );
   for (const threadId of affectedThreadIds) {
-    void queryClient.invalidateQueries({ queryKey: inboxKeys.thread(tenantKey, threadId) });
+    suppressAbortRejection(
+      queryClient.invalidateQueries({ queryKey: inboxKeys.thread(tenantKey, threadId) }),
+      isCommentUpdatesCancellation,
+    );
   }
 }
 
@@ -515,7 +521,10 @@ export function useCommentUpdates(options: UseCommentUpdatesOptions = {}) {
   // of sitting open in the background.
   useEffect(() => {
     if (isVisible) return;
-    void queryClient.cancelQueries({ queryKey: inboxKeys.updates(tenantKey) });
+    suppressAbortRejection(
+      queryClient.cancelQueries({ queryKey: inboxKeys.updates(tenantKey) }),
+      isCommentUpdatesCancellation,
+    );
   }, [isVisible, queryClient, tenantKey]);
 
   // Catch up immediately on visibility regain or window focus regain without duplicating

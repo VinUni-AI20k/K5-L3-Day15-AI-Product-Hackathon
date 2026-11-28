@@ -13,6 +13,7 @@ import {
 } from "@/ui/schemas/bulk.schema";
 import { COMPOSE_CHANNELS } from "@/ui/schemas/compose.schema";
 import { useActiveTenant } from "@/ui/hooks/useMe";
+import { abortWithReason, isAbortError } from "@/ui/services/abort";
 import { ApiError } from "@/ui/services/api-error";
 import { composePost, createPostBatch, generateCaptions } from "@/ui/services/post.api";
 
@@ -128,8 +129,13 @@ function summarise(rows: readonly BulkRunRow[]): BulkRunSummary {
   };
 }
 
-/** Nothing is thrown out of the loop: every failure becomes a row outcome. */
-function outcomeFromError(error: unknown): Pick<BulkRunRow, "status" | "reason" | "errorCode"> {
+/** True when an error in the bulk loop came from an intentional/navigation abort. */
+export function isBulkRunAbort(error: unknown, signal?: AbortSignal): boolean {
+  return isAbortError(error, signal);
+}
+
+/** Nothing is thrown out of the loop: every real failure becomes a row outcome. */
+export function outcomeFromError(error: unknown): Pick<BulkRunRow, "status" | "reason" | "errorCode"> {
   if (ApiError.is(error)) {
     return {
       status: isBulkSkipCode(error.code) ? "skipped" : "error",
@@ -202,7 +208,8 @@ export function useBulkRun() {
     () => () => {
       stopRef.current = true;
       runIdRef.current += 1;
-      abortRef.current?.abort();
+      abortWithReason(abortRef.current, "bulk-run: component unmounted");
+      abortRef.current = null;
     },
     [],
   );
@@ -242,8 +249,10 @@ export function useBulkRun() {
       // it created, and starting from a clean 0 means nobody has to reason
       // across runs about who owes the cache an invalidation.
       createdCountRef.current = 0;
-      abortRef.current = new AbortController();
-      const signal = abortRef.current.signal;
+      abortWithReason(abortRef.current, "bulk-run: superseded by new run");
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const signal = controller.signal;
 
       setRows(initialRows(input.codes, input.channelIds.length));
       inputRef.current = input;
@@ -336,12 +345,13 @@ export function useBulkRun() {
               reason: composed.warnings.length > 0 ? composed.warnings.join(" · ") : null,
             });
           } catch (error) {
-            // Never rethrown: the row carries the failure and the run continues.
-            if (signal.aborted || runId !== runIdRef.current) return;
+            // Intentional/navigation aborts exit quietly without painting a row error.
+            if (isBulkRunAbort(error, signal) || runId !== runIdRef.current) return;
             patchRow(runId, index, outcomeFromError(error));
           }
         }
       } finally {
+        if (abortRef.current === controller) abortRef.current = null;
         // Every exit of the loop lands here — finished, stopped, unmounted,
         // or superseded by a newer run. Batches already created keep running
         // on the server, so the log must be refreshed even when the run did
@@ -397,8 +407,10 @@ export function useBulkRun() {
 
     const runId = runIdRef.current;
     stopRef.current = false;
-    abortRef.current = new AbortController();
-    const signal = abortRef.current.signal;
+    abortWithReason(abortRef.current, "bulk-run: superseded by publish");
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const signal = controller.signal;
     setPhase("running");
     try {
       for (const row of targets) {
@@ -427,11 +439,12 @@ export function useBulkRun() {
             reason: batch.warnings.length > 0 ? batch.warnings.join(" · ") : null,
           });
         } catch (error) {
-          if (signal.aborted || runId !== runIdRef.current) return;
+          if (isBulkRunAbort(error, signal) || runId !== runIdRef.current) return;
           patchRow(runId, row.index, outcomeFromError(error));
         }
       }
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       flushJobLogCache();
     }
     if (runId === runIdRef.current) setPhase("finished");

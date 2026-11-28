@@ -9,6 +9,7 @@ import {
 
 import type { UploadCandidate } from "@/ui/hooks/direct-upload-queue";
 import {
+  cancelResponseBody,
   forwardAbortSignal,
   isAbortError,
   isCallerSignalAborted,
@@ -129,6 +130,9 @@ export async function postFileToStorage(
 
   let response: Response;
   try {
+    if (isCallerSignalAborted(signal)) {
+      throw normalizeAbortError(signal?.reason, signal, fallbackReason);
+    }
     response = await fetch(params.postUrl, { method: "POST", body: form, signal: forwardedSignal });
   } catch (cause) {
     if (isCallerSignalAborted(signal) || (!isTimeoutError(cause) && isAbortError(cause))) {
@@ -146,6 +150,11 @@ export async function postFileToStorage(
     });
   } finally {
     cleanup();
+  }
+
+  if (isCallerSignalAborted(signal)) {
+    cancelResponseBody(response);
+    throw normalizeAbortError(signal?.reason, signal, fallbackReason);
   }
 
   if (!response.ok) {

@@ -13,6 +13,7 @@ import {
 } from "@/ui/schemas/writing-style.schema";
 
 import {
+  cancelResponseBody,
   createRequestSignal,
   isAbortError,
   isCallerSignalAborted,
@@ -128,6 +129,10 @@ async function writingStyleJsonRequest<T>(
   let response: Response;
   let payload: unknown;
   try {
+    if (isCallerSignalAborted(options.signal)) {
+      throw normalizeAbortError(options.signal?.reason, options.signal, fallbackReason);
+    }
+
     try {
       response = await fetch(path, {
         method: options.method,
@@ -156,6 +161,11 @@ async function writingStyleJsonRequest<T>(
           : "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.",
         cause,
       });
+    }
+
+    if (isCallerSignalAborted(options.signal)) {
+      cancelResponseBody(response);
+      throw normalizeAbortError(options.signal?.reason, options.signal, fallbackReason);
     }
 
     try {
