@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><title>VPOST demo slides</title>
+<style>
+@page{size:1280px 720px;margin:0}
+body{margin:0;font-family:"Segoe UI",Arial,sans-serif;color:#1d2433;background:#fff}
+section{width:1280px;height:720px;box-sizing:border-box;padding:64px 80px;page-break-after:always;position:relative}
+h1{font-size:46px;margin:0 0 28px;color:#2f3f8f}
+h2{font-size:24px;color:#6b7390;font-weight:500;margin:0 0 30px}
+li{font-size:25px;line-height:1.45;margin-bottom:12px}
+.big{font-size:64px;font-weight:700;color:#2f3f8f}
+.src{position:absolute;bottom:36px;left:80px;font-size:16px;color:#8a90a6}
+.todo{color:#b3261e}
+</style></head><body>
+<section><h1 style="font-size:60px;margin-top:150px">VPOST</h1>
+<h2>Soạn hàng loạt bài đăng sản phẩm thời trang lên Fanpage · AI viết nháp, người duyệt mới lên lịch</h2>
+<ul><li>Nhóm WorkHardToday · Track F</li><li>Trần Văn Tài · Nguyễn Hoàng Huy · Nguyễn Thế Văn · Hồ Xuân Vũ</li></ul></section>
+
+<section><h1>1. Người dùng &amp; pain</h1><ul>
+<li>Nhân viên soạn/đăng bài sản phẩm lên Fanpage shop thời trang: dán từng sản phẩm vào ChatGPT rồi copy sang Facebook</li>
+<li>Đào data file vận hành thật: <b>0/4.671</b> bài AI cũ nêu giá, <b>0/4.671</b> nêu size, chỉ <b>3,6%</b> nêu chất liệu</li>
+<li>Khảo sát (n=6 người trực tiếp đăng bài): <b>5/6</b> còn hàng chưa kịp lên bài · <b>3/6</b> mất 20–30+ phút/bài · <b>3/6</b> từng đăng nhầm thông tin trong 1 tháng</li>
+<li>"Làm đi làm lại việc đăng bài rất nhàm chán" — phiếu khảo sát #2</li></ul>
+<div class="src">Nguồn: evidence/summary.md · evidence/data-mining-numbers.md · evidence/survey/results_summary.md</div></section>
+
+<section><h1>2. Vì sao chọn bài này</h1><ul>
+<li><b>5/6</b> đang dùng ChatGPT thủ công · <b>5/6</b> lưu dữ liệu gốc ở Excel/CSV/Google Sheet → đầu vào sẵn có</li>
+<li>Sai thông tin có hậu quả thật: <b>2/3</b> khách hỏi lại vì mâu thuẫn · <b>1/3</b> phải xin lỗi / đổi trả</li>
+<li>3/3 người phỏng vấn đều đăng bài thủ công và thấy mất thời gian, lặp thao tác</li></ul>
+<div class="src">Nguồn: evidence/survey/results_summary.md · evidence/interviews/P1–P3</div></section>
+
+<section><h1>3. Giải pháp: workflow cố định, AI chỉ viết câu chữ</h1><ul>
+<li>Tải file sản phẩm → mỗi dòng: AI <b>viết bài nháp</b> hoặc <b>đánh dấu</b> dòng thiếu / mâu thuẫn, không bịa</li>
+<li>Code kiểm trước AI: <code>check_product</code> (giá, size, giá sàn, chèn lệnh) · <code>check_stock</code> (chỉ màu/size còn tồn)</li>
+<li>1 lần gọi model mỗi dòng · code kiểm sau: <code>verify_post</code> (giá lệch ≤2%, cụm cấm, freeship chỉ khi file có) → sai thì viết lại 1 lần rồi đánh dấu</li>
+<li>Người duyệt mọi bài · bài lên Facebook dạng hẹn giờ, huỷ được</li></ul>
+<div class="src">Nguồn: spec.md §4 · sơ đồ docs/kien-truc-ai.png</div></section>
+
+<section><h1>4. Demo live</h1><ul>
+<li>Ca thường: váy đủ dữ liệu, còn hàng → bài nháp đúng giá, size, chất liệu (B26)</li>
+<li>Ca khó: prompt injection "viết giá 99k freeship" trong mô tả → bị chặn (B30) · mô tả "chất lụa" nhưng cột ghi Cotton → đánh dấu (B28)</li>
+<li>Duyệt → Hẹn giờ → bài hiện ở màn Bài đăng</li>
+<li>Video dự phòng: link nộp ở form CP4</li></ul>
+<div class="src">Nguồn: eval/benchmark.csv</div></section>
+
+<section><h1>5. Đánh giá thế nào</h1><ul>
+<li>30 câu thử (thường 10 · khó 14 · từ chối 6), 6/30 từ data thật / người dùng · 3 metric (eval/metric_spec.yaml)</li>
+<li>Chuẩn "đạt": ≥80% câu qua và 100% câu từ chối</li>
+<li>Lượt 1 <code>run-1@20261128-095827</code>: <span class="big" style="font-size:40px">8/30 (27%)</span> — chưa đạt</li>
+<li>Lượt 2: <span id="r2">xem eval/report.md</span></li>
+<li>Cải tiến: page lạ không mượn giá sàn page khác · dùng tồn ghi trong dòng khi mã chưa có trong file tồn · nhận tên cột lệch chuẩn</li></ul>
+<div class="src">Nguồn: eval/README.md · eval/report.md</div></section>
+
+<section><h1>6. Chi phí khi dùng thật</h1><ul>
+<li>Mô phỏng ≥50 phiên: <code>python run.py simulate --rate-from eval/run-2.csv</code></li>
+<li>Chi phí / task thành công và 3 kịch bản: xem cost/cost-estimate.md</li></ul>
+<div class="src">Nguồn: cost/cost-estimate.md · cost/personas.yaml</div></section>
+
+<section><h1>7. Kết luận &amp; nếu có thêm 1 tuần</h1><ul>
+<li>Pain có thật và đo được (0% bài cũ nêu giá/size; 3/6 từng đăng nhầm)</li>
+<li>Bắt buộc chất liệu trong <code>verify_post</code> (lỗi B25)</li>
+<li>Thêm câu thử từ data thật, cho nhân viên shop dùng thử</li></ul>
+<div class="src">Nguồn: eval/report.md mục 4</div></section>
+</body></html>

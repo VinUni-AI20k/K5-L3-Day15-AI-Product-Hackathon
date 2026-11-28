@@ -75,7 +75,10 @@ def page_for(row, default=None):
         if pid and rules.fold(pid) == rules.fold(p["name"]):
             return p, None
     d = PAGES.get(default) or PAGES[DEFAULT_PAGE]
-    return d, (("page", "page '%s' không có — dùng page %s" % (pid, d["name"])) if pid else None)
+    if not pid:
+        return d, None
+    # page lạ: mượn giọng page mặc định nhưng KHÔNG áp giá sàn của page khác (giá tệ × 13.500 vẫn áp)
+    return dict(d, floor_vnd=0), ("page", "page '%s' không có trong danh sách — dùng giọng page %s, không áp giá sàn page" % (pid, d["name"]))
 
 
 @tool
@@ -95,7 +98,15 @@ def check_product(row: dict, page: dict) -> dict:
 def check_stock(row: dict) -> dict:
     """check_stock · input: 1 dòng (mã, màu, size) · output: lỗi hết hàng / màu, size còn tồn / cảnh báo sắp hết
     · không tác động ra ngoài (chỉ đọc data/inventory.csv)."""
-    return rules.check_stock(row, inventory())
+    inv = inventory()
+    code = (row.get("ma_sp") or "").strip()
+    if code and code not in inv:
+        own = rules.parse_row_stock(row)
+        if own:   # mã không có trong file tồn nhưng dòng có cột Tồn kho đọc được → dùng, kèm cảnh báo
+            res = rules.check_stock(row, {code: own})
+            res["warn"].append(("ton_kho", "mã '%s' không có trong file tồn — dùng tồn ghi trong dòng, cần đối chiếu" % code))
+            return res
+    return rules.check_stock(row, inv)
 
 
 @tool
