@@ -96,7 +96,7 @@ def read_receipt_image(scan: dict, image_bytes: bytes, capture_date: str) -> dic
     """Model "cứu" ảnh mà OCR cục bộ chưa đọc ra số thực trả; code kiểm số đó có thật trên ảnh.
 
     - Ảnh không đạt chất lượng (mờ/lóa) hoặc đã bị chặn: giữ nguyên kết quả OCR, không gọi model.
-    - OCR cục bộ (ONNX, dự phòng Tesseract) đã đọc ra tổng chắc chắn: không gọi model.
+    - OCR cục bộ ONNX đã đọc ra tổng chắc chắn: không gọi model.
     - Số model đọc phải trùng tổng OCR cục bộ đọc được; nếu OCR chưa đọc ra tổng thì số đó phải
       xuất hiện trong chữ OCR của chính ảnh. Không thỏa → Cần đọc lại.
     - Ngày sau ngày chụp → Cần đọc lại. Không có ngày → dùng ngày chụp.

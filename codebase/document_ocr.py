@@ -6,15 +6,11 @@ Kế thừa trực tiếp thuật toán từ P-163 (quality.py + ocr.py) với t
 """
 
 import collections
-import csv
 import datetime
-import functools
 import io
 import math
 import os
 import re
-import shutil
-import subprocess
 import threading
 import unicodedata
 
@@ -121,18 +117,6 @@ def receipt_has_sensitive_text(text: str) -> bool:
     return any(_passes_luhn(match) for match in CardDigitsPattern.findall(normalized))
 
 
-@functools.lru_cache(maxsize=1)
-def _tesseract_vie_ready() -> bool:
-    executable = shutil.which("tesseract")
-    if executable is None:
-        return False
-    try:
-        listed = subprocess.run([executable, "--list-langs"], capture_output=True, text=True, check=True, timeout=3)
-        return "vie" in listed.stdout.splitlines()
-    except (OSError, subprocess.SubprocessError):
-        return False
-
-
 def GetOcrEnvironmentStatus() -> dict:
     """Kiểm tra trạng thái thư viện và file trọng số ONNX trên thiết bị hiện tại."""
     weights = os.environ.get("SKYBILL_OCR_WEIGHTS_DIR") or DefaultWeightsDirectory
@@ -141,7 +125,6 @@ def GetOcrEnvironmentStatus() -> dict:
     DetectionWeightExists = os.path.isfile(DetectionModelPath)
     RecognitionWeightExists = os.path.isfile(RecognitionModelPath)
     onnx_ready = bool(OcrDependenciesAvailable and DetectionWeightExists and RecognitionWeightExists)
-    tess_ready = _tesseract_vie_ready()
     return {
         "dependencies_available": OcrDependenciesAvailable,
         "import_error": OcrImportErrorMessage,
@@ -149,9 +132,8 @@ def GetOcrEnvironmentStatus() -> dict:
         "det_model_exists": DetectionWeightExists,
         "rec_model_exists": RecognitionWeightExists,
         "onnx_ready": onnx_ready,
-        "tesseract_available": tess_ready,
-        "engine_ready": onnx_ready or tess_ready,
-        "engine_version": "ppocrv3-viesvtr-v7" if onnx_ready else "tesseract-lstm-vie" if tess_ready else "unavailable",
+        "engine_ready": onnx_ready,
+        "engine_version": "ppocrv3-viesvtr-v7" if onnx_ready else "unavailable",
     }
 
 
@@ -497,35 +479,13 @@ def _extract_onnx_lines(ImageBytes: bytes) -> dict:
 
 
 def ExtractOcrLinesFromBytes(image_bytes: bytes) -> dict:
-    """Dùng ONNX nếu có trọng số, hoặc dùng Tesseract LSTM tiếng Việt."""
-    status = GetOcrEnvironmentStatus()
-    if status["onnx_ready"]:
-        result = _extract_onnx_lines(image_bytes)
-        if result["engine_available"] or not status["tesseract_available"]:
-            return result
-    try:
-        if not status["tesseract_available"]:
-            raise FileNotFoundError("Tesseract vie")
-        result = subprocess.run(
-            ["tesseract", "stdin", "stdout", "-l", "vie", "--oem", "1", "--psm", "6", "tsv"],
-            input=image_bytes, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True, timeout=12,
-        )
-        lines = []
-        for row in csv.DictReader(io.StringIO(result.stdout.decode("utf-8")), delimiter="\t", quoting=csv.QUOTE_NONE):
-            if row["level"] != "5" or not row["text"].strip():
-                continue
-            left, top, width, height = map(int, (row["left"], row["top"], row["width"], row["height"]))
-            lines.append({
-                "text": row["text"].strip(),
-                "confidence": max(0, float(row["conf"])) / 100,
-                "box": [left, top, left + width, top + height],
-            })
-        return {"engine_available": True, "engine_version": "tesseract-lstm-vie", "lines": lines, "error_message": ""}
-    except (OSError, ValueError, subprocess.SubprocessError):
+    """Đọc dòng chữ bằng ONNX (PP-OCRv3 + VieSVTR v7); thiếu thư viện/trọng số thì báo OCR chưa sẵn sàng."""
+    if not GetOcrEnvironmentStatus()["onnx_ready"]:
         return {
             "engine_available": False, "engine_version": "unavailable", "lines": [],
-            "error_message": "Không chạy được OCR. Kiểm tra Tesseract và dữ liệu ngôn ngữ vie, hoặc trọng số ONNX.",
+            "error_message": "Thiếu thư viện OCR hoặc trọng số ONNX trong backend/weights/ocr-1/ppocrv3-viesvtr-v7/.",
         }
+    return _extract_onnx_lines(image_bytes)
 
 
 def _GroupOcrLinesIntoVisualRows(OcrLines: list) -> list:
@@ -713,7 +673,7 @@ def read_image_total(LogicalRows: list) -> int:
     return next(iter(TopAmounts)) if len(TopAmounts) == 1 else 0
 
 
-def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: str, UseImageTotal: bool = False) -> dict:
+def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: str) -> dict:
     """Phân tích các dòng OCR thành cấu trúc hoá đơn có kiểm tra G10 khi ảnh mờ/thiếu.
 
     Nhóm chi không chọn ở đây: web và answer() cùng gọi agent.choose_category().
@@ -750,8 +710,7 @@ def ParseReceiptFromOcrLines(OcrLines: list, QualityReport: dict, FallbackDate: 
         if ItemPrice > 0 and ItemLabel:
             ParsedItems.append({"name": ItemLabel, "price": ItemPrice})
 
-    # Dòng ONNX dùng bộ chọn tổng theo ưu tiên; Tesseract (dự phòng) giữ bộ đọc cũ.
-    PrintedTotalVnd = read_image_total(LogicalRows) if UseImageTotal else read_paid_total(row["text"] for row in LogicalRows)
+    PrintedTotalVnd = read_image_total(LogicalRows)
     QualityStatus = QualityReport.get("quality_status", "unknown")
     MeanConfidence = (
         sum(LineItem["confidence"] for LineItem in LogicalRows) / float(len(LogicalRows))
@@ -819,9 +778,7 @@ def ScanReceiptImageBytes(
     }
     if receipt_has_sensitive_text(" ".join(row["text"] for row in lines)):
         return {**metadata, "blocked": True}
-    ParsedReceipt = ParseReceiptFromOcrLines(
-        lines, QualityReport, TargetDate, UseImageTotal=OcrOutput.get("engine_version") == "ppocrv3-viesvtr-v7"
-    )
+    ParsedReceipt = ParseReceiptFromOcrLines(lines, QualityReport, TargetDate)
     ParsedReceipt["source"] = SourceMode
     ParsedReceipt["filename"] = FileName
     ParsedReceipt["ocr_line_count"] = len(ParsedReceipt["logical_rows"])

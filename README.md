@@ -14,7 +14,7 @@
 
 **Chạy thử (CP3).** Web và `answer()` dùng chung quy tắc (`tools.py`, `agent.choose_category`) và chung một sổ `CSDL/receipts.json` (khởi tạo từ `data/expenses.json`). Eval/simulate dùng sổ tạm riêng, mỗi câu một bản sao `data/expenses.json`, nên không đụng sổ thật.
 
-Cách 1 — Docker (khuyên dùng, đủ Tesseract tiếng Việt + thư viện OCR):
+Cách 1 — Docker (khuyên dùng, đủ thư viện OCR):
 
 ```bash
 docker compose up --build                                   # web: http://localhost:8080
@@ -22,9 +22,9 @@ docker compose run --rm app python run.py eval --try        # mọi lệnh run.p
 docker compose run --rm app sh -c "cd codebase && python check_ocr.py --truth ../data/receipts/mcocr_sample_40.csv ../data/receipts/images/*.jpg"
 ```
 
-Cách 2 — máy có sẵn Python 3.10+ và `tesseract-ocr-vie`: `pip install -r requirements.txt` rồi `python run.py`.
+Cách 2 — máy có sẵn Python 3.10+: `pip install -r requirements.txt` rồi `python run.py`.
 
-Model thật: tạo `.env` (`MODEL_PROVIDER`, `MODEL_NAME`, `API_KEY` — xem `docs/connect-model.md`), không commit. Đọc ảnh: OCR cục bộ ONNX (PP-OCRv3 + VieSVTR v7, trọng số trong `backend/weights/ocr-1/ppocrv3-viesvtr-v7/` — nguồn, SHA-256 và giấy phép trong `manifest.json`; VieSVTR là **CC-BY-NC-4.0, chỉ dùng học thuật/phi thương mại**). Thiếu trọng số thì dùng Tesseract. Model chỉ được gọi để đọc lại ảnh mà OCR cục bộ chưa ra số thực trả, và số đó phải có trong chữ OCR. Đo trên 40 ảnh mẫu: `python codebase/check_ocr.py --model --truth data/receipts/mcocr_sample_40.csv data/receipts/images/*.jpg`.
+Model thật: tạo `.env` (`MODEL_PROVIDER`, `MODEL_NAME`, `API_KEY` — xem `docs/connect-model.md`), không commit. Đọc ảnh: OCR cục bộ ONNX (PP-OCRv3 + VieSVTR v7, trọng số trong `backend/weights/ocr-1/ppocrv3-viesvtr-v7/` — nguồn, SHA-256 và giấy phép trong `manifest.json`; VieSVTR là **CC-BY-NC-4.0, chỉ dùng học thuật/phi thương mại**). Model chỉ được gọi để đọc lại ảnh mà OCR cục bộ chưa ra số thực trả, và số đó phải có trong chữ OCR. Đo trên 40 ảnh mẫu: `python codebase/check_ocr.py --model --truth data/receipts/mcocr_sample_40.csv data/receipts/images/*.jpg`.
 
 Kiểm 3 ca ghép luồng (ảnh rõ → Chốt lưu đúng · ảnh mờ → Cần đọc lại, không đổi tổng · chụp lại cùng ảnh → không cộng trùng):
 

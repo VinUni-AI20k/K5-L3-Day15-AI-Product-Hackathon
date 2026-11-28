@@ -1,9 +1,9 @@
-# Môi trường chạy SkyBill cho cả nhóm: Python 3.12 + Tesseract tiếng Việt + thư viện OCR.
+# Môi trường chạy SkyBill cho cả nhóm: Python 3.12 + ONNX Runtime/OpenCV (OCR cục bộ, trọng số trong backend/weights/).
 # Mã nguồn được mount từ máy (docker-compose.yml), nên eval/run-N.csv, traces/, cost/ ghi thẳng ra repo.
 FROM python:3.12-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-vie libglib2.0-0 \
+    && apt-get install -y --no-install-recommends libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
