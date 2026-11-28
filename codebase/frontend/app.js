@@ -10,11 +10,15 @@
 
   const CATEGORIES = [
     "Ăn uống",
+    "Di chuyển",
     "Đi lại",
     "Mua sắm",
+    "Hóa đơn & Nhà ở",
     "Hoá đơn & Tiện ích",
     "Giải trí",
+    "Sức khỏe",
     "Sức khoẻ",
+    "Chưa phân loại",
     "Khác",
   ];
 
@@ -275,13 +279,13 @@
     },
     {
       id: "g-calendar",
-      title: "4. Bấm vào từng ngày trên Lịch Locket để xem chi tiết hoá đơn",
-      keywords: "lịch locket bấm ngày chi tiết hoá đơn bảng tổng kết mục chi thêm vào ngày",
+      title: "4. Bấm vào từng ngày trên Lịch Locket để xem lại ảnh & chi tiết hoá đơn",
+      keywords: "lịch locket bấm ngày chi tiết ảnh hoá đơn bảng tổng kết mục chi phóng to xem lại",
       view: "calendar",
       steps: [
         "Mở tab <strong>Lịch</strong> để xem toàn bộ các ngày trong tháng; ô màu xanh da trời đậm hơn là ngày chi tiêu nhiều hơn.",
-        "Bấm vào bất kỳ ô ngày nào để mở bảng bên cạnh: xem <strong>số hoá đơn</strong>, <strong>bảng tổng kết theo mục</strong> và <strong>từng hoá đơn chi tiết</strong>.",
-        "Nếu cần bổ sung hoá đơn cho một ngày cũ, bấm ngay nút <strong>+ Thêm vào ngày này</strong>.",
+        "Bấm vào bất kỳ ô ngày nào để mở bảng bên cạnh: xem <strong>số hoá đơn</strong>, <strong>bảng tổng kết theo mục</strong>, mục <strong>Ảnh hoá đơn hôm đó</strong> và <strong>từng hoá đơn chi tiết</strong>.",
+        "Bấm trực tiếp vào ảnh thu nhỏ hoặc nút <strong>Xem ảnh</strong> để mở ảnh hoá đơn gốc kích thước lớn, phóng to đối chiếu hoặc chuyển qua lại giữa các ảnh trong ngày.",
       ],
     },
     {
@@ -378,6 +382,10 @@
     tourIndex: 0,
     guideQuery: "",
     guideOpenIds: new Set(["g-camera", "g-upload"]),
+    isSavingDraft: false,
+    photoModalList: [],
+    photoModalIndex: 0,
+    photoModalZoomed: false,
   };
 
   function todayIso() {
@@ -724,9 +732,10 @@
         state.backendConnected = true;
         state.draft = {
           draft_id: serverDraft.draft_id || "",
+          capture_id: serverDraft.capture_id || serverDraft.draft_id || "",
           merchant: serverDraft.merchant || "không rõ",
           date: serverDraft.date || targetDate,
-          category: serverDraft.category || "Khác",
+          category: serverDraft.category || "Chưa phân loại",
           note: serverDraft.note || "",
           items: Array.isArray(serverDraft.items) && serverDraft.items.length ? serverDraft.items : [{ name: "không rõ", price: 0 }],
           image_path: serverDraft.image_path || "",
@@ -736,6 +745,8 @@
           ocr_engine: data.ocr_engine || "",
           ocr_engine_available: Boolean(data.ocr_engine_available),
           ocr_lines_count: Array.isArray(data.ocr_lines) ? data.ocr_lines.length : 0,
+          needs_reread: Boolean(data.needs_reread || serverDraft.needs_reread),
+          review_status: data.review_status || serverDraft.review_status || "Sẵn sàng Chốt",
           backend_warnings: (data.validation && data.validation.warnings) || [],
         };
         renderDraftForm();
@@ -884,7 +895,7 @@
     const check = validateReceiptCode(state.draft);
     document.getElementById("draft-total-display").textContent = formatVnd(check.calculatedTotal);
     document.getElementById("btn-confirm-save").textContent =
-      "Xác nhận lưu vào ngày " + formatDisplayDate(state.draft.date);
+      "Chốt & lưu vào ngày " + formatDisplayDate(state.draft.date);
 
     const qr = state.draft.quality_report;
     let metaLine = "";
@@ -900,39 +911,49 @@
     }
 
     const box = document.getElementById("draft-validation-box");
-    if (check.valid) {
+    const needsReread = Boolean(state.draft.needs_reread || !check.valid);
+    if (!needsReread) {
       box.className = "validation-box";
       box.innerHTML =
-        "<strong>Kiểm tra code đạt:</strong> Đủ thông tin và khớp tổng tiền <strong>" +
+        "<strong>Sẵn sàng Chốt:</strong> Đủ thông tin và khớp tổng thực trả <strong>" +
         formatVnd(check.calculatedTotal) +
-        "</strong>. Bấm xác nhận để lưu vào CSDL." +
+        "</strong>. Bấm <strong>Chốt &amp; lưu</strong> để đưa vào sổ ngày." +
         metaLine;
     } else {
+      const reasonText = !check.valid
+        ? "Thiếu hoặc chưa rõ: " + check.missingFields.join(", ")
+        : "Ảnh mờ/loá hoặc độ tin cậy thấp — cần bạn đối chiếu lại số thực trả";
       box.className = "validation-box uncertain";
       box.innerHTML =
-        "<strong>Cần bạn kiểm lại (G10 — thu hẹp khi không chắc):</strong> Thiếu hoặc chưa rõ: <strong>" +
-        escapeHtml(check.missingFields.join(", ")) +
-        "</strong>. Hãy sửa trực tiếp bên dưới trước khi lưu." +
+        "<strong>Cần đọc lại (G10 — không tự cộng khi chưa chắc):</strong> " +
+        escapeHtml(reasonText) +
+        ". Bạn có thể chụp lại hoặc sửa trực tiếp số tiền bên dưới trước khi bấm Chốt." +
         metaLine;
     }
   }
 
   async function confirmSaveDraft(ev) {
     ev.preventDefault();
-    if (!state.draft) return;
+    if (!state.draft || state.isSavingDraft) return;
     refreshDraftValidationAndTotal();
     const check = validateReceiptCode(state.draft);
     if (!check.valid) {
-      showToast("Vui lòng điền đủ tên món và số tiền > 0 trước khi lưu!");
+      showToast("Cần đọc lại: vui lòng điền đủ tên món và số tiền thực trả > 0 trước khi Chốt!");
       return;
     }
 
+    state.isSavingDraft = true;
+    const confirmBtn = document.getElementById("btn-confirm-save");
+    confirmBtn.disabled = true;
+
+    const captureId = state.draft.capture_id || state.draft.draft_id || ("CAP-" + Date.now().toString(36));
     const payload = {
       draft_id: state.draft.draft_id || "",
+      capture_id: captureId,
       user_id: "default_user",
       date: state.draft.date,
       merchant: state.draft.merchant,
-      category: state.draft.category || "Khác",
+      category: state.draft.category || "Chưa phân loại",
       source: state.draft.source || "camera",
       note: state.draft.note || "",
       image_path: state.draft.image_path || "",
@@ -951,13 +972,23 @@
         savedReceipt = data.receipt;
         state.backendConnected = true;
       }
-    } catch (_err) {}
+    } catch (_err) {
+    } finally {
+      state.isSavingDraft = false;
+      confirmBtn.disabled = false;
+    }
 
     if (!savedReceipt) {
+      const duplicateLocal = state.receipts.find((r) => r.capture_id && r.capture_id === captureId);
+      if (duplicateLocal) {
+        showToast("Hoá đơn lượt chụp này đã được Chốt trước đó — giữ nguyên tổng ngày.");
+        return;
+      }
       const now = new Date();
       const timeStr = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
       savedReceipt = {
         id: "HD-" + Date.now().toString().slice(-5),
+        capture_id: captureId,
         date: payload.date,
         time: timeStr,
         merchant: payload.merchant,
@@ -970,8 +1001,18 @@
       };
     }
 
-    state.receipts.push(savedReceipt);
-    saveReceiptsLocal(state.receipts);
+    if (savedReceipt.duplicate_prevented) {
+      showToast("Cùng mã lượt chụp đã được Chốt — giữ nguyên tổng ngày.");
+    } else {
+      const existingIdx = state.receipts.findIndex((r) => r.id === savedReceipt.id);
+      if (existingIdx >= 0) {
+        state.receipts[existingIdx] = savedReceipt;
+      } else {
+        state.receipts.push(savedReceipt);
+      }
+      saveReceiptsLocal(state.receipts);
+      showToast("Đã Chốt hoá đơn vào CSDL ngày " + formatDisplayDate(savedReceipt.date) + "!");
+    }
 
     const [y, m] = savedReceipt.date.split("-").map(Number);
     state.calendarYear = y;
@@ -979,8 +1020,6 @@
     state.selectedDate = savedReceipt.date;
     state.draft = null;
     renderDraftForm();
-
-    showToast("Đã lưu hoá đơn vào CSDL ngày " + formatDisplayDate(savedReceipt.date) + "!");
     switchView("calendar");
   }
 
@@ -1091,6 +1130,68 @@
     document.getElementById("stat-month-spend").textContent = formatVnd(monthTotal);
   }
 
+  function resolveReceiptImageUrl(rec) {
+    if (!rec) return "";
+    if (rec.image_path) return `/csdl/images/${rec.image_path}`;
+    return rec.image || "";
+  }
+
+  function openReceiptPhotoModal(dateIso, receiptId) {
+    const summary = getDaySummary(dateIso);
+    const withPhotos = summary.receipts.filter((r) => Boolean(resolveReceiptImageUrl(r)));
+    if (withPhotos.length === 0) {
+      showToast("Ngày này chưa có ảnh hoá đơn nào được lưu.");
+      return;
+    }
+    const foundIdx = withPhotos.findIndex((r) => r.id === receiptId);
+    state.photoModalList = withPhotos;
+    state.photoModalIndex = foundIdx >= 0 ? foundIdx : 0;
+    state.photoModalZoomed = false;
+    renderPhotoModal();
+    document.getElementById("receipt-photo-modal").classList.remove("hidden");
+  }
+
+  function closeReceiptPhotoModal() {
+    document.getElementById("receipt-photo-modal").classList.add("hidden");
+    state.photoModalZoomed = false;
+  }
+
+  function renderPhotoModal() {
+    const list = state.photoModalList || [];
+    if (list.length === 0) {
+      closeReceiptPhotoModal();
+      return;
+    }
+    const rec = list[state.photoModalIndex];
+    const imgSrc = resolveReceiptImageUrl(rec);
+    const imgEl = document.getElementById("photo-modal-img");
+    imgEl.src = imgSrc;
+    imgEl.alt = "Ảnh hoá đơn " + (rec.merchant || "");
+    imgEl.classList.toggle("zoomed", Boolean(state.photoModalZoomed));
+
+    document.getElementById("btn-photo-zoom").textContent = state.photoModalZoomed ? "Thu nhỏ (1x)" : "Phóng to (1.6x)";
+    document.getElementById("photo-modal-counter").textContent = `Ảnh ${state.photoModalIndex + 1} / ${list.length}`;
+    document.getElementById("photo-modal-title").textContent = `${rec.merchant || "Hoá đơn"} · ${formatDisplayDate(rec.date)}`;
+
+    document.getElementById("photo-modal-meta").innerHTML = `
+      <div><strong>Nơi mua:</strong> ${escapeHtml(rec.merchant || "—")}</div>
+      <div><strong>Ngày giờ:</strong> ${formatDisplayDate(rec.date)} · ${escapeHtml(rec.time || "--:--")}</div>
+      <div><strong>Nhóm chi:</strong> ${escapeHtml(rec.category || "Chưa phân loại")}</div>
+      <div><strong>Tổng thực trả:</strong> <strong>${formatVnd(rec.total)}</strong></div>
+      <div><strong>Nguồn:</strong> ${rec.source === "upload" ? "Tải ảnh từ máy/app khác" : "Chụp trực tiếp"}</div>
+      ${rec.note ? `<div><strong>Ghi chú:</strong> ${escapeHtml(rec.note)}</div>` : ""}
+    `;
+
+    const itemsHtml = (rec.items || [])
+      .map((it) => `<li>${escapeHtml(it.name)} — <strong>${formatVnd(it.price)}</strong></li>`)
+      .join("");
+    document.getElementById("photo-modal-items").innerHTML =
+      `<strong>Chi tiết khoản chi:</strong><ul class="receipt-items-ul" style="margin-top:6px;">${itemsHtml}</ul>`;
+
+    document.getElementById("btn-photo-prev").disabled = state.photoModalIndex <= 0;
+    document.getElementById("btn-photo-next").disabled = state.photoModalIndex >= list.length - 1;
+  }
+
   function renderDayDetail(dateIso) {
     const summary = getDaySummary(dateIso);
     document.getElementById("day-detail-badge").textContent =
@@ -1121,6 +1222,35 @@
         .join("");
     }
 
+    // Gallery ảnh hoá đơn của ngày hôm đó
+    const photosWrap = document.getElementById("day-photos-gallery");
+    const photosCountEl = document.getElementById("day-photos-count");
+    const photoReceipts = summary.receipts.filter((rec) => Boolean(resolveReceiptImageUrl(rec)));
+    photosCountEl.textContent = photoReceipts.length + " ảnh";
+
+    if (photoReceipts.length === 0) {
+      photosWrap.innerHTML =
+        '<p class="muted-sm" style="grid-column:1/-1;">Chưa có ảnh hoá đơn chụp/tải cho ngày này. Khi bạn chụp hoặc tải ảnh mới vào ngày này, ảnh sẽ hiển thị tại đây để bấm xem lại.</p>';
+    } else {
+      photosWrap.innerHTML = "";
+      photoReceipts.forEach((rec) => {
+        const imgUrl = resolveReceiptImageUrl(rec);
+        const tile = document.createElement("button");
+        tile.type = "button";
+        tile.className = "day-photo-tile";
+        tile.title = "Bấm để phóng to ảnh hoá đơn " + (rec.merchant || "");
+        tile.innerHTML = `
+          <img src="${escapeHtml(imgUrl)}" alt="Ảnh hoá đơn ${escapeHtml(rec.merchant)}" />
+          <div class="day-photo-caption">
+            <strong>${escapeHtml(rec.merchant || "Hoá đơn")}</strong>
+            <span>${formatVnd(rec.total)}</span>
+          </div>
+        `;
+        tile.addEventListener("click", () => openReceiptPhotoModal(dateIso, rec.id));
+        photosWrap.appendChild(tile);
+      });
+    }
+
     const listWrap = document.getElementById("day-receipts-list");
     if (summary.receipts.length === 0) {
       listWrap.innerHTML =
@@ -1135,9 +1265,9 @@
       const card = document.createElement("div");
       card.className = "receipt-card";
 
-      const imgSrc = rec.image_path ? `/csdl/images/${rec.image_path}` : rec.image || "";
+      const imgSrc = resolveReceiptImageUrl(rec);
       const thumbHtml = imgSrc
-        ? `<img src="${escapeHtml(imgSrc)}" alt="Ảnh hoá đơn ${escapeHtml(rec.merchant)}" class="receipt-thumb" />`
+        ? `<button type="button" class="receipt-thumb-btn" title="Xem lại ảnh hoá đơn này"><img src="${escapeHtml(imgSrc)}" alt="Ảnh hoá đơn ${escapeHtml(rec.merchant)}" class="receipt-thumb" /></button>`
         : `<div class="receipt-thumb" style="display:grid;place-items:center;background:#e0f2fe;color:#0369a1;font-size:0.7rem;font-weight:700;">HĐ</div>`;
 
       const itemsHtml = (rec.items || [])
@@ -1159,9 +1289,19 @@
         ${rec.note ? `<div class="muted-xs">Ghi chú: ${escapeHtml(rec.note)}</div>` : ""}
         <div class="receipt-card-footer">
           <select class="select-inline" aria-label="Đổi danh mục"></select>
-          <button type="button" class="btn btn-ghost btn-xs btn-del-receipt">Xoá</button>
+          <div class="receipt-footer-actions">
+            ${imgSrc ? `<button type="button" class="btn btn-soft btn-xs btn-view-photo">Xem ảnh</button>` : ""}
+            <button type="button" class="btn btn-ghost btn-xs btn-del-receipt">Xoá</button>
+          </div>
         </div>
       `;
+
+      if (imgSrc) {
+        const thumbBtn = card.querySelector(".receipt-thumb-btn");
+        if (thumbBtn) thumbBtn.addEventListener("click", () => openReceiptPhotoModal(dateIso, rec.id));
+        const viewBtn = card.querySelector(".btn-view-photo");
+        if (viewBtn) viewBtn.addEventListener("click", () => openReceiptPhotoModal(dateIso, rec.id));
+      }
 
       const sel = card.querySelector("select");
       CATEGORIES.forEach((cat) => {
@@ -1776,6 +1916,51 @@
     window.addEventListener("resize", () => {
       if (!document.getElementById("tour-overlay").classList.contains("hidden")) {
         positionTourSpotlight(TOUR_STEPS[state.tourIndex].target);
+      }
+    });
+
+    // Receipt photo lightbox modal controls
+    document.getElementById("btn-photo-close").addEventListener("click", closeReceiptPhotoModal);
+    document.getElementById("btn-photo-zoom").addEventListener("click", () => {
+      state.photoModalZoomed = !state.photoModalZoomed;
+      renderPhotoModal();
+    });
+    document.getElementById("photo-modal-img").addEventListener("click", () => {
+      state.photoModalZoomed = !state.photoModalZoomed;
+      renderPhotoModal();
+    });
+    document.getElementById("btn-photo-prev").addEventListener("click", () => {
+      if (state.photoModalIndex > 0) {
+        state.photoModalIndex -= 1;
+        state.photoModalZoomed = false;
+        renderPhotoModal();
+      }
+    });
+    document.getElementById("btn-photo-next").addEventListener("click", () => {
+      if (state.photoModalIndex < state.photoModalList.length - 1) {
+        state.photoModalIndex += 1;
+        state.photoModalZoomed = false;
+        renderPhotoModal();
+      }
+    });
+    document.getElementById("receipt-photo-modal").addEventListener("click", (e) => {
+      if (e.target.id === "receipt-photo-modal") {
+        closeReceiptPhotoModal();
+      }
+    });
+    document.addEventListener("keydown", (e) => {
+      const modalEl = document.getElementById("receipt-photo-modal");
+      if (modalEl.classList.contains("hidden")) return;
+      if (e.key === "Escape") closeReceiptPhotoModal();
+      if (e.key === "ArrowLeft" && state.photoModalIndex > 0) {
+        state.photoModalIndex -= 1;
+        state.photoModalZoomed = false;
+        renderPhotoModal();
+      }
+      if (e.key === "ArrowRight" && state.photoModalIndex < state.photoModalList.length - 1) {
+        state.photoModalIndex += 1;
+        state.photoModalZoomed = false;
+        renderPhotoModal();
       }
     });
   }

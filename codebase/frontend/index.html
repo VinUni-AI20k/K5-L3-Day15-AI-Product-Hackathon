@@ -315,6 +315,14 @@
               <div id="day-category-breakdown" class="breakdown-list"></div>
             </div>
 
+            <div class="day-section" id="day-photos-section">
+              <div class="items-head">
+                <h4>Ảnh hoá đơn hôm đó</h4>
+                <span id="day-photos-count" class="pill-tag">0 ảnh</span>
+              </div>
+              <div id="day-photos-gallery" class="day-photos-gallery"></div>
+            </div>
+
             <div class="day-section">
               <h4>Chi tiết từng hoá đơn trong ngày</h4>
               <div id="day-receipts-list" class="receipt-cards-list"></div>
@@ -527,6 +535,36 @@
         <button id="tour-prev-btn" type="button" class="btn btn-outline btn-sm">Quay lại</button>
         <div class="tour-dots" id="tour-dots"></div>
         <button id="tour-next-btn" type="button" class="btn btn-primary btn-sm">Tiếp theo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal xem lại ảnh hoá đơn của ngày đã chọn -->
+  <div id="receipt-photo-modal" class="photo-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="photo-modal-title">
+    <div class="photo-modal-card">
+      <div class="photo-modal-head">
+        <div>
+          <span id="photo-modal-counter" class="pill-tag">Ảnh 1 / 1</span>
+          <h3 id="photo-modal-title">Ảnh hoá đơn</h3>
+        </div>
+        <div class="photo-modal-tools">
+          <button id="btn-photo-zoom" type="button" class="btn btn-outline btn-sm">Phóng to</button>
+          <button id="btn-photo-close" type="button" class="btn btn-soft btn-sm">Đóng</button>
+        </div>
+      </div>
+
+      <div class="photo-modal-body">
+        <div class="photo-modal-stage" id="photo-modal-stage">
+          <img id="photo-modal-img" src="" alt="Ảnh hoá đơn phóng lớn" class="photo-modal-img" />
+        </div>
+        <div class="photo-modal-side">
+          <div id="photo-modal-meta" class="photo-modal-meta"></div>
+          <div id="photo-modal-items" class="photo-modal-items"></div>
+          <div class="photo-modal-nav">
+            <button id="btn-photo-prev" type="button" class="btn btn-outline btn-sm">&larr; Ảnh trước</button>
+            <button id="btn-photo-next" type="button" class="btn btn-outline btn-sm">Ảnh sau &rarr;</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
