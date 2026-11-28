@@ -1,7 +1,7 @@
 # Báo cáo đánh giá — lượt 1 → một cải tiến → lượt 2
 
 > Điền ở guide bước 4.1. Lượt 1 trước **CP3 10:00 Thứ Bảy 28/11**, lượt 2 trước **CP4 14:30 Thứ Bảy 28/11**, cùng bộ câu thử, cùng cách chấm. Chấm ở rubric R5.
-> Số lấy từ `python run.py score eval/run-1.csv` (và `run-2.csv`) sau khi điền cột `pass`. **Kết quả thấp ghi thật vẫn đủ điểm.**
+> Số lấy từ `python run.py score eval/run-1.csv` (và `run-2.csv`) sau khi điền cột `pass`. Chỉ ghi kết quả Lượt 2 sau khi thực sự chạy và chấm xong; **kết quả thấp ghi thật vẫn đủ điểm.**
 > Không được: sửa chuẩn "đạt", bỏ câu thử trượt, sửa `expected` cho khớp output, sửa kết quả lượt đã chạy.
 
 ## 1. Kết quả
@@ -9,9 +9,10 @@
 | Lượt | Run ID | Đạt / tổng | % | thuong | kho | tu_choi | So với chuẩn "đạt" |
 |---|---|---|---|---|---|---|---|
 | 1 | `run-1@20261128-095827` | 8/30 | 27% | 1/10 (10%) | 6/14 (43%) | 1/6 (17%) | chưa |
-| 2 | | __/__ | | __/__ | __/__ | __/__ | đạt / chưa |
+| 2 | `run-2@20261128-141751` | 9/30 | 30% | 2/10 (20%) | 6/14 (43%) | 1/6 (17%) | chưa |
 
-Kết quả từng câu: `eval/run-1.csv`, `eval/run-2.csv`. Trace: `traces/run-1.jsonl`, `traces/run-2.jsonl`.
+Kết quả từng câu: Lượt 1 tại `eval/run-1.csv`, Lượt 2 tại `eval/run-2.csv` (trace `traces/run-2.jsonl`). Không sửa file kết quả Lượt 1.
+So sánh: tăng 1 câu (từ 8 lên 9). Thay đổi thuộc `thuong` (`B25` 0→1). Các câu `B10`–`B12`, `B26`–`B30` giữ nguyên kết quả. `B25` đạt ở Lượt 2 do biến thiên của LLM, không phải do cải tiến (đường xử lý alias không liên quan đến `chat_lieu`).
 
 ## 2. Lỗi lượt 1 — gom thành nhóm có tên
 
@@ -30,17 +31,32 @@ Kết quả từng câu: `eval/run-1.csv`, `eval/run-2.csv`. Trace: `traces/run-
 | `B17` | `Ma_Hang: AO-17 \| Đơn giá: 160.000đ \| KichCo: S` | `ĐÁNH DẤU: gia_ban: thiếu giá bán; size: thiếu size` | `answer()` chưa map tên cột lệch chuẩn (`Đơn giá`, `KichCo`) như khi đọc file Excel |
 | `B25` | `ma_sp: G5V6071502 \| gia_ban: 1.950.000đ \| chat_lieu: Polyester` | `VIẾT ... Giá chỉ 1.950.000đ ... size S, M, L, XL, 2XL ...` | AI viết đúng giá, size, xưng hô nhưng bỏ sót chất liệu `Polyester` |
 
-## 3. Một lần cải tiến
+## 3. Cải tiến chọn cho Lượt 2
 
-- Nhắm vào nhóm lỗi: __ — vì sao là nhóm **đau nhất với người dùng**: __
-- Đã sửa gì (có thể vài thay đổi cùng nhắm nhóm lỗi đó): __
-- Kết quả: nhóm lỗi đó __/__ → __/__ · tổng __% → __%
-- Câu nào **tệ đi** sau khi sửa: __
+- Nhắm vào lỗi `B17`: chuẩn hóa alias tên cột dạng text — `Đơn giá` → `gia_ban`, `KichCo` → `size`. Đây là lỗi phù hợp để sửa và đo riêng: dữ liệu đầu vào đã có giá và size nhưng hệ thống vẫn đánh dấu thiếu, khiến người vận hành phải nhập lại dữ liệu.
+- Thay đổi dự kiến: bổ sung alias trong `codebase/rules.py` tại bước chuẩn hóa dòng. Giữ nguyên `eval/benchmark.csv`, `expected` và tiêu chí chấm để so sánh công bằng.
+- Trạng thái: **đã triển khai** (thêm alias `ma_hang`, `don gia`, `kichco` trong `ALIASES` ở `codebase/rules.py`) và **đã chạy Lượt 2**. Phần kiểm tra vật liệu trong `verify_post` đã được bỏ khỏi thay đổi này theo quyết định của nhóm.
+- Kết quả `B17`: **vẫn trượt**. Parse đã đúng (đọc được `gia_ban` 160000 và `size` S), nhưng giá 160.000đ dưới giá sàn 540.000đ của page mặc định `Dịu Mây`, nên hệ thống chặn đúng theo luật. Lỗi chuyển từ "thiếu giá/size" sang "dưới giá sàn" — tức là lỗi thật nằm ở ánh xạ page (xem mục 4).
+- Tổng Lượt 2: 9/30 (30%), tăng 1 câu so với Lượt 1 (8/30). Cải tiến chỉ tác động đến parse cột; không làm thay đổi đáng kể kết quả tổng. Đây là kết quả thật, không điều chỉnh.
 
 ## 4. Còn lại
 
 - Lỗi chưa sửa + nguy hiểm thế nào:
-  1. `B17` (`answer()` chưa map tên cột lệch chuẩn dạng text như `Đơn giá`, `KichCo`) khiến dữ liệu nhập tay bị đánh dấu thiếu giá/size dù có đủ thông tin.
+  1. `B17` vẫn trượt sau khi đã thêm alias: giá 160.000đ dưới giá sàn 540.000đ của page mặc định. Cần quyết định ánh xạ page/giá sàn cho bộ câu này; không sửa `expected` để khớp output.
   2. `B25` (AI đôi lúc bỏ sót trường chất liệu `Polyester` khi viết bài) — dễ làm thiếu thông số sản phẩm trên Fanpage nếu người duyệt không đọc kỹ.
-  3. Bộ câu `B01–B24` tự viết trước đó dùng giá `< 540.000đ` và tên page khác `data/pages.json`, cần đồng bộ hoặc bổ sung thêm câu `data_that` để đo đúng từng kịch bản ở Lượt 2.
-- Nếu có thêm thời gian (cho Lượt 2 / CP4): bổ sung kiểm tra bắt buộc đủ trường dữ kiện (`chat_lieu`) trong `verify_post`, chuẩn hóa alias cột trong `answer()`, và chạy `python run.py simulate` để hoàn thiện bài toán chi phí.
+  3. Nhóm 19 câu ở hàng đầu bảng mục 2 dùng giá dưới giá sàn mặc định và/hoặc tên page không khớp `data/pages.json`; cần giữ nguyên bộ câu khi so sánh Lượt 1–2, đồng thời ghi rõ giới hạn này khi diễn giải kết quả. Không sửa `expected` để làm cho output hiện tại đạt.
+- Kết luận: cải tiến alias đúng về mặt kỹ thuật nhưng không đủ để tăng đáng kể tỉ lệ đạt (8/30 → 9/30, trong đó 1 câu tăng do biến thiên LLM). Phần lớn lỗi nằm ở nhóm 19 câu bị chặn bởi giá sàn page và ở ánh xạ page trong bộ câu.
+- Mô phỏng chi phí (≥50 phiên, `python run.py simulate --rate-from eval/run-2.csv`, seed 42): 50 phiên, tỉ lệ đạt 30% lấy từ Lượt 2. Kết quả trong `cost/simulate-1-summary.md`. Token đo trên `gpt-4o-mini`; giá tính theo `gemini-3.1-flash-lite` ($0.00041/task thành công) và `gemini-4-hydrogen` ($0.0023/task thành công). Lưu ý: `cost/personas.yaml` vẫn còn chữ "(ví dụ)", cần thay bằng số và nguồn của nhóm trước khi dùng số này làm kết luận.
+
+## 5. Cải tiến tiếp theo — Lượt 3
+
+Giữ nguyên cấu hình Page `Dịu Mây` (giá sàn `540.000đ`), benchmark, `expected` và tiêu chí chấm. Thêm chặn cứng ảnh thiếu/không hợp lệ, mâu thuẫn độ dài tay áo, yêu cầu bỏ qua bước kiểm tra, và claim/thương hiệu bị cấm trong mô tả.
+
+| Lượt | Run ID | Đạt / tổng | % | thuong | kho | tu_choi |
+|---|---|---|---|---|---|---|
+| 2 | `run-2@20261128-141751` | 9/30 | 30% | 2/10 (20%) | 6/14 (43%) | 1/6 (17%) |
+| 3 | `run-3@20261128-143901` | 12/30 | 40% | 2/10 (20%) | 7/14 (50%) | 3/6 (50%) |
+
+Lượt 3 tăng 3 câu so với Lượt 2: `B02`, `B13`, `B22`, `B23` đạt; một câu trước đó đạt (`B25`) trượt do model bỏ sót chất liệu. Kết quả thực tế là 12/30, chưa đạt chuẩn 90%/100%. Output và chấm từng câu lưu tại `eval/run-3.csv`, trace tại `traces/run-3.jsonl`.
+
+Mô phỏng chi phí Lượt 3: 50 phiên, seed 42, đạt 12/30 (40%); kết quả tại `cost/simulate-2-summary.md` và dữ liệu tại `cost/simulate-2.csv`. Chi phí/task thành công theo cấu hình mô phỏng là `$0.00031` (gemini-3.1-flash-lite) và `$0.0017` (gemini-4-hydrogen). Các giá, persona và quy mô vẫn là giả định trong file cấu hình; cần bổ sung nguồn trước khi coi đây là dự báo thực tế.

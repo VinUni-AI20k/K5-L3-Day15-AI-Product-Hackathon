@@ -481,12 +481,12 @@ function ProductListBody({
               </span>
             }
             title="Chưa có sản phẩm nào trong hệ thống"
-            description="Đơn vị này chưa đồng bộ lần nào, hoặc lần đồng bộ gần nhất không đọc được mã nào. Mở màn Đồng bộ dữ liệu, kiểm tra nguồn Drive/Sheet rồi chạy đồng bộ."
+            description="Đơn vị này chưa nhập sản phẩm nào. Mở màn Kết nối dữ liệu để tải file sản phẩm lên."
             actions={
               <Button
                 variant="primary"
-                label="Mở màn Đồng bộ dữ liệu"
-                onClick={() => router.push("/sync")}
+                label="Mở màn Kết nối dữ liệu"
+                onClick={() => router.push("/data-mapping")}
               />
             }
           />

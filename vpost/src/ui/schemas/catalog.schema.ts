@@ -185,6 +185,24 @@ export const UploadCatalogFileResponseSchema = z.object({
 });
 export type UploadCatalogFileResponse = z.infer<typeof UploadCatalogFileResponseSchema>;
 
+// --- VPOST: nhập file sản phẩm vào backend Python (POST /api/vpost/catalog) --
+
+/** Backend Python đọc cả .xlsx lẫn .csv và tự nhận tên cột (mã, giá, size, màu, ảnh…). */
+export const PRODUCT_FILE_ACCEPT =
+  ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
+
+/** Mirrors the 10 MB cap in `codebase/vpost_api.py` (upload_catalog). */
+export const MAX_PRODUCT_FILE_BYTES = 10 * 1024 * 1024;
+
+export const ProductFileImportResponseSchema = z.object({
+  /** Số mã đã nhập — gồm cả mã thiếu thông tin. */
+  rows: z.number(),
+  codes: z.array(z.string()),
+  /** Chỉ dòng không có mã hoặc trùng mã. */
+  skipped: z.array(z.object({ line: z.number(), reason: z.string() })),
+});
+export type ProductFileImportResponse = z.infer<typeof ProductFileImportResponseSchema>;
+
 /** "2,4 MB" / "812 KB" — decimal, the way a file manager reads. */
 export function formatFileBytes(sizeBytes: number | null | undefined): string {
   if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes) || sizeBytes < 0) return "—";

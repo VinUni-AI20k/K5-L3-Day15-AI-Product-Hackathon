@@ -92,6 +92,8 @@ def process_row(row, page=None, model=call_model):
 
     c = check_product(row, page)
     res["warnings"] += ["%s: %s" % w for w in c["warn"]]
+    if not rules.parse_images(row.get("anh")):
+        c["hard"].append(("anh", "chưa có ảnh sản phẩm hoặc ô ảnh không có link hợp lệ"))
     if c["hard"]:
         res["reasons"] = c["hard"]
         note("dừng: lỗi cứng ở bước kiểm dòng, không gọi AI")

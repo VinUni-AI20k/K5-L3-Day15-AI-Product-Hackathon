@@ -6,6 +6,7 @@ import {
   PRODUCTS_DEFAULT_LIMIT,
   type CatalogProductsResponse,
   type CatalogSourceResponse,
+  type ProductFileImportResponse,
   type ProductFilter,
   type UploadCatalogFileResponse,
 } from "@/ui/schemas/catalog.schema";
@@ -16,6 +17,7 @@ import {
   catalogKeys,
   fetchCatalogProductDetail,
   fetchCatalogSource,
+  importProductFile,
   listCatalogProducts,
   updateCatalogSource,
   uploadCatalogFile,
@@ -92,6 +94,20 @@ export function useUpdateCatalogSource() {
  * catalog is not rewritten until somebody runs a sync, and the screen says so
  * rather than implying the upload imported anything.
  */
+/** VPOST + backend Python: nhập file sản phẩm, rồi làm mới mọi danh sách sản phẩm. */
+export function useImportProductFile() {
+  const queryClient = useQueryClient();
+  const { tenantKey } = useActiveTenant();
+
+  return useMutation<ProductFileImportResponse, ApiError, File>({
+    mutationFn: (file) => importProductFile(file),
+    retry: false,
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["catalog", tenantKey, "products"] });
+    },
+  });
+}
+
 export function useUploadCatalogFile() {
   const queryClient = useQueryClient();
   const { tenantKey } = useActiveTenant();

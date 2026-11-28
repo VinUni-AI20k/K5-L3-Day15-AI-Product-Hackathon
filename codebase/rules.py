@@ -31,7 +31,7 @@ def fold(s):
 
 
 ALIASES = {
-    "ma_sp": ["ma_sp", "ma", "ma sp", "ma san pham", "ma hang", "code", "sku"],
+    "ma_sp": ["ma_sp", "ma", "ma sp", "ma san pham", "ma hang", "ma_hang", "code", "sku"],
     "ten_sp": ["ten_sp", "ten", "ten sp", "ten san pham"],
     "loai": ["loai", "chung loai", "loai san pham"],
     "gia_ban": ["gia_ban", "gia ban", "gia", "gia ban (theo anh)", "nguyen gia", "nguyen gia (bat buoc)", "gia tmdt lam tron",
@@ -226,6 +226,7 @@ COLORS = ["xanh dương", "xanh lá", "xanh navy", "xanh than", "xanh rêu", "xa
 SIZE_TOKEN = re.compile(r"(?<![\w])(XS|S|M|L|XL|XXL|2XL|3XL|4XL|5XL|Freesize|Free size|freesize)(?![\w])")
 MONEY = re.compile(r"(?<![\w.,])(\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)\s*(k|đ|₫|vnđ|vnd|tr|triệu|nghìn|ngàn)?(?![\w])", re.I)
 INJECTION = re.compile(r"(bỏ qua|phớt lờ|quên|ghi đè)\s+(hết\s+|mọi\s+|tất cả\s+|các\s+)*(hướng dẫn|chỉ dẫn|luật|quy tắc|lệnh)"
+                       r"|(?:bỏ qua|phớt lờ|ignore)\s+(?:bước|step)\s+.{0,80}\b(?:check_product|check_stock|verify_post)\b"
                        r"|ignore\s+(all|any|previous|the above|prior)|system prompt|developer message|you are now", re.I)
 NEGATION = ("không", "đừng", "tránh", "chớ", "chẳng", "ko", "k", "cấm")
 
@@ -359,9 +360,10 @@ def check_product(row, page, glob):
         warn.append(("chat_lieu", "thiếu chất liệu — bài không được nhắc chất liệu"))
     if not parse_images(row.get("anh")):
         warn.append(("anh", "chưa có ảnh sản phẩm — thêm ảnh trước khi duyệt" + (" (ô ảnh không có link hợp lệ)" if row.get("anh") else "")))
+    injected_fields = [f for f in ("mo_ta", "prompt", "ten_sp") if INJECTION.search(row.get(f, ""))]
     # mô tả mâu thuẫn với trường
     desc = row.get("mo_ta", "")
-    if desc:
+    if desc and "mo_ta" not in injected_fields:
         mats_desc, mats_field = materials_in(desc), materials_in(row.get("chat_lieu"))
         if row.get("chat_lieu") and mats_desc - mats_field:
             hard.append(("mo_ta", "mô tả nói chất %s, trường chất liệu là '%s'" % (", ".join(sorted(mats_desc - mats_field)), row["chat_lieu"])))
@@ -375,8 +377,18 @@ def check_product(row, page, glob):
         bad = [s for s in SIZE_TOKEN.findall(desc) if sizes and parse_sizes(s) and not set(parse_sizes(s)) <= set(sizes)]
         if bad:
             hard.append(("mo_ta", "mô tả nhắc size %s, trường size là '%s'" % (", ".join(bad), row.get("size"))))
+        name = fold(row.get("ten_sp"))
+        desc_folded = fold(desc)
+        name_short = re.search(r"\b(?:ngan tay|tay ngan)\b", name)
+        name_long = re.search(r"\b(?:dai tay|tay dai)\b", name)
+        desc_short = re.search(r"\b(?:ngan tay|tay ngan)\b", desc_folded)
+        desc_long = re.search(r"\b(?:dai tay|tay dai)\b", desc_folded)
+        if (name_short and desc_long) or (name_long and desc_short):
+            hard.append(("mo_ta", "mô tả mâu thuẫn độ dài tay áo với tên sản phẩm"))
+    for p in _phrase_hits(desc, glob["banned"] + glob["brands"], negation_aware=True):
+        hard.append(("mo_ta", "mô tả chứa cụm quảng cáo hoặc thương hiệu không được phép"))
     # chèn lệnh / prompt đòi điều shop không được nói
-    for f in ("mo_ta", "prompt", "ten_sp"):
+    for f in injected_fields:
         if INJECTION.search(row.get(f, "")):
             hard.append((f, "có câu lệnh chèn vào dữ liệu — không làm theo"))
     for p in _phrase_hits(row.get("prompt"), glob["banned"] + glob["brands"], negation_aware=True):

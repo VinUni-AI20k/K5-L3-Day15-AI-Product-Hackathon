@@ -9,10 +9,12 @@ import {
   CatalogSourceResponseSchema,
   MAX_CATALOG_FILE_BYTES,
   PRODUCTS_DEFAULT_LIMIT,
+  ProductFileImportResponseSchema,
   UploadCatalogFileResponseSchema,
   formatFileBytes,
   type CatalogProductsResponse,
   type CatalogSourceResponse,
+  type ProductFileImportResponse,
   type ProductFilter,
   type UploadCatalogFileResponse,
 } from "@/ui/schemas/catalog.schema";
@@ -362,5 +364,37 @@ export async function uploadCatalogFile(
     timeoutMs: 120_000,
     malformedMessage:
       "Kết quả tải bảng dữ liệu lên không đúng định dạng. Hãy tải lại trang để xem nguồn đang được dùng.",
+  });
+}
+
+/**
+ * VPOST + backend Python: nhập file Excel/CSV sản phẩm, THAY toàn bộ danh mục.
+ * Dòng thiếu thông tin vẫn được nhập — chỉ bị chặn lúc soạn bài. Never retried
+ * automatically, for the same reason as `uploadCatalogFile`.
+ */
+export async function importProductFile(
+  file: File,
+  signal?: AbortSignal,
+): Promise<ProductFileImportResponse> {
+  if (!(file instanceof File) || file.size === 0) {
+    throw new ApiError({
+      code: "INVALID_INPUT",
+      status: 0,
+      message: "importProductFile requires a non-empty file",
+      userMessage: "Chưa chọn file, hoặc file rỗng (0 byte) — hãy chọn lại file sản phẩm.",
+    });
+  }
+
+  const form = new FormData();
+  form.set("file", file);
+
+  return apiRequest("/api/vpost/catalog", {
+    method: "POST",
+    body: form,
+    schema: ProductFileImportResponseSchema,
+    signal,
+    timeoutMs: 120_000,
+    malformedMessage:
+      "Kết quả nhập file sản phẩm không đúng định dạng. Hãy mở màn Sản phẩm để xem danh sách hiện tại.",
   });
 }

@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { getOperatorSession } from "@/app/_auth/session";
 import { DataMappingFallback } from "@/ui/components/onboarding/DataMappingFallback";
 import { DataMappingScreen } from "@/ui/components/onboarding/DataMappingScreen";
+import { ProductFileImport } from "@/ui/components/onboarding/ProductFileImport";
 
 /**
  * "Kết nối dữ liệu" (E10, onboarding phase 1). Server Component guard, client
@@ -30,6 +31,10 @@ export default async function DataMappingPage() {
   // Defence in depth: middleware already blocks this route, but a Server
   // Component must not trust that it was reached through the guard.
   if (!session) redirect("/signin?returnUrl=%2Fdata-mapping");
+
+  // VPOST_API_URL = /api/* đi sang backend Python (next.config.ts). Backend đó
+  // không có wizard /api/catalog/*, chỉ có POST /api/vpost/catalog.
+  if (process.env.VPOST_API_URL) return <ProductFileImport />;
 
   return (
     <Suspense fallback={<DataMappingFallback />}>
