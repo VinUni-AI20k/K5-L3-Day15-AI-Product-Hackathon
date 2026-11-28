@@ -8,6 +8,8 @@ Ba ví dụ dưới đây (OpenAI, Claude, Ollama) **đã chạy với key thậ
 
 ## 1. Điền `.env`
 
+Repo đã có adapter văn bản OpenAI. Sau khi điền cấu hình OpenAI, chạy `python3 run.py eval --try 1` để thử một câu OCR mẫu và xem số token. Đây là phép thử kết nối; ảnh hóa đơn và bước trích xuất bằng model thật cần được tích hợp riêng.
+
 Chép `.env.example` thành `.env`, điền 3 dòng. Ví dụ:
 
 ```
@@ -21,6 +23,8 @@ API_KEY=<key của nhóm, không dấu ngoặc kép>
 - `.env` đã có trong `.gitignore`. **Không commit key.**
 
 ## 2. Chép code vào `codebase/ai.py`
+
+Phần này dành cho nhóm muốn dùng nhà cung cấp khác hoặc cần xem ví dụ về kết nối.
 
 Giữ nguyên phần đầu file (`load_env`, các biến) và nhánh `fake`.
 1. Thêm 3 dòng `import` lên đầu file.

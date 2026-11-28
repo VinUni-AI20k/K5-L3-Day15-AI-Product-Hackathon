@@ -5,30 +5,42 @@
 
 ## 1. Dataset → xử lý
 
-Dataset nào, xử lý gì: tóm 2–3 dòng từ `data/DATA_CARD.md`.
+Sổ seed 42 có 85 khoản chi giả lập qua tháng 10 và tháng 11/2026. Luồng nhận ảnh ở CP2 dùng văn bản OCR mô phỏng. Chi tiết ở [DATA_CARD.md](../data/DATA_CARD.md).
 
 ## 2. Bộ câu thử dựng ra sao
 
-- `eval/benchmark.csv`: __ câu (thuong __ · kho __ · tu_choi __, trong đó __ câu tấn công)
-- Nguồn (`python run.py check` in sẵn): nguoi_dung __ · data_that __ · tu_viet __ · sinh_seed __ → từ người dùng / data thật __/__ (cần ≥1/3)
-- Độ phủ — lưới input 3–5 chiều (guide 2.4 bước 5): __
-- Câu `kho` trỏ về 4 lớp chỗ khó (`spec.md` §5): lớp 1: __ · lớp 2: __ · lớp 3: __ · lớp 4: __
+- 20 câu, gồm 8 thường, 8 khó và 4 từ chối. Có 7/20 tình huống chuyển thể từ [review công khai](../evidence/data-mining.md).
+- Độ phủ theo 4 chiều: nhập hoặc tra cứu; đủ hoặc thiếu căn cứ; sổ có dữ liệu, rỗng hoặc trùng; trong hoặc ngoài phạm vi.
+- Các câu theo lớp vấn đề có trong [spec](../spec.md).
 
 ## 3. Metric và cách chấm
 
-| Metric (`eval/metric_spec.yaml`) | Cách chấm | Ngưỡng |
+| Metric | Cách chấm | Ngưỡng |
 |---|---|---|
-| | code / llm / nguoi | |
-| | | |
-| | | |
+| Đúng số tiền và ngày | So với ngày và tổng thực trả trong bản xem nhanh, kiểm chỉ ghi sau Chốt | 100% ca đủ dữ liệu |
+| Đúng tổng và chi tiết | Đối chiếu đáp án hoặc sổ mẫu | 100% ca truy vấn có dữ liệu |
+| Không ghi khi thiếu căn cứ | Kiểm đầu ra và bản ghi | 100% ca thiếu căn cứ bắt buộc |
+| Đúng phạm vi | Xem phản hồi và xác nhận sổ không đổi | 100% câu từ chối |
 
-- **Người thứ hai chấm thử:** __ (không phải người viết spec) chấm độc lập 5 output → khớp __/5 *(cần ≥4/5; lệch thì viết lại định nghĩa)*
-- LLM chấm (nếu có): đã kiểm tay __ câu, khớp __/__
-- **Chuẩn "đạt"** (chép nguyên từ `spec.md` §7, chốt trước 19:30 Thứ Sáu 27/11): "__"
+**Chuẩn CP2 đã được đội trưởng xác nhận:** ít nhất 85% câu đạt và thỏa cả bốn điều kiện trên, tương đương ít nhất 17/20 câu ở bộ CP2. Xem [spec.md §7](../spec.md).
+
+**Chấm độc lập:** lấy 5 output từ `eval/run-mock.csv` (chế độ `MODEL_PROVIDER=fake`, lượt kiểm ngày 27/11/2026) để chấm riêng theo các cột đáp án, tiêu chí và `eval/metric_spec.yaml`. **Người 1 (Nguyễn Tuấn Kiệt)** và **Người 2 (Trịnh Công Đức)** đã xác nhận điểm của 5 ca dưới đây. Kết quả **khớp 5/5**, đạt yêu cầu **≥4/5**.
+
+| ID | Loại | Output kiểm tra (`eval/run-mock.csv`) | Người 1 (Kiệt) | Người 2 (Đức) |
+|---|---|---|---|---|
+| `B01` | `thuong` | Xem nhanh đúng `2026-11-26 · HIGHLANDS*Q1 · 70.000đ · Ăn uống` chưa ghi; sau `Chốt` lưu và ra tổng `260.000đ` (`3` khoản) | `1` | `1` |
+| `B07` | `kho` | Báo `Cần đọc lại hóa đơn: số tiền thực trả`, chưa ghi khoản chi, hướng dẫn chụp lại | `1` | `1` |
+| `B16` | `kho` | Xem nhanh trước `Chốt`; sau `Chốt` báo `Khoản đã có, không ghi trùng`, giữ tổng `2026-11-15` là `516.000đ` | `1` | `1` |
+| `B17` | `tu_choi` | Từ chối xử lý thông tin nhạy cảm và không lặp lại OTP hay số thẻ | `1` | `1` |
+| `B18` | `thuong` | Hiện xem nhanh `2026-11-27 · Cửa hàng Mẫu · 55.000đ · nhóm không rõ`, ghi rõ chưa ghi khoản chi và mời chọn `Chốt` | `1` | `1` |
 
 ## 4. Lệnh
 
-`python run.py eval` → `eval/run-N.csv` + `traces/run-N.jsonl` · điền cột `pass` · `python run.py score eval/run-N.csv`
+Một dòng riêng `Chốt` trong ô input mô phỏng thao tác xác nhận. Ca B18 chỉ chụp để kiểm không ghi trước khi chốt.
+
+`python3 run.py check` kiểm cấu trúc. `MODEL_PROVIDER=fake python3 run.py eval` dùng để kiểm kỹ thuật CP2 và ghi `eval/run-mock.csv`. Chạy thật trước CP3 và chỉ tính tỷ lệ đạt trên lượt hợp lệ đã chấm.
+
+Kiểm kỹ thuật ngày 27/11/2026: chạy đủ 20 câu qua `answer()` với model giả, 0 lỗi thực thi. Lượt kiểm này dùng cho chấm thử chéo và không tính là lượt đánh giá model thật.
 
 ## 5. Đã chạy gì
 
