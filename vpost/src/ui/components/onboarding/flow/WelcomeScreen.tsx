@@ -46,6 +46,8 @@ export function WelcomeScreen({
   name: string | null;
   onStart: () => void;
 }) {
+  const displayName = name?.trim() ?? "";
+
   return (
     <div className="flex flex-col items-center gap-4">
       {/*
@@ -70,8 +72,10 @@ export function WelcomeScreen({
           is nullable. So a nameless account gets a greeting with no name rather
           than an invented one.
         */}
-        <span className="block">{name === null ? "Hey you 👋" : `Hello ${name} 👋`}</span>
-        <span className="block">Welcome To VPost</span>
+        <span className="block">
+          {displayName.length === 0 ? "Chào bạn 👋" : `Chào ${displayName} 👋`}
+        </span>
+        <span className="block">Chào mừng tới VPOST</span>
       </h1>
 
       {/*

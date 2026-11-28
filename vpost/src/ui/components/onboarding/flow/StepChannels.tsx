@@ -44,7 +44,7 @@ const CHOICES: readonly ChannelTileChoice[] = FOCUS_CHANNELS.map((value) => ({
   isComingSoon: !AVAILABLE_CHANNELS.includes(value),
 }));
 
-const QUESTION = "Các kênh bạn đang tập trung";
+const QUESTION = "Kênh nào bạn đang tập trung?";
 
 /** Narrowing at the boundary: the group hands back a `string`. */
 function isFocusChannel(value: string): value is FocusChannel {
