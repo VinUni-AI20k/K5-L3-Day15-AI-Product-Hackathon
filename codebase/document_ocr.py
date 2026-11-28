@@ -597,8 +597,6 @@ def read_paid_total(lines) -> int:
     noisy = False
     for line in lines:
         normalized = _StripVietnameseAccents(line).strip()
-        if "chua ro thuc tra" in normalized or "nhieu muc tong chua ro" in normalized:
-            return 0
         field = _payment_field(normalized)
         if field in amounts:
             row_amounts = set()
