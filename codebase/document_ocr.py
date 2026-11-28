@@ -623,8 +623,11 @@ ImageTotalMediumPattern = re.compile(r"(cong\s*tien\s*hang|cong\s*tien|thanh\s*t
 ImageTotalLowPattern = re.compile(r"(tong\s*tien\s*hang)")
 ImageSkipRowPattern = re.compile(
     r"(tien\s*khach|tien\s*dua|khach\s*(?:dua|tra)|tien\s*thua|tien\s*mat|tra\s*lai|change|cash|"
-    r"don\s*gia|thanh\s*tien|ten\s*hang|tong\s*so\b(?!\s*(?:tien|thanh))|so\s*luong)"
+    r"don\s*gia|thanh\s*tien|ten\s*hang)"
 )
+# Dòng số lượng ("Tổng số lượng hàng: 2"): bỏ, trừ khi OCR gộp nó với dòng tổng mạnh trên cùng hàng ngang
+# ("Tong so tien thanh toan: Tong so luong hang: 18,200.00", ảnh quwvb). Số lượng < 1000 nên không lẫn vào giá.
+ImageQuantityRowPattern = re.compile(r"(tong\s*so\b(?!\s*(?:tien|thanh))|so\s*luong)")
 ImageDiscountPattern = re.compile(r"(chiet\s*khau|giam\s*gia|khuyen\s*mai)")
 ImagePricePattern = re.compile(r"(?<!\d)(\d{1,3}(?:\.\d{3})+|\d{1,3}(?:,\d{3})+|\d{4,7})(?!\d)")
 ImageSpacePricePattern = re.compile(r"(?<!\d)(\d{1,3}\s\d{3})(?!\d)")
@@ -651,10 +654,11 @@ def read_image_total(LogicalRows: list) -> int:
     PendingPriority = 0
     for RowItem in LogicalRows:
         Normalized = re.sub(r"^[^a-z0-9]+", "", _StripVietnameseAccents(RowItem["text"]))
-        if ImageSkipRowPattern.search(Normalized):
+        HighTotal = ImageTotalHighPattern.search(Normalized)
+        if ImageSkipRowPattern.search(Normalized) or (ImageQuantityRowPattern.search(Normalized) and not HighTotal):
             PendingPriority = 0
             continue
-        Priority = (3 if ImageTotalHighPattern.search(Normalized) else 2 if ImageTotalMediumPattern.search(Normalized)
+        Priority = (3 if HighTotal else 2 if ImageTotalMediumPattern.search(Normalized)
                     else 1 if ImageTotalLowPattern.search(Normalized) else 0)
         Prices = _ImageRowPrices(RowItem["text"], AllowSpace=bool(Priority or PendingPriority))
         if PendingPriority and Prices and not Priority:

@@ -14,7 +14,12 @@ import tracing
 
 def truth_amounts(label: str) -> set[int]:
     """Các số tiền trong nhãn MC-OCR: 35,500 · 253.000 253.000 · 39 000 · UHD510510.760 (dính chữ/số phía trước)."""
-    formatted = re.findall(r"(?=(\d{1,3}(?:[.,]\d{3})+)(?!\d))", label)
+    # Dò chồng lấn để tách số dính chữ số phía trước, nhưng mỗi điểm kết thúc chỉ giữ số dài nhất:
+    # "60,500" là 60500, không chấm "đúng" cho mảnh đuôi 500 hay 0,500.
+    longest = {}
+    for match in re.finditer(r"(?=(\d{1,3}(?:[.,]\d{3})+)(?!\d))", label):
+        longest.setdefault(match.end(1), match[1])
+    formatted = list(longest.values())
     spaced = re.findall(r"(?<![\d.,])(\d{1,3} \d{3})(?![\d.,])", label)
     plain = re.findall(r"(?<![\d.,])(\d{4,9})(?![\d.,])", label)
     return {int(re.sub(r"\D", "", token)) for token in formatted + spaced + plain}
