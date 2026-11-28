@@ -17,12 +17,16 @@ import { AlertCircle, MessageSquare, Sparkles } from "lucide-react";
 import { useId, useState, type FocusEvent, type KeyboardEvent } from "react";
 
 import { AGENT_RUN_ROW_INDICATOR_LABEL } from "@/ui/components/inbox/agent-run-state";
+import {
+  formatInboxCustomerName,
+  formatInboxThreadAccessibleContext,
+  isAnonymousCustomerName,
+  resolveThreadFirstMessageAt,
+} from "@/ui/components/inbox/inbox-customer-label";
 import { InboxCustomerAvatar } from "@/ui/components/inbox/InboxCustomerAvatar";
 import {
-  displayCommentAuthor,
   formatCommentAbsoluteTime,
   formatCommentRelativeTime,
-  formatThreadAccessibleContext,
   formatThreadLastMessageExcerpt,
   type InboxThread,
 } from "@/ui/schemas/inbox.schema";
@@ -33,6 +37,7 @@ const MAX_VISIBLE_TAGS = 2;
 
 export interface ConversationListItemProps {
   readonly thread: InboxThread;
+  readonly firstMessageAt?: string | null;
   readonly nowMs: number;
   readonly isSelected: boolean;
   readonly isBulkMode: boolean;
@@ -54,6 +59,7 @@ export interface ConversationListItemProps {
  */
 export function ConversationListItem({
   thread,
+  firstMessageAt,
   nowMs,
   isSelected,
   isBulkMode,
@@ -67,9 +73,17 @@ export function ConversationListItem({
   const attentionDescId = useId();
   const [isAttentionTooltipFocused, setIsAttentionTooltipFocused] = useState(false);
 
-  const customerName = displayCommentAuthor(thread.customer.name);
+  const resolvedFirstMessageAt = firstMessageAt ?? resolveThreadFirstMessageAt(thread);
+  const isAnonymous = isAnonymousCustomerName(thread.customer.name);
+  const customerName = formatInboxCustomerName(
+    thread.customer.name,
+    resolvedFirstMessageAt,
+  );
   const excerpt = formatThreadLastMessageExcerpt(thread.lastMessage);
-  const accessibleContext = formatThreadAccessibleContext(thread);
+  const accessibleContext = formatInboxThreadAccessibleContext(
+    thread,
+    resolvedFirstMessageAt,
+  );
   const relativeTime = formatCommentRelativeTime(thread.updatedAt, nowMs);
   const absoluteTime = formatCommentAbsoluteTime(thread.updatedAt);
 
@@ -159,7 +173,9 @@ export function ConversationListItem({
             ) : null}
             <InboxCustomerAvatar
               customerId={thread.customer.id}
+              threadId={thread.id}
               name={customerName}
+              isAnonymous={isAnonymous}
               size="md"
             />
           </HStack>

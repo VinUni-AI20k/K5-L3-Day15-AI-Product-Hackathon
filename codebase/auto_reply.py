@@ -8,9 +8,11 @@ Nguyên tắc cốt lõi:
   `data/auto_reply_rules.json` (tối đa 80 ký tự, đúng 1 câu).
 - Mọi trường hợp khác (châm biếm, khen, cảm ơn, khiếu nại, câu hỏi hỗn hợp, số đo, sản phẩm/mã khác, trích dẫn,
   chỉ emoji, bình luận phản hồi trong chuỗi...) đều gắn nhãn 'Cần bạn' cho nhân viên xử lý.
-- Các lớp bảo vệ an toàn được giữ nguyên: kill switch, chế độ dry-run, trần giờ/ngày, cooldown khách, idempotency,
-  khoá tư vấn theo Page (kiểm tra lại cả danh sách intents dưới khoá), kiểm tra đầu ra (`verify_post`), cùng lớp
-  phát hiện URL và prompt-injection bổ sung.
+- Các lớp bảo vệ an toàn được giữ nguyên và mở rộng cho khách thật (Facebook ẩn `from.id`): kill switch, chế độ dry-run,
+  trần giờ/ngày theo Page, idempotency theo bình luận (`auto:<comment_id>`), cooldown theo hội thoại (1 lần/10 phút),
+  giới hạn tốc độ theo bài đăng (tối đa 10 lần/bài/10 phút), chống spam lặp nguyên văn theo bài đăng trong 10 phút
+  không phân biệt tác giả, giữ thêm lớp cooldown/spam theo khách khi có `from_id`, khoá tư vấn theo Page (kiểm tra lại
+  cả danh sách intents dưới khoá), kiểm tra đầu ra (`verify_post`), cùng lớp phát hiện URL và prompt-injection bổ sung.
 
 Log tuyệt đối KHÔNG chứa nội dung tin nhắn khách hàng hay token Facebook.
 """
@@ -47,6 +49,10 @@ _INTENT_LABELS = {"price": "giá", "size": "size", "color": "màu"}
 DEFAULT_MAX_CHARS = 300
 DEFAULT_MAX_ALLOW_CHARS = 80
 DEFAULT_COOLDOWN_MINUTES = 10
+DEFAULT_POST_RATE_LIMIT = 10
+DEFAULT_POST_RATE_WINDOW_MINUTES = 10
+DEFAULT_POST_SPAM_THRESHOLD = 5
+DEFAULT_POST_SPAM_WINDOW_MINUTES = 10
 
 # Giữ thuộc tính tương thích ngược; mô hình allowlist tuyệt đối KHÔNG gọi AI để phân loại hay sinh câu trả lời.
 MODEL = None
@@ -298,6 +304,41 @@ def _recent_customer_texts(
         if cdt is None or (lo <= cdt <= hi):
             out.append(str(r.get("message") or ""))
     return out
+
+
+def _normalize_for_spam(text: str) -> str:
+    """Chuẩn hoá văn bản để nhận diện spam lặp nội dung (kể cả ký tự vô hình / homoglyph / dấu câu thừa)."""
+    cleaned = _fold_homoglyphs(_strip_invisible(unicodedata.normalize("NFKC", str(text or ""))))
+    return moderation.normalize_text(cleaned)
+
+
+def _recent_post_texts(
+    tenant_id: str,
+    page_id: str,
+    fb_post_id: str,
+    ref_dt: datetime,
+    *,
+    window_minutes: int = DEFAULT_POST_SPAM_WINDOW_MINUTES,
+) -> list[str]:
+    """Lấy bình luận khách trên cùng bài đăng trong cửa sổ `window_minutes` phút (không phân biệt tác giả)."""
+    if not page_id or not fb_post_id:
+        return []
+    lo = ref_dt - timedelta(minutes=window_minutes)
+    hi = ref_dt + timedelta(minutes=2)
+    rows = store.list_post_customer_comments(tenant_id, page_id, fb_post_id)
+    out: list[str] = []
+    for r in rows:
+        cdt = facebook.parse_time(r.get("created_time"))
+        if cdt is None or (lo <= cdt <= hi):
+            out.append(str(r.get("message") or ""))
+    return out
+
+
+def _count_post_identical_texts(message: str, post_texts: Iterable[str]) -> int:
+    norm_self = _normalize_for_spam(message)
+    if not norm_self:
+        return 0
+    return sum(1 for item in post_texts if _normalize_for_spam(item) == norm_self)
 
 
 def _now_z() -> str:
@@ -563,10 +604,15 @@ def _compile_rules(raw: dict) -> dict:
             "ascii_re": re.compile(ascii_pat) if ascii_pat else None,
         })
 
+    cooldown_minutes = int(raw.get("cooldown_minutes") or DEFAULT_COOLDOWN_MINUTES)
     return {
         "max_chars": int(raw.get("max_chars") or DEFAULT_MAX_CHARS),
         "max_allow_chars": int(raw.get("max_allow_chars") or DEFAULT_MAX_ALLOW_CHARS),
-        "cooldown_minutes": int(raw.get("cooldown_minutes") or DEFAULT_COOLDOWN_MINUTES),
+        "cooldown_minutes": cooldown_minutes,
+        "post_rate_limit": int(raw.get("post_rate_limit") or DEFAULT_POST_RATE_LIMIT),
+        "post_rate_window_minutes": int(raw.get("post_rate_window_minutes") or DEFAULT_POST_RATE_WINDOW_MINUTES),
+        "post_spam_threshold": int(raw.get("post_spam_threshold") or DEFAULT_POST_SPAM_THRESHOLD),
+        "post_spam_window_minutes": int(raw.get("post_spam_window_minutes") or DEFAULT_POST_SPAM_WINDOW_MINUTES),
         "injection": _compile_guarded_phrases(raw.get("injection_markers") or ()),
         "polite_leading_vi": _normalize_polite_list(pl.get("vi") or ()),
         "polite_leading_ascii": _normalize_polite_list(pl.get("ascii") or ()),
@@ -1126,6 +1172,7 @@ def _record_rejection(
     tenant_id: str,
     *,
     page_id: str,
+    fb_post_id: str = "",
     thread_id: str,
     comment_id: str,
     from_id: str,
@@ -1144,6 +1191,7 @@ def _record_rejection(
     store.append_auto_reply_log(
         tenant_id,
         page_id=page_id,
+        fb_post_id=fb_post_id,
         thread_id=thread_id,
         comment_id=comment_id,
         from_id=from_id,
@@ -1182,6 +1230,7 @@ def _evaluate_comment(
     compiled: dict,
     rules_cfg: Optional[dict] = None,
     recent_texts: Optional[list[str]] = None,
+    post_recent_texts: Optional[list[str]] = None,
     failed_pages: Optional[set[str]] = None,
     ref_dt: datetime,
     ts: str,
@@ -1268,19 +1317,15 @@ def _evaluate_comment(
     if has_prompt_injection(message, rules_cfg=rules_cfg):
         return {"status": "reject", "reason": "Phát hiện dấu hiệu chèn lệnh (prompt injection)", "intents": []}
 
-    if not from_id:
-        return {
-            "status": "reject",
-            "reason": "Bình luận không có mã người gửi (from_id trống) — không thể áp dụng chống spam/cooldown",
-            "intents": [],
-        }
+    fb_post_id = str(comment.get("fb_post_id") or (post_job.get("fb_post_id") if post_job else "") or "").strip()
 
-    fb_post_id = str(comment.get("fb_post_id") or "").strip()
-    recents = (
-        recent_texts
-        if recent_texts is not None
-        else _recent_customer_texts(tenant_id, page_id, from_id, fb_post_id, ref_dt)
-    )
+    # Lớp chống kiểm duyệt & chống spam lặp theo khách (khi có from_id; khi from_id trống vẫn chạy kiểm duyệt nội dung)
+    if recent_texts is not None:
+        recents = recent_texts
+    elif from_id:
+        recents = _recent_customer_texts(tenant_id, page_id, from_id, fb_post_id, ref_dt)
+    else:
+        recents = []
     mod_hit = moderation.classify_by_rules(
         message,
         pii_detector=rules.find_pii_spans,
@@ -1289,18 +1334,62 @@ def _evaluate_comment(
     if mod_hit is not None and mod_hit.get("category") in ("abusive", "spam", "scam", "pii", "complaint"):
         return {"status": "reject", "reason": _moderation_block_reason(mod_hit["category"]), "intents": []}
 
-    cooldown_minutes = compiled["cooldown_minutes"]
-    if check_cooldown and store.has_recent_auto_reply_for_customer(
-        tenant_id,
-        page_id,
-        from_id,
-        ref_dt - timedelta(minutes=cooldown_minutes),
-    ):
+    # Chống spam lặp nội dung giống nhau trên cùng bài đăng trong 10 phút, không phân biệt tác giả (kể cả from_id trống)
+    post_spam_window = compiled["post_spam_window_minutes"]
+    post_spam_threshold = compiled["post_spam_threshold"]
+    p_recents = (
+        post_recent_texts
+        if post_recent_texts is not None
+        else _recent_post_texts(tenant_id, page_id, fb_post_id, ref_dt, window_minutes=post_spam_window)
+    )
+    if _count_post_identical_texts(message, p_recents) >= post_spam_threshold:
         return {
             "status": "reject",
-            "reason": "Khách hàng này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
+            "reason": "Phát hiện spam lặp cùng nội dung trên bài đăng trong vòng %d phút gần đây" % post_spam_window,
             "intents": [],
         }
+
+    cooldown_minutes = compiled["cooldown_minutes"]
+    post_rate_limit = compiled["post_rate_limit"]
+    post_rate_window = compiled["post_rate_window_minutes"]
+    if check_cooldown:
+        # 1. Cooldown theo hội thoại: tối đa 1 câu tự động trả lời mỗi hội thoại trong 10 phút
+        if store.has_recent_auto_reply_for_thread(
+            tenant_id,
+            thread_id,
+            ref_dt - timedelta(minutes=cooldown_minutes),
+        ):
+            return {
+                "status": "reject",
+                "reason": "Hội thoại này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
+                "intents": [],
+            }
+
+        # 2. Giới hạn tốc độ theo bài đăng: tối đa 10 câu tự động trả lời mỗi bài trong 10 phút
+        if fb_post_id and store.count_auto_replies_for_post_since(
+            tenant_id,
+            fb_post_id,
+            ref_dt - timedelta(minutes=post_rate_window),
+        ) >= post_rate_limit:
+            return {
+                "status": "reject",
+                "reason": "Bài đăng đã đạt giới hạn %d lượt tự động trả lời trong vòng %d phút gần đây"
+                % (post_rate_limit, post_rate_window),
+                "intents": [],
+            }
+
+        # 3. Lớp bảo vệ bổ sung theo khách hàng khi có from_id
+        if from_id and store.has_recent_auto_reply_for_customer(
+            tenant_id,
+            page_id,
+            from_id,
+            ref_dt - timedelta(minutes=cooldown_minutes),
+        ):
+            return {
+                "status": "reject",
+                "reason": "Khách hàng này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
+                "intents": [],
+            }
 
     # ---------- BƯỚC 2: Allowlist Intent ----------
     intent_res = classify_intent(message, rules_cfg=rules_cfg)
@@ -1419,6 +1508,7 @@ def _evaluate_comment(
         "intents": sorted_ints,
         "reply_text": reply_text,
         "product_code": product_code,
+        "fb_post_id": fb_post_id,
     }
 
 
@@ -1492,6 +1582,7 @@ def process_comment(
     _later_in_tick: Optional[list[dict]] = None,
     _replied_threads_in_tick: Optional[set[str]] = None,
     _thread_id: Optional[str] = None,
+    _post_recent_texts: Optional[list[str]] = None,
 ) -> dict:
     """Chạy đúng 7 bước của pipeline cho MỘT bình luận khách hàng."""
     import vpost_api
@@ -1502,6 +1593,7 @@ def process_comment(
 
     thread_id = _thread_id or store.resolve_thread_root_id(tenant_id, comment)
     page_id = _comment_page_id(comment)
+    fb_post_id = str(comment.get("fb_post_id") or "").strip()
     from_id = str(comment.get("from_id") or "").strip()
     ref_dt = now_dt or _now()
     ts = schedule.iso_z(ref_dt)
@@ -1529,6 +1621,7 @@ def process_comment(
         return _record_rejection(
             tenant_id,
             page_id=page_id,
+            fb_post_id=fb_post_id,
             thread_id=thread_id,
             comment_id=cid,
             from_id=from_id,
@@ -1551,6 +1644,7 @@ def process_comment(
         compiled=compiled,
         rules_cfg=rules_cfg,
         recent_texts=recent_texts,
+        post_recent_texts=_post_recent_texts,
         failed_pages=failed_pages,
         ref_dt=ref_dt,
         ts=ts,
@@ -1560,6 +1654,7 @@ def process_comment(
         return _record_rejection(
             tenant_id,
             page_id=page_id,
+            fb_post_id=fb_post_id,
             thread_id=thread_id,
             comment_id=cid,
             from_id=from_id,
@@ -1570,6 +1665,7 @@ def process_comment(
 
     sorted_ints = ev["intents"]
     reply_text = ev["reply_text"]
+    fb_post_id = ev.get("fb_post_id") or fb_post_id
 
     # Nếu hội thoại đang mang nhãn 'can_ban' chưa được nhân viên xử lý → không tự động trả lời đè lên
     existing_att = store.get_thread_attentions(tenant_id, [thread_id]).get(thread_id)
@@ -1577,6 +1673,7 @@ def process_comment(
         return _record_rejection(
             tenant_id,
             page_id=page_id,
+            fb_post_id=fb_post_id,
             thread_id=thread_id,
             comment_id=cid,
             from_id=from_id,
@@ -1604,6 +1701,7 @@ def process_comment(
         return _record_rejection(
             tenant_id,
             page_id=page_id,
+            fb_post_id=fb_post_id,
             thread_id=thread_id,
             comment_id=cid,
             from_id=from_id,
@@ -1618,6 +1716,7 @@ def process_comment(
         return _record_rejection(
             tenant_id,
             page_id=page_id,
+            fb_post_id=fb_post_id,
             thread_id=thread_id,
             comment_id=cid,
             from_id=from_id,
@@ -1630,6 +1729,7 @@ def process_comment(
         store.append_auto_reply_log(
             tenant_id,
             page_id=page_id,
+            fb_post_id=fb_post_id,
             thread_id=thread_id,
             comment_id=cid,
             from_id=from_id,
@@ -1658,8 +1758,10 @@ def process_comment(
         }
 
     # Mode live: giữ khoá tư vấn theo (tenant_id, page_id) để tuần tự hoá kiểm tra đã trả lời,
-    # phạm vi hội thoại, intents đang bật (N11), cooldown khách, trần giờ/ngày, gửi Facebook và ghi log.
+    # phạm vi hội thoại, intents đang bật (N11), cooldown hội thoại/bài đăng/khách, trần giờ/ngày, gửi FB và ghi log.
     cooldown_minutes = compiled["cooldown_minutes"]
+    post_rate_limit = compiled["post_rate_limit"]
+    post_rate_window = compiled["post_rate_window_minutes"]
     with store.auto_reply_page_lock(tenant_id, page_id):
         if store.has_sent_auto_reply_for_comment(tenant_id, cid):
             return {
@@ -1684,6 +1786,7 @@ def process_comment(
             return _record_rejection(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,
@@ -1697,6 +1800,7 @@ def process_comment(
             return _record_rejection(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,
@@ -1710,6 +1814,7 @@ def process_comment(
             return _record_rejection(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,
@@ -1727,6 +1832,7 @@ def process_comment(
             return _record_rejection(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,
@@ -1743,6 +1849,7 @@ def process_comment(
             return _record_rejection(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,
@@ -1755,6 +1862,7 @@ def process_comment(
             store.append_auto_reply_log(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,
@@ -1774,8 +1882,43 @@ def process_comment(
                 "text": reply_text,
             }
 
-        # Kiểm tra lại cooldown khách dưới khoá để chặn race hai luồng cùng khách
-        if store.has_recent_auto_reply_for_customer(
+        # Kiểm tra lại cooldown theo hội thoại, tốc độ theo bài đăng và (khi có from_id) cooldown theo khách dưới khoá
+        if store.has_recent_auto_reply_for_thread(
+            tenant_id,
+            thread_id,
+            ref_dt - timedelta(minutes=cooldown_minutes),
+        ):
+            return _record_rejection(
+                tenant_id,
+                page_id=page_id,
+                fb_post_id=fb_post_id,
+                thread_id=thread_id,
+                comment_id=cid,
+                from_id=from_id,
+                intents=sorted_ints,
+                reason="Hội thoại này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
+                ts=ts,
+            )
+
+        if fb_post_id and store.count_auto_replies_for_post_since(
+            tenant_id,
+            fb_post_id,
+            ref_dt - timedelta(minutes=post_rate_window),
+        ) >= post_rate_limit:
+            return _record_rejection(
+                tenant_id,
+                page_id=page_id,
+                fb_post_id=fb_post_id,
+                thread_id=thread_id,
+                comment_id=cid,
+                from_id=from_id,
+                intents=sorted_ints,
+                reason="Bài đăng đã đạt giới hạn %d lượt tự động trả lời trong vòng %d phút gần đây"
+                % (post_rate_limit, post_rate_window),
+                ts=ts,
+            )
+
+        if from_id and store.has_recent_auto_reply_for_customer(
             tenant_id,
             page_id,
             from_id,
@@ -1784,6 +1927,7 @@ def process_comment(
             return _record_rejection(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,
@@ -1799,6 +1943,7 @@ def process_comment(
             return _record_rejection(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,
@@ -1826,6 +1971,7 @@ def process_comment(
                 return _record_rejection(
                     tenant_id,
                     page_id=page_id,
+                    fb_post_id=fb_post_id,
                     thread_id=thread_id,
                     comment_id=cid,
                     from_id=from_id,
@@ -1847,6 +1993,7 @@ def process_comment(
                 return _record_rejection(
                     tenant_id,
                     page_id=page_id,
+                    fb_post_id=fb_post_id,
                     thread_id=thread_id,
                     comment_id=cid,
                     from_id=from_id,
@@ -1859,6 +2006,7 @@ def process_comment(
                 return _record_rejection(
                     tenant_id,
                     page_id=page_id,
+                    fb_post_id=fb_post_id,
                     thread_id=thread_id,
                     comment_id=cid,
                     from_id=from_id,
@@ -1879,6 +2027,7 @@ def process_comment(
             res = _record_rejection(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,
@@ -1905,6 +2054,7 @@ def process_comment(
             res = _record_rejection(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,
@@ -1931,6 +2081,7 @@ def process_comment(
             res = _record_rejection(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,
@@ -1960,6 +2111,7 @@ def process_comment(
         store.append_auto_reply_log(
             tenant_id,
             page_id=page_id,
+            fb_post_id=fb_post_id,
             thread_id=thread_id,
             comment_id=cid,
             from_id=from_id,
@@ -2031,9 +2183,12 @@ def run_auto_reply(
         by_thread.setdefault(tid, []).append(c)
 
     ref_dt = now_dt or _now()
+    compiled = _get_compiled_rules(rules_cfg)
+    post_spam_window = compiled["post_spam_window_minutes"]
     failed_pages: set[str] = set()
     replied_threads_in_tick: set[str] = set()
     recent_cache: dict[tuple[str, str, str], list[str]] = {}
+    post_recent_cache: dict[tuple[str, str], list[str]] = {}
 
     for comment in eligible_comments:
         if stop_event is not None and stop_event.is_set():
@@ -2043,9 +2198,26 @@ def run_auto_reply(
         page_id = _comment_page_id(comment)
         from_id = str(comment.get("from_id") or "").strip()
         fb_post_id = str(comment.get("fb_post_id") or "").strip()
-        cache_key = (page_id, from_id, fb_post_id)
-        if cache_key not in recent_cache:
-            recent_cache[cache_key] = _recent_customer_texts(tenant_id, page_id, from_id, fb_post_id, ref_dt)
+        if from_id:
+            cache_key = (page_id, from_id, fb_post_id)
+            if cache_key not in recent_cache:
+                recent_cache[cache_key] = _recent_customer_texts(tenant_id, page_id, from_id, fb_post_id, ref_dt)
+            cust_recents = recent_cache[cache_key]
+        else:
+            cust_recents = []
+
+        post_recents: Optional[list[str]] = None
+        if page_id and fb_post_id:
+            post_key = (page_id, fb_post_id)
+            if post_key not in post_recent_cache:
+                post_recent_cache[post_key] = _recent_post_texts(
+                    tenant_id,
+                    page_id,
+                    fb_post_id,
+                    ref_dt,
+                    window_minutes=post_spam_window,
+                )
+            post_recents = post_recent_cache[post_key]
 
         thread_batch = by_thread.get(thread_id) or []
         cur_key = _comment_sort_key(comment)
@@ -2057,12 +2229,13 @@ def run_auto_reply(
                 comment,
                 model=model,
                 rules_cfg=rules_cfg,
-                recent_texts=recent_cache[cache_key],
+                recent_texts=cust_recents,
                 failed_pages=failed_pages,
                 now_dt=ref_dt,
                 _later_in_tick=later_in_tick if later_in_tick else None,
                 _replied_threads_in_tick=replied_threads_in_tick,
                 _thread_id=thread_id,
+                _post_recent_texts=post_recents,
             )
         except Exception as e:
             log.warning(
@@ -2076,6 +2249,7 @@ def run_auto_reply(
             res = _record_rejection(
                 tenant_id,
                 page_id=page_id,
+                fb_post_id=fb_post_id,
                 thread_id=thread_id,
                 comment_id=cid,
                 from_id=from_id,

@@ -100,7 +100,7 @@ describe("inbox notification planner", () => {
     expect(plan.toasts[1]).toEqual({
       uniqueID: "inbox-comment-m-2",
       type: "info",
-      body: "Khách hàng vừa bình luận: Inbox giá giúp mình",
+      body: "Khách Facebook · 17:00 27/11 vừa bình luận: Inbox giá giúp mình",
       actionLabel: "Xem",
       actionHref: "/comments?thread=th-2",
       collisionBehavior: "ignore",
@@ -454,7 +454,7 @@ describe("inbox notification planner", () => {
       {
         uniqueID: "inbox-need-you-th-2:reason:hết hàng size M",
         type: "info",
-        body: "Cần bạn: Khách hàng — hết hàng size M",
+        body: "Cần bạn: Khách Facebook — hết hàng size M",
         actionLabel: "Xem",
         actionHref: "/comments?thread=th-2",
         collisionBehavior: "ignore",
@@ -560,6 +560,145 @@ describe("inbox notification planner", () => {
     });
     expect(afterReset.toasts).toHaveLength(1);
     expect(afterReset.liveAnnouncement).toBe("Đã tự động trả lời 1 bình luận");
+  });
+
+  it("uses shared 'Khách Facebook · HH:mm dd/MM' fallback from first message time across anonymous comment, draft, and needYou toasts", () => {
+    const queryClient = new QueryClient();
+    // Cached anonymous thread with root message at 09:15 and later page reply at 10:00
+    queryClient.setQueryData(inboxKeys.thread("tenant-1", "th-anon-cached"), {
+      pages: [
+        {
+          tenantId: "tenant-1",
+          thread: {
+            id: "th-anon-cached",
+            customer: { id: "", name: null, tags: [] },
+            lastMessage: {
+              id: "m-page",
+              fromPage: true,
+              text: "Dạ shop đã phản hồi ạ",
+              createdAt: "2026-11-27T10:00:00+07:00",
+            },
+            updatedAt: "2026-11-27T10:00:00+07:00",
+          },
+          messages: [
+            {
+              id: "th-anon-cached",
+              createdAt: "2026-11-27T09:15:00+07:00",
+              delivery: "sent",
+            },
+            {
+              id: "m-page",
+              createdAt: "2026-11-27T10:00:00+07:00",
+              delivery: "sent",
+            },
+          ],
+          olderCursor: null,
+        },
+      ],
+      pageParams: [null],
+    });
+
+    expect(
+      lookupCachedCustomerName(queryClient, "tenant-1", "th-anon-cached"),
+    ).toBe("Khách Facebook · 09:15 27/11");
+
+    // List-only anonymous thread cache falls back to thread.lastMessage.createdAt
+    expect(
+      extractCustomerNameFromCache(
+        {
+          pages: [
+            {
+              items: [
+                {
+                  id: "th-anon-list",
+                  customer: { id: "", name: null, tags: [] },
+                  lastMessage: {
+                    id: "th-anon-list",
+                    fromPage: false,
+                    text: "Giá sao shop?",
+                    createdAt: "2026-11-27T08:40:00+07:00",
+                  },
+                  updatedAt: "2026-11-27T08:40:00+07:00",
+                },
+              ],
+            },
+          ],
+        },
+        "th-anon-list",
+      ),
+    ).toBe("Khách Facebook · 08:40 27/11");
+
+    const tracker = createInboxNotificationTracker();
+    const lookup = (threadId: string) =>
+      lookupCachedCustomerName(queryClient, "tenant-1", threadId);
+
+    // Tick 1: follow-up comment on cached anonymous thread uses cached first message time (09:15),
+    // while a brand-new anonymous thread uses its first comment createdAt (11:20)
+    const tick1 = tracker.plan({
+      response: makeResponse({
+        cursor: "c-anon-1",
+        items: [
+          makeItem({
+            threadId: "th-anon-cached",
+            messageId: "m-followup",
+            customerName: null,
+            text: "Cho mình thêm size L nhé",
+            createdAt: "2026-11-27T10:45:00+07:00",
+          }),
+          makeItem({
+            threadId: "th-anon-fresh",
+            messageId: "m-fresh-1",
+            customerName: "",
+            text: "Mẫu này còn màu đen không?",
+            createdAt: "2026-11-27T11:20:00+07:00",
+          }),
+        ],
+        draftsReady: ["th-anon-cached", "th-anon-fresh"],
+        needYou: [
+          {
+            threadId: "th-anon-cached",
+            customerName: null,
+            reason: "khách hỏi ship tỉnh",
+            since: "2026-11-27T10:46:00+07:00",
+          },
+        ],
+      }),
+      isInitialCursor: false,
+      activeThreadId: null,
+      lookupCachedCustomerName: lookup,
+    });
+
+    expect(tick1.toasts.map((t) => t.body)).toEqual([
+      "Khách Facebook · 09:15 27/11 vừa bình luận: Cho mình thêm size L nhé",
+      "Khách Facebook · 11:20 27/11 vừa bình luận: Mẫu này còn màu đen không?",
+      "Đã có nháp AI cho Khách Facebook · 09:15 27/11",
+      "Đã có nháp AI cho Khách Facebook · 11:20 27/11",
+      "Cần bạn: Khách Facebook · 09:15 27/11 — khách hỏi ship tỉnh",
+    ]);
+
+    // Tick 2: second anonymous comment on th-anon-fresh keeps first message time (11:20)
+    const tick2 = tracker.plan({
+      response: makeResponse({
+        cursor: "c-anon-2",
+        items: [
+          makeItem({
+            threadId: "th-anon-fresh",
+            messageId: "m-fresh-2",
+            customerName: null,
+            text: "Inbox giúp mình nhé",
+            createdAt: "2026-11-27T11:55:00+07:00",
+          }),
+        ],
+      }),
+      isInitialCursor: false,
+      activeThreadId: null,
+      lookupCachedCustomerName: lookup,
+    });
+    expect(tick2.toasts[0]?.body).toBe(
+      "Khách Facebook · 11:20 27/11 vừa bình luận: Inbox giúp mình nhé",
+    );
+
+    queryClient.clear();
   });
 });
 

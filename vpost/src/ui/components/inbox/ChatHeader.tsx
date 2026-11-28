@@ -19,9 +19,13 @@ import {
 } from "@astryxdesign/core";
 import { AlertCircle, ArrowLeft, Ban, PanelRight, RotateCcw } from "lucide-react";
 
+import {
+  formatInboxCustomerName,
+  isAnonymousCustomerName,
+  resolveThreadFirstMessageAt,
+} from "@/ui/components/inbox/inbox-customer-label";
 import { InboxCustomerAvatar } from "@/ui/components/inbox/InboxCustomerAvatar";
 import {
-  displayCommentAuthor,
   toSafeFacebookUrl,
   toSafeImageUrl,
   type InboxThread,
@@ -31,6 +35,7 @@ import "./inbox-surface.css";
 
 export interface ChatHeaderProps {
   readonly thread: InboxThread;
+  readonly firstMessageAt?: string | null;
   readonly readOnlyReason: string | null;
   readonly isTogglingIgnore: boolean;
   readonly showBackButton: boolean;
@@ -48,6 +53,7 @@ export interface ChatHeaderProps {
  */
 export function ChatHeader({
   thread,
+  firstMessageAt,
   readOnlyReason,
   isTogglingIgnore,
   showBackButton,
@@ -57,7 +63,11 @@ export function ChatHeader({
   onUnignore,
   onToggleCustomerPanel,
 }: ChatHeaderProps) {
-  const customerName = displayCommentAuthor(thread.customer.name);
+  const isAnonymous = isAnonymousCustomerName(thread.customer.name);
+  const customerName = formatInboxCustomerName(
+    thread.customer.name,
+    firstMessageAt ?? resolveThreadFirstMessageAt(thread),
+  );
   const safePostUrl = toSafeFacebookUrl(thread.postUrl);
   const safeImageUrl = toSafeImageUrl(thread.postImageUrl);
   const rawPostUrlText = thread.postUrl?.trim() ?? "";
@@ -98,7 +108,9 @@ export function ChatHeader({
 
             <InboxCustomerAvatar
               customerId={thread.customer.id}
+              threadId={thread.id}
               name={customerName}
+              isAnonymous={isAnonymous}
               size="md"
             />
 

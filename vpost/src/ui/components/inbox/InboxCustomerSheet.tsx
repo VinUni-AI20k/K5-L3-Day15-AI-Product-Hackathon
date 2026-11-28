@@ -3,7 +3,11 @@
 import { Dialog, DialogHeader, Layout, LayoutContent } from "@astryxdesign/core";
 
 import { CustomerPanel } from "@/ui/components/inbox/customer/CustomerPanel";
-import { displayCommentAuthor, type InboxThread } from "@/ui/schemas/inbox.schema";
+import {
+  formatInboxCustomerName,
+  resolveThreadFirstMessageAt,
+} from "@/ui/components/inbox/inbox-customer-label";
+import type { InboxThread } from "@/ui/schemas/inbox.schema";
 
 import "./inbox-surface.css";
 
@@ -11,6 +15,7 @@ export interface InboxCustomerSheetProps {
   readonly isOpen: boolean;
   readonly isMobile: boolean;
   readonly thread: InboxThread | null;
+  readonly firstMessageAt?: string | null;
   readonly onClose: () => void;
 }
 
@@ -22,11 +27,15 @@ export function InboxCustomerSheet({
   isOpen,
   isMobile,
   thread,
+  firstMessageAt,
   onClose,
 }: InboxCustomerSheetProps) {
   if (!isOpen || !thread) return null;
 
-  const customerName = displayCommentAuthor(thread.customer.name);
+  const customerName = formatInboxCustomerName(
+    thread.customer.name,
+    firstMessageAt ?? resolveThreadFirstMessageAt(thread),
+  );
 
   return (
     <Dialog
@@ -57,7 +66,7 @@ export function InboxCustomerSheet({
           <LayoutContent padding={0} isScrollable className="inbox-surface-page">
             <CustomerPanel
               fromId={thread.customer.id}
-              fallbackName={thread.customer.name}
+              fallbackName={customerName}
               threadId={thread.id}
             />
           </LayoutContent>

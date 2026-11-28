@@ -205,6 +205,9 @@ describe("CustomerPanelView states & semantics", () => {
       );
       expect(connectedHtml).toContain("Khách ẩn danh");
       expect(connectedHtml).toContain("Không có thông tin khách");
+      expect(connectedHtml).toContain(
+        "Facebook ẩn thông tin người dùng khi app chưa có quyền nâng cao (Advanced Access)",
+      );
       expect(connectedHtml).not.toContain('data-skeleton="customer-panel"');
       expect(connectedHtml).not.toContain("Đang tải hồ sơ khách hàng");
       expect(connectedHtml).not.toContain("Thử lại");
@@ -238,6 +241,9 @@ describe("CustomerPanelView states & semantics", () => {
         />,
       );
       expect(viewHtml).toContain("Không có thông tin khách");
+      expect(viewHtml).toContain(
+        "Facebook ẩn thông tin người dùng khi app chưa có quyền nâng cao (Advanced Access)",
+      );
       expect(viewHtml).not.toContain('data-skeleton="customer-panel"');
       expect(viewHtml).not.toContain("Đang tải hồ sơ khách hàng");
       expect(viewHtml).not.toContain("Thử lại");

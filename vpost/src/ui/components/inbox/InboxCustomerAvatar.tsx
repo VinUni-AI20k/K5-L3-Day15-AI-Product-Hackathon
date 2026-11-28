@@ -3,6 +3,10 @@
 import { Avatar } from "@astryxdesign/core";
 
 import { cn } from "@/shared/utils";
+import {
+  INBOX_ANONYMOUS_AVATAR_NAME,
+  isAnonymousCustomerLabel,
+} from "@/ui/components/inbox/inbox-customer-label";
 
 import "./inbox-surface.css";
 
@@ -43,28 +47,38 @@ export function resolveCustomerAvatarTone(
 
 export interface InboxCustomerAvatarProps {
   readonly customerId?: string | null;
+  readonly threadId?: string | null;
   readonly name: string;
+  readonly isAnonymous?: boolean;
   readonly size?: "sm" | "md" | "lg";
   readonly className?: string;
 }
 
 /**
  * Customer initials avatar wrapping Astryx `Avatar` with a deterministic
- * accent-tinted fallback derived from `customerId`.
+ * accent-tinted fallback derived from `customerId` (or `threadId` for anonymous
+ * Facebook commenters, whose initials stay `"KF"`).
  */
 export function InboxCustomerAvatar({
   customerId,
+  threadId,
   name,
+  isAnonymous,
   size = "md",
   className,
 }: InboxCustomerAvatarProps) {
-  const tone = resolveCustomerAvatarTone(customerId, name);
+  const anonymous = isAnonymous ?? isAnonymousCustomerLabel(name);
+  const avatarName = anonymous ? INBOX_ANONYMOUS_AVATAR_NAME : name;
+  const toneSeed = anonymous
+    ? threadId?.trim() || customerId?.trim() || null
+    : customerId?.trim() || threadId?.trim() || null;
+  const tone = resolveCustomerAvatarTone(toneSeed, name);
   return (
     <span
       className={cn("inbox-avatar", className)}
       data-avatar-tone={tone}
     >
-      <Avatar name={name} size={size} tooltip={false} />
+      <Avatar name={avatarName} alt={name} size={size} tooltip={false} />
     </span>
   );
 }

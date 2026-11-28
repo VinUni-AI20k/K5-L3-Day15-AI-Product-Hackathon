@@ -96,6 +96,7 @@ export interface ConversationListPaneProps {
   readonly counts: InboxThreadCounts;
   readonly hasCounts: boolean;
   readonly items: readonly InboxThread[];
+  readonly firstMessageAtByThread?: Readonly<Record<string, string | undefined>>;
   readonly selectedThreadId: string | null;
   readonly nowMs: number;
   readonly readOnlyReason: string | null;
@@ -151,6 +152,7 @@ export function ConversationListPane({
   counts,
   hasCounts,
   items,
+  firstMessageAtByThread,
   selectedThreadId,
   nowMs,
   readOnlyReason,
@@ -381,6 +383,7 @@ export function ConversationListPane({
               <ConversationListItem
                 key={thread.id}
                 thread={thread}
+                firstMessageAt={firstMessageAtByThread?.[thread.id]}
                 nowMs={nowMs}
                 isSelected={selectedThreadId === thread.id}
                 isBulkMode={isBulkMode}

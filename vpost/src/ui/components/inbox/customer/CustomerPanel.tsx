@@ -330,7 +330,7 @@ export function CustomerPanelView({
             kind="no-result"
             icon={<UserX className="size-5" aria-hidden="true" />}
             title="Không có thông tin khách"
-            description="Facebook không cung cấp mã định danh cho tài khoản này do cài đặt quyền riêng tư, nên chưa thể xem hồ sơ, gắn nhãn hay lưu ghi chú."
+            description="Facebook ẩn thông tin người dùng khi app chưa có quyền nâng cao (Advanced Access)"
           />
         </Stack>
       ) : isLoading && !customer ? (

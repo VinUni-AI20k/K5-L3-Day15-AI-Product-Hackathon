@@ -1,3 +1,9 @@
+import {
+  INBOX_ANONYMOUS_CUSTOMER_PREFIX,
+  formatAnonymousCustomerTime,
+  formatInboxCustomerName,
+  type InboxMessageTimeSource,
+} from "@/ui/components/inbox/inbox-customer-label";
 import type {
   CommentUpdateAutoRepliedItem,
   CommentUpdateItem,
@@ -14,7 +20,7 @@ export const TOAST_EXCERPT_MAX_CHARS = 60;
 /** Upper bound for per-tenant seen message IDs and thread name cache. */
 export const MAX_TRACKED_ENTRIES = 500;
 
-export const COMMENT_SENDER_FALLBACK = "Khách hàng";
+export const COMMENT_SENDER_FALLBACK = INBOX_ANONYMOUS_CUSTOMER_PREFIX;
 export const DRAFT_CUSTOMER_FALLBACK = "khách";
 
 export interface PlannedToast {
@@ -60,9 +66,11 @@ export function truncateToastExcerpt(
   return `${normalized.slice(0, maxChars).trimEnd()}…`;
 }
 
-export function formatCommentSender(customerName: string | null | undefined): string {
-  const trimmed = typeof customerName === "string" ? customerName.trim() : "";
-  return trimmed.length > 0 ? trimmed : COMMENT_SENDER_FALLBACK;
+export function formatCommentSender(
+  customerName: string | null | undefined,
+  firstMessageAt?: string | null,
+): string {
+  return formatInboxCustomerName(customerName, firstMessageAt);
 }
 
 export function formatDraftCustomer(customerName: string | null | undefined): string {
@@ -91,17 +99,19 @@ export function buildNeedYouDedupeKey(
 }
 
 function formatSingleCommentToastBody(
-  item: Pick<CommentUpdateItem, "customerName" | "text">,
+  item: Pick<CommentUpdateItem, "customerName" | "text" | "createdAt">,
+  resolvedSender?: string | null,
 ): string {
-  const sender = formatCommentSender(item.customerName);
+  const sender = formatCommentSender(resolvedSender ?? item.customerName, item.createdAt);
   const excerpt = truncateToastExcerpt(item.text);
   return excerpt.length > 0 ? `${sender} vừa bình luận: ${excerpt}` : `${sender} vừa bình luận`;
 }
 
 function formatOpenThreadAnnouncement(
-  item: Pick<CommentUpdateItem, "customerName" | "text">,
+  item: Pick<CommentUpdateItem, "customerName" | "text" | "createdAt">,
+  resolvedSender?: string | null,
 ): string {
-  const sender = formatCommentSender(item.customerName);
+  const sender = formatCommentSender(resolvedSender ?? item.customerName, item.createdAt);
   const excerpt = truncateToastExcerpt(item.text);
   return excerpt.length > 0 ? `${sender}: ${excerpt}` : `${sender} vừa bình luận`;
 }
@@ -109,8 +119,9 @@ function formatOpenThreadAnnouncement(
 function formatNeedYouCopy(
   senderName: string | null | undefined,
   reason: string,
+  fallbackTime?: string | null,
 ): string {
-  const sender = formatCommentSender(senderName);
+  const sender = formatCommentSender(senderName, fallbackTime);
   const reasonExcerpt = truncateToastExcerpt(reason);
   return reasonExcerpt.length > 0
     ? `Cần bạn: ${sender} — ${reasonExcerpt}`
@@ -131,22 +142,100 @@ function readThreadCustomerName(candidate: unknown, threadId: string): string | 
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function isMatchingThreadRecord(
+  candidate: unknown,
+  threadId: string,
+): candidate is Record<string, unknown> {
+  return isRecord(candidate) && candidate.id === threadId;
+}
+
+function readExplicitThreadFirstTime(candidate: Record<string, unknown>): string | null {
+  for (const key of ["firstMessageAt", "createdAt"] as const) {
+    const value = candidate[key];
+    if (typeof value === "string" && formatAnonymousCustomerTime(value) !== null) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function readSummaryThreadTime(candidate: Record<string, unknown>): string | null {
+  const lastMessage = candidate.lastMessage;
+  if (
+    isRecord(lastMessage) &&
+    typeof lastMessage.createdAt === "string" &&
+    formatAnonymousCustomerTime(lastMessage.createdAt) !== null
+  ) {
+    return lastMessage.createdAt.trim();
+  }
+  if (
+    typeof candidate.updatedAt === "string" &&
+    formatAnonymousCustomerTime(candidate.updatedAt) !== null
+  ) {
+    return candidate.updatedAt.trim();
+  }
+  return null;
+}
+
+function collectCachedMessages(
+  container: Record<string, unknown>,
+  out: InboxMessageTimeSource[],
+): void {
+  if (!Array.isArray(container.messages)) return;
+  for (const item of container.messages) {
+    if (!isRecord(item)) continue;
+    if (typeof item.id !== "string" || typeof item.createdAt !== "string") continue;
+    const delivery =
+      item.delivery === "sent" || item.delivery === "sending" || item.delivery === "failed"
+        ? item.delivery
+        : undefined;
+    out.push({ id: item.id, createdAt: item.createdAt, delivery });
+  }
+}
+
+function pickEarliestIso(candidates: readonly string[]): string | null {
+  let best: string | null = null;
+  let bestMs = Number.POSITIVE_INFINITY;
+  for (const iso of candidates) {
+    if (formatAnonymousCustomerTime(iso) === null) continue;
+    const ms = Date.parse(iso);
+    if (ms < bestMs) {
+      bestMs = ms;
+      best = iso;
+    }
+  }
+  return best;
+}
+
 /**
- * Best-effort customer name lookup against cached inbox thread/list query payloads
- * (`{ thread }`, `{ items }`, or TanStack infinite `{ pages: [{ thread }] }` / `{ pages: [{ items }] }`).
+ * Best-effort customer display label lookup against cached inbox thread/list query payloads
+ * (`{ thread, messages? }`, `{ items }`, or TanStack infinite `{ pages: [{ thread, messages? }] }`
+ * / `{ pages: [{ items }] }`). Prefers any real `customer.name` across pages; for anonymous
+ * threads (`customer.name` null/empty), derives `"Khách Facebook · HH:mm dd/MM"` from the
+ * thread's first message timestamp.
  */
 export function extractCustomerNameFromCache(cached: unknown, threadId: string): string | null {
   if (!isRecord(cached)) return null;
 
+  const matchedThreads: Record<string, unknown>[] = [];
+  const matchedMessages: InboxMessageTimeSource[] = [];
+
   if ("thread" in cached) {
     const direct = readThreadCustomerName(cached.thread, threadId);
     if (direct !== null) return direct;
+    if (isMatchingThreadRecord(cached.thread, threadId)) {
+      matchedThreads.push(cached.thread);
+      collectCachedMessages(cached, matchedMessages);
+    }
   }
 
   if (Array.isArray(cached.items)) {
     for (const item of cached.items) {
       const found = readThreadCustomerName(item, threadId);
       if (found !== null) return found;
+      if (isMatchingThreadRecord(item, threadId)) {
+        matchedThreads.push(item);
+      }
     }
   }
 
@@ -156,14 +245,54 @@ export function extractCustomerNameFromCache(cached: unknown, threadId: string):
       if ("thread" in page) {
         const found = readThreadCustomerName(page.thread, threadId);
         if (found !== null) return found;
+        if (isMatchingThreadRecord(page.thread, threadId)) {
+          matchedThreads.push(page.thread);
+          collectCachedMessages(page, matchedMessages);
+        }
       }
       if (Array.isArray(page.items)) {
         for (const item of page.items) {
           const found = readThreadCustomerName(item, threadId);
           if (found !== null) return found;
+          if (isMatchingThreadRecord(item, threadId)) {
+            matchedThreads.push(item);
+          }
         }
       }
     }
+  }
+
+  if (matchedThreads.length === 0) return null;
+
+  const explicitTimes = matchedThreads
+    .map(readExplicitThreadFirstTime)
+    .filter((value): value is string => value !== null);
+  const explicitFirst = pickEarliestIso(explicitTimes);
+  if (explicitFirst) {
+    return formatInboxCustomerName(null, explicitFirst);
+  }
+
+  if (matchedMessages.length > 0) {
+    const rootMsg = matchedMessages.find((msg) => msg.id === threadId);
+    if (rootMsg && formatAnonymousCustomerTime(rootMsg.createdAt) !== null) {
+      return formatInboxCustomerName(null, rootMsg.createdAt);
+    }
+    const persisted = matchedMessages.filter(
+      (msg) => msg.delivery === undefined || msg.delivery === "sent",
+    );
+    const pool = persisted.length > 0 ? persisted : matchedMessages;
+    const earliestMsg = pickEarliestIso(pool.map((msg) => msg.createdAt));
+    if (earliestMsg) {
+      return formatInboxCustomerName(null, earliestMsg);
+    }
+  }
+
+  const summaryTimes = matchedThreads
+    .map(readSummaryThreadTime)
+    .filter((value): value is string => value !== null);
+  const summaryFirst = pickEarliestIso(summaryTimes);
+  if (summaryFirst) {
+    return formatInboxCustomerName(null, summaryFirst);
   }
 
   return null;
@@ -217,6 +346,47 @@ export function createInboxNotificationTracker(
   const seenNeedYouKeys = new Set<string>();
   const seenAutoRepliedKeys = new Set<string>();
   const customerNamesByThread = new Map<string, string>();
+  const fallbackLabelsByThread = new Map<string, string>();
+
+  function rememberRealName(threadId: string, name: string | null | undefined): string {
+    const trimmed = typeof name === "string" ? name.trim() : "";
+    if (trimmed.length > 0) {
+      customerNamesByThread.set(threadId, trimmed);
+      trimBoundedMap(customerNamesByThread, maxTracked);
+    }
+    return trimmed;
+  }
+
+  function rememberFallbackLabel(
+    threadId: string,
+    fallbackTime: string | null | undefined,
+  ): string | null {
+    const existing = fallbackLabelsByThread.get(threadId);
+    if (existing) return existing;
+    if (formatAnonymousCustomerTime(fallbackTime) === null) return null;
+    const label = formatInboxCustomerName(null, fallbackTime);
+    fallbackLabelsByThread.set(threadId, label);
+    trimBoundedMap(fallbackLabelsByThread, maxTracked);
+    return label;
+  }
+
+  function resolveThreadCustomerLabel(
+    threadId: string,
+    explicitName: string | null | undefined,
+    fallbackTime: string | null | undefined,
+    lookupCachedCustomerName?: (threadId: string) => string | null,
+  ): string | null {
+    const trimmed = rememberRealName(threadId, explicitName);
+    if (trimmed.length > 0) return trimmed;
+
+    const knownName = customerNamesByThread.get(threadId);
+    if (knownName) return knownName;
+
+    const cached = lookupCachedCustomerName?.(threadId)?.trim() ?? "";
+    if (cached.length > 0) return cached;
+
+    return rememberFallbackLabel(threadId, fallbackTime);
+  }
 
   return {
     reset(): void {
@@ -224,6 +394,7 @@ export function createInboxNotificationTracker(
       seenNeedYouKeys.clear();
       seenAutoRepliedKeys.clear();
       customerNamesByThread.clear();
+      fallbackLabelsByThread.clear();
     },
 
     plan({
@@ -238,11 +409,12 @@ export function createInboxNotificationTracker(
 
       const freshItems: CommentUpdateItem[] = [];
       for (const item of response.items) {
-        const trimmedName = item.customerName?.trim() ?? "";
-        if (trimmedName.length > 0) {
-          customerNamesByThread.set(item.threadId, trimmedName);
-          trimBoundedMap(customerNamesByThread, maxTracked);
-        }
+        resolveThreadCustomerLabel(
+          item.threadId,
+          item.customerName,
+          item.createdAt,
+          lookupCachedCustomerName,
+        );
 
         if (seenMessageIds.has(item.messageId)) continue;
         seenMessageIds.add(item.messageId);
@@ -264,10 +436,16 @@ export function createInboxNotificationTracker(
 
       if (toastableItems.length > 0 && toastableItems.length <= MAX_INDIVIDUAL_COMMENT_TOASTS) {
         for (const item of toastableItems) {
+          const sender = resolveThreadCustomerLabel(
+            item.threadId,
+            item.customerName,
+            item.createdAt,
+            lookupCachedCustomerName,
+          );
           toasts.push({
             uniqueID: `inbox-comment-${item.messageId}`,
             type: "info",
-            body: formatSingleCommentToastBody(item),
+            body: formatSingleCommentToastBody(item, sender),
             actionLabel: "Xem",
             actionHref: buildThreadHref(item.threadId),
             collisionBehavior: "ignore",
@@ -287,8 +465,12 @@ export function createInboxNotificationTracker(
       const openThreadDraftLabels: string[] = [];
       const uniqueDraftThreadIds = new Set(response.draftsReady);
       for (const threadId of uniqueDraftThreadIds) {
-        const resolvedName =
-          customerNamesByThread.get(threadId) ?? lookupCachedCustomerName?.(threadId) ?? null;
+        const resolvedName = resolveThreadCustomerLabel(
+          threadId,
+          null,
+          null,
+          lookupCachedCustomerName,
+        );
         const customerLabel = formatDraftCustomer(resolvedName);
 
         if (activeThreadId !== null && threadId === activeThreadId) {
@@ -308,23 +490,19 @@ export function createInboxNotificationTracker(
       // "Cần bạn" escalations: deduped by threadId + since (fallback threadId + reason).
       const openNeedYouAnnouncements: string[] = [];
       for (const item of response.needYou ?? []) {
-        const trimmedName = item.customerName?.trim() ?? "";
-        if (trimmedName.length > 0) {
-          customerNamesByThread.set(item.threadId, trimmedName);
-          trimBoundedMap(customerNamesByThread, maxTracked);
-        }
+        const resolvedName = resolveThreadCustomerLabel(
+          item.threadId,
+          item.customerName,
+          item.since,
+          lookupCachedCustomerName,
+        );
 
         const dedupeKey = buildNeedYouDedupeKey(item);
         if (seenNeedYouKeys.has(dedupeKey)) continue;
         seenNeedYouKeys.add(dedupeKey);
         trimBoundedSet(seenNeedYouKeys, maxTracked);
 
-        const resolvedName =
-          trimmedName ||
-          customerNamesByThread.get(item.threadId) ||
-          lookupCachedCustomerName?.(item.threadId) ||
-          null;
-        const copy = formatNeedYouCopy(resolvedName, item.reason);
+        const copy = formatNeedYouCopy(resolvedName, item.reason, item.since);
 
         if (activeThreadId !== null && item.threadId === activeThreadId) {
           openNeedYouAnnouncements.push(copy);
@@ -352,7 +530,13 @@ export function createInboxNotificationTracker(
 
       const liveParts: string[] = [];
       for (const item of openThreadItems) {
-        liveParts.push(formatOpenThreadAnnouncement(item));
+        const sender = resolveThreadCustomerLabel(
+          item.threadId,
+          item.customerName,
+          item.createdAt,
+          lookupCachedCustomerName,
+        );
+        liveParts.push(formatOpenThreadAnnouncement(item, sender));
       }
       for (const label of openThreadDraftLabels) {
         liveParts.push(`Đã có nháp AI cho ${label}`);
@@ -362,10 +546,12 @@ export function createInboxNotificationTracker(
       }
       if (freshAutoReplied.length === 1) {
         const single = freshAutoReplied[0];
-        const resolvedName =
-          customerNamesByThread.get(single.threadId) ??
-          lookupCachedCustomerName?.(single.threadId) ??
-          null;
+        const resolvedName = resolveThreadCustomerLabel(
+          single.threadId,
+          null,
+          null,
+          lookupCachedCustomerName,
+        );
         liveParts.push(
           resolvedName
             ? `Đã tự động trả lời cho ${resolvedName}`

@@ -43,6 +43,7 @@ pool = ThreadPoolExecutor(max_workers=4)
 
 @asynccontextmanager
 async def _lifespan(_app):
+    vpost_api.get_tenant_id()
     comment_poller.start()
     try:
         yield
@@ -61,6 +62,7 @@ moderation_store.init_moderation()
 inbox_store.init_inbox()
 writing_style.init_writing_style()
 auto_reply.init_auto_reply()
+vpost_api.resolve_tenant_id(startup=True)
 app.include_router(moderation_api.router)
 app.include_router(inbox_api.router)
 app.include_router(writing_style_api.router)
@@ -112,7 +114,7 @@ def _process(row_id, default_page):
                 data = dict(data, anh="\n".join(chk["ok"]))
                 store.update(row_id, data=data)
         page, pwarn = tools.page_for(data, default_page)
-        page = writing_style.apply(page, vpost_api.TENANT_ID, page["id"])
+        page = writing_style.apply(page, vpost_api.get_tenant_id(), page["id"])
         res = agent.process_row(data, page, model=counted)
         if pwarn:
             res["warnings"].insert(0, "%s: %s" % pwarn)
@@ -188,7 +190,7 @@ def _row_or_404(rid):
 
 def _allowed(r):
     page = tools.PAGES.get(r["page_id"]) or tools.PAGES[tools.DEFAULT_PAGE]
-    page = writing_style.apply(page, vpost_api.TENANT_ID, page["id"])
+    page = writing_style.apply(page, vpost_api.get_tenant_id(), page["id"])
     return rules.allowed_facts(r["data"], rules.check_stock(r["data"], tools.inventory()), page, agent._effective_glob(page))
 
 

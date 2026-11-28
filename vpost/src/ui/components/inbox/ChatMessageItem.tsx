@@ -19,9 +19,12 @@ import { CommentErrorNotice } from "@/ui/components/comments/CommentErrorNotice"
 import { ModerationBadge } from "@/ui/components/comments/moderation/ModerationBadge";
 import { AgentRunTrace } from "@/ui/components/inbox/AgentRunTrace";
 import {
+  formatInboxCustomerName,
+  isAnonymousCustomerName,
+} from "@/ui/components/inbox/inbox-customer-label";
+import {
   INBOX_DELIVERY_LABELS,
   INBOX_HIDDEN_MESSAGE_NOTE,
-  displayCommentAuthor,
   formatCommentAbsoluteTime,
   formatCommentRelativeTime,
   toSafeFacebookUrl,
@@ -34,6 +37,7 @@ import "./inbox-surface.css";
 export interface ChatMessageItemProps {
   readonly message: InboxMessage;
   readonly channelName: string;
+  readonly threadFirstMessageAt?: string | null;
   readonly nowMs: number;
   readonly readOnlyReason: string | null;
   readonly isCoarsePointer: boolean;
@@ -62,6 +66,7 @@ export interface ChatMessageItemProps {
 export function ChatMessageItem({
   message,
   channelName,
+  threadFirstMessageAt,
   nowMs,
   readOnlyReason,
   isCoarsePointer,
@@ -78,9 +83,14 @@ export function ChatMessageItem({
   onToggleAgentTrace,
   onRetryAgentRuns,
 }: ChatMessageItemProps) {
+  const isAnonymousSender =
+    !message.fromPage && isAnonymousCustomerName(message.fromName);
   const senderDisplayName = message.fromPage
     ? channelName.trim() || "Fanpage"
-    : displayCommentAuthor(message.fromName);
+    : formatInboxCustomerName(
+        message.fromName,
+        threadFirstMessageAt ?? message.createdAt,
+      );
 
   const isAutoReplied = message.fromPage && message.sentBy === "auto";
 
@@ -88,7 +98,9 @@ export function ChatMessageItem({
     ? isAutoReplied
       ? `Trang ${senderDisplayName} (Tự động trả lời): `
       : `Trang ${senderDisplayName} (Bạn): `
-    : `Khách hàng ${senderDisplayName}: `;
+    : isAnonymousSender
+      ? `${senderDisplayName}: `
+      : `Khách hàng ${senderDisplayName}: `;
 
   const relativeTime = formatCommentRelativeTime(message.createdAt, nowMs);
   const absoluteTime = formatCommentAbsoluteTime(message.createdAt);
