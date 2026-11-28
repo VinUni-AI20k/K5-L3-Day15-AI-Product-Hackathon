@@ -39,6 +39,8 @@ export const metadata: Metadata = {
   description: "Công cụ đăng bài tự động cho Facebook và TikTok",
   // VPOST: ảnh sản phẩm là link Google (lh3.googleusercontent.com) — Google chặn khi có Referer lạ.
   referrer: "no-referrer",
+  // Meta Business domain verification for vpost.vannt.asia (must be in server-rendered <head>).
+  other: { "facebook-domain-verification": "o40psj52tndat2egji49b1yc4t8ldx" },
 };
 
 /**
