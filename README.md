@@ -35,7 +35,7 @@ npx pnpm@11.21.0 dev -p 3010                    # giao diện: http://localhost:
   2. Điền `FB_APP_ID`, `FB_APP_SECRET` vào `.env` ở gốc repo, rồi chạy lại backend.
   3. Bấm nối kênh, tự đăng nhập Facebook và cho phép. Mỗi Page có token sẽ thành một kênh `fb-<id>`; bài hẹn giờ trên kênh đó lên Page thật.
   - Token lưu trong `data/app.db` (không commit). Cách khác: dán User Access Token vào ô nhập token (`POST /api/channels/import`).
-- Tải file sản phẩm mới: `POST /api/vpost/catalog` (multipart, field `file`). Giao diện chưa có nút cho bước này.
+- **Kết nối dữ liệu** (`/data-mapping`): nhập file sản phẩm .xlsx/.csv (`POST /api/vpost/catalog`), có bảng các cột cần có, file mẫu (`/api/vpost/catalog/template`) và data demo 30 mẫu váy (`/api/sample`). Dòng thiếu thông tin vẫn nhập, chỉ bị lọc lúc soạn bài.
 - API nằm ở `codebase/vpost_api.py`. Test: `python -m pytest tests -q`.
 
 ## Chạy bản chạy thử (web app cũ)

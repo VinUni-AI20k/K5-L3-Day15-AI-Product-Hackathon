@@ -169,3 +169,15 @@ def test_upload_keeps_incomplete_rows_and_blocks_them_only_at_compose():
     assert [p["code"] for p in blocked] == ["B0"] and blocked[0]["composable"] is False
     r = client.post("/api/posts/compose", json={"productCode": "B0"})  # thiếu ảnh nên mã lỗi đại diện là MEDIA_NOT_FOUND
     assert r.status_code == 404 and r.json()["code"] == "MEDIA_NOT_FOUND" and "Giá" in r.json()["message"]
+
+
+def test_catalog_template_round_trips():
+    import rules
+    r = client.get("/api/vpost/catalog/template")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
+    assert "mau-nhap-san-pham.csv" in r.headers["content-disposition"]
+    assert r.content.startswith(b"\xef\xbb\xbf")  # BOM: Excel trên Windows mở đúng dấu
+    rows = rules.read_table(r.content, "mau.csv")
+    assert len(rows) == 2 and all(rows[0][f] for f in rules.FIELDS if f != "page")  # mọi cột mẫu đều được nhận
+    up = client.post("/api/vpost/catalog", files={"file": ("mau.csv", r.content, "text/csv")}).json()
+    assert up["rows"] == 2 and up["skipped"] == []

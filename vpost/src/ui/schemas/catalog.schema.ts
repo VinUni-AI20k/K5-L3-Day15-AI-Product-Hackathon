@@ -191,8 +191,8 @@ export type UploadCatalogFileResponse = z.infer<typeof UploadCatalogFileResponse
 export const PRODUCT_FILE_ACCEPT =
   ".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
 
-/** Mirrors the 10 MB cap in `codebase/vpost_api.py` (upload_catalog). */
-export const MAX_PRODUCT_FILE_BYTES = 10 * 1024 * 1024;
+/** 10 MB thập phân — chặt hơn chút so với 10 MiB của `codebase/vpost_api.py` (upload_catalog), để màn hình ghi "10,0 MB". */
+export const MAX_PRODUCT_FILE_BYTES = 10_000_000;
 
 export const ProductFileImportResponseSchema = z.object({
   /** Số mã đã nhập — gồm cả mã thiếu thông tin. */

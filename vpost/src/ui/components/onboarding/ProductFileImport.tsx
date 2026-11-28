@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
 import { ReadOnlyNotice } from "@/ui/components/feedback/ReadOnlyNotice";
+import { ProductFileSchema } from "@/ui/components/onboarding/ProductFileSchema";
 import { writeGate } from "@/ui/hooks/read-only-gate";
 import { useImportProductFile } from "@/ui/hooks/useCatalogProducts";
 import { useReadOnlyReason } from "@/ui/hooks/useReadOnlyReason";
@@ -40,6 +41,8 @@ export function ProductFileImport() {
           soạn bài. File mới thay toàn bộ danh sách sản phẩm đang có.
         </Text>
       </header>
+
+      <ProductFileSchema />
 
       <ReadOnlyNotice reason={gate.reason} />
 

@@ -222,6 +222,29 @@ async def upload_catalog(file: UploadFile = File(...)):
     return load_catalog(rows)
 
 
+# File mẫu: tên cột tiếng Việt mà rules.ALIASES nhận được + 2 dòng ví dụ (đủ thông tin / chỉ mã + giá)
+TEMPLATE_COLUMNS = [
+    ("Mã sản phẩm", "VAY001", "VAY002"), ("Tên sản phẩm", "Váy voan hoa nhí", ""), ("Loại", "Váy", ""),
+    ("Giá bán", "890.000đ", "450000"), ("Giá tệ", "45", ""), ("Size", "S, M, L", ""), ("Màu", "Đen, Trắng", ""),
+    ("Chất liệu", "Voan", ""), ("Mô tả", "Váy 2 lớp, kéo khoá sau", ""),
+    ("Ảnh", "https://drive.google.com/file/d/THAY_BANG_ID_ANH_DRIVE/view", ""), ("Page", "", ""),
+    ("Prompt", "Giọng nhẹ nhàng, hợp đi làm", ""),
+]
+
+
+@router.get("/vpost/catalog/template")
+def catalog_template():
+    """File CSV mẫu để nhập sản phẩm (UTF-8 có BOM để Excel mở đúng dấu)."""
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    for i in range(3):
+        w.writerow([c[i] for c in TEMPLATE_COLUMNS])
+    return Response(("﻿" + buf.getvalue()).encode("utf-8"), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="mau-nhap-san-pham.csv"'})
+
+
 def load_catalog(rows):
     seen, keep, skipped = set(), [], []
     for i, r in enumerate(rows, 2):  # dòng 1 là tiêu đề
