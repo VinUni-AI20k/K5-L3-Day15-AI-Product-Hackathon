@@ -3,7 +3,7 @@
 import { HStack, Skeleton, Stack } from "@astryxdesign/core";
 
 /** Column widths mirror ChannelTable so the real rows land where these sat. */
-const COLUMNS = [130, null, 190, 110, 170, 280] as const;
+const COLUMNS = [120, null, 170, 104, 160, 220] as const;
 const ROWS = 5;
 
 /**
@@ -13,14 +13,18 @@ const ROWS = 5;
  */
 export function ChannelTableSkeleton() {
   return (
-    <Stack direction="vertical" gap={0} padding={0} aria-hidden="true">
-      {Array.from({ length: ROWS }, (_, row) => (
-        <HStack key={row} gap={3} padding={3} align="center">
-          {COLUMNS.map((width, column) => (
-            <Skeleton key={column} width={width ?? "100%"} height={16} index={row} />
+    <div className="px-4 pb-6 sm:px-6" aria-hidden="true">
+      <div className="border-border bg-card overflow-hidden rounded-xl border">
+        <Stack direction="vertical" gap={0} padding={0}>
+          {Array.from({ length: ROWS }, (_, row) => (
+            <HStack key={row} gap={3} padding={3} align="center">
+              {COLUMNS.map((width, column) => (
+                <Skeleton key={column} width={width ?? "100%"} height={16} index={row} />
+              ))}
+            </HStack>
           ))}
-        </HStack>
-      ))}
-    </Stack>
+        </Stack>
+      </div>
+    </div>
   );
 }

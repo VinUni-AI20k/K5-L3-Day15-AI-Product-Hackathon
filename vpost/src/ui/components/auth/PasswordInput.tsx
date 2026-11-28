@@ -60,7 +60,13 @@ export function PasswordInput({
         size="sm"
         label={label}
         tooltip={label}
-        icon={isVisible ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+        icon={
+          isVisible ? (
+            <EyeOff className="size-4" aria-hidden="true" />
+          ) : (
+            <Eye className="size-4" aria-hidden="true" />
+          )
+        }
         isDisabled={inputProps.isDisabled}
         onClick={onToggleVisibility}
         /* `z-10` is not decoration: Astryx's own control paints a stacking

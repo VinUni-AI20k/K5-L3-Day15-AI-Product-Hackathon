@@ -1,6 +1,7 @@
 "use client";
 
 import { Banner, Button, EmptyState, Heading, HStack, Stack, StackItem, Text } from "@astryxdesign/core";
+import { Plus, Radio } from "lucide-react";
 
 import { ChannelTable } from "@/ui/components/channels/ChannelTable";
 import { ChannelTableSkeleton } from "@/ui/components/channels/ChannelTableSkeleton";
@@ -56,36 +57,58 @@ export function ConnectedChannelsScreen({
       ? (remove.variables?.channelId ?? null)
       : null;
 
+  const blockedTooltip = areWritesBlocked
+    ? (blockedReasonOverride ?? secretsNotConfiguredReason())
+    : undefined;
+
   return (
     <Stack direction="vertical" height="100%">
-      <HStack gap={3} paddingInline={4} paddingBlock={3} align="center" wrap="wrap">
-        {/* h2: the hub above owns the page's h1 (core-accessibility §1). */}
-        <Heading level={2}>Page đã kết nối</Heading>
-        {/* Only once the list is real: "0 Page" while loading reads as an
-            answer, and the operator would act on it. */}
-        {channels.data ? (
-          <Text type="supporting" role="status" aria-live="polite">
-            {items.length} Page
-          </Text>
-        ) : null}
-        <Button
-          variant="secondary"
-          size="sm"
-          label={channels.isFetching ? "Đang tải…" : "Tải lại"}
-          isDisabled={channels.isFetching}
-          onClick={() => void channels.refetch()}
-        />
-      </HStack>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
+        <div className="flex flex-wrap items-baseline gap-3">
+          {/* h2: the hub above owns the page's h1 (core-accessibility §1). */}
+          <Heading level={2}>Page đã kết nối</Heading>
+          {/* Only once the list is real: "0 Page" while loading reads as an
+              answer, and the operator would act on it. */}
+          {channels.data ? (
+            <Text type="supporting" color="secondary" role="status" aria-live="polite">
+              {items.length} Page
+            </Text>
+          ) : null}
+        </div>
+
+        <HStack gap={2} align="center" wrap="wrap">
+          <Button
+            variant="secondary"
+            size="sm"
+            label={channels.isFetching ? "Đang tải…" : "Tải lại"}
+            isDisabled={channels.isFetching}
+            onClick={() => void channels.refetch()}
+          />
+          {/* Single clear primary action when rows exist; when empty, the empty state
+              below owns the primary CTA so there is never more than one per view. */}
+          {items.length > 0 ? (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus aria-hidden="true" />}
+              label="Kết nối Page"
+              isDisabled={areWritesBlocked}
+              tooltip={blockedTooltip}
+              onClick={onGoToConnect}
+            />
+          ) : null}
+        </HStack>
+      </div>
 
       {setStatus.isError ? (
-        <Stack direction="vertical" paddingInline={4} paddingBlock={0}>
+        <div className="px-4 pb-3 sm:px-6">
           <ApiErrorNotice error={setStatus.error} />
-        </Stack>
+        </div>
       ) : null}
       {remove.isError ? (
-        <Stack direction="vertical" paddingInline={4} paddingBlock={0}>
+        <div className="px-4 pb-3 sm:px-6">
           <ApiErrorNotice error={remove.error} />
-        </Stack>
+        </div>
       ) : null}
 
       <StackItem size="fill">
@@ -113,6 +136,17 @@ export function ConnectedChannelsScreen({
         />
       </StackItem>
     </Stack>
+  );
+}
+
+function ChannelEmptyIcon() {
+  return (
+    <span
+      aria-hidden="true"
+      className="bg-accent text-accent-foreground inline-flex size-10 items-center justify-center rounded-lg"
+    >
+      <Radio className="size-5" />
+    </span>
   );
 }
 
@@ -150,9 +184,9 @@ function ChannelListBody({
   // --- Error, with nothing to fall back on ---------------------------------
   if (isError && items.length === 0) {
     return (
-      <Stack direction="vertical" padding={4}>
+      <div className="px-4 pb-6 sm:px-6">
         <ApiErrorNotice error={error} onRetry={onRetry} />
-      </Stack>
+      </div>
     );
   }
 
@@ -165,37 +199,46 @@ function ChannelListBody({
     // company simply has no Page and VPOST staff are not the ones to add it.
     if (blockedReasonOverride) {
       return (
-        <Stack direction="vertical" padding={4}>
-          <EmptyState
-            headingLevel={3}
-            title="Công ty này chưa kết nối Page nào"
-            description={`Chưa có Page nào để đăng bài. ${blockedReasonOverride}`}
-          />
-        </Stack>
+        <div className="px-4 pb-6 sm:px-6">
+          <div className="border-border bg-card rounded-xl border p-6">
+            <EmptyState
+              headingLevel={3}
+              icon={<ChannelEmptyIcon />}
+              title="Công ty này chưa kết nối Page nào"
+              description={`Chưa có Page nào để đăng bài. ${blockedReasonOverride}`}
+            />
+          </div>
+        </div>
       );
     }
 
     if (areWritesBlocked) {
       return (
-        <Stack direction="vertical" padding={4}>
-          <EmptyState
-            headingLevel={3}
-            title="Chưa kết nối Page nào"
-            description={`Chưa thể kết nối Page cho tới khi máy chủ được cấu hình xong. ${secretsNotConfiguredReason()}`}
-          />
-        </Stack>
+        <div className="px-4 pb-6 sm:px-6">
+          <div className="border-border bg-card rounded-xl border p-6">
+            <EmptyState
+              headingLevel={3}
+              icon={<ChannelEmptyIcon />}
+              title="Chưa kết nối Page nào"
+              description={`Chưa thể kết nối Page cho tới khi máy chủ được cấu hình xong. ${secretsNotConfiguredReason()}`}
+            />
+          </div>
+        </div>
       );
     }
 
     return (
-      <Stack direction="vertical" padding={4}>
-        <EmptyState
-          headingLevel={3}
-          title="Chưa kết nối Page nào"
-          description="Chưa có Page nào để đăng bài, nên màn soạn bài sẽ không có kênh để chọn. Sang tab “Kết nối thêm” rồi bấm “Đăng nhập bằng Facebook” — hệ thống sẽ tự lấy về mọi Page bạn quản lý. Nếu công ty chưa cấu hình App Secret thì mở mục “Cách nâng cao” để dán User Access Token."
-          actions={<Button variant="primary" label="Kết nối Page" onClick={onGoToConnect} />}
-        />
-      </Stack>
+      <div className="px-4 pb-6 sm:px-6">
+        <div className="border-border bg-card rounded-xl border p-6">
+          <EmptyState
+            headingLevel={3}
+            icon={<ChannelEmptyIcon />}
+            title="Chưa kết nối Page nào"
+            description="Kết nối Fanpage Facebook để màn soạn bài có kênh đăng; bạn có thể đăng nhập bằng Facebook hoặc dán User Access Token ở tab Kết nối thêm."
+            actions={<Button variant="primary" label="Kết nối Page" onClick={onGoToConnect} />}
+          />
+        </div>
+      </div>
     );
   }
 
@@ -209,7 +252,7 @@ function ChannelListBody({
   return (
     <Stack direction="vertical" height="100%">
       {isError ? (
-        <Stack direction="vertical" paddingInline={4} paddingBlock={3}>
+        <div className="px-4 pb-4 sm:px-6">
           <Banner
             status="warning"
             title="Danh sách bên dưới có thể đã cũ — chưa làm mới được"
@@ -218,7 +261,7 @@ function ChannelListBody({
               <Button variant="secondary" size="sm" label="Thử lại" onClick={onRetry} />
             }
           />
-        </Stack>
+        </div>
       ) : null}
 
       <StackItem size="fill">

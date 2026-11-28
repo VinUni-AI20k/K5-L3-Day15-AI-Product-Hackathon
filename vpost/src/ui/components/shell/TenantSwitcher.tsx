@@ -54,7 +54,7 @@ export function TenantSwitcher({ fallbackLabel }: { fallbackLabel: string | null
       label: item.name,
       description: `${MEMBERSHIP_ROLE_LABELS[item.role]} · ${planLabel(item.plan)}`,
       // A tick AND the position of the item — never colour alone.
-      icon: isActive ? <Check aria-hidden="true" /> : undefined,
+      icon: isActive ? <Check className="size-4" aria-hidden="true" /> : undefined,
       endContent: isActive ? <Badge variant="success" label="Đang dùng" /> : undefined,
       isDisabled: switchTenant.isPending,
       onClick: () => {
@@ -91,7 +91,7 @@ export function TenantSwitcher({ fallbackLabel }: { fallbackLabel: string | null
         {
           id: "create-tenant",
           label: "Tạo công ty mới…",
-          icon: <Plus aria-hidden="true" />,
+          icon: <Plus className="size-4" aria-hidden="true" />,
           isDisabled: switchTenant.isPending,
           onClick: () => setIsCreateOpen(true),
         },
@@ -126,10 +126,14 @@ export function TenantSwitcher({ fallbackLabel }: { fallbackLabel: string | null
         button={{
           label: switchTenant.isPending ? "Đang chuyển công ty…" : `Công ty: ${label}`,
           variant: "ghost",
-          size: "sm",
-          icon: <Building2 aria-hidden="true" />,
+          size: "md",
+          icon: <Building2 className="size-4 shrink-0" aria-hidden="true" />,
           isLoading: switchTenant.isPending,
-          children: <Text>{label}</Text>,
+          children: (
+            <Text maxLines={1} weight="medium">
+              {label}
+            </Text>
+          ),
         }}
       />
 

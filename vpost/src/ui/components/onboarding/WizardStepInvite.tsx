@@ -67,17 +67,14 @@ export function WizardStepInvite({ onDone }: { onDone: () => void }) {
 
   return (
     <Stack direction="vertical" gap={4}>
-      <Stack direction="vertical" gap={1}>
-        <p className="text-muted-foreground font-mono text-[11px] tracking-[0.2em] uppercase">
+      <Stack direction="vertical" gap={1.5}>
+        <p className="text-foreground-subtle text-sm font-medium tabular-nums">
           Bước 02 / 02
         </p>
-        <Heading
-          level={1}
-          className="text-foreground text-2xl font-bold tracking-tight sm:text-3xl"
-        >
+        <Heading level={1}>
           Ai đăng bài cùng bạn?
         </Heading>
-        <Text type="supporting" className="text-muted-foreground mt-1 text-sm leading-relaxed">
+        <Text type="supporting" className="text-muted-foreground text-sm leading-relaxed">
           Tạo link mời theo vai trò rồi gửi cho nhân viên qua Zalo, Messenger hay tin nhắn. Ai mở
           link là vào đúng công ty này, bạn không phải cấu hình thêm.
         </Text>
@@ -92,7 +89,7 @@ export function WizardStepInvite({ onDone }: { onDone: () => void }) {
         <div
           role="radiogroup"
           aria-labelledby="invite-role-label"
-          className="flex flex-wrap gap-2"
+          className="flex gap-2 overflow-x-auto pb-1"
         >
           {ROLE_OPTIONS.map((option) => {
             const isSelected = option.role === role;
@@ -104,12 +101,12 @@ export function WizardStepInvite({ onDone }: { onDone: () => void }) {
                 aria-checked={isSelected}
                 onClick={() => setRole(option.role)}
                 className={cn(
-                  "rounded-full border px-4 py-2 text-sm outline-none",
-                  "focus-visible:ring-ring/50 focus-visible:ring-3",
-                  "motion-safe:transition-colors motion-safe:duration-150",
+                  "min-h-10 shrink-0 rounded-full border px-4 py-2 text-sm whitespace-nowrap outline-none",
+                  "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2",
+                  "motion-safe:transition-colors motion-safe:duration-150 motion-safe:ease-out",
                   isSelected
-                    ? "border-primary bg-accent text-accent-foreground font-medium"
-                    : "border-border text-foreground hover:bg-muted",
+                    ? "border-primary bg-primary text-primary-foreground font-medium"
+                    : "border-border bg-card text-foreground hover:bg-sidebar active:bg-muted",
                 )}
               >
                 {option.label}
@@ -117,7 +114,7 @@ export function WizardStepInvite({ onDone }: { onDone: () => void }) {
             );
           })}
         </div>
-        <Text type="supporting" className="text-muted-foreground text-xs leading-relaxed">
+        <Text type="supporting" className="text-muted-foreground text-sm leading-relaxed">
           <span className="text-foreground font-medium">{selected.label}:</span> {selected.summary}
         </Text>
       </Stack>
@@ -126,6 +123,7 @@ export function WizardStepInvite({ onDone }: { onDone: () => void }) {
         <Button
           type="button"
           variant="secondary"
+          className="min-h-10 px-4"
           onClick={() =>
             create.mutate(
               { role },
@@ -134,7 +132,7 @@ export function WizardStepInvite({ onDone }: { onDone: () => void }) {
           }
           disabled={create.isPending}
         >
-          <Plus className="size-3.5" aria-hidden="true" />
+          <Plus className="size-4" aria-hidden="true" />
           {create.isPending ? "Đang tạo link…" : "Tạo link mời"}
         </Button>
       </Stack>
@@ -150,13 +148,13 @@ export function WizardStepInvite({ onDone }: { onDone: () => void }) {
         never send.
       */}
       <Stack direction="horizontal" gap={3} align="center" wrap="wrap" className="pt-1">
-        <Button type="button" onClick={onDone} size="lg">
+        <Button type="button" onClick={onDone} size="lg" className="min-h-10 px-5">
           Vào VPOST
         </Button>
         <button
           type="button"
           onClick={onDone}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 rounded text-sm underline underline-offset-4 outline-none focus-visible:ring-2"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex min-h-10 items-center rounded-sm px-2 text-sm underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 motion-safe:transition-colors motion-safe:duration-150"
         >
           Mời sau, vào làm việc trước
         </button>
@@ -174,15 +172,15 @@ export function WizardStepInvite({ onDone }: { onDone: () => void }) {
  */
 function MintedLinks({ links }: { links: readonly CreateInviteResponse[] }) {
   return (
-    <Stack direction="vertical" gap={0} className="border-border overflow-hidden rounded-lg border">
+    <Stack direction="vertical" gap={0} className="border-border bg-card overflow-hidden rounded-xl border">
       <Stack
         direction="horizontal"
         gap={2}
         align="center"
         justify="between"
-        className="bg-muted/40 border-border border-b px-3.5 py-2.5"
+        className="bg-sidebar border-border border-b px-4 py-3"
       >
-        <p className="text-foreground text-sm font-medium">Link mời đã tạo</p>
+        <p className="text-foreground text-sm font-semibold">Link mời đã tạo</p>
         <p className="text-muted-foreground font-mono text-xs tabular-nums">
           {links.length} link
         </p>
@@ -196,7 +194,7 @@ function MintedLinks({ links }: { links: readonly CreateInviteResponse[] }) {
         ))}
       </ul>
 
-      <p className="text-muted-foreground bg-muted/20 px-3.5 py-2 text-xs leading-relaxed">
+      <p className="text-muted-foreground bg-sidebar/60 px-4 py-2.5 text-xs leading-relaxed">
         Chép link ngay — vì lý do an toàn, hệ thống chỉ hiện mỗi link đúng một lần. Cần thêm thì tạo
         link mới ở màn Thành viên.
       </p>
@@ -226,19 +224,24 @@ function MintedLinkRow({ invite }: { invite: CreateInviteResponse }) {
   const isCopied = copiedAt !== null;
 
   return (
-    <Stack direction="horizontal" gap={3} align="center" className="px-3.5 py-2.5">
-      <span className="border-border text-muted-foreground shrink-0 rounded border px-2 py-0.5 text-[11px]">
+    <Stack direction="horizontal" gap={3} align="center" className="px-4 py-3">
+      <span className="border-border bg-muted text-muted-foreground shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium">
         {roleLabel}
       </span>
       {/* `select-all`: one click selects the whole link when the clipboard says no. */}
       <code className="text-foreground min-w-0 flex-1 truncate font-mono text-xs select-all">
         {invite.url}
       </code>
-      <Button type="button" variant="ghost" size="sm" onClick={() => void copy()}>
+      <Button
+        type="button"
+        variant="ghost"
+        className="min-h-10 shrink-0 px-3 sm:min-h-8"
+        onClick={() => void copy()}
+      >
         {isCopied ? (
-          <Check className="size-3.5" aria-hidden="true" />
+          <Check className="size-4" aria-hidden="true" />
         ) : (
-          <Copy className="size-3.5" aria-hidden="true" />
+          <Copy className="size-4" aria-hidden="true" />
         )}
         {isCopied ? "Đã chép" : "Chép link"}
       </Button>

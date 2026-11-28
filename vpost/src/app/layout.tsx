@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 
-import { readAppearancePreset } from "@/app/_lib/appearance";
-import { APPEARANCE_PRESET_ATTRIBUTE } from "@/shared/appearance-presets";
 import {
   COLOR_SCHEME_ATTRIBUTE,
   COLOR_SCHEME_BOOTSTRAP_SCRIPT,
@@ -44,15 +42,13 @@ export const metadata: Metadata = {
 };
 
 /**
- * Session-independent, but NOT static: the appearance preset (M3.4) is read
- * here so the first paint already carries the right dye. The gate behind
- * `readAppearancePreset` caches it, so this costs one query a minute per
- * process rather than one per page view.
+ * Session-independent, but NOT static: reads the per-viewer colour-scheme
+ * cookie here so an explicit light/dark preference arrives on first paint.
  */
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const [themePreset, cookieStore] = await Promise.all([readAppearancePreset(), cookies()]);
+  const cookieStore = await cookies();
 
   const schemeChoice = parseColorSchemeCookie(cookieStore.get(COLOR_SCHEME_COOKIE)?.value);
   const resolvedScheme = resolveColorSchemeOnServer(schemeChoice);
@@ -66,10 +62,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
          without surfacing a hydration error in the Next dev overlay.
          `suppressHydrationWarning` applies only one level deep (to `<html>`). */
       suppressHydrationWarning
-      /* The preset's stylesheet is already in the <head> (globals.css imports
-         it), and it is scoped to this attribute — so the colour arrives with
-         the markup and never flips after hydration. */
-      {...{ [APPEARANCE_PRESET_ATTRIBUTE]: themePreset }}
       /* The CHOICE travels too, so the toggle can render "Theo máy" as chosen
          rather than inferring it back from whichever class ended up applied. */
       {...{ [COLOR_SCHEME_ATTRIBUTE]: schemeChoice }}

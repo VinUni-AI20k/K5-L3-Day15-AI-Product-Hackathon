@@ -6,19 +6,20 @@ import {
   DESIGN_DARK,
   DESIGN_LIGHT,
   DESIGN_SCALE_TOKENS,
+  buildRootSchemeTokens,
   type DesignSchemePalette,
 } from "@/ui/theme/design-tokens";
 import { vpostTheme } from "@/ui/theme/vpost-theme";
 
 /**
- * Guard suite for the design system UI Foundations v2 theme (`vpost-theme.ts` → `vpost.css` + `presets.css`).
+ * Guard suite for the design system UI Foundations v2 theme (`vpost-theme.ts` → `vpost.css` + `root-tokens.css`).
  *
  * Verifies:
  *   1. Built CSS sync: every token overridden in `vpost-theme.ts` is emitted verbatim into `:scope`
  *      of `vpost.css` (and `vpost.css` carries the `@generated` header).
- *   2. Root bridge & reduced motion: `presets.css` carries the `:root` / `:root.dark` design system
- *      bridge, `[data-astryx-theme]:not([data-theme]) { color-scheme: inherit; }`, and
- *      `@media (prefers-reduced-motion: reduce)`.
+ *   2. Root bridge & reduced motion: `root-tokens.css` carries the `:root:not(.dark)` / `:root.dark`
+ *      design system bridge in exact sync with `buildRootSchemeTokens`, `[data-astryx-theme]:not([data-theme]) { color-scheme: inherit; }`,
+ *      and `@media (prefers-reduced-motion: reduce)`.
  *   3. Spec sections 1–6 invariants: 90/9/1 palette, never white text on green/orange,
  *      12px typography floor (no 10px), Hanken Grotesk Vietnamese font wiring, 4-pt spacing,
  *      small radii (<=24px, no 56px), valid soft shadows + accent-based inset state shadows
@@ -28,7 +29,7 @@ import { vpostTheme } from "@/ui/theme/vpost-theme";
  */
 
 const VPOST_CSS_PATH = new URL("../vpost.css", import.meta.url);
-const PRESETS_CSS_PATH = new URL("../presets.css", import.meta.url);
+const ROOT_TOKENS_CSS_PATH = new URL("../root-tokens.css", import.meta.url);
 const THEME_SOURCE_PATH = new URL("../vpost-theme.ts", import.meta.url);
 const LAYOUT_PATH = new URL("../../../app/layout.tsx", import.meta.url);
 
@@ -42,10 +43,27 @@ function readBuiltCss(): string {
   return css;
 }
 
-function readPresetsCss(): string {
-  const css = readFileSync(PRESETS_CSS_PATH, "utf8");
-  if (css.trim().length === 0) throw new Error("presets.css is empty — re-run `pnpm theme:presets`");
+function readRootTokensCss(): string {
+  const css = readFileSync(ROOT_TOKENS_CSS_PATH, "utf8");
+  if (css.trim().length === 0) throw new Error("root-tokens.css is empty");
   return css;
+}
+
+function extractCssBlockDeclarations(css: string, selector: string): Map<string, string> {
+  const header = `${selector} {`;
+  const start = css.indexOf(header);
+  if (start < 0) {
+    throw new Error(`root-tokens.css is missing \`${selector}\` block`);
+  }
+  const end = css.indexOf("\n}", start);
+  if (end < 0) throw new Error(`root-tokens.css \`${selector}\` block is unterminated`);
+
+  const declarations = new Map<string, string>();
+  for (const line of css.slice(start + header.length, end).split("\n")) {
+    const match = /^\s*([a-z0-9-]+|--[a-z0-9-]+)\s*:\s*(.+?);\s*$/i.exec(line);
+    if (match) declarations.set(match[1], match[2]);
+  }
+  return declarations;
 }
 
 /** Declarations inside the theme root (`:scope { ... }`) of `vpost.css`. */
@@ -175,29 +193,45 @@ describe("vpost.css is the build of vpost-theme.ts", () => {
 
 // --- 2. Root Tailwind bridge, dark mode & reduced motion --------------------
 
-describe("presets.css root bridge, dark-mode switching and reduced motion", () => {
-  const presetsCss = readPresetsCss();
+describe("root-tokens.css root bridge, dark-mode switching and reduced motion", () => {
+  const rootTokensCss = readRootTokensCss();
 
-  it("is @generated and applies design system light & dark tokens to :root", () => {
-    expect(presetsCss.slice(0, 300)).toContain("@generated");
-    expect(presetsCss).toContain(":root:not(.dark),\n:root[data-theme-preset] {");
-    expect(presetsCss).toContain(":root.dark,\n:root.dark[data-theme-preset] {");
-    expect(presetsCss).toContain(`--background: ${DESIGN_LIGHT.bgPage};`);
-    expect(presetsCss).toContain(`--background: ${DESIGN_DARK.bgPage};`);
-    expect(presetsCss).toContain(`--primary: ${DESIGN_LIGHT.buttonPrimaryBg};`);
-    expect(presetsCss).toContain(`--primary: ${DESIGN_DARK.buttonPrimaryBg};`);
-    expect(presetsCss).toContain(`--ring: ${DESIGN_LIGHT.accentBrand};`);
-    expect(presetsCss).toContain(`--ring: ${DESIGN_DARK.accentBrand};`);
+  it("matches buildRootSchemeTokens(DESIGN_LIGHT) and buildRootSchemeTokens(DESIGN_DARK) verbatim", () => {
+    const lightDecls = extractCssBlockDeclarations(rootTokensCss, ":root:not(.dark)");
+    const darkDecls = extractCssBlockDeclarations(rootTokensCss, ":root.dark");
+
+    expect(lightDecls.get("color-scheme")).toBe("light");
+    expect(darkDecls.get("color-scheme")).toBe("dark");
+
+    const expectedLight = buildRootSchemeTokens(DESIGN_LIGHT);
+    for (const [token, value] of Object.entries(expectedLight)) {
+      expect(lightDecls.get(token), `light root token ${token}`).toBe(value);
+    }
+
+    const expectedDark = buildRootSchemeTokens(DESIGN_DARK);
+    for (const [token, value] of Object.entries(expectedDark)) {
+      expect(darkDecls.get(token), `dark root token ${token}`).toBe(value);
+    }
+
+    expect(rootTokensCss).not.toContain("data-theme-preset");
   });
 
-  it("restores color-scheme: inherit on [data-astryx-theme]:not([data-theme]) so .dark switches light-dark()", () => {
-    expect(presetsCss).toMatch(
+  it("restores color-scheme switching on [data-astryx-theme]:not([data-theme]) so .dark switches light-dark()", () => {
+    expect(rootTokensCss).toMatch(
       /\[data-astryx-theme\]:not\(\[data-theme\]\)\s*\{\s*color-scheme:\s*inherit;\s*\}/,
+    );
+    expect(rootTokensCss).toMatch(
+      /:root:not\(\.dark\)\s+\[data-astryx-theme\]:not\(\[data-theme\]\)\s*\{\s*color-scheme:\s*light;\s*\}/,
+    );
+    expect(rootTokensCss).toMatch(
+      /:root\.dark\s+\[data-astryx-theme\]:not\(\[data-theme\]\)\s*\{\s*color-scheme:\s*dark;\s*\}/,
     );
   });
 
   it("respects prefers-reduced-motion: reduce for transition and motion tokens", () => {
-    const match = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/.exec(presetsCss);
+    const match = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/.exec(
+      rootTokensCss,
+    );
     expect(match, "missing @media (prefers-reduced-motion: reduce) block").not.toBeNull();
     const block = match![1];
     expect(block).toContain("--motion-hover: 0ms;");

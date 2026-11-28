@@ -1,5 +1,7 @@
 "use client";
 
+import { ProgressBar } from "@astryxdesign/core";
+import { Loader2 } from "lucide-react";
 import { useId } from "react";
 
 /**
@@ -21,27 +23,22 @@ export function SyncRunningCard() {
     <section
       aria-labelledby={headingId}
       aria-busy="true"
-      className="bg-card border-border space-y-2.5 rounded-xl border p-4"
+      className="bg-card border-border space-y-3 rounded-xl border p-5"
     >
       <div className="flex items-center gap-2.5">
-        <span
+        <Loader2
           aria-hidden="true"
-          className="border-primary/30 border-t-primary size-4 shrink-0 rounded-full border-2 motion-safe:animate-spin"
+          className="text-accent-foreground size-4 shrink-0 motion-safe:animate-spin"
         />
-        <h2 id={headingId} className="text-sm font-semibold">
+        <h2 id={headingId} className="text-foreground text-base font-semibold">
           Đang đọc Drive và Sheet
         </h2>
       </div>
 
-      {/* Indeterminate on purpose: it pulses to show work, it does not fill. */}
-      <span
-        aria-hidden="true"
-        className="bg-muted flex h-1.5 w-full overflow-hidden rounded-full"
-      >
-        <span className="bg-primary/60 h-full w-full motion-safe:animate-pulse" />
-      </span>
+      {/* Indeterminate on purpose: it signals ongoing work without inventing a percentage. */}
+      <ProgressBar label="Đang đọc Drive và Sheet" isLabelHidden isIndeterminate variant="accent" />
 
-      <p className="text-muted-foreground text-sm">
+      <p className="text-muted-foreground text-sm leading-relaxed">
         Chưa có số liệu cho tới khi lần chạy kết thúc — hệ thống không báo được tiến độ giữa chừng.
         Thư mục lớn có thể mất vài phút. Kết quả sẽ hiện ngay bên dưới khi xong.
       </p>

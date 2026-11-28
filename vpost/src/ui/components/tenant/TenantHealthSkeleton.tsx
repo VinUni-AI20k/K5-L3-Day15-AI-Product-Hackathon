@@ -1,3 +1,7 @@
+"use client";
+
+import { Card, HStack, Skeleton, Stack } from "@astryxdesign/core";
+
 /**
  * Loading placeholder for TenantHealthCard. Heights mirror the real card so the
  * layout does not shift when data arrives (web-feedback-states rule 1: CLS = 0).
@@ -6,19 +10,18 @@
  */
 export function TenantHealthSkeleton() {
   return (
-    <div
-      aria-hidden="true"
-      className="bg-card space-y-4 rounded-xl border p-5 motion-safe:animate-pulse"
-    >
-      <div className="flex items-center justify-between gap-4">
-        <div className="bg-muted h-5 w-40 rounded" />
-        <div className="bg-muted h-6 w-24 rounded-full" />
-      </div>
-      <div className="space-y-2">
-        <div className="bg-muted h-4 w-72 max-w-full rounded" />
-        <div className="bg-muted h-4 w-52 max-w-full rounded" />
-        <div className="bg-muted h-4 w-60 max-w-full rounded" />
-      </div>
-    </div>
+    <Card padding={5} aria-hidden="true">
+      <Stack direction="vertical" gap={4}>
+        <HStack gap={4} justify="between" align="center">
+          <Skeleton width={160} height={22} index={0} />
+          <Skeleton width={96} height={24} index={1} />
+        </HStack>
+        <Stack direction="vertical" gap={2}>
+          <Skeleton width="75%" height={16} index={2} />
+          <Skeleton width="55%" height={16} index={3} />
+          <Skeleton width="65%" height={16} index={4} />
+        </Stack>
+      </Stack>
+    </Card>
   );
 }

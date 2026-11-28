@@ -61,7 +61,11 @@ function headerColumnInsetPx(relative: string): number {
     /\bmx-auto\b[\s\S]*\bmax-w-5xl\b|\bmax-w-5xl\b[\s\S]*\bmx-auto\b/,
   );
 
-  const inline = /(?:^|\s)p[xl]?-(\d+)(?:\s|$)/.exec(box);
+  // Desktop gutter (1440px): responsive `sm:px-6` / `md:px-6` / `lg:px-6` wins
+  // over the mobile `px-4` fallback (screen pass rule 5: 24px desktop, 16px mobile).
+  const desktopInline = /(?:^|\s)(?:sm|md|lg):p[xl]?-(\d+)(?:\s|$)/.exec(box);
+  const baseInline = /(?:^|\s)p[xl]?-(\d+)(?:\s|$)/.exec(box);
+  const inline = desktopInline ?? baseInline;
   return inline ? Number(inline[1]) * TAILWIND_STEP_PX : 0;
 }
 

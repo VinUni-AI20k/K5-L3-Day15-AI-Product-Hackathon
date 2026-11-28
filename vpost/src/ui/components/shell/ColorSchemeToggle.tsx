@@ -14,11 +14,10 @@ import {
 /**
  * One icon. Press it, the scheme flips.
  *
- * A PER-VIEWER preference, deliberately NOT the platform appearance setting:
- * one admin picks the product's colour for everybody, but light-or-dark is each
- * operator's own, and the two live in different places for that reason. Every
- * preset already ships both schemes (`presets.css`), so this only chooses which
- * half of an existing palette is shown.
+ * A PER-VIEWER preference: light-or-dark is each operator's own, stored in a
+ * browser cookie and switched on `<html>`. Both schemes ship in
+ * `root-tokens.css` and `vpost.css`, so this only chooses which half of the
+ * existing palette is shown.
  *
  * NO REACT STATE, AND THAT IS THE POINT. The scheme in force lives in one place
  * — the `dark` class on `<html>`, put there by the server or by the bootstrap
@@ -98,12 +97,13 @@ export function ColorSchemeToggle() {
       label="Đổi chế độ sáng tối"
       tooltip="Đổi chế độ sáng tối"
       isIconOnly
-      size="sm"
+      size="md"
       variant="ghost"
+      className="vpost-theme-toggle"
       icon={
         <>
-          <Sun className="dark:hidden" aria-hidden="true" />
-          <Moon className="hidden dark:block" aria-hidden="true" />
+          <Sun className="size-4 dark:hidden" aria-hidden="true" />
+          <Moon className="hidden size-4 dark:block" aria-hidden="true" />
         </>
       }
       onClick={toggle}

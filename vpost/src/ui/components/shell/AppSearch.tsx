@@ -85,10 +85,11 @@ export function AppSearch() {
     <>
       <Button
         variant="secondary"
-        size="sm"
-        icon={<Search aria-hidden="true" />}
+        size="md"
+        className="vpost-search-trigger"
+        icon={<Search className="size-4" aria-hidden="true" />}
         label="Tìm màn hình"
-        endContent={<Kbd keys="mod+k" />}
+        endContent={<Kbd keys="mod+k" className="hidden sm:inline-flex" />}
         onClick={() => setIsOpen(true)}
       />
       <CommandPalette

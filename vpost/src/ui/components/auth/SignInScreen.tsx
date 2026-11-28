@@ -5,11 +5,8 @@ import {
   Button,
   Card,
   Divider,
-  Grid,
   Heading,
-  Icon,
   LinkProvider,
-  Section,
   Stack,
   Tab,
   TabList,
@@ -17,6 +14,7 @@ import {
   Theme,
 } from "@astryxdesign/core";
 import { InternationalizationProvider } from "@astryxdesign/core/i18n";
+import { Check, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -118,13 +116,8 @@ export function SignInScreen({
   return (
     /* THE SAME THREE PROVIDERS AppFrame wraps the app in, because this screen
        lives OUTSIDE the `(app)` group and therefore outside AppFrame.
-       Measured on /signin in the T11 inspect round, before this wrapper:
-       `--color-accent` resolved to Astryx's own `#0064e0` while `--primary`
-       was Indigo Dye, so "Tiếp tục với Facebook" — a `variant="primary"`
-       Astryx Button — rendered in a bright product blue on the front door of a
-       product whose only action colour is indigo (DESIGN.md, The One Indigo
-       Rule). The ink went with it: body text came out at the neutral theme's
-       cold near-black instead of Warm Ink.
+       Without `<Theme theme={vpostTheme}>`, Astryx components fall back to
+       the built-in neutral blue accent instead of the VPOST semantic token set.
        `LinkProvider` and the Vietnamese catalog come along for the same reason
        they do in AppFrame — an Astryx `Link` here must route like every other,
        and Astryx's built-in strings must speak Vietnamese on this page too. */
@@ -134,189 +127,152 @@ export function SignInScreen({
         messages={{ [ASTRYX_LOCALE]: ASTRYX_VI }}
       >
         <Theme theme={vpostTheme}>
-          <Grid
-            columns={{ minWidth: 460, max: 2, repeat: "fit" }}
-            gap={0}
-            width="100%"
-            className="flex-1"
-          >
-      <BrandColumn />
+          <div className="bg-background grid min-h-full w-full flex-1 grid-cols-1 lg:grid-cols-2">
+            <BrandColumn />
 
-      {/* THE AUTH COLUMN — one island card floating on an otherwise empty half.
-          A Card here is deliberate even though the layout doc keeps cards out of
-          page structure: this is a single discrete widget with a hard boundary
-          (the whole point of the island), not a wrapper around page sections. */}
-      <Section variant="transparent" padding={8} className="relative overflow-hidden">
-        {/* Decoration only. The halo is mixed from the same accent token the
-            brand column's gradient uses, so it re-values itself with the theme;
-            aria-hidden because it says nothing. */}
-        <Stack
-          aria-hidden
-          className="pointer-events-none absolute start-0 bottom-10 size-72 rounded-full bg-accent/40 blur-3xl"
-        />
+            {/* THE AUTH COLUMN — one calm island card on the pure page ground. */}
+            <div className="bg-background flex flex-col justify-center px-4 py-8 sm:px-6 lg:p-10">
+              <Stack
+                direction="vertical"
+                vAlign="center"
+                gap={5}
+                className="mx-auto w-full max-w-md"
+              >
+                <Card elevation="low" padding={6} width="100%">
+                  <Stack
+                    direction="vertical"
+                    gap={5}
+                    as="section"
+                    aria-label="Tự động hóa cùng VPOST ngay"
+                  >
+                    <Stack direction="vertical" gap={1.5}>
+                      <Heading level={2}>Tự động hóa cùng VPOST ngay</Heading>
+                      <Text type="supporting" color="secondary">
+                        {mode === "register"
+                          ? "Tạo tài khoản để bắt đầu dùng VPOST."
+                          : "Chào mừng bạn trở lại. Đăng nhập để tiếp tục soạn và đăng bài."}
+                      </Text>
+                    </Stack>
 
-        <Stack
-          direction="vertical"
-          vAlign="center"
-          height="100%"
-          gap={4}
-          className="relative"
-        >
-          <Card
-            elevation="med"
-            padding={8}
-            width="100%"
-            maxWidth={480}
-            className="mx-auto"
-          >
-          <Stack
-            direction="vertical"
-            gap={4}
-            as="section"
-            aria-label="Tự động hóa cùng VPOST ngay"
-          >
-            <Stack direction="vertical" gap={1}>
-              <Heading level={2}>Tự động hóa cùng VPOST ngay</Heading>
-              <Text type="supporting">
-                {mode === "register"
-                  ? "Tạo tài khoản để bắt đầu dùng VPOST."
-                  : "Chào mừng bạn trở lại. Đăng nhập để tiếp tục soạn và đăng bài."}
-              </Text>
-            </Stack>
+                    {/* Neither banner is decoration: they are the only explanation an
+                        operator gets for a round trip that ended back here. */}
+                    {isPendingApproval ? (
+                      // `status="info"` + `role="status"`, never error red: the request
+                      // was recorded and is waiting for a human. Someone who reads
+                      // "bị từ chối" goes and asks for a second account instead of
+                      // waiting five minutes (core-feedback-states).
+                      <Banner
+                        status="info"
+                        role="status"
+                        title="Tài khoản đang chờ quản trị viên duyệt"
+                        description="Yêu cầu truy cập của bạn đã được ghi nhận. Vui lòng đợi quản trị viên duyệt."
+                      />
+                    ) : null}
 
-            {/* Neither banner is decoration: they are the only explanation an
-                operator gets for a round trip that ended back here. */}
-            {isPendingApproval ? (
-              // `status="info"` + `role="status"`, never error red: the request
-              // was recorded and is waiting for a human. Someone who reads
-              // "bị từ chối" goes and asks for a second account instead of
-              // waiting five minutes (core-feedback-states).
-              <Banner
-                status="info"
-                role="status"
-                title="Tài khoản đang chờ quản trị viên duyệt"
-                description="Yêu cầu truy cập của bạn đã được ghi nhận. Vui lòng đợi quản trị viên duyệt."
-              />
-            ) : null}
+                    {errorMessage ? (
+                      <Stack direction="vertical" gap={1.5}>
+                        <Banner
+                          status="error"
+                          role="alert"
+                          title="Không đăng nhập được"
+                          description={errorMessage}
+                        />
+                        {unknownErrorCode ? (
+                          <Text type="code" size="xsm" color="secondary">
+                            Mã lỗi: {unknownErrorCode}
+                          </Text>
+                        ) : null}
+                      </Stack>
+                    ) : null}
 
-            {errorMessage ? (
-              <Stack direction="vertical" gap={1}>
-                <Banner
-                  status="error"
-                  role="alert"
-                  title="Không đăng nhập được"
-                  description={errorMessage}
-                />
-                {unknownErrorCode ? (
-                  <Text type="code" size="xsm" color="secondary">
-                    Mã lỗi: {unknownErrorCode}
+                    {/* Anchors, not buttons: `/signin?mode=register` is a real address,
+                        so the switch works before hydration, survives F5 and Back, and
+                        can be sent to a colleague. `TabList` requires `onChange`, but
+                        the anchors already own the navigation — handling it a second
+                        time is what would navigate twice (the same trap MembersHub
+                        documents). AppLink comes from the LinkProvider above, so the
+                        move stays client-side and the typed e-mail is preserved. */}
+                    <TabList
+                      value={mode}
+                      onChange={() => undefined}
+                      layout="fill"
+                      aria-label="Chọn cách vào hệ thống"
+                    >
+                      {AUTH_MODES.map((value) => (
+                        <Tab
+                          key={value}
+                          value={value}
+                          label={AUTH_MODE_LABELS[value]}
+                          href={authModeHref(value, returnUrl)}
+                        />
+                      ))}
+                    </TabList>
+
+                    {/* `key` — switching tabs must build a NEW form, not re-label the
+                        old one: a refusal from the tab being left has nothing to say
+                        about the tab being opened (core-form-architecture §"Đổi ID reset
+                        bằng key prop"). The e-mail lives above, so it survives. */}
+                    <PasswordAuthForm
+                      key={mode}
+                      mode={mode}
+                      action={mode === "register" ? registerWithPassword : signInWithPassword}
+                      returnUrl={returnUrl}
+                      email={email}
+                      onEmailChange={setEmail}
+                    />
+
+                    <Divider label="Hoặc tiếp tục với" />
+
+                    {/* Two independent forms, not one with two buttons: each carries its
+                        own Server Action, and a failure of one must not touch the other. */}
+                    <Stack direction="vertical" gap={3}>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {/* Both secondary since the password form arrived: the screen
+                            gets ONE primary button, and it is the submit of the form the
+                            operator is looking at. */}
+                        <ProviderForm
+                          action={signInWithFacebook}
+                          returnUrl={returnUrl}
+                          label="Tiếp tục với Facebook"
+                          pendingLabel="Đang chuyển sang Facebook…"
+                          variant="secondary"
+                        />
+                        <ProviderForm
+                          action={signInWithGoogle}
+                          returnUrl={returnUrl}
+                          label="Tiếp tục với Google"
+                          pendingLabel="Đang chuyển sang Google…"
+                          variant="secondary"
+                        />
+                      </div>
+
+                      {/* One shared line for both buttons. Two separate paragraphs said
+                          the same thing twice and pushed the terms line off the fold. */}
+                      <Text type="supporting" color="secondary">
+                        Liên hệ với VPOST ngay để nhận hỗ trợ.
+                      </Text>
+                    </Stack>
+
+                    {isDefaultReturnUrl ? null : (
+                      <Text type="supporting" color="secondary">
+                        Sau khi đăng nhập, bạn sẽ quay lại: <Text type="code">{returnUrl}</Text>
+                      </Text>
+                    )}
+
+                    <Text type="supporting" size="xsm" color="secondary">
+                      Khi tiếp tục, bạn đồng ý với quy định sử dụng nội bộ của VPOST.
+                    </Text>
+                  </Stack>
+                </Card>
+
+                <footer className="w-full text-center lg:text-start">
+                  <Text type="supporting" size="xsm" color="secondary">
+                    © VPOST 2026. All rights reserved.
                   </Text>
-                ) : null}
+                </footer>
               </Stack>
-            ) : null}
-
-            {/* Anchors, not buttons: `/signin?mode=register` is a real address,
-                so the switch works before hydration, survives F5 and Back, and
-                can be sent to a colleague. `TabList` requires `onChange`, but
-                the anchors already own the navigation — handling it a second
-                time is what would navigate twice (the same trap MembersHub
-                documents). AppLink comes from the LinkProvider above, so the
-                move stays client-side and the typed e-mail is preserved. */}
-            <TabList
-              value={mode}
-              onChange={() => undefined}
-              layout="fill"
-              aria-label="Chọn cách vào hệ thống"
-            >
-              {AUTH_MODES.map((value) => (
-                <Tab
-                  key={value}
-                  value={value}
-                  label={AUTH_MODE_LABELS[value]}
-                  href={authModeHref(value, returnUrl)}
-                />
-              ))}
-            </TabList>
-
-            {/* `key` — switching tabs must build a NEW form, not re-label the
-                old one: a refusal from the tab being left has nothing to say
-                about the tab being opened (core-form-architecture §"Đổi ID reset
-                bằng key prop"). The e-mail lives above, so it survives. */}
-            <PasswordAuthForm
-              key={mode}
-              mode={mode}
-              action={mode === "register" ? registerWithPassword : signInWithPassword}
-              returnUrl={returnUrl}
-              email={email}
-              onEmailChange={setEmail}
-            />
-
-            <Divider label="Hoặc tiếp tục với" />
-
-            {/* Two independent forms, not one with two buttons: each carries its
-                own Server Action, and a failure of one must not touch the other.
-                Grid, not HStack: the pair sits side by side while there is room
-                and drops to one per row on a narrow screen, without a media
-                query. */}
-            <Stack direction="vertical" gap={2}>
-              <Grid columns={{ minWidth: 170, max: 2, repeat: "fit" }} gap={3}>
-                {/* Both secondary since the password form arrived: the screen
-                    gets ONE primary button, and it is the submit of the form the
-                    operator is looking at (DESIGN.md, The One Indigo Rule).
-                    E5.2 still makes Facebook the more valuable of the two — the
-                    same round trip signs the operator in AND brings back the
-                    Page tokens — so it keeps the first slot. Full-page redirect,
-                    never a popup (web-auth-methods rule 1). */}
-                <ProviderForm
-                  action={signInWithFacebook}
-                  returnUrl={returnUrl}
-                  label="Tiếp tục với Facebook"
-                  pendingLabel="Đang chuyển sang Facebook…"
-                  variant="secondary"
-                />
-                <ProviderForm
-                  action={signInWithGoogle}
-                  returnUrl={returnUrl}
-                  label="Tiếp tục với Google"
-                  pendingLabel="Đang chuyển sang Google…"
-                  variant="secondary"
-                />
-              </Grid>
-
-              {/* One shared line for both buttons. Two separate paragraphs said
-                  the same thing twice and pushed the terms line off the fold. */}
-              <Text type="supporting">
-                Liên hệ với VPOST ngay để nhận hỗ trợ.
-              </Text>
-            </Stack>
-
-            {isDefaultReturnUrl ? null : (
-              <Text type="supporting">
-                Sau khi đăng nhập, bạn sẽ quay lại: <Text type="code">{returnUrl}</Text>
-              </Text>
-            )}
-
-            <Text type="supporting">
-              Khi tiếp tục, bạn đồng ý với quy định sử dụng nội bộ của VPOST.
-            </Text>
-          </Stack>
-          </Card>
-
-          {/* OUTSIDE the card, the way the template puts it under the island:
-              the copyright is about the product, not about signing in, and one
-              more divider inside the card only made the card longer. */}
-          <Stack
-            direction="vertical"
-            as="footer"
-            width="100%"
-            maxWidth={480}
-            className="mx-auto"
-          >
-            <Text type="supporting">© VPOST 2026. All rights reserved.</Text>
-          </Stack>
-        </Stack>
-      </Section>
-          </Grid>
+            </div>
+          </div>
         </Theme>
       </InternationalizationProvider>
     </LinkProvider>
@@ -330,73 +286,52 @@ export function SignInScreen({
  */
 function BrandColumn() {
   return (
-    <Section
-      variant="transparent"
-      padding={8}
-      // The one gradient on the screen, mixed from the app's own semantic
-      // tokens (accent -> muted -> background), so it re-values itself with the
-      // theme instead of freezing a pair of hex stops.
-      className="bg-linear-to-br from-accent/35 via-muted to-background"
-    >
+    <div className="bg-sidebar border-border flex flex-col justify-center border-b px-4 py-8 sm:px-6 lg:border-e lg:border-b-0 lg:p-12">
       {/* Bounded to the same measure the auth island uses and centred in the
           half, so the two columns read as facing blocks instead of one text
           rail pinned to the window edge. */}
-      <Stack
-        direction="vertical"
-        gap={6}
-        height="100%"
-        vAlign="center"
-        width="100%"
-        maxWidth={448}
-        className="mx-auto"
-      >
-        <Stack direction="horizontal" gap={2} align="center" as="header">
-          <Text weight="bold" size="lg">
-            VPOST
-          </Text>
-          <Text type="supporting">Đăng bài tự động</Text>
-        </Stack>
-
-        {/* The template's floating collage, as GEOMETRY rather than photographs.
-            The template fills it with stock portraits; the only pictures this
-            product owns are customer product photos and none of them belong on
-            a public sign-in page, so the shapes carry the motion instead.
-            Purely decorative — aria-hidden — and dropped below `sm`, where it
-            would only push the form down a phone screen. */}
-        <Stack
-          aria-hidden
-          width="100%"
-          maxWidth={360}
-          height={160}
-          className="relative hidden sm:flex"
-        >
-          <Stack className="absolute start-0 top-0 size-20 rounded-full bg-card/80 ring-1 ring-border" />
-          <Stack className="absolute end-0 top-4 h-12 w-32 rounded-full bg-accent/70" />
-          <Stack className="absolute end-16 bottom-0 size-24 rounded-full bg-card/70 ring-1 ring-border" />
-          <Stack className="absolute start-20 bottom-5 size-8 rounded-full bg-card/60" />
-        </Stack>
+      <Stack direction="vertical" gap={6} className="mx-auto w-full max-w-md">
+        <header className="flex items-center gap-3">
+          <div
+            aria-hidden="true"
+            className="bg-accent text-accent-foreground flex size-10 shrink-0 items-center justify-center rounded-lg"
+          >
+            <Sparkles className="size-5" aria-hidden="true" />
+          </div>
+          <div className="flex flex-col">
+            <Text weight="bold" size="lg">
+              VPOST
+            </Text>
+            <Text type="supporting" size="xsm" color="secondary">
+              Đăng bài tự động
+            </Text>
+          </div>
+        </header>
 
         <Stack direction="vertical" gap={2}>
-          <Heading level={1} type="display-2">
+          <Heading level={1} className="sm:text-4xl sm:leading-tight">
             Bắt đầu ngay hôm nay
           </Heading>
-          <Text type="supporting">
+          <Text type="large" color="secondary">
             Công cụ soạn, duyệt và đăng bài đa nền tảng
           </Text>
         </Stack>
 
-        <Stack direction="vertical" gap={2} as="ul" className="list-none">
+        <ul className="m-0 flex list-none flex-col gap-3 p-0">
           {VALUE_POINTS.map((point) => (
-            // The tick is decorative: the sentence beside it carries the whole
-            // meaning, so Icon stays aria-hidden (its default).
-            <Stack key={point} direction="horizontal" gap={2} align="start" as="li">
-              <Icon icon="check" color="success" size="sm" />
-              <Text>{point}</Text>
-            </Stack>
+            <li key={point} className="flex items-start gap-3">
+              <span
+                aria-hidden="true"
+                className="bg-success/15 text-success-foreground mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full"
+              >
+                <Check className="size-3.5" aria-hidden="true" />
+              </span>
+              <Text className="text-foreground">{point}</Text>
+            </li>
           ))}
-        </Stack>
+        </ul>
       </Stack>
-    </Section>
+    </div>
   );
 }
 

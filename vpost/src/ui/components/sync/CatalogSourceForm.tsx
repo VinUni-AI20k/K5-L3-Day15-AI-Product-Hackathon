@@ -130,7 +130,7 @@ export function CatalogSourceForm({
               placeholder="https://drive.google.com/drive/folders/…"
               autoComplete="off"
               spellCheck={false}
-              className="font-mono"
+              className="h-10 font-mono"
               disabled={update.isPending}
             />
           )}
@@ -149,7 +149,7 @@ export function CatalogSourceForm({
               placeholder="https://docs.google.com/spreadsheets/d/…"
               autoComplete="off"
               spellCheck={false}
-              className="font-mono"
+              className="h-10 font-mono"
               disabled={update.isPending}
             />
           )}
@@ -167,6 +167,7 @@ export function CatalogSourceForm({
               {...props}
               placeholder="Mẫu 2026"
               autoComplete="off"
+              className="h-10"
               disabled={update.isPending}
             />
           )}
@@ -174,13 +175,19 @@ export function CatalogSourceForm({
 
         {pending === null ? (
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={update.isPending}>
+            <Button
+              type="submit"
+              variant="secondary"
+              className="min-h-10 px-4"
+              disabled={update.isPending}
+            >
               {update.isPending ? "Đang lưu…" : "Lưu nguồn mới"}
             </Button>
             {onCancel ? (
               <Button
                 type="button"
                 variant="ghost"
+                className="min-h-10 px-3.5"
                 onClick={() => {
                   form.reset();
                   update.reset();
@@ -202,9 +209,9 @@ export function CatalogSourceForm({
           onKeyDown={(event) => {
             if (event.key === "Escape") setPending(null);
           }}
-          className="border-warning/40 bg-warning/5 space-y-3 rounded-xl border p-4"
+          className="border-warning/30 bg-warning/10 space-y-3 rounded-xl border p-4"
         >
-          <p className="text-sm font-medium">Đổi nguồn dữ liệu của đơn vị này?</p>
+          <p className="text-foreground text-sm font-semibold">Đổi nguồn dữ liệu của đơn vị này?</p>
           {/*
             A tenant switching AWAY from an uploaded file is making a bigger
             change than one editing a folder id, and only this screen knows it is
@@ -212,7 +219,7 @@ export function CatalogSourceForm({
             after this, nothing reads that file again.
           */}
           {current?.textSource?.kind === "file" ? (
-            <p className="text-sm">
+            <p className="text-foreground text-sm">
               Đơn vị này đang đọc file{" "}
               <span className="font-medium">“{current.textSource.fileName}”</span>. Lưu xong hệ
               thống chuyển sang đọc bảng Google Sheet ở trên và{" "}
@@ -224,10 +231,21 @@ export function CatalogSourceForm({
             lại. Lần đồng bộ kế tiếp sẽ xoá sản phẩm/ảnh không còn thuộc nguồn mới.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button ref={confirmRef} type="button" onClick={save}>
+            <Button
+              ref={confirmRef}
+              type="button"
+              variant="secondary"
+              className="min-h-10 px-4"
+              onClick={save}
+            >
               Đổi nguồn
             </Button>
-            <Button type="button" variant="outline" onClick={() => setPending(null)}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-10 px-3.5"
+              onClick={() => setPending(null)}
+            >
               Xem lại
             </Button>
           </div>

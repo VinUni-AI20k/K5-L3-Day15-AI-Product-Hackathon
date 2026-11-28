@@ -13,6 +13,7 @@ import {
   StatusDot,
   Text,
 } from "@astryxdesign/core";
+import { PackageSearch, SearchX } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { StockCheckSkippedBanner } from "@/ui/components/inventory/StockCheckSkippedBanner";
@@ -75,19 +76,29 @@ export function ProductInspector({
   // --- Nothing asked for ---------------------------------------------------
   if (state.kind === "none") {
     return (
-      <EmptyState
-        isCompact
-        headingLevel={headingLevel}
-        title="Chưa chọn sản phẩm nào"
-        description="Bấm vào mã sản phẩm trong bảng để xem tồn kho, ảnh và lý do bị chặn."
-      />
+      <Stack direction="vertical" padding={5} height="100%" justify="center">
+        <EmptyState
+          isCompact
+          headingLevel={headingLevel}
+          icon={
+            <span
+              aria-hidden="true"
+              className="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl"
+            >
+              <PackageSearch className="size-5" aria-hidden="true" />
+            </span>
+          }
+          title="Chưa chọn sản phẩm nào"
+          description="Bấm vào mã sản phẩm trong bảng để xem tồn kho, ảnh và lý do bị chặn."
+        />
+      </Stack>
     );
   }
 
   // --- Asked for, answer not back yet --------------------------------------
   if (state.kind === "loading") {
     return (
-      <Stack direction="vertical" gap={2} padding={4} align="start" role="status">
+      <Stack direction="vertical" gap={2} padding={5} align="start" role="status">
         <Spinner size="sm" label={`Đang mở mã ${state.code}…`} />
       </Stack>
     );
@@ -99,37 +110,47 @@ export function ProductInspector({
   // code and both ways back is the honest answer (business rule 5).
   if (state.kind === "missing") {
     return (
-      <EmptyState
-        isCompact
-        headingLevel={headingLevel}
-        title={`Không thấy mã ${state.code} trong danh sách`}
-        // Each case names ITS own cause. One sentence covering all three would
-        // tell an operator with no filter on that their filter might be to blame.
-        description={
-          recovery === null
-            ? "Danh sách đã tải hết và không có mã này. Kiểm tra lại mã, hoặc chạy đồng bộ nếu Sheet vừa thêm mã mới."
-            : recovery.kind === "clear-filter"
-              ? "Bộ lọc đang bật có thể đang loại mã này ra khỏi danh sách."
-              : "Danh sách mới tải một phần — mã này có thể nằm ở những trang chưa tải."
-        }
-        // The action lives INSIDE the modal. Pointing at a control on the page
-        // behind is pointing at something the dialog has made inert.
-        actions={
-          recovery ? (
-            // `isLoading`, not a swapped label: the fetch it starts changes
-            // nothing else in this box — the title still reads "Không thấy mã
-            // …" until the row lands — so the button is the only thing that can
-            // say the press was heard. It also disables while pending, which is
-            // what stops a second press queuing a second page.
-            <Button
-              variant="secondary"
-              label={recovery.label}
-              isLoading={recovery.isBusy}
-              onClick={recovery.onPress}
-            />
-          ) : undefined
-        }
-      />
+      <Stack direction="vertical" padding={5}>
+        <EmptyState
+          isCompact
+          headingLevel={headingLevel}
+          icon={
+            <span
+              aria-hidden="true"
+              className="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl"
+            >
+              <SearchX className="size-5" aria-hidden="true" />
+            </span>
+          }
+          title={`Không thấy mã ${state.code} trong danh sách`}
+          // Each case names ITS own cause. One sentence covering all three would
+          // tell an operator with no filter on that their filter might be to blame.
+          description={
+            recovery === null
+              ? "Danh sách đã tải hết và không có mã này. Kiểm tra lại mã, hoặc chạy đồng bộ nếu Sheet vừa thêm mã mới."
+              : recovery.kind === "clear-filter"
+                ? "Bộ lọc đang bật có thể đang loại mã này ra khỏi danh sách."
+                : "Danh sách mới tải một phần — mã này có thể nằm ở những trang chưa tải."
+          }
+          // The action lives INSIDE the modal. Pointing at a control on the page
+          // behind is pointing at something the dialog has made inert.
+          actions={
+            recovery ? (
+              // `isLoading`, not a swapped label: the fetch it starts changes
+              // nothing else in this box — the title still reads "Không thấy mã
+              // …" until the row lands — so the button is the only thing that can
+              // say the press was heard. It also disables while pending, which is
+              // what stops a second press queuing a second page.
+              <Button
+                variant="secondary"
+                label={recovery.label}
+                isLoading={recovery.isBusy}
+                onClick={recovery.onPress}
+              />
+            ) : undefined
+          }
+        />
+      </Stack>
     );
   }
 
@@ -149,7 +170,7 @@ export function ProductInspector({
     // No scroll container here: the frame around this body owns overflow
     // (LayoutPanel above 1024px, LayoutContent inside the drawer). Two nested
     // scrollers is how the drawer ended up with a body that could not move.
-    <Stack direction="vertical" gap={4} padding={4}>
+    <Stack direction="vertical" gap={4} padding={5}>
       <Stack direction="vertical" gap={1}>
         <Stack direction="horizontal" gap={2} align="center">
           <StatusDot variant={status.variant} label={status.label} />

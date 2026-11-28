@@ -1,11 +1,10 @@
 "use client";
 
-import { Fragment } from "react";
 import {
-  CheckCircle2,
   AlertTriangle,
-  FileSpreadsheet,
   ArrowDownRight,
+  CheckCircle2,
+  FileSpreadsheet,
   TrendingDown,
 } from "lucide-react";
 
@@ -41,20 +40,20 @@ export function CompatibilityReport({
   return (
     <div className="flex flex-col gap-6">
       {/* 1. Hero Stat Headline Card */}
-      <div className="relative overflow-hidden rounded-xl border border-border/80 bg-card p-6 shadow-xs">
+      <div className="border-border bg-card relative overflow-hidden rounded-xl border p-5 sm:p-6">
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="font-mono text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              BÁO CÁO TƯƠNG THÍCH DỮ LIỆU
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-muted-foreground text-sm font-medium">
+              Báo cáo tương thích dữ liệu
             </p>
             {headline.value !== null && (
               <span
                 className={`rounded-full px-2.5 py-0.5 font-mono text-xs font-medium ${
                   postableRate >= 80
-                    ? "bg-leaf/20 text-leaf-deep"
+                    ? "bg-success/15 text-success-foreground"
                     : postableRate >= 40
-                      ? "bg-turmeric/20 text-turmeric-deep"
-                      : "bg-madder/20 text-madder"
+                      ? "bg-warning/15 text-warning-foreground"
+                      : "bg-destructive/10 text-destructive"
                 }`}
               >
                 Tỷ lệ sẵn sàng: {postableRate}%
@@ -64,17 +63,17 @@ export function CompatibilityReport({
 
           <div className="flex flex-wrap items-baseline gap-3">
             {headline.value === null ? (
-              <span className="text-2xl font-semibold text-muted-foreground">
+              <span className="text-muted-foreground text-2xl font-semibold">
                 Chưa tính được số mã
               </span>
             ) : (
               <>
-                <span className="font-mono text-4xl font-bold tracking-tight text-foreground md:text-5xl tabular-nums">
+                <span className="text-foreground font-mono text-4xl font-semibold tabular-nums md:text-5xl">
                   {headline.value.toLocaleString("vi-VN")}
                 </span>
-                <span className="text-base text-muted-foreground">
+                <span className="text-muted-foreground text-base">
                   mã hợp lệ sẵn sàng đăng ngay trên{" "}
-                  <strong className="font-mono text-foreground font-semibold">
+                  <strong className="text-foreground font-mono font-semibold">
                     {report.sheet.productsParsed.toLocaleString("vi-VN")}
                   </strong>{" "}
                   mã đọc được từ bảng tính
@@ -83,7 +82,7 @@ export function CompatibilityReport({
             )}
           </div>
 
-          <p className="text-xs leading-relaxed text-muted-foreground max-w-2xl">
+          <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
             {headline.unavailableReason ??
               (headline.stockCheckSkipped
                 ? "Số mã có đủ dữ liệu trên bảng và tìm thấy ảnh trên Drive. Bạn đang tắt kiểm tồn nên số lượng tồn chưa được trừ — kết quả này có thể cao hơn thực tế."
@@ -95,39 +94,39 @@ export function CompatibilityReport({
       {headline.stockCheckSkipped ? <StockCheckSkippedBanner reason={null} /> : null}
 
       {/* 2. Visual Pipeline / Funnel */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
-        <div className="flex items-center justify-between border-b border-border/60 pb-3">
+      <div className="border-border bg-card flex flex-col gap-4 rounded-xl border p-5 sm:p-6">
+        <div className="border-border flex flex-wrap items-center justify-between gap-2 border-b pb-3">
           <div className="flex items-center gap-2">
-            <TrendingDown className="size-4 text-primary" />
-            <CardHeading className="text-sm font-semibold text-foreground">
+            <TrendingDown className="text-accent-foreground size-4 shrink-0" aria-hidden="true" />
+            <CardHeading className="text-foreground text-base font-semibold">
               Quy trình lọc dữ liệu (Vì sao chỉ ngần này mã)
             </CardHeading>
           </div>
-          <span className="text-xs text-muted-foreground">Phân tích từng giai đoạn</span>
+          <span className="text-foreground-subtle text-xs">Phân tích từng giai đoạn</span>
         </div>
 
-        <div className="flex flex-col divide-y divide-border/60">
+        <div className="divide-border flex flex-col divide-y">
           {stages.map((stage, idx) => (
-            <div key={stage.key} className="flex flex-col gap-1.5 py-3 first:pt-1 last:pb-1">
+            <div key={stage.key} className="flex flex-col gap-1.5 py-3.5 first:pt-1 last:pb-1">
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="flex size-5 items-center justify-center rounded-full bg-muted font-mono text-[10px] font-semibold text-muted-foreground">
+                <div className="flex items-center gap-2.5">
+                  <span className="bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-full font-mono text-xs font-semibold">
                     {idx + 1}
                   </span>
-                  <span className="text-sm font-medium text-foreground">{stage.label}</span>
+                  <span className="text-foreground text-sm font-medium">{stage.label}</span>
                 </div>
-                <span className="font-mono text-base font-semibold text-foreground tabular-nums">
+                <span className="text-foreground font-mono text-base font-semibold tabular-nums">
                   {stage.value.toLocaleString("vi-VN")}
                 </span>
               </div>
 
               {stage.loss ? (
-                <div className="flex items-center gap-1.5 pl-7 text-xs text-turmeric-deep">
-                  <ArrowDownRight className="size-3.5 shrink-0" />
+                <div className="text-warning-foreground flex items-center gap-1.5 pl-8 text-xs">
+                  <ArrowDownRight className="size-3.5 shrink-0" aria-hidden="true" />
                   <span>{stage.loss}</span>
                 </div>
               ) : (
-                <p className="pl-7 text-xs text-muted-foreground">
+                <p className="text-muted-foreground pl-8 text-xs">
                   Không bị mất mã nào ở giai đoạn này.
                 </p>
               )}
@@ -138,21 +137,21 @@ export function CompatibilityReport({
 
       {/* 3. Mapping Issues (if any) */}
       {mapIssues.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-xl border border-madder/30 bg-madder/10 p-5">
-          <div className="flex items-center gap-2 text-madder font-semibold text-sm">
-            <AlertTriangle className="size-4" />
+        <div className="border-destructive/30 bg-destructive/10 flex flex-col gap-3 rounded-xl border p-5 sm:p-6">
+          <div className="text-destructive flex items-center gap-2 text-base font-semibold">
+            <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
             <span>Cần kiểm tra lại ánh xạ cột</span>
           </div>
           <div className="flex flex-col gap-2">
             {mapIssues.map((issue) => (
               <div
                 key={`${issue.code}-${issue.column ?? issue.fields.join(",")}`}
-                className="flex flex-col gap-0.5 rounded-lg border border-madder/20 bg-card p-3"
+                className="border-destructive/20 bg-card flex flex-col gap-1 rounded-lg border p-3.5"
               >
-                <span className="text-xs font-semibold text-foreground">
+                <span className="text-foreground text-sm font-semibold">
                   {issue.fields.map((field) => CATALOG_FIELD_LABELS[field]).join(" · ")}
                 </span>
-                <p className="text-xs text-muted-foreground">{issue.detail}</p>
+                <p className="text-muted-foreground text-xs leading-relaxed">{issue.detail}</p>
               </div>
             ))}
           </div>
@@ -160,33 +159,33 @@ export function CompatibilityReport({
       )}
 
       {/* 4. Top Issues To Fix */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
-        <div className="flex items-center justify-between border-b border-border/60 pb-3">
-          <CardHeading className="text-sm font-semibold text-foreground">
+      <div className="border-border bg-card flex flex-col gap-4 rounded-xl border p-5 sm:p-6">
+        <div className="border-border flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+          <CardHeading className="text-foreground text-base font-semibold">
             Những việc cần xử lý nhất
           </CardHeading>
-          <span className="font-mono text-xs text-muted-foreground">
+          <span className="text-foreground-subtle font-mono text-xs">
             {report.topIssues.length} nhóm vấn đề
           </span>
         </div>
 
         {report.topIssues.length === 0 ? (
-          <div className="flex items-center gap-2 py-4 text-xs text-leaf-deep">
-            <CheckCircle2 className="size-4" />
+          <div className="text-success-foreground flex items-center gap-2 py-3 text-sm">
+            <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
             <span>Dữ liệu rất chuẩn! Không có lỗi nào đáng kể làm gián đoạn việc đăng bài.</span>
           </div>
         ) : (
-          <div className="flex flex-col divide-y divide-border/60">
+          <div className="divide-border flex flex-col divide-y">
             {report.topIssues.map((issue) => (
-              <div key={issue.reason} className="flex flex-col gap-1 py-3 first:pt-1 last:pb-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-foreground">{issue.detail}</span>
-                  <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-xs font-semibold text-muted-foreground tabular-nums">
+              <div key={issue.reason} className="flex flex-col gap-1.5 py-3.5 first:pt-1 last:pb-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-foreground text-sm font-medium">{issue.detail}</span>
+                  <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums">
                     {issue.count} mã
                   </span>
                 </div>
                 {issue.examples.length > 0 && (
-                  <p className="font-mono text-[11px] text-muted-foreground">
+                  <p className="text-foreground-subtle font-mono text-xs">
                     Ví dụ các mã gặp lỗi: {issue.examples.join(", ")}
                     {issue.count > issue.examples.length ? " …" : ""}
                   </p>
@@ -198,27 +197,27 @@ export function CompatibilityReport({
       </div>
 
       {/* 5. Sheet & Column Inventory Facts */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
-        <div className="flex items-center justify-between border-b border-border/60 pb-3">
+      <div className="border-border bg-card flex flex-col gap-4 rounded-xl border p-5 sm:p-6">
+        <div className="border-border flex flex-wrap items-center justify-between gap-2 border-b pb-3">
           <div className="flex items-center gap-2">
-            <FileSpreadsheet className="size-4 text-primary" />
-            <CardHeading className="text-sm font-semibold text-foreground">
+            <FileSpreadsheet className="text-accent-foreground size-4 shrink-0" aria-hidden="true" />
+            <CardHeading className="text-foreground text-base font-semibold">
               Thông tin bảng tính đã quét
             </CardHeading>
           </div>
-          <span className="font-mono text-xs text-muted-foreground">
+          <span className="text-foreground-subtle font-mono text-xs">
             Tab “{report.sheetName}”
           </span>
         </div>
 
-        <div className="flex flex-col gap-2.5 text-xs text-muted-foreground">
+        <div className="text-muted-foreground flex flex-col gap-3 text-sm leading-relaxed">
           <p>
             Đã đọc{" "}
-            <strong className="font-mono text-foreground font-semibold">
+            <strong className="text-foreground font-mono font-semibold">
               {report.sheet.columns.length} cột
             </strong>{" "}
             và{" "}
-            <strong className="font-mono text-foreground font-semibold">
+            <strong className="text-foreground font-mono font-semibold">
               {report.sheet.totalRows.toLocaleString("vi-VN")} dòng
             </strong>
             .
@@ -233,7 +232,7 @@ export function CompatibilityReport({
             {report.sheet.columns.map((column) => (
               <span
                 key={column}
-                className="rounded-md border border-border/80 bg-muted/40 px-2 py-1 font-mono text-[11px] text-foreground"
+                className="border-border bg-sidebar text-foreground rounded-md border px-2.5 py-1 font-mono text-xs"
               >
                 {column}
               </span>
@@ -241,14 +240,14 @@ export function CompatibilityReport({
           </div>
 
           {report.fieldMap.priceLikeColumns.length > 0 && (
-            <p className="text-[11px] text-turmeric-deep pt-1">
+            <p className="text-warning-foreground pt-1 text-xs">
               * Cột trông như giá và không đưa vào caption:{" "}
               {report.fieldMap.priceLikeColumns.join(", ")}
             </p>
           )}
 
           {report.sheet.conflictingCodes.length > 0 && (
-            <p className="text-[11px] text-madder pt-1">
+            <p className="text-destructive pt-1 text-xs">
               * Có {report.sheet.conflictingCodes.length} mã bị trùng lặp mang dữ liệu mâu thuẫn:{" "}
               {report.sheet.conflictingCodes.slice(0, 5).join(", ")}
               {report.sheet.conflictingCodes.length > 5 ? "…" : ""}

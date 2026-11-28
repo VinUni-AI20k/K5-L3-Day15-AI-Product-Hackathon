@@ -80,10 +80,10 @@ export function PostsHub({ tab }: { tab: PostsTab }) {
               belongs to LayoutHeader rather than to this box. The frame the
               other two hubs already use (`ChannelsHub`, `MembersHub`); this
               screen was the last one still hand-rolling a page container. */}
-          <div className="mx-auto w-full max-w-5xl space-y-4 px-6 py-4">
+          <div className="mx-auto w-full max-w-5xl space-y-4 px-4 sm:px-6 py-4">
             <div className="max-w-prose space-y-1">
               <Heading level={1}>Bài đăng</Heading>
-              <Text type="supporting">
+              <Text type="supporting" color="secondary">
                 Bài đang chờ tới giờ đăng và nhật ký những bài đã chạy — theo dõi ở cùng một chỗ.
               </Text>
             </div>
@@ -109,7 +109,7 @@ export function PostsHub({ tab }: { tab: PostsTab }) {
               land on the shell wrapper above it — which stretches
               `documentElement.scrollHeight` past the viewport and hands the
               page a SECOND scrollbar with nothing but background in it. */}
-          <div className="relative mx-auto w-full max-w-5xl px-6 py-8">
+          <div className="relative mx-auto w-full max-w-5xl px-4 sm:px-6 py-8">
             {active === "scheduled" ? <ScheduledScreen /> : <JobLogScreen />}
           </div>
         </LayoutContent>

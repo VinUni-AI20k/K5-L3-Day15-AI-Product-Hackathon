@@ -16,14 +16,14 @@ export function ProductsFallback() {
       aria-hidden="true"
       header={
         <LayoutHeader hasDivider>
-          <Stack direction="vertical" gap={3} padding={4}>
+          <Stack direction="vertical" gap={4} paddingInline={6} paddingBlock={5}>
             <Stack direction="vertical" gap={2}>
               <Skeleton width={160} height={28} />
               <Skeleton width="100%" height={16} />
             </Stack>
             <HStack gap={3} align="center">
-              <Skeleton width="100%" height={32} />
-              <Skeleton width={320} height={32} />
+              <Skeleton width="100%" height={36} />
+              <Skeleton width={320} height={36} />
             </HStack>
           </Stack>
         </LayoutHeader>

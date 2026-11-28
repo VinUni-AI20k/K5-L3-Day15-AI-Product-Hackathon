@@ -91,7 +91,7 @@ export function TenantStatusDialog({
         }
         onOpenChange={() => onCancel()}
       />
-      <Stack direction="vertical" gap={3} padding={4}>
+      <Stack direction="vertical" gap={4} padding={5}>
         {/* The consequence, spelled out before the click — the sentence the
             inline block carried, kept word for word. */}
         <Text role="alert">

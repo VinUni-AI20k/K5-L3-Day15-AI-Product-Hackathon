@@ -37,21 +37,20 @@ export function AppTopBar({
       // that company name is not what the screen is about. The slot is already
       // a spaced row, so the two travel as a fragment — no wrapper of our own.
       startContent={
-        <>
+        <div className="flex min-w-0 items-center gap-2">
           <TenantSwitcher fallbackLabel={tenantName} />
           <OutOfTenantBadge />
-        </>
+        </div>
       }
-      // Sáng / tối, immediately left of the search (M3.4). A per-VIEWER
-      // preference, not the platform appearance setting — so it belongs on
-      // the chrome every operator has, not on an admin screen most of them
-      // cannot open. The slot is already a spaced row, so the two travel as
-      // a fragment, the same way `startContent` does above.
+      // Sáng / tối, immediately left of the search (M3.4). A per-viewer
+      // preference, so it lives on the chrome every operator has. Wrapped so
+      // theme toggle and search pill align on the same baseline across desktop
+      // and 390px mobile.
       endContent={
-        <>
+        <div className="vpost-topbar-actions">
           <ColorSchemeToggle />
           <AppSearch />
-        </>
+        </div>
       }
     />
   );
