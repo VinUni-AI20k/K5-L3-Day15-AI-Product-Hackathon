@@ -210,7 +210,8 @@ def channel_groups():
 # ---------------- file sản phẩm ----------------
 @router.post("/vpost/catalog")
 async def upload_catalog(file: UploadFile = File(...)):
-    """Tải file Excel/CSV sản phẩm — thay toàn bộ danh sách mã đang dùng."""
+    """Tải file Excel/CSV sản phẩm — thay toàn bộ danh sách mã đang dùng.
+    Dòng thiếu giá/size/ảnh… vẫn nhập; chỉ bị chặn lúc soạn bài (compose). Chỉ bỏ dòng không có mã hoặc trùng mã."""
     data = await file.read()
     if len(data) > 10 * 1024 * 1024:
         raise ApiError(413, "INVALID_INPUT", "File lớn hơn 10MB")
@@ -232,8 +233,6 @@ def load_catalog(rows):
         keep.append(dict(r, ma_sp=code))
     if not keep:
         raise ApiError(400, "INVALID_INPUT", "File không có dòng nào có mã sản phẩm")
-    if len(keep) > 500:
-        raise ApiError(400, "INVALID_INPUT", "File có %d mã — tối đa 500" % len(keep))
     store.replace_catalog(keep)
     return {"rows": len(keep), "codes": [r["ma_sp"] for r in keep], "skipped": skipped}
 
