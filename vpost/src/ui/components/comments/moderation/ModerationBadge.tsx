@@ -46,11 +46,11 @@ export function formatModerationBadgeLabel(
 function actionIcon(action: ModerationAction) {
   switch (action) {
     case "auto_hidden":
-      return <EyeOff aria-hidden="true" />;
+      return <EyeOff className="size-4" aria-hidden="true" />;
     case "would_hide":
-      return <FlaskConical aria-hidden="true" />;
+      return <FlaskConical className="size-4" aria-hidden="true" />;
     case "flagged":
-      return <Flag aria-hidden="true" />;
+      return <Flag className="size-4" aria-hidden="true" />;
   }
 }
 

@@ -1,0 +1,338 @@
+/**
+ * Comment inbox surface, bubble, chip rail, avatar, and motion rules.
+ *
+ * Uses ONLY semantic design system / Astryx CSS custom properties from
+ * `src/ui/theme/vpost.css` and `src/ui/theme/presets.css` (zero raw hex/rgb,
+ * zero inline styles, zero arbitrary Tailwind values). Declared inside
+ * `@layer components` so it cleanly overrides `@layer astryx-base` and
+ * `@layer astryx-theme` while staying below `@layer utilities`.
+ */
+
+@layer components {
+  /* --- Surface hierarchy --------------------------------------------------- */
+  .inbox-surface-page {
+    background-color: var(--bg-page);
+    --scroll-cue-surface: var(--bg-page);
+  }
+
+  .inbox-surface-subtle {
+    background-color: var(--bg-subtle);
+  }
+
+  .inbox-list-header {
+    min-width: 0;
+    max-width: 100%;
+    background-color: var(--bg-page);
+    padding-inline: var(--spacing-4);
+    padding-block: var(--spacing-4) var(--spacing-3);
+  }
+
+  .inbox-panel-header {
+    min-width: 0;
+    max-width: 100%;
+    background-color: var(--bg-page);
+    padding-inline: var(--spacing-4);
+    padding-block: var(--spacing-3);
+  }
+
+  .inbox-chat-header {
+    min-width: 0;
+    max-width: 100%;
+    background-color: var(--bg-page);
+    padding-inline: var(--spacing-4);
+    padding-block: var(--spacing-3);
+  }
+
+  .inbox-chat-stream {
+    background-color: var(--bg-page);
+    padding-inline: var(--spacing-4);
+    padding-block: var(--spacing-4);
+  }
+
+  .inbox-composer-footer {
+    min-width: 0;
+    max-width: 100%;
+    background-color: var(--bg-page);
+    padding-inline: var(--spacing-4);
+    padding-block: var(--spacing-3);
+  }
+
+  @media (min-width: 1024px) {
+    .inbox-chat-header {
+      padding-inline: var(--spacing-6);
+      padding-block: var(--spacing-4) var(--spacing-3);
+    }
+
+    .inbox-chat-stream {
+      padding-inline: var(--spacing-6);
+      padding-block: var(--spacing-5);
+    }
+
+    .inbox-composer-footer {
+      padding-inline: var(--spacing-6);
+      padding-block: var(--spacing-4);
+    }
+  }
+
+  /* --- Filter chip horizontal scroll rail with subtle edge fade ------------ */
+  .inbox-chip-rail {
+    position: relative;
+    min-width: 0;
+    max-width: 100%;
+    --scroll-cue-surface: var(--bg-page);
+  }
+
+  .inbox-chip-scroller {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--spacing-1-5);
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-block: var(--spacing-0-5);
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .inbox-chip-scroller::-webkit-scrollbar {
+    display: none;
+  }
+
+  .inbox-chip {
+    flex-shrink: 0;
+    white-space: nowrap;
+    border-radius: var(--radius-pill);
+    transition: var(--transition-interactive);
+  }
+
+  .inbox-pill-button {
+    border-radius: var(--radius-pill);
+    transition: var(--transition-interactive);
+  }
+
+  /* --- Deterministic accent-tinted customer avatars ------------------------ */
+  .inbox-avatar {
+    display: inline-flex;
+    flex-shrink: 0;
+    border-radius: var(--radius-full);
+  }
+
+  .inbox-avatar .astryx-avatar-fallback {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .inbox-avatar[data-avatar-tone="purple"] .astryx-avatar-fallback {
+    background-color: var(--color-background-purple);
+    color: var(--color-text-purple);
+    box-shadow: inset 0 0 0 1px var(--color-border-purple);
+  }
+
+  .inbox-avatar[data-avatar-tone="blue"] .astryx-avatar-fallback {
+    background-color: var(--color-background-blue);
+    color: var(--color-text-blue);
+    box-shadow: inset 0 0 0 1px var(--color-border-blue);
+  }
+
+  .inbox-avatar[data-avatar-tone="teal"] .astryx-avatar-fallback {
+    background-color: var(--color-background-teal);
+    color: var(--color-text-teal);
+    box-shadow: inset 0 0 0 1px var(--color-border-teal);
+  }
+
+  .inbox-avatar[data-avatar-tone="green"] .astryx-avatar-fallback {
+    background-color: var(--color-background-green);
+    color: var(--color-text-green);
+    box-shadow: inset 0 0 0 1px var(--color-border-green);
+  }
+
+  .inbox-avatar[data-avatar-tone="orange"] .astryx-avatar-fallback {
+    background-color: var(--color-background-orange);
+    color: var(--color-text-orange);
+    box-shadow: inset 0 0 0 1px var(--color-border-orange);
+  }
+
+  .inbox-avatar[data-avatar-tone="pink"] .astryx-avatar-fallback {
+    background-color: var(--color-background-pink);
+    color: var(--color-text-pink);
+    box-shadow: inset 0 0 0 1px var(--color-border-pink);
+  }
+
+  .inbox-avatar[data-avatar-tone="cyan"] .astryx-avatar-fallback {
+    background-color: var(--color-background-cyan);
+    color: var(--color-text-cyan);
+    box-shadow: inset 0 0 0 1px var(--color-border-cyan);
+  }
+
+  /* --- Conversation list rows (56-72px, subtle selected + accent bar) ------ */
+  .inbox-thread-row {
+    position: relative;
+  }
+
+  .inbox-thread-item {
+    position: relative;
+    min-height: calc(var(--spacing-12) + var(--spacing-4));
+    padding-inline: var(--spacing-4);
+    padding-block: var(--spacing-3);
+    border-radius: var(--radius-none);
+    background-color: transparent;
+    transition: var(--transition-interactive);
+  }
+
+  .inbox-thread-item:hover {
+    background-color: var(--bg-subtle);
+  }
+
+  .inbox-thread-item:active {
+    background-color: var(--bg-muted);
+  }
+
+  .inbox-thread-row[data-selected="true"] .inbox-thread-item {
+    background-color: var(--bg-subtle);
+  }
+
+  .inbox-thread-row[data-selected="true"] .inbox-thread-item::before {
+    content: "";
+    position: absolute;
+    inset-block: var(--spacing-1-5);
+    inset-inline-start: 0;
+    width: var(--spacing-1);
+    border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+    background-color: var(--state-selected-bar);
+  }
+
+  .inbox-thread-item:focus-within:has(:focus-visible) {
+    box-shadow: inset 0 0 0 var(--focus-ring-width) var(--focus-ring-color);
+  }
+
+  /* --- Post context card in chat header (matches lg 13px card radius) ------ */
+  .inbox-post-card {
+    border-radius: var(--radius-lg);
+    background-color: var(--bg-subtle);
+    border: 1px solid var(--border-default);
+    padding: var(--spacing-3);
+    box-shadow: none;
+  }
+
+  .inbox-post-card .astryx-thumbnail,
+  .inbox-post-card .astryx-thumbnail > div,
+  .inbox-post-card img {
+    border-radius: var(--radius-xs);
+  }
+
+  /* --- Chat bubbles (18px radius, 6px tail corner, distinct surfaces) ------ */
+  .inbox-bubble-customer {
+    background-color: var(--bg-muted);
+    color: var(--text-primary);
+    border-radius: var(--radius-chat) var(--radius-chat) var(--radius-chat)
+      var(--radius-chat-tail);
+    padding-block: var(--spacing-3);
+    padding-inline: var(--spacing-4);
+  }
+
+  .inbox-bubble-page {
+    background-color: var(--button-primary-bg);
+    color: var(--button-primary-text);
+    --color-text-primary: var(--button-primary-text);
+    --color-text-secondary: var(--button-primary-text);
+    border-radius: var(--radius-chat) var(--radius-chat) var(--radius-chat-tail)
+      var(--radius-chat);
+    padding-block: var(--spacing-3);
+    padding-inline: var(--spacing-4);
+  }
+
+  /* --- Typography roles: 12px tertiary meta & calm links ------------------- */
+  .inbox-meta-text {
+    font-size: var(--text-caption-size);
+    line-height: var(--text-caption-leading);
+    color: var(--text-tertiary);
+  }
+
+  .inbox-sender-name {
+    font-size: var(--text-caption-size);
+    line-height: var(--text-caption-leading);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+  }
+
+  .inbox-subtle-link {
+    font-size: var(--text-caption-size);
+    line-height: var(--text-caption-leading);
+    color: var(--text-tertiary);
+    transition: var(--transition-interactive);
+  }
+
+  .inbox-subtle-link:hover,
+  .inbox-subtle-link:focus-visible {
+    color: var(--color-text-accent);
+  }
+
+  .inbox-message-actions {
+    transition: opacity var(--motion-hover) var(--ease-out);
+  }
+
+  /* --- Empty state: accent icon tile + sentence + optional CTA ------------- */
+  .inbox-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--spacing-3);
+    max-width: 24rem;
+    padding: var(--spacing-6);
+    margin-inline: auto;
+  }
+
+  .inbox-empty-state[data-compact="true"] {
+    padding: var(--spacing-5) var(--spacing-4);
+    gap: var(--spacing-2);
+  }
+
+  .inbox-empty-icon-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--spacing-12);
+    height: var(--spacing-12);
+    border-radius: var(--radius-lg);
+    background-color: var(--color-accent-muted);
+    color: var(--color-icon-accent);
+    flex-shrink: 0;
+  }
+
+  .inbox-empty-state[data-compact="true"] .inbox-empty-icon-tile {
+    width: var(--spacing-10);
+    height: var(--spacing-10);
+  }
+
+  /* --- Mobile & touch targets (>= 40px) ------------------------------------ */
+  @media (max-width: 767px), (pointer: coarse) {
+    .inbox-touch-target {
+      min-height: var(--spacing-10);
+      min-width: var(--spacing-10);
+    }
+
+    .inbox-chip {
+      min-height: var(--spacing-10);
+    }
+  }
+
+  /* --- Subtle entrance motion (resting state is opacity: 1) ---------------- */
+  @media (prefers-reduced-motion: no-preference) {
+    .inbox-thread-row,
+    .inbox-message-item {
+      animation: inbox-item-enter var(--motion-panel) var(--ease-out) backwards;
+    }
+  }
+
+  @keyframes inbox-item-enter {
+    from {
+      opacity: 0;
+      transform: translateY(var(--motion-item-slide));
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}

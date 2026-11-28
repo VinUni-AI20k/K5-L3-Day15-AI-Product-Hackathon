@@ -1,11 +1,12 @@
 "use client";
 
-import { AppShell, LinkProvider, Theme } from "@astryxdesign/core";
+import { AppShell, LayerProvider, LinkProvider, Theme } from "@astryxdesign/core";
 import { InternationalizationProvider } from "@astryxdesign/core/i18n";
 import type { ReactNode } from "react";
 
 import { cn } from "@/shared/utils";
 
+import { InboxRealtime } from "@/ui/components/inbox/realtime/InboxRealtime";
 import { useHandoffArrival } from "@/ui/hooks/useHandoffArrival";
 import { ASTRYX_LOCALE, ASTRYX_VI } from "@/ui/i18n/astryx-vi";
 import { SetupDock } from "@/ui/components/onboarding/SetupDock";
@@ -19,6 +20,13 @@ import { SupportModeBanner } from "@/ui/components/shell/SupportModeBanner";
 import { vpostTheme } from "@/ui/theme/vpost";
 
 import "./handoff-motion.css";
+import "./shell-chrome.css";
+
+/** Stable toast viewport options so LayerProvider context value does not churn on re-renders. */
+const TOAST_VIEWPORT_CONFIG = {
+  position: "bottomEnd",
+  maxVisible: 5,
+} as const;
 
 /**
  * The app's single client boundary for the shell (web-layout-shell). Pages stay
@@ -77,56 +85,61 @@ export function AppFrame({
         messages={{ [ASTRYX_LOCALE]: ASTRYX_VI }}
       >
         <Theme theme={vpostTheme}>
-          <AppShell
-            contentPadding={0}
-            topNav={<AppTopBar tenantName={tenantName} />}
-            // The account block lives at the foot of the nav, so the session
-            // props travel down this side of the shell.
-            sideNav={
-              <AppSideNav
-                operatorLabel={operatorLabel}
-                onSignOut={signOutAction}
-                defaultCollapsed={navDefaultCollapsed}
-              />
-            }
-          >
-            {/* Above every screen, on purpose (M3.3): while VPOST staff are
-                inside a customer's company, no screen may look like their own.
-                It pushes content down instead of floating over it. */}
-            <SupportModeBanner />
-            {/* `relative`, and it is load-bearing.
-                `sr-only` is `position: absolute`, so every visually hidden node
-                anchors to the nearest POSITIONED ancestor. AppShell's content
-                element is `position: static`, so they were escaping the scroll
-                container entirely and landing at their un-scrolled static
-                position on the shell wrapper above it — which stretched
-                `documentElement.scrollHeight` past the viewport (1382 vs 900 on
-                /sync, 3625 on the job log) and let the whole page drag down onto
-                a band of empty background. Nothing visible moved, so the only
-                symptom was a scrollbar with nothing in it.
-                `h-full`, not auto: screens size themselves with `h-full` against
-                this box, exactly as they did against the content element. */}
-            {/* Cú mờ lên của bàn giao nằm ở ĐÂY, trên vùng nội dung, chứ
-                không bọc quanh `AppShell`. `Layout` của Astryx cao `100%` của
-                thẻ cha, nên chèn thêm một lớp bọc giữa nó và <body> là đụng vào
-                mô hình cuộn của cả app để lấy 400ms hiệu ứng — đổi sai. Thanh
-                nav và thanh trên hiện ngay: khung app đứng yên, nội dung là thứ
-                đi tới. */}
-            <div
-              className={cn(
-                "relative h-full min-h-0",
-                isHandoffArrival && "app-handoff-in",
-              )}
+          <LayerProvider toast={TOAST_VIEWPORT_CONFIG}>
+            <AppShell
+              variant="section"
+              className="vpost-app-shell"
+              contentPadding={0}
+              topNav={<AppTopBar tenantName={tenantName} />}
+              // The account block lives at the foot of the nav, so the session
+              // props travel down this side of the shell.
+              sideNav={
+                <AppSideNav
+                  operatorLabel={operatorLabel}
+                  onSignOut={signOutAction}
+                  defaultCollapsed={navDefaultCollapsed}
+                />
+              }
             >
-              {children}
-            </div>
-            {/* The setup pointer lives in the SHELL, not on a screen: the steps
-                it lists are spread across /sync, /channels and /compose, and an
-                operator sent to one of them would otherwise lose the list they
-                were working through. It decides for itself whether to appear —
-                nothing here has to know about onboarding. */}
-            <SetupDock />
-          </AppShell>
+              {/* Above every screen, on purpose (M3.3): while VPOST staff are
+                  inside a customer's company, no screen may look like their own.
+                  It pushes content down instead of floating over it. */}
+              <SupportModeBanner />
+              {/* `relative`, and it is load-bearing.
+                  `sr-only` is `position: absolute`, so every visually hidden node
+                  anchors to the nearest POSITIONED ancestor. AppShell's content
+                  element is `position: static`, so they were escaping the scroll
+                  container entirely and landing at their un-scrolled static
+                  position on the shell wrapper above it — which stretched
+                  `documentElement.scrollHeight` past the viewport (1382 vs 900 on
+                  /sync, 3625 on the job log) and let the whole page drag down onto
+                  a band of empty background. Nothing visible moved, so the only
+                  symptom was a scrollbar with nothing in it.
+                  `h-full`, not auto: screens size themselves with `h-full` against
+                  this box, exactly as they did against the content element. */}
+              {/* Cú mờ lên của bàn giao nằm ở ĐÂY, trên vùng nội dung, chứ
+                  không bọc quanh `AppShell`. `Layout` của Astryx cao `100%` của
+                  thẻ cha, nên chèn thêm một lớp bọc giữa nó và <body> là đụng vào
+                  mô hình cuộn của cả app để lấy 400ms hiệu ứng — đổi sai. Thanh
+                  nav và thanh trên hiện ngay: khung app đứng yên, nội dung là thứ
+                  đi tới. */}
+              <div
+                className={cn(
+                  "relative h-full min-h-0",
+                  isHandoffArrival && "app-handoff-in",
+                )}
+              >
+                {children}
+              </div>
+              {/* The setup pointer lives in the SHELL, not on a screen: the steps
+                  it lists are spread across /sync, /channels and /compose, and an
+                  operator sent to one of them would otherwise lose the list they
+                  were working through. It decides for itself whether to appear —
+                  nothing here has to know about onboarding. */}
+              <SetupDock />
+              <InboxRealtime />
+            </AppShell>
+          </LayerProvider>
         </Theme>
       </InternationalizationProvider>
     </LinkProvider>

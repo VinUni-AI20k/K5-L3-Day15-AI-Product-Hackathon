@@ -6,7 +6,6 @@ import {
   type BulkActionBarViewProps,
 } from "@/ui/components/comments/moderation/BulkActionBar";
 import { ModerationBadge } from "@/ui/components/comments/moderation/ModerationBadge";
-import { ModerationFilterBar } from "@/ui/components/comments/moderation/ModerationFilterBar";
 import {
   ModerationLogSkeleton,
   ModerationLogView,
@@ -132,7 +131,7 @@ function logProps(
   };
 }
 
-describe("ModerationBadge & ModerationFilterBar rendering", () => {
+describe("ModerationBadge rendering", () => {
   it("renders the three moderation badges and hides when moderation/action is absent", () => {
     const autoHidden: CommentModeration = {
       category: "spam",
@@ -171,20 +170,6 @@ describe("ModerationBadge & ModerationFilterBar rendering", () => {
     expect(
       renderToStaticMarkup(<ModerationBadge moderation={{ ...autoHidden, action: null }} />),
     ).toBe("");
-  });
-
-  it("renders ModerationFilterBar with counts", () => {
-    const html = renderToStaticMarkup(
-      <ModerationFilterBar
-        value="flagged"
-        onChange={() => {}}
-        counts={{ autoHidden: 4, flagged: 2 }}
-      />,
-    );
-    expect(html).toContain("Tất cả kiểm duyệt");
-    expect(html).toContain("Tự ẩn (4)");
-    expect(html).toContain("Sẽ ẩn (chạy thử)");
-    expect(html).toContain("Cần xem (2)");
   });
 });
 

@@ -21,8 +21,9 @@ import { Eye, History, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
-import { EmptyState } from "@/ui/components/feedback/EmptyState";
 import { ReadOnlyNotice } from "@/ui/components/feedback/ReadOnlyNotice";
+import { InboxEmptyState } from "@/ui/components/inbox/InboxEmptyState";
+import "@/ui/components/inbox/inbox-surface.css";
 import { useDelayedFlag } from "@/ui/hooks/useDelayedFlag";
 import { useModerationLog, useUndoModerationHide } from "@/ui/hooks/useModeration";
 import { useNowMs } from "@/ui/hooks/useNowMs";
@@ -290,7 +291,8 @@ export function ModerationLogView({
               type="button"
               variant="secondary"
               size="sm"
-              icon={<Eye aria-hidden="true" />}
+              className="inbox-touch-target"
+              icon={<Eye className="size-4" aria-hidden="true" />}
               label={isUndoing ? "Đang hiện lại…" : "Hiện lại"}
               isLoading={isUndoing}
               isDisabled={!undoGate.canUndo}
@@ -305,12 +307,15 @@ export function ModerationLogView({
   );
 
   return (
-    <Stack direction="vertical" gap={4} data-moderation="log-panel">
+    <Stack direction="vertical" gap={5} data-moderation="log-panel">
       {/* Header & refresh */}
       <HStack gap={3} align="start" justify="between" wrap="wrap">
-        <Stack direction="vertical" gap={0.5}>
+        <Stack direction="vertical" gap={1}>
           <HStack gap={2} align="center">
-            <History aria-hidden="true" />
+            <History
+              className="size-5 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
             <Heading level={2}>Nhật ký kiểm duyệt</Heading>
           </HStack>
           <Text type="supporting" color="secondary">
@@ -323,7 +328,8 @@ export function ModerationLogView({
           type="button"
           variant="secondary"
           size="sm"
-          icon={<RefreshCw aria-hidden="true" />}
+          className="inbox-touch-target"
+          icon={<RefreshCw className="size-4" aria-hidden="true" />}
           label={isFetching ? "Đang tải…" : "Làm mới"}
           isDisabled={isFetching}
           onClick={onRefresh}
@@ -334,45 +340,50 @@ export function ModerationLogView({
 
       {/* Action & actor filters */}
       <HStack gap={3} align="end" wrap="wrap">
-        <Selector
-          label="Lọc theo hành động"
-          options={ACTION_FILTER_OPTIONS}
-          value={filter.action ?? ALL_VALUE}
-          size="sm"
-          width={210}
-          onChange={(nextValue) =>
-            onFilterChange({
-              ...filter,
-              action:
-                nextValue === ALL_VALUE
-                  ? null
-                  : (nextValue as ModerationLogAction),
-            })
-          }
-        />
+        <div className="w-full sm:w-52">
+          <Selector
+            label="Lọc theo hành động"
+            options={ACTION_FILTER_OPTIONS}
+            value={filter.action ?? ALL_VALUE}
+            size="sm"
+            width="100%"
+            onChange={(nextValue) =>
+              onFilterChange({
+                ...filter,
+                action:
+                  nextValue === ALL_VALUE
+                    ? null
+                    : (nextValue as ModerationLogAction),
+              })
+            }
+          />
+        </div>
 
-        <Selector
-          label="Lọc theo nguồn thực hiện"
-          options={ACTOR_FILTER_OPTIONS}
-          value={filter.actor ?? ALL_VALUE}
-          size="sm"
-          width={190}
-          onChange={(nextValue) =>
-            onFilterChange({
-              ...filter,
-              actor:
-                nextValue === ALL_VALUE
-                  ? null
-                  : (nextValue as ModerationLogActor),
-            })
-          }
-        />
+        <div className="w-full sm:w-48">
+          <Selector
+            label="Lọc theo nguồn thực hiện"
+            options={ACTOR_FILTER_OPTIONS}
+            value={filter.actor ?? ALL_VALUE}
+            size="sm"
+            width="100%"
+            onChange={(nextValue) =>
+              onFilterChange({
+                ...filter,
+                actor:
+                  nextValue === ALL_VALUE
+                    ? null
+                    : (nextValue as ModerationLogActor),
+              })
+            }
+          />
+        </div>
 
         {hasFilters ? (
           <Button
             type="button"
             variant="ghost"
             size="sm"
+            className="inbox-touch-target"
             label="Xoá bộ lọc"
             onClick={onClearFilters}
           />
@@ -415,7 +426,7 @@ export function ModerationLogView({
         <ApiErrorNotice error={error} onRetry={onRefresh} />
       ) : items.length === 0 ? (
         resolveModerationLogEmptyKind(filter) === "no-result" ? (
-          <EmptyState
+          <InboxEmptyState
             kind="no-result"
             title="Không có bản ghi nào khớp bộ lọc"
             description="Thử bỏ lọc hành động hoặc nguồn thực hiện để xem toàn bộ nhật ký kiểm duyệt."
@@ -424,13 +435,14 @@ export function ModerationLogView({
                 type="button"
                 variant="secondary"
                 size="sm"
+                className="inbox-touch-target"
                 label="Xoá bộ lọc"
                 onClick={onClearFilters}
               />
             }
           />
         ) : (
-          <EmptyState
+          <InboxEmptyState
             kind="first-run"
             title="Chưa có nhật ký kiểm duyệt"
             description="Khi bạn dùng thao tác hàng loạt hoặc bật tự kiểm duyệt cho Fanpage, mọi hành động sẽ được ghi lại tại đây."
@@ -442,14 +454,16 @@ export function ModerationLogView({
             <ApiErrorNotice error={error} shouldFocus={false} onRetry={onRefresh} />
           ) : null}
 
-          <Table
-            data={tableData}
-            columns={columns}
-            idKey="id"
-            density="balanced"
-            dividers="rows"
-            verticalAlign="top"
-          />
+          <div className="w-full overflow-x-auto scroll-cue-x">
+            <Table
+              data={tableData}
+              columns={columns}
+              idKey="id"
+              density="balanced"
+              dividers="rows"
+              verticalAlign="top"
+            />
+          </div>
 
           {hasNextPage ? (
             <HStack justify="center" paddingBlock={2}>
@@ -457,6 +471,7 @@ export function ModerationLogView({
                 type="button"
                 variant="secondary"
                 size="sm"
+                className="inbox-touch-target"
                 label={isFetchingNextPage ? "Đang tải thêm…" : "Tải thêm nhật ký"}
                 isLoading={isFetchingNextPage}
                 isDisabled={isFetchingNextPage}

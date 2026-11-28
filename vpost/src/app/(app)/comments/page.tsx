@@ -3,12 +3,12 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { getOperatorSession } from "@/app/_auth/session";
-import { CommentsFallback } from "@/ui/components/comments/CommentListSkeleton";
-import { CommentsScreen } from "@/ui/components/comments/CommentsScreen";
+import { InboxScreen } from "@/ui/components/inbox/InboxScreen";
+import { InboxFallback } from "@/ui/components/inbox/InboxSkeleton";
 
 /**
- * "Bình luận" — Facebook comment inbox.
- * Server Component session guard wrapping the URL-driven client screen.
+ * "Bình luận" — Pancake/Messenger-style Facebook comment inbox.
+ * Server Component session guard wrapping the URL-driven client inbox screen.
  */
 
 export const metadata: Metadata = {
@@ -25,8 +25,8 @@ export default async function CommentsPage() {
   if (!session) redirect("/signin?returnUrl=%2Fcomments");
 
   return (
-    <Suspense fallback={<CommentsFallback />}>
-      <CommentsScreen />
+    <Suspense fallback={<InboxFallback />}>
+      <InboxScreen />
     </Suspense>
   );
 }
