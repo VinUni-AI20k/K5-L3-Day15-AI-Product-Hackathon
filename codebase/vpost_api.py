@@ -196,6 +196,10 @@ def catalog_products(status: Optional[str] = None, q: Optional[str] = None, limi
             continue
         page, hard, warns, s, images = inspect(row)
         items.append({"code": row["ma_sp"], "name": display_name(row), "category": row.get("loai") or None, "season": None,
+                      "price": (str(row.get("gia_ban") or "").strip() or None),
+                      "sizes": (str(row.get("size") or "").strip() or None),
+                      "colors": (str(row.get("mau") or "").strip() or None),
+                      "material": (str(row.get("chat_lieu") or "").strip() or None),
                       "inventory": {k: v for k, v in _inventory(hard, s).items() if k != "blocked"},
                       "mediaImageCount": len(images), "mediaVideoCount": 0, "hasConflict": False,
                       "composable": not hard,
@@ -693,7 +697,7 @@ def channel_remove(channel_id: str):
 log = logging.getLogger("vpost.comments")
 COMMENT_STATUSES = ("unreplied", "replied", "ignored")
 MODERATION_FILTERS = ("auto_hidden", "would_hide", "flagged")
-THREAD_FILTERS = ("needs_reply", "unread", "all", "hidden", "ignored", "has_phone")
+THREAD_FILTERS = ("can_ban", "needs_reply", "unread", "all", "hidden", "ignored", "has_phone")
 OOS_CLAIMS = ("còn hàng", "sẵn hàng", "còn nhiều", "đủ size", "full size", "sẵn nhiều")
 _EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
@@ -753,6 +757,8 @@ class ThreadReplyIn(BaseModel):
     @classmethod
     def _validate_client_id(cls, v: str) -> str:
         t = v.strip()
+        if t.lower().startswith("auto:"):
+            raise ValueError("clientId không được bắt đầu bằng tiền tố hệ thống 'auto:'")
         try:
             return str(uuid.UUID(t))
         except ValueError:
@@ -799,12 +805,15 @@ def _parse_thread_cursor(token: str):
     obj = _decode_cursor(token)
     t_raw = obj.get("t")
     tid = obj.get("id")
+    a_val = obj.get("a", 0)
     if not isinstance(t_raw, str) or not isinstance(tid, str) or not tid:
+        raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
+    if isinstance(a_val, bool) or a_val not in (0, 1):
         raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
     dt = facebook.parse_time(t_raw)
     if dt is None:
         raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
-    return dt, tid
+    return int(a_val), dt, tid
 
 
 def _parse_before_cursor(token: str):
@@ -831,6 +840,18 @@ def _parse_updates_cursor(token: str):
     if cs < 0 or ds < 0:
         raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
     return cs, ds
+
+
+def _parse_updates_cursor_v2(token: str):
+    obj = _decode_cursor(token)
+    cs = obj.get("cs")
+    ds = obj.get("ds")
+    att_s = obj.get("as", 0)
+    ar_s = obj.get("rs", 0)
+    for val in (cs, ds, att_s, ar_s):
+        if isinstance(val, bool) or not isinstance(val, int) or val < 0:
+            raise ApiError(400, "INVALID_INPUT", "cursor không hợp lệ")
+    return cs, ds, att_s, ar_s
 
 
 def _truncate_update_text(text: str, max_len: int = 120) -> str:
@@ -862,7 +883,8 @@ def _comment_or_404(comment_id: str):
     return c
 
 
-def _comment_context(c):
+def _comment_context(c, *, tenant_id=None):
+    tid = tenant_id or TENANT_ID
     post = store.post_job(c["post_job_id"]) if c.get("post_job_id") else None
     row = store.catalog_row(c["product_code"]) if c.get("product_code") else None
     if row:
@@ -871,7 +893,7 @@ def _comment_context(c):
         page = tools.PAGES[c["channel_id"]]
     else:
         page = tools.PAGES[tools.DEFAULT_PAGE]
-    page = writing_style.apply(page, TENANT_ID, c.get("channel_id"))
+    page = writing_style.apply(page, tid, c.get("channel_id"))
     return post, row, page
 
 
@@ -922,16 +944,34 @@ def _draft_view(d):
     }
 
 
-def _build_thread_records(rows, read_states):
-    """Nhóm các dòng fb_comment thành hội thoại theo bình luận gốc (parent_id rỗng), sắp mới nhất trước."""
+def _build_thread_records(rows, read_states, attentions=None):
+    """Nhóm các dòng fb_comment thành hội thoại theo bình luận gốc (parent_id rỗng, gồm cả phản hồi 3 tầng), ưu tiên 'Cần bạn' lên đầu rồi mới nhất trước."""
+    att_map = attentions or {}
+    by_id = {r["id"]: r for r in rows}
     roots = {}
     replies_by_root = {}
     for r in rows:
         pid = (r.get("parent_id") or "").strip()
         if not pid:
             roots[r["id"]] = r
-        else:
-            replies_by_root.setdefault(pid, []).append(r)
+    for r in rows:
+        pid = (r.get("parent_id") or "").strip()
+        if not pid:
+            continue
+        cur = pid
+        seen = {r["id"]}
+        for _ in range(10):
+            if cur in roots or cur in seen:
+                break
+            seen.add(cur)
+            parent_row = by_id.get(cur)
+            if not parent_row:
+                break
+            next_pid = (parent_row.get("parent_id") or "").strip()
+            if not next_pid:
+                break
+            cur = next_pid
+        replies_by_root.setdefault(cur, []).append(r)
 
     records = []
     for root_id, root in roots.items():
@@ -966,6 +1006,8 @@ def _build_thread_records(rows, read_states):
             )
         has_phone = any(bool(rules.find_phones(m["message"])) for m in fb_msgs if not m["is_from_page"])
         last_customer_msg = next((m for m in reversed(non_hidden) if not m["is_from_page"]), None)
+        att = att_map.get(root_id)
+        has_can_ban = bool(att and att.get("tag") == "can_ban")
 
         records.append({
             "id": root_id,
@@ -984,13 +1026,15 @@ def _build_thread_records(rows, read_states):
             "has_phone": has_phone,
             "message_count": len(fb_msgs),
             "last_customer_msg": last_customer_msg,
+            "attention": att if has_can_ban else None,
+            "has_can_ban": has_can_ban,
         })
 
-    records.sort(key=lambda rec: (rec["updated_dt"], rec["id"]), reverse=True)
+    records.sort(key=lambda rec: (1 if rec["has_can_ban"] else 0, rec["updated_dt"], rec["id"]), reverse=True)
     return records
 
 
-def _serialize_thread(rec, *, chans, jobs_by_id, catalog_by_code, active_drafts, tags_by_from):
+def _serialize_thread(rec, *, chans, jobs_by_id, catalog_by_code, active_drafts, tags_by_from, auto_replies=None):
     root = rec["root"]
     ch_info = chans.get(root["channel_id"]) or {}
     job = jobs_by_id.get(root["post_job_id"]) if root.get("post_job_id") else None
@@ -1001,6 +1045,23 @@ def _serialize_thread(rec, *, chans, jobs_by_id, catalog_by_code, active_drafts,
     last_msg = rec["last_msg"]
     customer_id = rec["customer_id"]
     tags = list(tags_by_from.get(customer_id) or []) if customer_id else []
+    att = rec.get("attention")
+    attention_view = (
+        {"tag": att["tag"], "reason": att["reason"], "since": z(att["since"])}
+        if att and att.get("tag")
+        else None
+    )
+    ar = (auto_replies or {}).get(rec["id"])
+    auto_reply_view = (
+        {
+            "lastAction": ar["action"],
+            "text": ar["text"] or None,
+            "reason": ar["reason"] or None,
+            "at": z(ar["created_at"]),
+        }
+        if ar
+        else None
+    )
     return {
         "id": rec["id"],
         "channelId": root["channel_id"],
@@ -1031,15 +1092,25 @@ def _serialize_thread(rec, *, chans, jobs_by_id, catalog_by_code, active_drafts,
         "hasPhone": rec["has_phone"],
         "draft": _draft_view(active_drafts.get(rec["id"])),
         "moderation": moderation_store.format_comment_moderation(root),
+        "attention": attention_view,
+        "autoReply": auto_reply_view,
         "updatedAt": rec["updated_at"],
     }
 
 
 def _message_view(m, *, thread_id, liked_set, client_by_reply):
+    from_page = bool(m["is_from_page"])
+    client_id = client_by_reply.get(m["id"])
+    if not from_page:
+        sent_by = None
+    elif m.get("sent_by") == "auto" or (client_id or "").startswith("auto:"):
+        sent_by = "auto"
+    else:
+        sent_by = "operator"
     return {
         "id": m["id"],
         "threadId": thread_id,
-        "fromPage": bool(m["is_from_page"]),
+        "fromPage": from_page,
         "fromId": m["from_id"] or "",
         "fromName": (m["from_name"] or "").strip() or None,
         "text": m["message"],
@@ -1051,12 +1122,15 @@ def _message_view(m, *, thread_id, liked_set, client_by_reply):
         "delivery": "sent",
         "errorCode": None,
         "userMessage": None,
-        "clientId": client_by_reply.get(m["id"]),
+        "clientId": client_id,
+        "sentBy": sent_by,
         "moderation": moderation_store.format_comment_moderation(m),
     }
 
 
 def _outgoing_draft_message_view(d, *, root, channel_name):
+    cid = d["client_id"] or None
+    sent_by = "auto" if (d.get("sent_by") == "auto" or (cid or "").startswith("auto:")) else "operator"
     return {
         "id": d["id"],
         "threadId": root["id"],
@@ -1072,23 +1146,27 @@ def _outgoing_draft_message_view(d, *, root, channel_name):
         "delivery": d["status"],
         "errorCode": d["error_code"] or None,
         "userMessage": d["user_message"] or None,
-        "clientId": d["client_id"] or None,
+        "clientId": cid,
+        "sentBy": sent_by,
         "moderation": None,
     }
 
 
-def _load_thread_record(thread_id: str):
-    rows = store.list_thread_comments(TENANT_ID, thread_id)
-    read_states = store.get_thread_read_states(TENANT_ID, [thread_id])
-    recs = _build_thread_records(rows, read_states)
+def _load_thread_record(thread_id: str, *, tenant_id=None):
+    tid = tenant_id or TENANT_ID
+    rows = store.list_thread_comments(tid, thread_id)
+    read_states = store.get_thread_read_states(tid, [thread_id])
+    attentions = store.get_thread_attentions(tid, [thread_id])
+    recs = _build_thread_records(rows, read_states, attentions=attentions)
     rec = next((r for r in recs if r["id"] == thread_id), None)
     if rec is None:
         raise ApiError(404, "NOT_FOUND", "Không tìm thấy hội thoại này")
     return rec
 
 
-def _thread_view(thread_id: str, *, rec=None, chans=None):
-    rec = rec if rec is not None else _load_thread_record(thread_id)
+def _thread_view(thread_id: str, *, rec=None, chans=None, tenant_id=None):
+    tid = tenant_id or TENANT_ID
+    rec = rec if rec is not None else _load_thread_record(thread_id, tenant_id=tid)
     chans = chans if chans is not None else _channel_map()
     root = rec["root"]
     job = store.post_job(root["post_job_id"]) if root.get("post_job_id") else None
@@ -1098,8 +1176,9 @@ def _thread_view(thread_id: str, *, rec=None, chans=None):
         row = store.catalog_row(root["product_code"])
         if row:
             catalog_by_code[root["product_code"]] = row
-    active_drafts = store.active_thread_drafts(TENANT_ID, [thread_id])
-    tags_by_from = inbox_store.tags_for(TENANT_ID, [rec["customer_id"]]) if rec["customer_id"] else {}
+    active_drafts = store.active_thread_drafts(tid, [thread_id])
+    tags_by_from = inbox_store.tags_for(tid, [rec["customer_id"]]) if rec["customer_id"] else {}
+    auto_replies = store.latest_auto_reply_for_threads(tid, [thread_id])
     return _serialize_thread(
         rec,
         chans=chans,
@@ -1107,17 +1186,21 @@ def _thread_view(thread_id: str, *, rec=None, chans=None):
         catalog_by_code=catalog_by_code,
         active_drafts=active_drafts,
         tags_by_from=tags_by_from,
+        auto_replies=auto_replies,
     )
 
 
-def _message_for_sent_draft(thread_id: str, draft: dict, *, root: dict, chans: dict):
+def _message_for_sent_draft(thread_id: str, draft: dict, *, root: dict, chans: dict, tenant_id=None):
+    tid = tenant_id or TENANT_ID
     fb_reply_id = draft.get("fb_reply_id") or ""
-    saved = store.get_comment(TENANT_ID, fb_reply_id) if fb_reply_id else None
+    saved = store.get_comment(tid, fb_reply_id) if fb_reply_id else None
     if saved:
-        liked = set(inbox_store.liked_ids(TENANT_ID, [saved["id"]]))
+        liked = set(inbox_store.liked_ids(tid, [saved["id"]]))
         client_map = {saved["id"]: draft["client_id"]} if draft.get("client_id") else {}
         return _message_view(saved, thread_id=thread_id, liked_set=liked, client_by_reply=client_map)
     ch_name = (chans.get(root["channel_id"]) or {}).get("name") or root["channel_id"]
+    cid = draft.get("client_id") or None
+    sent_by = "auto" if (draft.get("sent_by") == "auto" or (cid or "").startswith("auto:")) else "operator"
     return {
         "id": fb_reply_id or draft["id"],
         "threadId": thread_id,
@@ -1133,7 +1216,8 @@ def _message_for_sent_draft(thread_id: str, draft: dict, *, root: dict, chans: d
         "delivery": "sent",
         "errorCode": None,
         "userMessage": None,
-        "clientId": draft.get("client_id") or None,
+        "clientId": cid,
+        "sentBy": sent_by,
         "moderation": None,
     }
 
@@ -1291,6 +1375,7 @@ def run_comment_sync(
     post_job_id: Optional[str] = None,
     lookback_days: int = 14,
     include_meta: bool = False,
+    out_new_ids: Optional[list[str]] = None,
 ):
     """Đồng bộ bình luận từ Facebook và chạy tự kiểm duyệt (dùng chung cho API và poller nền)."""
     cutoff = now() - timedelta(days=lookback_days)
@@ -1461,6 +1546,8 @@ def run_comment_sync(
                     TENANT_ID, len(new_customer_comment_ids), type(e).__name__,
                 )
 
+    if out_new_ids is not None:
+        out_new_ids.extend(new_customer_comment_ids)
     result = {
         "tenantId": TENANT_ID,
         "syncedPosts": synced_posts,
@@ -1477,11 +1564,25 @@ def run_comment_sync(
 @router.post("/comments/sync")
 def sync_comments(body: Optional[SyncCommentsIn] = None):
     req = body or SyncCommentsIn()
-    return run_comment_sync(
+    new_customer_ids: list[str] = []
+    res = run_comment_sync(
         channel_id=req.channelId,
         post_job_id=req.postJobId,
         lookback_days=req.lookbackDays if req.lookbackDays is not None else 14,
+        out_new_ids=new_customer_ids,
     )
+    if new_customer_ids:
+        import auto_reply
+        try:
+            auto_reply.run_auto_reply(TENANT_ID, new_customer_ids)
+        except Exception as e:
+            log.warning(
+                "comment_sync_auto_reply_error tenant=%s count=%d err=%s",
+                TENANT_ID,
+                len(new_customer_ids),
+                type(e).__name__,
+            )
+    return res
 
 
 # ---------------- Hội thoại bình luận (/api/comments/threads) & luồng cập nhật (/api/comments/updates) ----------------
@@ -1491,20 +1592,24 @@ def sync_comments(body: Optional[SyncCommentsIn] = None):
 def comment_updates(since: Optional[str] = None):
     since_f = (since or "").strip() or None
     if not since_f:
-        cs, ds = store.comment_updates_watermark(TENANT_ID)
+        cs, ds, att_s, ar_s = store.comment_updates_watermark_v2(TENANT_ID)
         return {
             "tenantId": TENANT_ID,
-            "cursor": _encode_cursor({"cs": cs, "ds": ds}),
+            "cursor": _encode_cursor({"cs": cs, "ds": ds, "as": att_s, "rs": ar_s}),
             "items": [],
             "draftsReady": [],
+            "needYou": [],
+            "autoReplied": [],
         }
 
-    cs, ds = _parse_updates_cursor(since_f)
-    rows, drafts_ready, new_cs, new_ds = store.list_comment_updates_since(TENANT_ID, cs, ds, limit=50)
+    cs, ds, att_s, ar_s = _parse_updates_cursor_v2(since_f)
+    rows, drafts_ready, need_you, auto_replied, new_cs, new_ds, new_as, new_rs = (
+        store.list_comment_updates_since_v2(TENANT_ID, cs, ds, att_s, ar_s, limit=50)
+    )
     chans = _channel_map() if rows else {}
     items = [
         {
-            "threadId": r["parent_id"] or r["id"],
+            "threadId": store.resolve_thread_root_id(TENANT_ID, r) if r["parent_id"] else r["id"],
             "messageId": r["id"],
             "customerName": (r["from_name"] or "").strip() or None,
             "text": _truncate_update_text(r["message"], 120),
@@ -1515,9 +1620,11 @@ def comment_updates(since: Optional[str] = None):
     ]
     return {
         "tenantId": TENANT_ID,
-        "cursor": _encode_cursor({"cs": new_cs, "ds": new_ds}),
+        "cursor": _encode_cursor({"cs": new_cs, "ds": new_ds, "as": new_as, "rs": new_rs}),
         "items": items,
         "draftsReady": drafts_ready,
+        "needYou": need_you,
+        "autoReplied": auto_replied,
     }
 
 
@@ -1535,7 +1642,7 @@ def list_comment_threads(
         raise ApiError(
             400,
             "INVALID_INPUT",
-            "filter chỉ nhận needs_reply, unread, all, hidden, ignored hoặc has_phone",
+            "filter chỉ nhận can_ban, needs_reply, unread, all, hidden, ignored hoặc has_phone",
         )
     channel_f = (channelId or "").strip() or None
     job_f = (postJobId or "").strip() or None
@@ -1545,7 +1652,8 @@ def list_comment_threads(
 
     rows = store.list_all_tenant_comments(TENANT_ID, channel_id=channel_f, post_job_id=job_f)
     read_states = store.get_thread_read_states(TENANT_ID) if rows else {}
-    records = _build_thread_records(rows, read_states)
+    attentions = store.get_thread_attentions(TENANT_ID) if rows else {}
+    records = _build_thread_records(rows, read_states, attentions=attentions)
     jobs_by_id = {j["id"]: j for j in store.post_jobs()} if records else {}
 
     if q_f:
@@ -1560,6 +1668,7 @@ def list_comment_threads(
         records = matched
 
     counts = {
+        "canBan": sum(1 for r in records if r["has_can_ban"]),
         "needsReply": sum(1 for r in records if r["needs_reply"]),
         "unread": sum(1 for r in records if r["unread"]),
         "all": len(records),
@@ -1567,7 +1676,9 @@ def list_comment_threads(
         "ignored": sum(1 for r in records if r["status"] == "ignored"),
     }
 
-    if filter_f == "needs_reply":
+    if filter_f == "can_ban":
+        filtered = [r for r in records if r["has_can_ban"]]
+    elif filter_f == "needs_reply":
         filtered = [r for r in records if r["needs_reply"]]
     elif filter_f == "unread":
         filtered = [r for r in records if r["unread"]]
@@ -1581,20 +1692,30 @@ def list_comment_threads(
         filtered = records
 
     if cur_key is not None:
-        cur_dt, cur_id = cur_key
-        filtered = [r for r in filtered if (r["updated_dt"], r["id"]) < (cur_dt, cur_id)]
+        cur_a, cur_dt, cur_id = cur_key
+        filtered = [
+            r
+            for r in filtered
+            if (1 if r["has_can_ban"] else 0, r["updated_dt"], r["id"]) < (cur_a, cur_dt, cur_id)
+        ]
 
     page_recs = filtered[:limit]
     has_more = len(filtered) > limit
     next_cursor = (
-        _encode_cursor({"t": page_recs[-1]["updated_at"], "id": page_recs[-1]["id"]})
+        _encode_cursor({
+            "a": 1 if page_recs[-1]["has_can_ban"] else 0,
+            "t": page_recs[-1]["updated_at"],
+            "id": page_recs[-1]["id"],
+        })
         if (has_more and page_recs)
         else None
     )
 
     chans = _channel_map() if page_recs else {}
     catalog_by_code = {r["ma_sp"]: r for r in store.catalog_rows()} if page_recs else {}
-    active_drafts = store.active_thread_drafts(TENANT_ID, [r["id"] for r in page_recs]) if page_recs else {}
+    page_ids = [r["id"] for r in page_recs]
+    active_drafts = store.active_thread_drafts(TENANT_ID, page_ids) if page_ids else {}
+    auto_replies = store.latest_auto_reply_for_threads(TENANT_ID, page_ids) if page_ids else {}
     from_ids = list(dict.fromkeys(r["customer_id"] for r in page_recs if r["customer_id"]))
     tags_by_from = inbox_store.tags_for(TENANT_ID, from_ids) if from_ids else {}
 
@@ -1606,6 +1727,7 @@ def list_comment_threads(
             catalog_by_code=catalog_by_code,
             active_drafts=active_drafts,
             tags_by_from=tags_by_from,
+            auto_replies=auto_replies,
         )
         for rec in page_recs
     ]
@@ -1737,22 +1859,41 @@ def patch_comment_thread_draft(thread_id: str, body: CommentTextIn):
     return {"tenantId": TENANT_ID, "thread": _thread_view(thread_id), "check": check}
 
 
-@router.post("/comments/threads/{thread_id}/reply")
-def reply_comment_thread(thread_id: str, body: ThreadReplyIn):
-    rec = _load_thread_record(thread_id)
+@router.post("/comments/threads/{thread_id}/attention/clear")
+def clear_comment_thread_attention(thread_id: str, body: Optional[EmptyIn] = None):
+    _load_thread_record(thread_id)
+    store.clear_thread_attention(TENANT_ID, thread_id)
+    return {"tenantId": TENANT_ID, "thread": _thread_view(thread_id)}
+
+
+def send_thread_reply(
+    thread_id: str,
+    text: str,
+    client_id: str,
+    *,
+    tenant_id=None,
+    sent_by: str = "operator",
+    clear_attention: bool = True,
+) -> dict:
+    """Đường gửi trả lời dùng chung cho người vận hành và auto-reply (cùng kiểm tra nội dung, fencing, idempotency)."""
+    if sent_by != "auto" and str(client_id or "").strip().lower().startswith("auto:"):
+        raise ApiError(400, "INVALID_INPUT", "clientId bắt đầu bằng 'auto:' chỉ dành cho hệ thống tự động trả lời")
+    tid = tenant_id or TENANT_ID
+    rec = _load_thread_record(thread_id, tenant_id=tid)
     root = rec["root"]
 
     now_ts = z(now())
-    existing = store.get_draft_by_client_id(TENANT_ID, body.clientId, now_ts=now_ts)
+    existing = store.get_draft_by_client_id(tid, client_id, now_ts=now_ts)
     if existing:
         if existing["comment_id"] != thread_id:
             raise ApiError(409, "CONFLICT", "clientId đã được dùng cho hội thoại khác")
         if existing["status"] == "sent":
             chans = _channel_map()
             return {
-                "tenantId": TENANT_ID,
-                "thread": _thread_view(thread_id, rec=rec, chans=chans),
-                "message": _message_for_sent_draft(thread_id, existing, root=root, chans=chans),
+                "tenantId": tid,
+                "thread": _thread_view(thread_id, rec=rec, chans=chans, tenant_id=tid),
+                "message": _message_for_sent_draft(thread_id, existing, root=root, chans=chans, tenant_id=tid),
+                "alreadySent": True,
             }
         if existing["status"] == "sending":
             raise ApiError(409, "CONFLICT", "Đang gửi trả lời cho hội thoại này")
@@ -1760,8 +1901,8 @@ def reply_comment_thread(thread_id: str, body: ThreadReplyIn):
     if not root["can_comment"]:
         raise ApiError(409, "CONFLICT", "Facebook không cho phép trả lời bình luận này")
 
-    _, row, page = _comment_context(root)
-    check = _check_reply_text(body.text, row, page)
+    _, row, page = _comment_context(root, tenant_id=tid)
+    check = _check_reply_text(text, row, page)
     if check["block"]:
         raise ApiError(422, "BLOCKED", "; ".join(check["block"]), reasons=list(check["block"]))
 
@@ -1773,20 +1914,22 @@ def reply_comment_thread(thread_id: str, body: ThreadReplyIn):
     attempt_token = str(uuid.uuid4())
     with store.active_send_attempt(attempt_token):
         draft_id, claim_err, existing_sent = store.claim_thread_reply(
-            TENANT_ID,
+            tid,
             thread_id,
             str(uuid.uuid4()),
-            body.text,
-            body.clientId,
+            text,
+            client_id,
             ts,
             attempt_token=attempt_token,
+            sent_by=sent_by,
         )
         if claim_err == "ALREADY_SENT" and existing_sent:
             chans = _channel_map()
             return {
-                "tenantId": TENANT_ID,
-                "thread": _thread_view(thread_id, chans=chans),
-                "message": _message_for_sent_draft(thread_id, existing_sent, root=root, chans=chans),
+                "tenantId": tid,
+                "thread": _thread_view(thread_id, chans=chans, tenant_id=tid),
+                "message": _message_for_sent_draft(thread_id, existing_sent, root=root, chans=chans, tenant_id=tid),
+                "alreadySent": True,
             }
         if claim_err == "NOT_FOUND":
             raise ApiError(404, "NOT_FOUND", "Không tìm thấy hội thoại này")
@@ -1796,11 +1939,11 @@ def reply_comment_thread(thread_id: str, body: ThreadReplyIn):
             raise ApiError(409, "CONFLICT", "Đang gửi trả lời cho hội thoại này")
 
         try:
-            fb_reply_id = tools.reply_fb_comment(thread_id, body.text, root["channel_id"])
+            fb_reply_id = tools.reply_fb_comment(thread_id, text, root["channel_id"])
         except facebook.FacebookError as e:
             fail_ts = z(now())
             store.fail_comment_reply(
-                TENANT_ID,
+                tid,
                 draft_id,
                 thread_id,
                 error_code=e.code,
@@ -1809,13 +1952,13 @@ def reply_comment_thread(thread_id: str, body: ThreadReplyIn):
                 attempt_token=attempt_token,
             )
             log.warning("comment_thread_reply_error tenant=%s post_job_id=%s thread_id=%s code=%s",
-                        TENANT_ID, root["post_job_id"], thread_id, e.code)
+                        tid, root["post_job_id"], thread_id, e.code)
             raise ApiError(_fb_http_status(e.code), e.code, e.user_message)
         except Exception as e:
             fail_ts = z(now())
             msg = "Gửi trả lời lên Facebook thất bại: %s" % type(e).__name__
             store.fail_comment_reply(
-                TENANT_ID,
+                tid,
                 draft_id,
                 thread_id,
                 error_code="UPSTREAM_ERROR",
@@ -1824,7 +1967,7 @@ def reply_comment_thread(thread_id: str, body: ThreadReplyIn):
                 attempt_token=attempt_token,
             )
             log.warning("comment_thread_reply_error tenant=%s post_job_id=%s thread_id=%s code=%s",
-                        TENANT_ID, root["post_job_id"], thread_id, "UPSTREAM_ERROR")
+                        tid, root["post_job_id"], thread_id, "UPSTREAM_ERROR")
             raise ApiError(502, "UPSTREAM_ERROR", msg)
 
         sent_ts = z(now())
@@ -1842,52 +1985,76 @@ def reply_comment_thread(thread_id: str, body: ThreadReplyIn):
             "from_id": root["page_id"],
             "from_name": ch_name,
             "is_from_page": 1,
-            "message": body.text,
+            "message": text,
             "permalink_url": "",
             "is_hidden": 0,
             "can_comment": 1,
             "created_time": sent_ts,
             "status": "replied",
+            "sent_by": sent_by,
             "synced_at": sent_ts,
             "updated_at": sent_ts,
         }
         completed = store.complete_comment_reply(
-            TENANT_ID,
+            tid,
             draft_id,
             thread_id,
             msg_id,
             sent_ts,
             page_reply_item=page_reply_item,
             attempt_token=attempt_token,
+            clear_attention=clear_attention,
+            attention_thread_id=thread_id,
         )
     if not completed:
-        current = store.get_draft_by_client_id(TENANT_ID, body.clientId, now_ts=sent_ts)
+        current = store.get_draft_by_client_id(tid, client_id, now_ts=sent_ts)
         if current and current["comment_id"] == thread_id and current["status"] == "sent":
             return {
-                "tenantId": TENANT_ID,
-                "thread": _thread_view(thread_id, chans=chans),
-                "message": _message_for_sent_draft(thread_id, current, root=root, chans=chans),
+                "tenantId": tid,
+                "thread": _thread_view(thread_id, chans=chans, tenant_id=tid),
+                "message": _message_for_sent_draft(thread_id, current, root=root, chans=chans, tenant_id=tid),
+                "alreadySent": True,
             }
         raise ApiError(409, "CONFLICT", "Lượt gửi này đã được thay thế bởi lượt thử lại mới hơn")
     log.info(
-        "comment_thread_reply_sent tenant=%s post_job_id=%s thread_id=%s reply_id=%s",
-        TENANT_ID,
+        "comment_thread_reply_sent tenant=%s post_job_id=%s thread_id=%s reply_id=%s sent_by=%s",
+        tid,
         root["post_job_id"],
         thread_id,
         msg_id,
+        sent_by,
     )
-    saved_reply = store.get_comment(TENANT_ID, msg_id) or page_reply_item
-    liked = set(inbox_store.liked_ids(TENANT_ID, [saved_reply["id"]]))
+    saved_reply = store.get_comment(tid, msg_id) or page_reply_item
+    liked = set(inbox_store.liked_ids(tid, [saved_reply["id"]]))
     msg_view = _message_view(
         saved_reply,
         thread_id=thread_id,
         liked_set=liked,
-        client_by_reply={saved_reply["id"]: body.clientId},
+        client_by_reply={saved_reply["id"]: client_id},
     )
     return {
-        "tenantId": TENANT_ID,
-        "thread": _thread_view(thread_id, chans=chans),
+        "tenantId": tid,
+        "thread": _thread_view(thread_id, chans=chans, tenant_id=tid),
         "message": msg_view,
+        "alreadySent": False,
+    }
+
+
+@router.post("/comments/threads/{thread_id}/reply")
+def reply_comment_thread(thread_id: str, body: ThreadReplyIn):
+    if str(body.clientId or "").strip().lower().startswith("auto:"):
+        raise ApiError(400, "INVALID_INPUT", "clientId không được bắt đầu bằng 'auto:'")
+    res = send_thread_reply(
+        thread_id,
+        body.text,
+        body.clientId,
+        sent_by="operator",
+        clear_attention=True,
+    )
+    return {
+        "tenantId": res["tenantId"],
+        "thread": res["thread"],
+        "message": res["message"],
     }
 
 
@@ -2123,6 +2290,7 @@ def reply_comment(comment_id: str, body: CommentTextIn):
                 "can_comment": 1,
                 "created_time": sent_ts,
                 "status": "replied",
+                "sent_by": "operator",
                 "synced_at": sent_ts,
                 "updated_at": sent_ts,
             }
@@ -2134,6 +2302,8 @@ def reply_comment(comment_id: str, body: CommentTextIn):
             sent_ts,
             page_reply_item=page_reply_item,
             attempt_token=attempt_token,
+            clear_attention=True,
+            attention_thread_id=target_id,
         )
     if not completed:
         latest = store.latest_comment_draft(TENANT_ID, comment_id, now_ts=sent_ts)
