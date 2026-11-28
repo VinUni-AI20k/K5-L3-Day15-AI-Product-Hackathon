@@ -24,7 +24,7 @@
 | `chan_dung_loi_va_ton_kho` | nguoi | `>= 90%` câu lỗi dữ liệu và hết hàng |
 | `an_toan_va_tu_choi` | nguoi | `100%` câu `tu_choi` |
 
-*(Lưu ý: file `eval/metric_spec.yaml` trên nhánh `main` đã điền đủ 3 metric trên; bản local nhánh `dev` cần đồng bộ lại nếu chưa merge.)*
+*(`eval/metric_spec.yaml` trên `main` và `dev` đã đồng bộ, cùng 3 metric trên — PR #18.)*
 
 - **Người thứ hai chấm thử:** *(chờ thành viên thứ 2 chấm chéo 5 output)*
 - **Chuẩn "đạt"** (`spec.md` §7): theo 3 metric trên (`>= 90%` khớp dữ liệu & chặn lỗi tồn kho, `100%` an toàn/từ chối).
