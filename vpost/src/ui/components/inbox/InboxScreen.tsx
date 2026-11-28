@@ -121,6 +121,7 @@ export interface InboxWorkspaceViewProps {
   readonly onCollapseDesktopCustomerPanel: () => void;
   readonly onCloseCustomerSheet: () => void;
   readonly onCloseModerationPanel: () => void;
+  readonly onOpenModerationLog?: () => void;
   readonly onCloseAutoReplyDialog?: () => void;
 }
 
@@ -144,6 +145,7 @@ export function InboxWorkspaceView({
   onCollapseDesktopCustomerPanel,
   onCloseCustomerSheet,
   onCloseModerationPanel,
+  onOpenModerationLog,
   onCloseAutoReplyDialog,
 }: InboxWorkspaceViewProps) {
   const isMobile = layoutMode === "mobile";
@@ -191,6 +193,7 @@ export function InboxWorkspaceView({
           readOnlyReason={readOnlyReason}
           pageNameById={pageNameById}
           onClose={onCloseModerationPanel}
+          onOpenLog={onOpenModerationLog}
         />
 
         <InboxAutoReplyDialog
@@ -297,6 +300,7 @@ export function InboxWorkspaceView({
         readOnlyReason={readOnlyReason}
         pageNameById={pageNameById}
         onClose={onCloseModerationPanel}
+        onOpenLog={onOpenModerationLog}
       />
 
       <InboxAutoReplyDialog
@@ -1014,6 +1018,7 @@ export function InboxScreen() {
       onCollapseDesktopCustomerPanel={() => setIsDesktopCustomerPanelOpen(false)}
       onCloseCustomerSheet={() => setIsCustomerSheetOpen(false)}
       onCloseModerationPanel={handleCloseModerationPanel}
+      onOpenModerationLog={() => setActiveModerationPanel("log")}
       onCloseAutoReplyDialog={() => setIsAutoReplyDialogOpen(false)}
     />
   );

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AlertDialog,
   Badge,
   Banner,
   Button,
@@ -13,15 +12,14 @@ import {
   Heading,
   Link,
   NumberInput,
-  RadioList,
-  RadioListItem,
+  Section,
   Skeleton,
   Stack,
   StackItem,
-  Switch,
+  StatusDot,
   Text,
 } from "@astryxdesign/core";
-import { Bot, RotateCcw, Save } from "lucide-react";
+import { Bot, History, RotateCcw, Save } from "lucide-react";
 import { useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
@@ -30,7 +28,6 @@ import {
   buildAutoReplyUpdatePayload,
   evaluateAutoReplySaveGate,
   isAutoReplyDraftDirty,
-  needsLiveModeConfirm,
   sanitizeAutoReplyIntents,
   settingToAutoReplyDraft,
   validateAutoReplyDraft,
@@ -52,14 +49,10 @@ import {
   AUTO_REPLY_HOURLY_CAP_MAX,
   AUTO_REPLY_HOURLY_CAP_MIN,
   AUTO_REPLY_INTENT_META,
-  AUTO_REPLY_LIVE_CONFIRM_COPY,
-  AUTO_REPLY_MODE_LABELS,
-  type AutoReplyMode,
   type AutoReplySetting,
   type AutoReplySettingUpdateInput,
 } from "@/ui/schemas/auto-reply.schema";
 import { formatCommentAbsoluteTime } from "@/ui/schemas/comment.schema";
-import { ApiError } from "@/ui/services/api-error";
 
 export function AutoReplySettingsSkeleton() {
   return (
@@ -97,10 +90,9 @@ interface PageAutoReplySettingCardProps {
   readonly savedMessage: string | null;
   /** Optional initial draft override for deterministic render tests. */
   readonly initialDraftOverride?: Partial<AutoReplySettingDraft>;
-  /** Optional override to render the live-mode confirmation AlertDialog open in tests. */
-  readonly initialLiveConfirmOpen?: boolean;
   readonly onSave: (pageId: string, input: AutoReplySettingUpdateInput) => void;
   readonly onDismissSaved?: (pageId: string) => void;
+  readonly onOpenLog?: () => void;
 }
 
 function PageAutoReplySettingCard({
@@ -110,23 +102,21 @@ function PageAutoReplySettingCard({
   saveError,
   savedMessage,
   initialDraftOverride,
-  initialLiveConfirmOpen = false,
   onSave,
   onDismissSaved,
+  onOpenLog,
 }: PageAutoReplySettingCardProps) {
-  const serverKey = `${setting.pageId}:${setting.enabled}:${setting.mode}:${setting.intents.join(",")}:${setting.hourlyCap}:${setting.dailyCap}:${setting.updatedAt ?? ""}`;
+  const serverKey = `${setting.pageId}:${setting.intents.join(",")}:${setting.hourlyCap}:${setting.dailyCap}:${setting.updatedAt ?? ""}`;
   const [lastSyncedKey, setLastSyncedKey] = useState(serverKey);
   const [draft, setDraft] = useState<AutoReplySettingDraft>(() => ({
     ...settingToAutoReplyDraft(setting),
     ...initialDraftOverride,
   }));
-  const [isLiveConfirmOpen, setIsLiveConfirmOpen] = useState(initialLiveConfirmOpen);
 
   // Reconcile draft synchronously when server setting updates after save/refetch.
   if (lastSyncedKey !== serverKey) {
     setLastSyncedKey(serverKey);
     setDraft(settingToAutoReplyDraft(setting));
-    setIsLiveConfirmOpen(false);
   }
 
   const isDirty = isAutoReplyDraftDirty(setting, draft);
@@ -137,55 +127,29 @@ function PageAutoReplySettingCard({
     readOnlyReason,
     validation,
   });
-  const requiresLiveConfirm = needsLiveModeConfirm(setting, draft);
 
   const pageLabel = setting.pageName.trim() || setting.pageId;
-  const statusBadge = !setting.enabled
-    ? { variant: "neutral" as const, label: "Đang tắt" }
-    : setting.mode === "dry_run"
-      ? { variant: "info" as const, label: `Đang bật · ${AUTO_REPLY_MODE_LABELS.dry_run}` }
-      : { variant: "success" as const, label: `Đang bật · ${AUTO_REPLY_MODE_LABELS.live}` };
 
   function handleSaveClick() {
     if (!gate.canSave) return;
-    if (requiresLiveConfirm) {
-      setIsLiveConfirmOpen(true);
-      return;
-    }
-    onSave(
-      setting.pageId,
-      buildAutoReplyUpdatePayload(draft, { confirmedLive: draft.mode === "live" }),
-    );
-  }
-
-  function handleConfirmLiveSave() {
-    if (!gate.canSave) return;
-    setIsLiveConfirmOpen(false);
-    onSave(
-      setting.pageId,
-      buildAutoReplyUpdatePayload(draft, { confirmedLive: true }),
-    );
+    onSave(setting.pageId, buildAutoReplyUpdatePayload(draft));
   }
 
   function handleReset() {
     if (!gate.canReset) return;
     setDraft(settingToAutoReplyDraft(setting));
-    setIsLiveConfirmOpen(false);
   }
-
-  const isServerConfirmRequired =
-    ApiError.is(saveError) && saveError.code === "CONFIRM_REQUIRED";
 
   return (
     <Card padding={5} data-auto-reply-page={setting.pageId}>
       <Stack direction="vertical" gap={4}>
-        {/* Page heading & status */}
+        {/* Page heading & always-active live status */}
         <HStack gap={3} align="start" justify="between" wrap="wrap">
           <StackItem size="fill">
             <Stack direction="vertical" gap={0.5}>
               <HStack gap={2} align="center" wrap="wrap">
                 <Heading level={3}>{pageLabel}</Heading>
-                <Badge variant={statusBadge.variant} label={statusBadge.label} />
+                <Badge variant="success" label="Đang bật · chạy thật" />
               </HStack>
               <Text
                 type="supporting"
@@ -196,7 +160,7 @@ function PageAutoReplySettingCard({
                 Page ID: {setting.pageId}
                 {setting.updatedAt
                   ? ` · Cập nhật lúc ${formatCommentAbsoluteTime(setting.updatedAt)}`
-                  : " · Đang dùng cấu hình mặc định (tắt, Chạy thử)"}
+                  : " · Đang dùng cấu hình mặc định"}
               </Text>
             </Stack>
           </StackItem>
@@ -204,57 +168,40 @@ function PageAutoReplySettingCard({
 
         <Divider />
 
-        {/* Per-Page enable switch */}
-        <Switch
-          label="Bật tự động trả lời bình luận mới"
-          description="Mặc định tắt. Hệ thống chỉ trả lời câu hỏi về giá, size hoặc màu từ dữ liệu sản phẩm; các câu hỏi khác luôn gắn “Cần bạn” để nhân viên xử lý."
-          value={draft.enabled}
-          isDisabled={!gate.canEdit}
-          disabledMessage={gate.editDisabledReason ?? undefined}
-          onChange={(checked) => setDraft((prev) => ({ ...prev, enabled: checked }))}
-        />
+        {/* Always-active live status explanation & log pointer */}
+        <Section variant="muted" padding={3} data-auto-reply-status="active">
+          <Stack direction="vertical" gap={1.5}>
+            <HStack gap={2} align="center" justify="between" wrap="wrap">
+              <HStack gap={2} align="center">
+                <StatusDot
+                  variant="success"
+                  label="Đang bật · chạy thật"
+                  aria-hidden="true"
+                />
+                <Text type="label">Đang bật · chạy thật</Text>
+              </HStack>
+              {onOpenLog ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="inbox-touch-target"
+                  icon={<History className="size-4" aria-hidden="true" />}
+                  label="Xem nhật ký tự trả lời"
+                  onClick={onOpenLog}
+                />
+              ) : null}
+            </HStack>
+            <Text type="supporting" color="secondary">
+              Hệ thống tự động trả lời công khai các bình luận khớp loại câu hỏi bên dưới
+              trong giới hạn mỗi giờ và mỗi ngày (ghép trực tiếp từ dữ liệu sản phẩm; các câu
+              hỏi khác luôn gắn “Cần bạn”). Xem lịch sử câu trả lời đã gửi hoặc bỏ qua ở tab
+              “Nhật ký tự trả lời”.
+            </Text>
+          </Stack>
+        </Section>
 
-        {/* Mode radio group */}
-        <RadioList
-          label="Chế độ hoạt động"
-          description="Nên dùng Chạy thử trước để xem câu trả lời mẫu trong hộp thư và nhật ký trước khi chuyển sang Chạy thật."
-          value={draft.mode}
-          isDisabled={!gate.canEdit}
-          disabledMessage={gate.editDisabledReason ?? undefined}
-          onChange={(nextMode) => {
-            if (nextMode === "dry_run" || nextMode === "live") {
-              setDraft((prev) => ({ ...prev, mode: nextMode as AutoReplyMode }));
-            }
-          }}
-        >
-          <RadioListItem
-            value="dry_run"
-            label="Chạy thử"
-            description="Chỉ hiển thị thẻ “Sẽ tự trả lời (chạy thử)” trong hội thoại và ghi nhật ký — không gọi hay đăng bình luận lên Facebook."
-          />
-          <RadioListItem
-            value="live"
-            label="Chạy thật"
-            description="Tự động đăng câu trả lời công khai lên Facebook khi khớp loại câu hỏi đã chọn và đủ dữ liệu sản phẩm."
-          />
-        </RadioList>
-
-        {draft.mode === "dry_run" ? (
-          <Banner
-            status="info"
-            title="Chế độ Chạy thử không đăng bình luận lên Facebook"
-            description="Câu trả lời mẫu chỉ hiển thị nội bộ để bạn đối chiếu với dữ liệu sản phẩm trước khi bật Chạy thật."
-          />
-        ) : (
-          <Banner
-            status="warning"
-            title={AUTO_REPLY_LIVE_CONFIRM_COPY}
-            description="Mỗi câu hỏi hợp lệ sẽ được đăng công khai dưới tên Fanpage trong giới hạn mỗi giờ và mỗi ngày."
-            data-auto-reply-live-warning="true"
-          />
-        )}
-
-        {/* Intents checkboxes: Giá / Size / Màu */}
+        {/* Intents checkboxes: Giá / Size / Màu / Tư vấn size */}
         <CheckboxList
           label="Loại câu hỏi cho phép tự trả lời"
           description="Chỉ các loại câu hỏi được chọn mới được tự động trả lời; câu hỏi kèm ship, đổi trả, khuyến mãi hoặc thiếu dữ liệu luôn gắn “Cần bạn”."
@@ -278,6 +225,14 @@ function PageAutoReplySettingCard({
             />
           ))}
         </CheckboxList>
+
+        <Text type="supporting" size="xsm" color="secondary">
+          Tính năng Tư vấn size sử dụng bảng cân nặng/chiều cao của shop —{" "}
+          <Link href="/writing-style" hasUnderline>
+            xem hoặc chỉnh Bảng size tại Phong cách viết
+          </Link>
+          .
+        </Text>
 
         {validation.intentsError ? (
           <Banner
@@ -316,7 +271,7 @@ function PageAutoReplySettingCard({
 
           <NumberInput
             label="Giới hạn tối đa mỗi ngày"
-            description={`Số nguyên từ ${AUTO_REPLY_DAILY_CAP_MIN} đến ${AUTO_REPLY_DAILY_CAP_MAX.toLocaleString("vi-VN")} (mặc định ${AUTO_REPLY_DAILY_CAP_DEFAULT}).`}
+            description={`Số nguyên từ ${AUTO_REPLY_DAILY_CAP_MIN} đến ${AUTO_REPLY_DAILY_CAP_MAX.toLocaleString("vi-VN")} (mặc định ${AUTO_REPLY_DAILY_CAP_DEFAULT.toLocaleString("vi-VN")}).`}
             value={draft.dailyCap}
             step={1}
             isIntegerOnly
@@ -347,13 +302,7 @@ function PageAutoReplySettingCard({
           <ApiErrorNotice
             error={saveError}
             shouldFocus={false}
-            onRetry={
-              gate.canSave
-                ? isServerConfirmRequired
-                  ? () => setIsLiveConfirmOpen(true)
-                  : handleSaveClick
-                : undefined
-            }
+            onRetry={gate.canSave ? handleSaveClick : undefined}
           />
         ) : null}
 
@@ -408,19 +357,6 @@ function PageAutoReplySettingCard({
           ) : null}
         </HStack>
       </Stack>
-
-      {/* Mandatory explicit confirmation dialog before enabling/switching to live mode */}
-      <AlertDialog
-        isOpen={isLiveConfirmOpen}
-        onOpenChange={setIsLiveConfirmOpen}
-        title={AUTO_REPLY_LIVE_CONFIRM_COPY}
-        description={`Fanpage ${pageLabel} sẽ tự động đăng câu trả lời công khai lên Facebook cho các câu hỏi đã chọn (tối đa ${draft.hourlyCap ?? AUTO_REPLY_HOURLY_CAP_DEFAULT} tin/giờ, ${draft.dailyCap ?? AUTO_REPLY_DAILY_CAP_DEFAULT} tin/ngày). Bạn có chắc chắn muốn bật Chạy thật?`}
-        cancelLabel="Hủy"
-        actionLabel="Xác nhận bật Chạy thật"
-        actionVariant="primary"
-        isActionLoading={isSaving}
-        onAction={handleConfirmLiveSave}
-      />
     </Card>
   );
 }
@@ -439,15 +375,15 @@ export interface AutoReplySettingsViewProps {
   readonly initialDraftOverrides?: Readonly<
     Record<string, Partial<AutoReplySettingDraft> | undefined>
   >;
-  readonly initialLiveConfirmPageId?: string | null;
   readonly onRetry: () => void;
   readonly onSave: (pageId: string, input: AutoReplySettingUpdateInput) => void;
   readonly onDismissSaved?: (pageId: string) => void;
+  readonly onOpenLog?: () => void;
 }
 
 /**
  * Presentational view of per-Page auto-reply settings covering loading,
- * empty (no connected Pages), API error, read-only, validation, and live-confirm states.
+ * empty (no connected Pages), API error, read-only, and validation states.
  */
 export function AutoReplySettingsView({
   isFirstLoad,
@@ -460,10 +396,10 @@ export function AutoReplySettingsView({
   saveErrorByPageId,
   savedMessageByPageId,
   initialDraftOverrides,
-  initialLiveConfirmPageId = null,
   onRetry,
   onSave,
   onDismissSaved,
+  onOpenLog,
 }: AutoReplySettingsViewProps) {
   return (
     <Stack direction="vertical" gap={5} data-auto-reply="settings-panel">
@@ -476,9 +412,9 @@ export function AutoReplySettingsView({
           <Heading level={2}>Cài đặt tự động trả lời theo Fanpage</Heading>
         </HStack>
         <Text type="supporting" color="secondary">
-          Tự động trả lời tắt mặc định cho mọi Fanpage. Câu trả lời được ghép trực tiếp từ dữ liệu
-          sản phẩm (không dùng AI viết nội dung); mọi trường hợp không chắc chắn đều gắn “Cần bạn”
-          chờ nhân viên xử lý.
+          Tự động trả lời đang bật ở chế độ chạy thật cho mọi Fanpage đã kết nối. Câu trả lời
+          được ghép trực tiếp từ dữ liệu sản phẩm (không dùng AI viết nội dung); mọi trường
+          hợp không chắc chắn đều gắn “Cần bạn” chờ nhân viên xử lý.
         </Text>
       </Stack>
 
@@ -516,9 +452,9 @@ export function AutoReplySettingsView({
               saveError={saveErrorByPageId[setting.pageId] ?? null}
               savedMessage={savedMessageByPageId[setting.pageId] ?? null}
               initialDraftOverride={initialDraftOverrides?.[setting.pageId]}
-              initialLiveConfirmOpen={initialLiveConfirmPageId === setting.pageId}
               onSave={onSave}
               onDismissSaved={onDismissSaved}
+              onOpenLog={onOpenLog}
             />
           ))}
         </Stack>
@@ -530,6 +466,8 @@ export function AutoReplySettingsView({
 export interface AutoReplySettingsPanelProps {
   /** Optional override for read-only reason (defaults to `useReadOnlyReason()`). */
   readonly readOnlyReason?: string | null;
+  /** Optional callback to switch directly to the auto-reply log tab. */
+  readonly onOpenLog?: () => void;
 }
 
 /**
@@ -537,6 +475,7 @@ export interface AutoReplySettingsPanelProps {
  */
 export function AutoReplySettingsPanel({
   readOnlyReason: readOnlyReasonProp,
+  onOpenLog,
 }: AutoReplySettingsPanelProps = {}) {
   const hookReadOnlyReason = useReadOnlyReason();
   const readOnlyReason =
@@ -597,6 +536,7 @@ export function AutoReplySettingsPanel({
       onDismissSaved={(pageId) =>
         setSavedMessageByPageId((prev) => ({ ...prev, [pageId]: undefined }))
       }
+      onOpenLog={onOpenLog}
     />
   );
 }

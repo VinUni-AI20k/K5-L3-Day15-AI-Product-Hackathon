@@ -17,7 +17,13 @@ import {
   Tooltip,
   VisuallyHidden,
 } from "@astryxdesign/core";
-import { AlertCircle, ArrowLeft, Ban, PanelRight, RotateCcw } from "lucide-react";
+import { AlertCircle, ArrowLeft, Ban, PanelRight, RotateCcw, Ruler } from "lucide-react";
+
+import {
+  AWAITING_MEASUREMENTS_BADGE_LABEL,
+  formatAwaitingMeasurementsTooltip,
+  resolveAwaitingMeasurements,
+} from "@/ui/components/inbox/auto-reply-state";
 
 import {
   formatInboxCustomerName,
@@ -36,6 +42,7 @@ import "./inbox-surface.css";
 export interface ChatHeaderProps {
   readonly thread: InboxThread;
   readonly firstMessageAt?: string | null;
+  readonly nowMs?: number;
   readonly readOnlyReason: string | null;
   readonly isTogglingIgnore: boolean;
   readonly showBackButton: boolean;
@@ -54,6 +61,7 @@ export interface ChatHeaderProps {
 export function ChatHeader({
   thread,
   firstMessageAt,
+  nowMs,
   readOnlyReason,
   isTogglingIgnore,
   showBackButton,
@@ -88,8 +96,18 @@ export function ChatHeader({
       : "Cần bạn"
     : null;
 
+  const awaitingMeasurements = resolveAwaitingMeasurements(thread, nowMs);
+  const awaitingTooltip = awaitingMeasurements
+    ? formatAwaitingMeasurementsTooltip(awaitingMeasurements)
+    : null;
+
   return (
-    <LayoutHeader hasDivider padding={0} className="inbox-chat-header">
+    <LayoutHeader
+      hasDivider
+      padding={0}
+      className="inbox-chat-header"
+      data-awaiting-measurements={awaitingMeasurements ? "true" : "false"}
+    >
       <Stack direction="vertical" gap={3} className="min-w-0">
         <HStack gap={2} align="center" justify="between" wrap="wrap">
           <HStack gap={3} align="center" className="min-w-0">
@@ -125,6 +143,18 @@ export function ChatHeader({
                         icon={<AlertCircle className="size-4" aria-hidden="true" />}
                         label="Cần bạn"
                         data-attention-badge="can_ban"
+                      />
+                    </span>
+                  </Tooltip>
+                ) : null}
+                {awaitingMeasurements && awaitingTooltip ? (
+                  <Tooltip content={awaitingTooltip} placement="below">
+                    <span className="inline-flex" title={awaitingTooltip}>
+                      <Badge
+                        variant="info"
+                        icon={<Ruler className="size-4" aria-hidden="true" />}
+                        label={AWAITING_MEASUREMENTS_BADGE_LABEL}
+                        data-awaiting-measurements-badge="true"
                       />
                     </span>
                   </Tooltip>

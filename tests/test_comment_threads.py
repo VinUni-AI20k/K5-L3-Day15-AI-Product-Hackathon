@@ -272,7 +272,7 @@ def test_threads_list_shapes_filters_counts_and_has_phone():
         "id", "channelId", "channelName", "pageId", "postJobId", "productCode", "postCaption",
         "postUrl", "postImageUrl", "customer", "lastMessage", "needsReply", "unread", "unreadCount",
         "status", "isHidden", "messageCount", "hasPhone", "draft", "moderation", "attention",
-        "autoReply", "agentRun", "updatedAt",
+        "autoReply", "agentRun", "awaitingMeasurements", "updatedAt",
     }
     assert set(tf.keys()) == expected_thread_keys
     assert tf["customer"] == {"id": "u3", "name": "Quỳnh", "tags": []}
@@ -890,6 +890,8 @@ def test_finding04_updates_feed_no_skip_on_split_snapshot_or_concurrent_writers(
 
 def test_finding05_autohidden_never_leaks_into_updates_during_sync_to_moderation_window(monkeypatch):
     """#5: Auto-hidden comments must never appear in /api/comments/updates between sync and moderation."""
+    # Isolate sync-to-moderation updates window from default-on live auto-reply (avoids outbound Graph reply call)
+    monkeypatch.setenv("VPOST_AUTO_REPLY_DISABLED", "1")
     seed_post_job(job_id="job-1", fb_post_id="123_1")
     seed_post_job(job_id="job-2", fb_post_id="123_2")
 

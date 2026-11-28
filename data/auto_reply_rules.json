@@ -202,14 +202,14 @@
     {
       "id": "price_item",
       "intents": ["price"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:(?:giá|gía)\\s+(?:bao\\s+nhiêu(?:\\s+tiền)?|nhiêu(?:\\s+tiền)?|nhiu(?:\\s+tiền)?|sao|thế\\s+nào|như\\s+nào|bn|bnh|bnhiu|bnhieu|mấy)|(?:giá|gía)\\s+(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+(?:bao\\s+nhiêu(?:\\s+tiền)?|nhiêu(?:\\s+tiền)?|nhiu(?:\\s+tiền)?|sao|thế\\s+nào|như\\s+nào|bn|bnh|bnhiu|bnhieu)|bao\\s+nhiêu\\s+tiền|nhiêu\\s+tiền|nhiu\\s+tiền|bao\\s+tiền|mấy\\s+tiền|bao\\s+nhiêu|bnhiu(?:\\s+tiền)?|bnhieu(?:\\s+tiền)?)$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:gia\\s+(?:bao\\s+nhieu(?:\\s+tien)?|nhieu(?:\\s+tien)?|nhiu(?:\\s+tien)?|sao|the\\s+nao|nhu\\s+nao|bn|bnh|bnhiu|bnhieu|may)|gia\\s+(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+(?:bao\\s+nhieu(?:\\s+tien)?|nhieu(?:\\s+tien)?|nhiu(?:\\s+tien)?|sao|the\\s+nao|nhu\\s+nao|bn|bnh|bnhiu|bnhieu)|bao\\s+nhieu\\s+tien|nhieu\\s+tien|nhiu\\s+tien|bao\\s+tien|may\\s+tien|bao\\s+nhieu|bnhiu(?:\\s+tien)?|bnhieu(?:\\s+tien)?)$"
+      "vi": "^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này(?:,\\s*|\\s+))?(?:(?:giá|gía)\\s+(?:bao\\s+nhiêu(?:\\s+tiền)?|nhiêu(?:\\s+tiền)?|nhiu(?:\\s+tiền)?|sao|thế\\s+nào|như\\s+nào|bn|bnh|bnhiu|bnhieu|mấy)|(?:giá|gía)\\s+(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+(?:bao\\s+nhiêu(?:\\s+tiền)?|nhiêu(?:\\s+tiền)?|nhiu(?:\\s+tiền)?|sao|thế\\s+nào|như\\s+nào|bn|bnh|bnhiu|bnhieu)|bao\\s+nhiêu\\s+tiền|nhiêu\\s+tiền|nhiu\\s+tiền|bao\\s+tiền|mấy\\s+tiền|bao\\s+nhiêu|bnhiu(?:\\s+tiền)?|bnhieu(?:\\s+tiền)?)$",
+      "ascii": "^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay(?:,\\s*|\\s+))?(?:gia\\s+(?:bao\\s+nhieu(?:\\s+tien)?|nhieu(?:\\s+tien)?|nhiu(?:\\s+tien)?|sao|the\\s+nao|nhu\\s+nao|bn|bnh|bnhiu|bnhieu|may)|gia\\s+(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+(?:bao\\s+nhieu(?:\\s+tien)?|nhieu(?:\\s+tien)?|nhiu(?:\\s+tien)?|sao|the\\s+nao|nhu\\s+nao|bn|bnh|bnhiu|bnhieu)|bao\\s+nhieu\\s+tien|nhieu\\s+tien|nhiu\\s+tien|bao\\s+tien|may\\s+tien|bao\\s+nhieu|bnhiu(?:\\s+tien)?|bnhieu(?:\\s+tien)?)$"
     },
     {
       "id": "price_request",
       "intents": ["price"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:(?:xin|báo|ib|inbox)\\s+(?:giá|gía)|cho\\s+(?:em|e|mình|chị)\\s+(?:xin\\s+)?(?:giá|gía))$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:(?:xin|bao|ib|inbox)\\s+gia|cho\\s+(?:em|e|minh|chi)\\s+(?:xin\\s+)?gia)$",
+      "vi": "^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này(?:,\\s*|\\s+))?(?:(?:xin|báo|ib|inbox)\\s+(?:giá|gía)|cho\\s+(?:em|e|mình|chị)\\s+(?:xin\\s+)?(?:giá|gía))$",
+      "ascii": "^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay(?:,\\s*|\\s+))?(?:(?:xin|bao|ib|inbox)\\s+gia|cho\\s+(?:em|e|minh|chi)\\s+(?:xin\\s+)?gia)$",
       "forbid_trailing": [
         "vậy",
         "thế",
@@ -227,68 +227,80 @@
     {
       "id": "size_list",
       "intents": ["size"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?(?:size|sz|cỡ)\\s+(?:gì|nào|j)(?:\\s+(?:không|ko|k))?|(?:có|còn)\\s+mấy\\s+(?:size|sz|cỡ)|(?:size|sz|cỡ)\\s+(?:gì|nào|j))$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?(?:size|sz)\\s+(?:gi|nao|j)(?:\\s+(?:khong|ko|k))?|(?:co|con)\\s+may\\s+(?:size|sz)|(?:size|sz)\\s+(?:gi|nao|j))$"
+      "vi": "^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này(?:,\\s*|\\s+))?(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?(?:size|sz|cỡ)\\s+(?:gì|nào|j)(?:\\s+(?:không|ko|k))?|(?:có|còn)\\s+mấy\\s+(?:size|sz|cỡ)|(?:size|sz|cỡ)\\s+(?:gì|nào|j))$",
+      "ascii": "^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay(?:,\\s*|\\s+))?(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?(?:size|sz)\\s+(?:gi|nao|j)(?:\\s+(?:khong|ko|k))?|(?:co|con)\\s+may\\s+(?:size|sz)|(?:size|sz)\\s+(?:gi|nao|j))$"
     },
     {
       "id": "color_list",
       "intents": ["color"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?(?:màu|mầu)\\s+(?:gì|nào|j)(?:\\s+(?:không|ko|k))?|(?:có|còn)\\s+mấy\\s+(?:màu|mầu)|(?:màu|mầu)\\s+(?:gì|nào|j))$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?mau\\s+(?:gi|nao|j)(?:\\s+(?:khong|ko|k))?$"
+      "vi": "^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này(?:,\\s*|\\s+))?(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?(?:màu|mầu)\\s+(?:gì|nào|j)(?:\\s+(?:không|ko|k))?|(?:có|còn)\\s+mấy\\s+(?:màu|mầu)|(?:màu|mầu)\\s+(?:gì|nào|j))$",
+      "ascii": "^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay(?:,\\s*|\\s+))?(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?mau\\s+(?:gi|nao|j)(?:\\s+(?:khong|ko|k))?$"
     },
     {
       "id": "size_named_verb_first",
       "intents": ["size"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:có|còn)\\s+(?:size|sz|cỡ)\\s+(?P<size>free\\s+size|freesize|fs|[2-6]xl|x{1,3}l|xs|[sml]|[2-5]\\d)\\s+(?:không|ko|k)$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:co|con)\\s+(?:size|sz)\\s+(?P<size>free\\s+size|freesize|fs|[2-6]xl|x{1,3}l|xs|[sml]|[2-5]\\d)\\s+(?:khong|ko|k)$"
+      "vi": "^(?:(?P<item_ref>(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này)(?:,\\s*|\\s+))?(?:(?:shop|ad)\\s+)?(?:có\\s+còn|có|còn)\\s+(?:size|sz|cỡ)\\s+(?P<size>free\\s+size|freesize|fs|f|[2-6]xl|x{1,3}l|xs|[sml]|[2-5]\\d)\\s+(?:không|ko|k)$",
+      "ascii": "^(?:(?P<item_ref>(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay)(?:,\\s*|\\s+))?(?:(?:shop|ad)\\s+)?(?:co\\s+con|co|con)\\s+(?:size|sz)\\s+(?P<size>free\\s+size|freesize|fs|f|[2-6]xl|x{1,3}l|xs|[sml]|[2-5]\\d)\\s+(?:khong|ko|k)$"
     },
     {
       "id": "size_named_front",
       "intents": ["size"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:size|sz|cỡ)\\s+(?P<size>free\\s+size|freesize|fs|[2-6]xl|x{1,3}l|xs|[sml]|[2-5]\\d)\\s+(?:có\\s+)?(?:còn|có)\\s+(?:không|ko|k)$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:size|sz)\\s+(?P<size>free\\s+size|freesize|fs|[2-6]xl|x{1,3}l|xs|[sml]|[2-5]\\d)\\s+(?:co\\s+)?(?:con|co)\\s+(?:khong|ko|k)$"
+      "vi": "^(?:(?P<item_ref>(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này)(?:,\\s*|\\s+))?(?:size|sz|cỡ)\\s+(?P<size>free\\s+size|freesize|fs|f|[2-6]xl|x{1,3}l|xs|[sml]|[2-5]\\d)\\s+(?:có\\s+)?(?:còn|có)\\s+(?:không|ko|k)$",
+      "ascii": "^(?:(?P<item_ref>(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay)(?:,\\s*|\\s+))?(?:size|sz)\\s+(?P<size>free\\s+size|freesize|fs|f|[2-6]xl|x{1,3}l|xs|[sml]|[2-5]\\d)\\s+(?:co\\s+)?(?:con|co)\\s+(?:khong|ko|k)$"
     },
     {
       "id": "freesize_named",
       "intents": ["size"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:(?:có|còn)\\s+)?(?P<size>free\\s+size|freesize)(?:\\s+(?:có\\s+)?(?:còn|có))?\\s+(?:không|ko|k)$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:(?:co|con)\\s+)?(?P<size>free\\s+size|freesize)(?:\\s+(?:co\\s+)?(?:con|co))?\\s+(?:khong|ko|k)$"
+      "vi": "^(?:(?P<item_ref>(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này)(?:,\\s*|\\s+))?(?:(?:có\\s+còn|có|còn)\\s+)?(?P<size>free\\s+size|freesize)(?:\\s+(?:có\\s+)?(?:còn|có))?\\s+(?:không|ko|k)$",
+      "ascii": "^(?:(?P<item_ref>(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay)(?:,\\s*|\\s+))?(?:(?:co\\s+con|co|con)\\s+)?(?P<size>free\\s+size|freesize)(?:\\s+(?:co\\s+)?(?:con|co))?\\s+(?:khong|ko|k)$"
     },
     {
       "id": "color_named_verb_first",
       "intents": ["color"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:có|còn)\\s+(?:màu|mầu)\\s+(?P<color>[a-zàáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]+(?:\\s+[a-zàáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]+){0,3})\\s+(?:không|ko|k)$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:co|con)\\s+mau\\s+(?P<color>[a-z]+(?:\\s+[a-z]+){0,3})\\s+(?:khong|ko|k)$"
+      "vi": "^(?:(?P<item_ref>(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này)(?:,\\s*|\\s+))?(?:(?:shop|ad)\\s+)?(?:có\\s+còn|có|còn)\\s+(?:màu|mầu)\\s+(?P<color>__COLOR_VI__)\\s+(?:không|ko|k)$",
+      "ascii": "^(?:(?P<item_ref>(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay)(?:,\\s*|\\s+))?(?:(?:shop|ad)\\s+)?(?:co\\s+con|co|con)\\s+mau\\s+(?P<color>__COLOR_ASCII__)\\s+(?:khong|ko|k)$"
     },
     {
       "id": "color_named_front",
       "intents": ["color"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:màu|mầu)\\s+(?P<color>[a-zàáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]+(?:\\s+[a-zàáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]+){0,3}?)\\s+(?:có\\s+)?(?:còn|có)\\s+(?:không|ko|k)$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?mau\\s+(?P<color>[a-z]+(?:\\s+[a-z]+){0,3}?)\\s+(?:co\\s+)?(?:con|co)\\s+(?:khong|ko|k)$"
+      "vi": "^(?:(?P<item_ref>(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này)(?:,\\s*|\\s+))?(?:màu|mầu)\\s+(?P<color>__COLOR_VI__)\\s+(?:có\\s+)?(?:còn|có)\\s+(?:không|ko|k)$",
+      "ascii": "^(?:(?P<item_ref>(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay)(?:,\\s*|\\s+))?mau\\s+(?P<color>__COLOR_ASCII__)\\s+(?:co\\s+)?(?:con|co)\\s+(?:khong|ko|k)$"
     },
     {
       "id": "combo_price_size",
       "intents": ["price", "size"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:(?:giá|gía)\\s+(?:bao\\s+nhiêu|nhiêu|nhiu|sao|thế\\s+nào|như\\s+nào|bn|bnhiu|bnhieu)|bao\\s+nhiêu\\s+tiền|nhiêu\\s+tiền|bao\\s+tiền)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:size|sz|cỡ)\\s+(?:gì|nào|j)$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:gia\\s+(?:bao\\s+nhieu|nhieu|nhiu|sao|the\\s+nao|nhu\\s+nao|bn|bnhiu|bnhieu)|bao\\s+nhieu\\s+tien|nhieu\\s+tien|bao\\s+tien)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?(?:size|sz)\\s+(?:gi|nao|j)$"
+      "vi": "^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này(?:,\\s*|\\s+))?(?:(?:giá|gía)\\s+(?:bao\\s+nhiêu|nhiêu|nhiu|sao|thế\\s+nào|như\\s+nào|bn|bnhiu|bnhieu)|bao\\s+nhiêu\\s+tiền|nhiêu\\s+tiền|bao\\s+tiền)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:size|sz|cỡ)\\s+(?:gì|nào|j)$",
+      "ascii": "^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay(?:,\\s*|\\s+))?(?:gia\\s+(?:bao\\s+nhieu|nhieu|nhiu|sao|the\\s+nao|nhu\\s+nao|bn|bnhiu|bnhieu)|bao\\s+nhieu\\s+tien|nhieu\\s+tien|bao\\s+tien)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?(?:size|sz)\\s+(?:gi|nao|j)$"
     },
     {
       "id": "combo_price_color",
       "intents": ["price", "color"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:(?:giá|gía)\\s+(?:bao\\s+nhiêu|nhiêu|nhiu|sao|thế\\s+nào|như\\s+nào|bn|bnhiu|bnhieu)|bao\\s+nhiêu\\s+tiền|nhiêu\\s+tiền|bao\\s+tiền)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:màu|mầu)\\s+(?:gì|nào|j)$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:gia\\s+(?:bao\\s+nhieu|nhieu|nhiu|sao|the\\s+nao|nhu\\s+nao|bn|bnhiu|bnhieu)|bao\\s+nhieu\\s+tien|nhieu\\s+tien|bao\\s+tien)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?mau\\s+(?:gi|nao|j)$"
+      "vi": "^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này(?:,\\s*|\\s+))?(?:(?:giá|gía)\\s+(?:bao\\s+nhiêu|nhiêu|nhiu|sao|thế\\s+nào|như\\s+nào|bn|bnhiu|bnhieu)|bao\\s+nhiêu\\s+tiền|nhiêu\\s+tiền|bao\\s+tiền)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:màu|mầu)\\s+(?:gì|nào|j)$",
+      "ascii": "^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay(?:,\\s*|\\s+))?(?:gia\\s+(?:bao\\s+nhieu|nhieu|nhiu|sao|the\\s+nao|nhu\\s+nao|bn|bnhiu|bnhieu)|bao\\s+nhieu\\s+tien|nhieu\\s+tien|bao\\s+tien)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?mau\\s+(?:gi|nao|j)$"
     },
     {
       "id": "combo_size_color",
       "intents": ["size", "color"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:size|sz|cỡ)\\s+(?:gì|nào|j)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:màu|mầu)\\s+(?:gì|nào|j)|(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:màu|mầu)\\s+(?:gì|nào|j)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:size|sz|cỡ)\\s+(?:gì|nào|j))$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?(?:size|sz)\\s+(?:gi|nao|j)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?mau\\s+(?:gi|nao|j)|(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?mau\\s+(?:gi|nao|j)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?(?:size|sz)\\s+(?:gi|nao|j))$"
+      "vi": "^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này(?:,\\s*|\\s+))?(?:(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:size|sz|cỡ)\\s+(?:gì|nào|j)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:màu|mầu)\\s+(?:gì|nào|j)|(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:màu|mầu)\\s+(?:gì|nào|j)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:size|sz|cỡ)\\s+(?:gì|nào|j))$",
+      "ascii": "^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay(?:,\\s*|\\s+))?(?:(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?(?:size|sz)\\s+(?:gi|nao|j)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?mau\\s+(?:gi|nao|j)|(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?mau\\s+(?:gi|nao|j)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?(?:size|sz)\\s+(?:gi|nao|j))$"
     },
     {
       "id": "combo_price_size_color",
       "intents": ["price", "size", "color"],
-      "vi": "^(?:(?:mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này\\s+)?(?:(?:giá|gía)\\s+(?:bao\\s+nhiêu|nhiêu|nhiu|sao|thế\\s+nào|như\\s+nào|bn|bnhiu|bnhieu)|bao\\s+nhiêu\\s+tiền|nhiêu\\s+tiền|bao\\s+tiền)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:size|sz|cỡ)\\s+(?:gì|nào|j)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:màu|mầu)\\s+(?:gì|nào|j)|(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:màu|mầu)\\s+(?:gì|nào|j)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:size|sz|cỡ)\\s+(?:gì|nào|j))$",
-      "ascii": "^(?:(?:mau|bo|vay|dam|cai|set|chiec)\\s+nay\\s+)?(?:gia\\s+(?:bao\\s+nhieu|nhieu|nhiu|sao|the\\s+nao|nhu\\s+nao|bn|bnhiu|bnhieu)|bao\\s+nhieu\\s+tien|nhieu\\s+tien|bao\\s+tien)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?(?:size|sz)\\s+(?:gi|nao|j)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?mau\\s+(?:gi|nao|j)|(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?mau\\s+(?:gi|nao|j)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?(?:size|sz)\\s+(?:gi|nao|j))$"
+      "vi": "^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này(?:,\\s*|\\s+))?(?:(?:giá|gía)\\s+(?:bao\\s+nhiêu|nhiêu|nhiu|sao|thế\\s+nào|như\\s+nào|bn|bnhiu|bnhieu)|bao\\s+nhiêu\\s+tiền|nhiêu\\s+tiền|bao\\s+tiền)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:size|sz|cỡ)\\s+(?:gì|nào|j)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:màu|mầu)\\s+(?:gì|nào|j)|(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:màu|mầu)\\s+(?:gì|nào|j)(?:,\\s*|\\s+(?:và|với)\\s+)(?:(?:có|còn)\\s+(?:những\\s+|các\\s+)?)?(?:size|sz|cỡ)\\s+(?:gì|nào|j))$",
+      "ascii": "^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay(?:,\\s*|\\s+))?(?:gia\\s+(?:bao\\s+nhieu|nhieu|nhiu|sao|the\\s+nao|nhu\\s+nao|bn|bnhiu|bnhieu)|bao\\s+nhieu\\s+tien|nhieu\\s+tien|bao\\s+tien)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?(?:size|sz)\\s+(?:gi|nao|j)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?mau\\s+(?:gi|nao|j)|(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?mau\\s+(?:gi|nao|j)(?:,\\s*|\\s+(?:va|voi)\\s+)(?:(?:co|con)\\s+(?:nhung\\s+|cac\\s+)?)?(?:size|sz)\\s+(?:gi|nao|j))$"
+    },
+    {
+      "id": "size_advice_ask",
+      "intents": ["size_advice"],
+      "vi": "^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này(?:,\\s*|\\s+))?(?:(?:shop|ad)\\s+)?(?:tư\\s+vấn(?:\\s+(?:giúp|cho)(?:\\s+(?:em|e|mình|chị))?)?\\s+(?:chọn\\s+)?(?:size|sz|cỡ)(?:\\s+(?:cho|giúp)\\s+(?:em|e|mình|chị))?|chọn\\s+(?:size|sz|cỡ)(?:\\s+(?:cho|giúp)\\s+(?:em|e|mình|chị))?)$",
+      "ascii": "^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay(?:,\\s*|\\s+))?(?:(?:shop|ad)\\s+)?(?:tu\\s+van(?:\\s+(?:giup|cho)(?:\\s+(?:em|e|minh|chi))?)?\\s+(?:chon\\s+)?(?:size|sz)(?:\\s+(?:cho|giup)\\s+(?:em|e|minh|chi))?|chon\\s+(?:size|sz)(?:\\s+(?:cho|giup)\\s+(?:em|e|minh|chi))?)$"
+    },
+    {
+      "id": "size_advice_wear",
+      "intents": ["size_advice"],
+      "vi": "^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\\s+này(?:,\\s*|\\s+))?(?:(?:em|e|chị|c|mình|mk|tớ|tôi)\\s+)?(?:(?:nên\\s+)?(?:mặc|chọn)\\s+(?:vừa\\s+)?(?:size|sz|cỡ)\\s+(?:nào|gì|j)(?:\\s+(?:vừa|thì\\s+vừa|là\\s+vừa|cho\\s+vừa))?|(?:size|sz|cỡ)\\s+(?:nào|gì|j)\\s+(?:(?:mặc|mặc\\s+lên)\\s+)?vừa)$",
+      "ascii": "^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\\s+nay(?:,\\s*|\\s+))?(?:(?:em|e|chi|c|minh|mk|to|toi)\\s+)?(?:(?:nen\\s+)?(?:mac|chon)\\s+(?:vua\\s+)?(?:size|sz)\\s+(?:nao|gi|j)(?:\\s+(?:vua|thi\\s+vua|la\\s+vua|cho\\s+vua))?|(?:size|sz)\\s+(?:nao|gi|j)\\s+(?:(?:mac|mac\\s+len)\\s+)?vua)$"
     }
   ]
 }

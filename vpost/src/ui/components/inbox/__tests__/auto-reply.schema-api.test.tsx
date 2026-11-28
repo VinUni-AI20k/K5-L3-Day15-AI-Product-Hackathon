@@ -13,9 +13,8 @@ import { useUpdateAutoReplySetting } from "@/ui/hooks/useAutoReply";
 import { useClearThreadAttention } from "@/ui/hooks/useInbox";
 import {
   AUTO_REPLY_DAILY_CAP_DEFAULT,
+  AUTO_REPLY_DEFAULT_INTENTS,
   AUTO_REPLY_HOURLY_CAP_DEFAULT,
-  AUTO_REPLY_INTENTS,
-  AUTO_REPLY_LIVE_CONFIRM_COPY,
   AutoReplyLogResponseSchema,
   AutoReplySettingSchema,
   AutoReplySettingsListResponseSchema,
@@ -168,7 +167,7 @@ describe("auto-reply & inbox schema backwards compatibility (missing optional fi
     expect(legacyUpdates.needYou).toEqual([]);
     expect(legacyUpdates.autoReplied).toEqual([]);
 
-    // Minimal auto-reply setting payload with omitted defaults
+    // Minimal auto-reply setting payload with omitted optional enabled/mode fields
     const minimalSetting = AutoReplySettingSchema.parse({
       pageId: "123",
       channelId: "fb-123",
@@ -178,13 +177,23 @@ describe("auto-reply & inbox schema backwards compatibility (missing optional fi
       pageId: "123",
       channelId: "fb-123",
       pageName: "Shop A",
-      enabled: false,
-      mode: "dry_run",
-      intents: [...AUTO_REPLY_INTENTS],
+      intents: [...AUTO_REPLY_DEFAULT_INTENTS],
       hourlyCap: AUTO_REPLY_HOURLY_CAP_DEFAULT,
       dailyCap: AUTO_REPLY_DAILY_CAP_DEFAULT,
       updatedAt: null,
     });
+    expect(minimalSetting.enabled).toBeUndefined();
+    expect(minimalSetting.mode).toBeUndefined();
+    expect(minimalSetting.intents).toEqual(["price", "size", "color", "size_advice"]);
+    expect(minimalSetting.hourlyCap).toBe(200);
+    expect(minimalSetting.dailyCap).toBe(2000);
+
+    // Legacy payload carrying enabled=false & mode=dry_run still parses cleanly
+    const legacySetting = AutoReplySettingSchema.parse(
+      sampleSettingJson({ enabled: false, mode: "dry_run" }),
+    );
+    expect(legacySetting.enabled).toBe(false);
+    expect(legacySetting.mode).toBe("dry_run");
   });
 
   it("parses full attention, autoReply, sentBy, counts.canBan, updates needYou/autoReplied, settings, and log payloads", () => {
@@ -295,32 +304,57 @@ describe("auto-reply & inbox schema backwards compatibility (missing optional fi
     expect(log.nextCursor).toBe("cur-2");
   });
 
-  it("rejects empty intents when enabled and rejects invalid caps/modes", () => {
+  it("rejects empty intents, enabled=false, mode=dry_run, and invalid caps", () => {
+    // Omitted enabled/mode with valid intents & caps is accepted
+    expect(
+      AutoReplySettingUpdateInputSchema.safeParse({
+        intents: ["price"],
+        hourlyCap: 30,
+        dailyCap: 200,
+      }).success,
+    ).toBe(true);
+
+    // Explicit enabled=true & mode=live is accepted
     expect(
       AutoReplySettingUpdateInputSchema.safeParse({
         enabled: true,
-        mode: "dry_run",
+        mode: "live",
+        intents: ["price"],
+        hourlyCap: 30,
+        dailyCap: 200,
+      }).success,
+    ).toBe(true);
+
+    // Empty intents is always rejected
+    expect(
+      AutoReplySettingUpdateInputSchema.safeParse({
         intents: [],
         hourlyCap: 30,
         dailyCap: 200,
       }).success,
     ).toBe(false);
 
-    // Disabled with empty intents is valid
+    // enabled=false and mode=dry_run are always rejected
     expect(
       AutoReplySettingUpdateInputSchema.safeParse({
         enabled: false,
-        mode: "dry_run",
-        intents: [],
+        intents: ["price"],
         hourlyCap: 30,
         dailyCap: 200,
       }).success,
-    ).toBe(true);
+    ).toBe(false);
 
     expect(
       AutoReplySettingUpdateInputSchema.safeParse({
-        enabled: true,
         mode: "dry_run",
+        intents: ["price"],
+        hourlyCap: 30,
+        dailyCap: 200,
+      }).success,
+    ).toBe(false);
+
+    expect(
+      AutoReplySettingUpdateInputSchema.safeParse({
         intents: ["price"],
         hourlyCap: 0,
         dailyCap: 200,
@@ -329,8 +363,6 @@ describe("auto-reply & inbox schema backwards compatibility (missing optional fi
 
     expect(
       AutoReplySettingUpdateInputSchema.safeParse({
-        enabled: true,
-        mode: "dry_run",
         intents: ["price"],
         hourlyCap: 201,
         dailyCap: 200,
@@ -339,8 +371,6 @@ describe("auto-reply & inbox schema backwards compatibility (missing optional fi
 
     expect(
       AutoReplySettingUpdateInputSchema.safeParse({
-        enabled: true,
-        mode: "dry_run",
         intents: ["price"],
         hourlyCap: 30,
         dailyCap: 2001,
@@ -405,33 +435,37 @@ describe("auto-reply & clear-attention API clients", () => {
     expect(url).toContain("limit=25");
   });
 
-  it("enforces confirmLive=true before sending live mode and validates intents/caps", async () => {
+  it("always sends active live mode, rejects enabled=false/mode=dry_run, and validates intents/caps", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
 
-    // Switching to live without confirmLive -> rejected client-side with CONFIRM_REQUIRED
+    // enabled=false -> rejected client-side without calling fetch
     await expect(
       updateAutoReplySetting("123", {
-        enabled: true,
-        mode: "live",
+        enabled: false as never,
         intents: ["price"],
         hourlyCap: 30,
         dailyCap: 200,
       }),
     ).rejects.toSatisfy(
-      (err: unknown) =>
-        ApiError.is(err) &&
-        err.code === "CONFIRM_REQUIRED" &&
-        err.status === 400 &&
-        err.userMessage.includes(AUTO_REPLY_LIVE_CONFIRM_COPY),
+      (err: unknown) => ApiError.is(err) && err.code === "INVALID_INPUT",
     );
-    expect(fetchSpy).not.toHaveBeenCalled();
 
-    // Enabled with empty intents -> rejected client-side with INVALID_INPUT
+    // mode=dry_run -> rejected client-side without calling fetch
     await expect(
       updateAutoReplySetting("123", {
-        enabled: true,
-        mode: "dry_run",
+        mode: "dry_run" as never,
+        intents: ["price"],
+        hourlyCap: 30,
+        dailyCap: 200,
+      }),
+    ).rejects.toSatisfy(
+      (err: unknown) => ApiError.is(err) && err.code === "INVALID_INPUT",
+    );
+
+    // Empty intents -> rejected client-side with INVALID_INPUT
+    await expect(
+      updateAutoReplySetting("123", {
         intents: [],
         hourlyCap: 30,
         dailyCap: 200,
@@ -441,18 +475,15 @@ describe("auto-reply & clear-attention API clients", () => {
     );
     expect(fetchSpy).not.toHaveBeenCalled();
 
-    // Confirmed live sends PUT with confirmLive: true
+    // Calling without enabled/mode/confirmLive sends active live payload
     const okSpy = mockFetchJson({
       tenantId: TENANT_ID,
       setting: sampleSettingJson({ enabled: true, mode: "live", intents: ["price"] }),
     });
     const saved = await updateAutoReplySetting("123", {
-      enabled: true,
-      mode: "live",
       intents: ["price", "price"],
       hourlyCap: 40,
       dailyCap: 300,
-      confirmLive: true,
     });
     expect(saved.setting.mode).toBe("live");
     expect(okSpy.mock.calls[0]?.[0]).toBe("/api/comments/auto-reply-settings/123");
@@ -464,26 +495,6 @@ describe("auto-reply & clear-attention API clients", () => {
       hourlyCap: 40,
       dailyCap: 300,
       confirmLive: true,
-    });
-
-    // dry_run omits confirmLive from body
-    const drySpy = mockFetchJson({
-      tenantId: TENANT_ID,
-      setting: sampleSettingJson({ enabled: true, mode: "dry_run", intents: ["size"] }),
-    });
-    await updateAutoReplySetting("123", {
-      enabled: true,
-      mode: "dry_run",
-      intents: ["size"],
-      hourlyCap: 30,
-      dailyCap: 200,
-    });
-    expect(JSON.parse(String(drySpy.mock.calls[0]?.[1]?.body ?? "{}"))).toEqual({
-      enabled: true,
-      mode: "dry_run",
-      intents: ["size"],
-      hourlyCap: 30,
-      dailyCap: 200,
     });
   });
 });
@@ -586,7 +597,7 @@ describe("auto-reply & clear-attention mutation cache invalidation", () => {
 
     mockFetchJson({
       tenantId: TENANT_ID,
-      setting: sampleSettingJson({ enabled: true, mode: "dry_run", intents: ["price"] }),
+      setting: sampleSettingJson({ enabled: true, mode: "live", intents: ["price"] }),
     });
 
     let mutation!: ReturnType<typeof useUpdateAutoReplySetting>;
@@ -603,7 +614,7 @@ describe("auto-reply & clear-attention mutation cache invalidation", () => {
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     await mutation.mutateAsync({
       pageId: "123",
-      input: { enabled: true, mode: "dry_run", intents: ["price"], hourlyCap: 30, dailyCap: 200 },
+      input: { intents: ["price"], hourlyCap: 30, dailyCap: 200 },
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({

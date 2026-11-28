@@ -15,6 +15,7 @@ export interface InboxModerationDialogProps {
   readonly readOnlyReason: string | null;
   readonly pageNameById?: Readonly<Record<string, string | undefined>>;
   readonly onClose: () => void;
+  readonly onOpenLog?: () => void;
   /** Optional test overrides for presentational rendering. */
   readonly settingsContent?: ReactNode;
   readonly logContent?: ReactNode;
@@ -22,13 +23,14 @@ export interface InboxModerationDialogProps {
 
 /**
  * Fullscreen Astryx Dialog reusing the existing `ModerationSettingsPanel` and
- * `ModerationLog` unchanged from `components/comments/moderation/*`.
+ * `ModerationLog` from `components/comments/moderation/*`.
  */
 export function InboxModerationDialog({
   activePanel,
   readOnlyReason,
   pageNameById,
   onClose,
+  onOpenLog,
   settingsContent,
   logContent,
 }: InboxModerationDialogProps) {
@@ -52,7 +54,7 @@ export function InboxModerationDialog({
             title={isSettings ? "Cài đặt tự kiểm duyệt" : "Nhật ký kiểm duyệt"}
             subtitle={
               isSettings
-                ? "Bật hoặc tắt tự ẩn bình luận vi phạm theo từng Fanpage Facebook."
+                ? "Tự kiểm duyệt đang bật · chạy thật theo từng Fanpage Facebook. Điều chỉnh nhóm tự ẩn và ngưỡng độ tin cậy."
                 : "Lịch sử mọi thao tác kiểm duyệt tự động và thủ công, hỗ trợ hoàn tác Hiện lại."
             }
             onOpenChange={(open) => {
@@ -71,7 +73,10 @@ export function InboxModerationDialog({
             >
               {isSettings
                 ? (settingsContent ?? (
-                    <ModerationSettingsPanel readOnlyReason={readOnlyReason} />
+                    <ModerationSettingsPanel
+                      readOnlyReason={readOnlyReason}
+                      onOpenLog={onOpenLog}
+                    />
                   ))
                 : (logContent ?? (
                     <ModerationLog

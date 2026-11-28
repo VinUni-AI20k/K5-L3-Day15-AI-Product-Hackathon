@@ -31,16 +31,17 @@ def fold(s):
 
 
 ALIASES = {
-    "ma_sp": ["ma_sp", "ma", "ma sp", "ma san pham", "ma hang", "code", "sku"],
+    "ma_sp": ["ma_sp", "ma", "ma sp", "ma san pham", "ma hang", "ma_hang", "code", "sku"],
     "ten_sp": ["ten_sp", "ten", "ten sp", "ten san pham"],
     "loai": ["loai", "chung loai", "loai san pham"],
-    "gia_ban": ["gia_ban", "gia ban", "gia", "gia ban (theo anh)", "nguyen gia", "nguyen gia (bat buoc)", "gia tmdt lam tron"],
+    "gia_ban": ["gia_ban", "gia ban", "gia", "gia ban (theo anh)", "nguyen gia", "nguyen gia (bat buoc)", "gia tmdt lam tron",
+                "don gia", "dongia", "giaban"],
     "gia_te": ["gia_te", "gia te", "gia nhap (te)", "gia te (cny)"],
-    "size": ["size", "size so", "kich co", "sizes"],
-    "mau": ["mau", "mau sac", "colors"],
-    "chat_lieu": ["chat_lieu", "chat lieu", "chat lieu tu van khach", "chat lieu thuc te"],
-    "mo_ta": ["mo_ta", "mo ta", "mo ta san pham"],
-    "anh": ["anh", "hinh anh", "link anh", "link anh info", "anh san pham", "image", "images", "anh drive json", "thu muc anh"],
+    "size": ["size", "size so", "kich co", "kichco", "sizes"],
+    "mau": ["mau", "mau sac", "mausac", "colors"],
+    "chat_lieu": ["chat_lieu", "chat lieu", "chatlieu", "chat lieu tu van khach", "chat lieu thuc te"],
+    "mo_ta": ["mo_ta", "mo ta", "mota", "mo ta san pham"],
+    "anh": ["anh", "hinh anh", "hinhanh", "link anh", "link anh info", "anh san pham", "image", "images", "anh drive json", "thu muc anh"],
     "page": ["page", "fanpage", "trang"],
     "prompt": ["prompt", "yeu cau", "yeu cau viet", "yeu cau bai viet"],
 }
@@ -65,9 +66,11 @@ def normalize_row(raw):
             if val:
                 colors.append(val)
             continue
-        f = _ALIAS.get(key)
+        f = _ALIAS.get(key) or _ALIAS.get(key.replace("_", " "))   # 'Ma_Hang' = 'ma hang'
         if f and not row[f]:
             row[f] = val
+        elif not f and key.replace("_", " ") in ("ton kho", "ton") and val:
+            row["ton_kho"] = val   # tồn ghi ngay trong dòng — chỉ dùng khi mã không có trong file tồn
     if colors and not row["mau"]:
         row["mau"] = ", ".join(colors)
     return row
@@ -223,6 +226,7 @@ COLORS = ["xanh dương", "xanh lá", "xanh navy", "xanh than", "xanh rêu", "xa
 SIZE_TOKEN = re.compile(r"(?<![\w])(XS|S|M|L|XL|XXL|2XL|3XL|4XL|5XL|Freesize|Free size|freesize)(?![\w])")
 MONEY = re.compile(r"(?<![\w.,])(\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)\s*(k|đ|₫|vnđ|vnd|tr|triệu|nghìn|ngàn)?(?![\w])", re.I)
 INJECTION = re.compile(r"(bỏ qua|phớt lờ|quên|ghi đè)\s+(hết\s+|mọi\s+|tất cả\s+|các\s+)*(hướng dẫn|chỉ dẫn|luật|quy tắc|lệnh)"
+                       r"|(?:bỏ qua|phớt lờ|ignore)\s+(?:bước|step)\s+.{0,80}\b(?:check_product|check_stock|verify_post)\b"
                        r"|ignore\s+(all|any|previous|the above|prior)|system prompt|developer message|you are now", re.I)
 NEGATION = ("không", "đừng", "tránh", "chớ", "chẳng", "ko", "k", "cấm")
 
@@ -290,6 +294,38 @@ def load_inventory(path=os.path.join(DATA, "inventory.csv")):
     return inv
 
 
+def parse_row_stock(row):
+    """Cột 'Tồn kho' ghi trong dòng → [{mau, size, ton, trang_thai}] cùng dạng file tồn. Đọc không được → [].
+    Nhận: 'Trắng M(10), Đen L(5)' · 'Vàng S(0), M(0)' · 'Kem(8)' · 'Nâu Freesize(15)' · '20'."""
+    t = str(row.get("ton_kho") or "").strip()
+    if not t:
+        return []
+    colors, sizes = parse_colors(row.get("mau")), parse_sizes(row.get("size"))
+    if re.fullmatch(r"\d+", t):
+        return [{"mau": c, "size": s, "ton": int(t), "trang_thai": ""}
+                for c in (colors or [""]) for s in (sizes or [""])]
+    out, last_color = [], None
+    for part in [p.strip() for p in t.split(",") if p.strip()]:
+        m = re.fullmatch(r"(.*?)\s*\((\d+)\)", part)
+        if not m:
+            return []
+        label, ton = m.group(1).strip(), int(m.group(2))
+        size, color = None, label
+        for s in sorted(sizes, key=len, reverse=True):
+            sm = re.search(r"(?i)(?:^|\s)" + re.escape(s) + r"$", label)
+            if sm:
+                size, color = s, label[: sm.start()].strip()
+                break
+        color = color or last_color or (colors[0] if len(colors) == 1 else "")
+        last_color = color
+        if color and colors and not any(color.lower() == c.lower() for c in colors):
+            return []   # màu trong cột tồn không có trong cột màu → không đoán
+        for s in ([size] if size else (sizes or [""])):
+            for c in ([color] if color else (colors or [""])):
+                out.append({"mau": c, "size": s, "ton": ton, "trang_thai": ""})
+    return out
+
+
 # ---------------- 1. kiểm dòng ----------------
 def check_product(row, page, glob):
     hard, warn = [], []
@@ -324,9 +360,10 @@ def check_product(row, page, glob):
         warn.append(("chat_lieu", "thiếu chất liệu — bài không được nhắc chất liệu"))
     if not parse_images(row.get("anh")):
         warn.append(("anh", "chưa có ảnh sản phẩm — thêm ảnh trước khi duyệt" + (" (ô ảnh không có link hợp lệ)" if row.get("anh") else "")))
+    injected_fields = [f for f in ("mo_ta", "prompt", "ten_sp") if INJECTION.search(row.get(f, ""))]
     # mô tả mâu thuẫn với trường
     desc = row.get("mo_ta", "")
-    if desc:
+    if desc and "mo_ta" not in injected_fields:
         mats_desc, mats_field = materials_in(desc), materials_in(row.get("chat_lieu"))
         if row.get("chat_lieu") and mats_desc - mats_field:
             hard.append(("mo_ta", "mô tả nói chất %s, trường chất liệu là '%s'" % (", ".join(sorted(mats_desc - mats_field)), row["chat_lieu"])))
@@ -340,8 +377,18 @@ def check_product(row, page, glob):
         bad = [s for s in SIZE_TOKEN.findall(desc) if sizes and parse_sizes(s) and not set(parse_sizes(s)) <= set(sizes)]
         if bad:
             hard.append(("mo_ta", "mô tả nhắc size %s, trường size là '%s'" % (", ".join(bad), row.get("size"))))
+        name = fold(row.get("ten_sp"))
+        desc_folded = fold(desc)
+        name_short = re.search(r"\b(?:ngan tay|tay ngan)\b", name)
+        name_long = re.search(r"\b(?:dai tay|tay dai)\b", name)
+        desc_short = re.search(r"\b(?:ngan tay|tay ngan)\b", desc_folded)
+        desc_long = re.search(r"\b(?:dai tay|tay dai)\b", desc_folded)
+        if (name_short and desc_long) or (name_long and desc_short):
+            hard.append(("mo_ta", "mô tả mâu thuẫn độ dài tay áo với tên sản phẩm"))
+    for p in _phrase_hits(desc, glob["banned"] + glob["brands"], negation_aware=True):
+        hard.append(("mo_ta", "mô tả chứa cụm quảng cáo hoặc thương hiệu không được phép"))
     # chèn lệnh / prompt đòi điều shop không được nói
-    for f in ("mo_ta", "prompt", "ten_sp"):
+    for f in injected_fields:
         if INJECTION.search(row.get(f, "")):
             hard.append((f, "có câu lệnh chèn vào dữ liệu — không làm theo"))
     for p in _phrase_hits(row.get("prompt"), glob["banned"] + glob["brands"], negation_aware=True):

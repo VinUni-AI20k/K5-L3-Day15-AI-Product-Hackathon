@@ -296,11 +296,11 @@ SCHEMA_STATEMENTS = (
     create table if not exists auto_reply_setting(
       tenant_id text not null,
       page_id text not null,
-      enabled integer not null default 0,
-      mode text not null default 'dry_run',
-      intents text not null default '["price","size","color"]',
-      hourly_cap integer not null default 30,
-      daily_cap integer not null default 200,
+      enabled integer not null default 1,
+      mode text not null default 'live',
+      intents text not null default '["price","size","color","size_advice"]',
+      hourly_cap integer not null default 200,
+      daily_cap integer not null default 2000,
       updated_by text not null default '',
       updated_at text not null default '',
       primary key (tenant_id, page_id)
@@ -409,6 +409,35 @@ SCHEMA_STATEMENTS = (
     """
     create index if not exists agent_run_started_at
       on agent_run(started_at)
+    """,
+    """
+    create table if not exists size_chart(
+      tenant_id text not null,
+      category_key text not null,
+      category_label text not null default '',
+      chart json not null default '{}'::json,
+      updated_by text not null default '',
+      updated_at text not null default '',
+      primary key (tenant_id, category_key)
+    )
+    """,
+    """
+    create table if not exists auto_reply_thread_state(
+      tenant_id text not null,
+      thread_id text not null,
+      product_code text not null default '',
+      state text not null,
+      asked_comment_id text not null default '',
+      bot_reply_id text not null default '',
+      expires_at text not null,
+      created_at text not null default '',
+      updated_at text not null default '',
+      primary key (tenant_id, thread_id)
+    )
+    """,
+    """
+    create index if not exists auto_reply_thread_state_expires
+      on auto_reply_thread_state(tenant_id, state, expires_at)
     """,
 )
 
@@ -617,6 +646,8 @@ def init():
             "create unique index if not exists comment_draft_one_active "
             "on comment_draft(tenant_id, comment_id) where status = 'sending'"
         )
+        c.execute("alter table auto_reply_thread_state add column if not exists bot_reply_id text not null default ''")
+        c.execute("alter table auto_reply_thread_state add column if not exists created_at text not null default ''")
 
 
 def _row(r):
@@ -1964,8 +1995,68 @@ def claim_comment_reply(tenant_id, comment_id, new_draft_id, text, ts, *, attemp
         return None, "CONFLICT"
 
 
-def _thread_blocked_for_auto_claim_in_tx(c, tenant_id, thread_id, c_row, ref_dt):
-    """True nếu hội thoại đã có phản hồi/thao tác nhân viên hoặc Page ngay dưới khoá giao dịch (R5)."""
+def _thread_blocked_for_auto_claim_in_tx(
+    c,
+    tenant_id,
+    thread_id,
+    c_row,
+    ref_dt,
+    *,
+    allow_pending_asked_comment_id=None,
+):
+    """True nếu hội thoại đã có phản hồi/thao tác nhân viên hoặc Page ngay dưới khoá giao dịch (R5).
+
+    Khi `allow_pending_asked_comment_id` được truyền (chỉ dành cho lượt phản hồi số đo của chính câu hỏi
+    `size_advice` đang chờ của bot), chỉ cho phép đúng 1 câu hỏi chờ đó của bot và vẫn chặn mọi phản hồi
+    Page/nhân viên khác, nháp đang sửa hoặc trạng thái đã hết hạn/đã xoá.
+    """
+    if allow_pending_asked_comment_id:
+        if c_row["is_from_page"] or c_row["status"] == "ignored":
+            return True
+        st_row = c.execute(
+            "select state, asked_comment_id, bot_reply_id, expires_at "
+            "from auto_reply_thread_state where tenant_id=%s and thread_id=%s",
+            (tenant_id, thread_id),
+        ).fetchone()
+        if not st_row or st_row.get("state") != "awaiting_measurements":
+            return True
+        if str(st_row.get("asked_comment_id") or "") != str(allow_pending_asked_comment_id):
+            return True
+        exp_dt = _parse_utc_ts(st_row.get("expires_at"))
+        if exp_dt is None or exp_dt <= ref_dt:
+            return True
+
+        allowed_client_id = "auto:" + str(allow_pending_asked_comment_id)
+        allowed_page_ids = set()
+        if st_row.get("bot_reply_id"):
+            allowed_page_ids.add(str(st_row["bot_reply_id"]))
+
+        tree_rows = _thread_tree_rows_in_conn(c, tenant_id, thread_id)
+        tree_ids = [r["id"] for r in tree_rows] or [thread_id]
+        draft_rows = c.execute(
+            "select status, edited_text, sent_by, client_id, fb_reply_id, attempt_token, created_at, updated_at "
+            "from comment_draft where tenant_id=%s and comment_id = any(%s)",
+            (tenant_id, tree_ids),
+        ).fetchall()
+        for dr in draft_rows:
+            st = dr.get("status") or ""
+            if st == "sending" and not _is_stale_sending(dr, ref_dt):
+                return True
+            if st == "draft" and (dr.get("edited_text") or "").strip():
+                return True
+            if st == "sent":
+                if str(dr.get("client_id") or "") == allowed_client_id and dr.get("sent_by") == "auto":
+                    if dr.get("fb_reply_id"):
+                        allowed_page_ids.add(str(dr["fb_reply_id"]))
+                    continue
+                return True
+        for r in tree_rows:
+            if r["status"] != "deleted" and r["is_from_page"]:
+                if str(r["id"]) in allowed_page_ids:
+                    continue
+                return True
+        return False
+
     if c_row["is_from_page"] or c_row["status"] in ("replied", "ignored"):
         return True
     tree_rows = _thread_tree_rows_in_conn(c, tenant_id, thread_id)
@@ -1999,6 +2090,7 @@ def claim_thread_reply(
     *,
     attempt_token=None,
     sent_by="operator",
+    allow_pending_asked_comment_id=None,
 ):
     """Đặt chỗ gửi trả lời cho hội thoại kèm khoá chống gửi trùng client_id.
 
@@ -2033,7 +2125,14 @@ def claim_thread_reply(
                     return existing["id"], "ALREADY_SENT", _draft(existing)
                 if existing["status"] == "sending":
                     return None, "CONFLICT", None
-                if actor == "auto" and _thread_blocked_for_auto_claim_in_tx(c, tenant_id, thread_id, c_row, ref_dt):
+                if actor == "auto" and _thread_blocked_for_auto_claim_in_tx(
+                    c,
+                    tenant_id,
+                    thread_id,
+                    c_row,
+                    ref_dt,
+                    allow_pending_asked_comment_id=allow_pending_asked_comment_id,
+                ):
                     return None, "CONFLICT", None
                 if not c_row["can_comment"]:
                     return None, "CANNOT_COMMENT", None
@@ -2053,7 +2152,14 @@ def claim_thread_reply(
                     return None, "CONFLICT", None
                 return existing["id"], None, None
 
-            if actor == "auto" and _thread_blocked_for_auto_claim_in_tx(c, tenant_id, thread_id, c_row, ref_dt):
+            if actor == "auto" and _thread_blocked_for_auto_claim_in_tx(
+                c,
+                tenant_id,
+                thread_id,
+                c_row,
+                ref_dt,
+                allow_pending_asked_comment_id=allow_pending_asked_comment_id,
+            ):
                 return None, "CONFLICT", None
 
             if not c_row["can_comment"]:
@@ -2137,6 +2243,7 @@ def complete_comment_reply(
     attempt_token=None,
     clear_attention=False,
     attention_thread_id=None,
+    clear_thread_state=False,
 ):
     """Hoàn tất gửi trả lời trong một giao dịch duy nhất, có rào chắn attempt_token để lượt cũ không ghi đè lượt mới."""
     with tx_locked(_comment_lock_key(tenant_id, comment_id)) as c:
@@ -2171,10 +2278,15 @@ def complete_comment_reply(
         )
         if page_reply_item:
             _upsert_fb_comment_in_tx(c, tenant_id, page_reply_item)
+        att_tid = attention_thread_id or comment_id
         if clear_attention:
-            att_tid = attention_thread_id or comment_id
             c.execute(
                 "delete from comment_thread_attention where tenant_id=%s and thread_id=%s",
+                (tenant_id, att_tid),
+            )
+        if clear_thread_state:
+            c.execute(
+                "delete from auto_reply_thread_state where tenant_id=%s and thread_id=%s",
                 (tenant_id, att_tid),
             )
         return True
@@ -2252,10 +2364,16 @@ def list_comment_updates_since(tenant_id, comment_seq, draft_seq, limit=50):
 
 # ---------------- VPOST: tự động trả lời & nhãn "Cần bạn" (auto_reply_setting, auto_reply_log, attention) ----------------
 
-AUTO_REPLY_DEFAULT_INTENTS = ("price", "size", "color")
-AUTO_REPLY_DEFAULT_MODE = "dry_run"
-AUTO_REPLY_DEFAULT_HOURLY_CAP = 30
-AUTO_REPLY_DEFAULT_DAILY_CAP = 200
+AUTO_REPLY_DEFAULT_INTENTS = ("price", "size", "color", "size_advice")
+AUTO_REPLY_DEFAULT_MODE = "live"
+AUTO_REPLY_DEFAULT_HOURLY_CAP = 200
+AUTO_REPLY_DEFAULT_DAILY_CAP = 2000
+AUTO_REPLY_DISABLED_SKIP_PREFIX = "Chưa bật tự động trả lời"
+
+
+def is_disabled_auto_reply_reason(reason):
+    """True nếu lý do bỏ qua chỉ do Fanpage chưa bật tự động trả lời."""
+    return str(reason or "").strip().startswith(AUTO_REPLY_DISABLED_SKIP_PREFIX)
 
 
 def _parse_json_str_list(raw):
@@ -2272,11 +2390,12 @@ def _parse_json_str_list(raw):
 
 def _decode_auto_reply_setting(r):
     d = dict(r)
+    # Luôn coi mọi dòng cài đặt (kể cả dòng cũ lưu enabled=0/mode='dry_run') là đang bật ở chế độ live.
     return {
         "tenant_id": d["tenant_id"],
         "page_id": str(d["page_id"]),
-        "enabled": bool(d["enabled"]),
-        "mode": d.get("mode") or AUTO_REPLY_DEFAULT_MODE,
+        "enabled": True,
+        "mode": AUTO_REPLY_DEFAULT_MODE,
         "intents": _parse_json_str_list(d.get("intents")),
         "hourly_cap": int(d["hourly_cap"]) if d.get("hourly_cap") is not None else AUTO_REPLY_DEFAULT_HOURLY_CAP,
         "daily_cap": int(d["daily_cap"]) if d.get("daily_cap") is not None else AUTO_REPLY_DEFAULT_DAILY_CAP,
@@ -2289,7 +2408,7 @@ def default_auto_reply_setting(tenant_id, page_id):
     return {
         "tenant_id": tenant_id,
         "page_id": str(page_id),
-        "enabled": False,
+        "enabled": True,
         "mode": AUTO_REPLY_DEFAULT_MODE,
         "intents": list(AUTO_REPLY_DEFAULT_INTENTS),
         "hourly_cap": AUTO_REPLY_DEFAULT_HOURLY_CAP,
@@ -2325,9 +2444,9 @@ def upsert_auto_reply_setting(
     tenant_id,
     page_id,
     *,
-    enabled,
-    mode,
-    intents,
+    enabled=True,
+    mode=AUTO_REPLY_DEFAULT_MODE,
+    intents=AUTO_REPLY_DEFAULT_INTENTS,
     hourly_cap=AUTO_REPLY_DEFAULT_HOURLY_CAP,
     daily_cap=AUTO_REPLY_DEFAULT_DAILY_CAP,
     updated_by="operator",
@@ -2338,6 +2457,9 @@ def upsert_auto_reply_setting(
     intents_json = json.dumps(clean_intents, ensure_ascii=False)
     hcap = int(hourly_cap)
     dcap = int(daily_cap)
+    # Luôn lưu enabled=1 và mode='live' (không hỗ trợ tắt hay dry_run theo Page).
+    eff_enabled = True
+    eff_mode = AUTO_REPLY_DEFAULT_MODE
     with connect() as c:
         c.execute(
             """insert into auto_reply_setting(
@@ -2351,13 +2473,13 @@ def upsert_auto_reply_setting(
                  daily_cap=excluded.daily_cap,
                  updated_by=excluded.updated_by,
                  updated_at=excluded.updated_at""",
-            (tenant_id, str(page_id), 1 if enabled else 0, mode, intents_json, hcap, dcap, updated_by or "", ts),
+            (tenant_id, str(page_id), 1, eff_mode, intents_json, hcap, dcap, updated_by or "", ts),
         )
     return {
         "tenant_id": tenant_id,
         "page_id": str(page_id),
-        "enabled": bool(enabled),
-        "mode": mode,
+        "enabled": eff_enabled,
+        "mode": eff_mode,
         "intents": clean_intents,
         "hourly_cap": hcap,
         "daily_cap": dcap,
@@ -2478,6 +2600,70 @@ def has_sent_auto_reply_for_comment(tenant_id, comment_id):
     return bool(d)
 
 
+def list_retryable_disabled_auto_reply_comments(tenant_id, *, now_dt=None, max_age_hours=24):
+    """Lấy bình luận khách (< `max_age_hours` giờ, không bị ẩn/bỏ qua/xoá, chưa có phản hồi Page/nhân viên)
+    từng bị bỏ qua DUY NHẤT vì lý do 'Chưa bật tự động trả lời…' và chưa từng được đánh giá lại hay tự trả lời.
+    """
+    ref_dt = _parse_utc_ts(now_dt) if now_dt is not None else datetime.now(timezone.utc)
+    if ref_dt is None:
+        ref_dt = datetime.now(timezone.utc)
+    cutoff = ref_dt - timedelta(hours=float(max_age_hours))
+    now_ts = _iso_utc(ref_dt)
+    prefix_like = AUTO_REPLY_DISABLED_SKIP_PREFIX + "%"
+
+    with connect() as c:
+        rows = c.execute(
+            """select c.*
+               from fb_comment c
+               where c.tenant_id = %s
+                 and c.is_from_page = 0
+                 and c.status not in ('deleted', 'ignored', 'replied')
+                 and c.is_hidden = 0
+                 and exists (
+                   select 1
+                   from auto_reply_log l
+                   where l.tenant_id = c.tenant_id
+                     and l.comment_id = c.id
+                     and l.action = 'skipped'
+                     and trim(l.reason) like %s
+                 )
+                 and not exists (
+                   select 1
+                   from auto_reply_log l2
+                   where l2.tenant_id = c.tenant_id
+                     and l2.comment_id = c.id
+                     and (l2.action != 'skipped' or trim(l2.reason) not like %s)
+                 )
+                 and not exists (
+                   select 1
+                   from comment_draft d
+                   where d.tenant_id = c.tenant_id
+                     and d.client_id = ('auto:' || c.id)
+                     and d.status = 'sent'
+                 )
+               order by c.created_time asc, c.id asc""",
+            (tenant_id, prefix_like, prefix_like),
+        ).fetchall()
+
+    out = []
+    for raw in rows:
+        item = _comment_row(raw)
+        cdt = _parse_utc_ts(item.get("created_time"))
+        if cdt is None or cdt <= cutoff:
+            continue
+        if has_thread_reply_or_operator_activity(tenant_id, item, now_ts=now_ts):
+            continue
+        tid = resolve_thread_root_id(tenant_id, item)
+        if tid != item["id"]:
+            root = get_comment(tenant_id, tid)
+            if not root or root.get("status") in ("deleted", "ignored") or root.get("is_hidden"):
+                continue
+        if thread_has_any_page_reply_or_operator_activity(tenant_id, tid, now_ts=now_ts):
+            continue
+        out.append(item)
+    return out
+
+
 def count_auto_replies_since(tenant_id, page_id, since_dt):
     """Đếm số câu đã tự động trả lời (`action='sent'`) của một Page kể từ `since_dt` (UTC)."""
     since_utc = _parse_utc_ts(since_dt) or datetime.now(timezone.utc)
@@ -2494,39 +2680,54 @@ def count_auto_replies_since(tenant_id, page_id, since_dt):
     return total
 
 
-def has_recent_auto_reply_for_customer(tenant_id, page_id, from_id, since_dt):
-    """True nếu khách `from_id` trên Page `page_id` đã được tự trả lời (`action='sent'`) kể từ `since_dt`."""
+def has_recent_auto_reply_for_customer(tenant_id, page_id, from_id, since_dt, intents=None):
+    """True nếu khách `from_id` trên Page `page_id` đã được tự trả lời (`action='sent'`) kể từ `since_dt`.
+
+    `intents` (danh sách): chỉ tính các lần trả lời cùng đúng loại câu hỏi — khách hỏi câu khác vẫn được trả lời.
+    """
     if not from_id or not page_id:
         return False
     since_utc = _parse_utc_ts(since_dt) or datetime.now(timezone.utc)
+    wanted = sorted(set(intents)) if intents is not None else None
     with connect() as c:
         rows = c.execute(
-            "select created_at from auto_reply_log "
+            "select created_at, intents from auto_reply_log "
             "where tenant_id=%s and page_id=%s and from_id=%s and action='sent' "
             "order by created_at desc, seq desc limit 20",
             (tenant_id, str(page_id), str(from_id)),
         ).fetchall()
     for r in rows:
         dt = _parse_utc_ts(r["created_at"])
-        if dt is not None and dt >= since_utc:
-            return True
+        if dt is None or dt < since_utc:
+            continue
+        if wanted is not None:
+            try:
+                prev = sorted(set(json.loads(r["intents"] or "[]")))
+            except (TypeError, ValueError):
+                prev = None
+            if prev != wanted:
+                continue
+        return True
     return False
 
 
-def has_recent_auto_reply_for_thread(tenant_id, thread_id, since_dt):
+def has_recent_auto_reply_for_thread(tenant_id, thread_id, since_dt, *, exclude_comment_id=None):
     """True nếu hội thoại `thread_id` đã có câu tự động trả lời (`action='sent'`) kể từ `since_dt`."""
     tid = str(thread_id or "").strip()
     if not tid:
         return False
     since_utc = _parse_utc_ts(since_dt) or datetime.now(timezone.utc)
+    excl = str(exclude_comment_id or "").strip()
     with connect() as c:
         rows = c.execute(
-            "select created_at from auto_reply_log "
+            "select comment_id, created_at from auto_reply_log "
             "where tenant_id=%s and thread_id=%s and action='sent' "
             "order by created_at desc, seq desc limit 20",
             (tenant_id, tid),
         ).fetchall()
     for r in rows:
+        if excl and str(r.get("comment_id") or "") == excl:
+            continue
         dt = _parse_utc_ts(r["created_at"])
         if dt is not None and dt >= since_utc:
             return True
@@ -2804,3 +3005,168 @@ def list_comment_updates_since_v2(tenant_id, comment_seq, draft_seq, attention_s
         new_attention_seq,
         new_auto_reply_seq,
     )
+
+
+# ---------------- VPOST: trạng thái chờ số đo theo hội thoại (auto_reply_thread_state) ----------------
+
+def set_thread_state(
+    tenant_id,
+    thread_id,
+    *,
+    product_code="",
+    state="awaiting_measurements",
+    asked_comment_id="",
+    bot_reply_id="",
+    expires_at,
+    now_ts=None,
+):
+    """Lưu trạng thái chờ phản hồi (vd `awaiting_measurements`, hết hạn sau 24h) cho hội thoại."""
+    ts = now_ts or _iso_utc(datetime.now(timezone.utc))
+    with connect() as c:
+        row = c.execute(
+            """insert into auto_reply_thread_state(
+                 tenant_id, thread_id, product_code, state, asked_comment_id, bot_reply_id,
+                 expires_at, created_at, updated_at
+               ) values(%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               on conflict(tenant_id, thread_id) do update set
+                 product_code=excluded.product_code,
+                 state=excluded.state,
+                 asked_comment_id=excluded.asked_comment_id,
+                 bot_reply_id=excluded.bot_reply_id,
+                 expires_at=excluded.expires_at,
+                 updated_at=excluded.updated_at
+               returning *""",
+            (
+                str(tenant_id),
+                str(thread_id),
+                str(product_code or ""),
+                str(state),
+                str(asked_comment_id or ""),
+                str(bot_reply_id or ""),
+                str(expires_at),
+                ts,
+                ts,
+            ),
+        ).fetchone()
+    return dict(row)
+
+
+def clear_thread_state(tenant_id, thread_id):
+    """Xoá trạng thái chờ số đo của hội thoại. Trả True nếu đã có và vừa xoá."""
+    tid = str(thread_id or "").strip()
+    if not tenant_id or not tid:
+        return False
+    with connect() as c:
+        cur = c.execute(
+            "delete from auto_reply_thread_state where tenant_id=%s and thread_id=%s",
+            (str(tenant_id), tid),
+        )
+    return cur.rowcount > 0
+
+
+def get_thread_state(tenant_id, thread_id, *, now_dt=None):
+    """Đọc trạng thái chờ số đo đang còn hiệu lực của hội thoại; tự xoá và trả None nếu đã hết hạn."""
+    tid = str(thread_id or "").strip()
+    if not tenant_id or not tid:
+        return None
+    ref_dt = _parse_utc_ts(now_dt) if now_dt is not None else datetime.now(timezone.utc)
+    if ref_dt is None:
+        ref_dt = datetime.now(timezone.utc)
+    with connect() as c:
+        row = c.execute(
+            "select * from auto_reply_thread_state where tenant_id=%s and thread_id=%s",
+            (str(tenant_id), tid),
+        ).fetchone()
+        if not row:
+            return None
+        exp_dt = _parse_utc_ts(row.get("expires_at"))
+        if exp_dt is None or exp_dt <= ref_dt:
+            c.execute(
+                "delete from auto_reply_thread_state where tenant_id=%s and thread_id=%s",
+                (str(tenant_id), tid),
+            )
+            return None
+        return dict(row)
+
+
+def get_active_thread_states(tenant_id, thread_ids=None, *, now_dt=None):
+    """Đọc bản đồ `thread_id -> state_row` đang còn hiệu lực (tự dọn dòng đã hết hạn)."""
+    if not tenant_id:
+        return {}
+    ref_dt = _parse_utc_ts(now_dt) if now_dt is not None else datetime.now(timezone.utc)
+    if ref_dt is None:
+        ref_dt = datetime.now(timezone.utc)
+    with connect() as c:
+        if thread_ids is None:
+            rows = c.execute(
+                "select * from auto_reply_thread_state where tenant_id=%s",
+                (str(tenant_id),),
+            ).fetchall()
+        else:
+            ids = list(dict.fromkeys(str(x) for x in thread_ids if x))
+            if not ids:
+                return {}
+            rows = c.execute(
+                "select * from auto_reply_thread_state where tenant_id=%s and thread_id = any(%s)",
+                (str(tenant_id), ids),
+            ).fetchall()
+        active = {}
+        expired_ids = []
+        for r in rows:
+            exp_dt = _parse_utc_ts(r.get("expires_at"))
+            if exp_dt is None or exp_dt <= ref_dt:
+                expired_ids.append(r["thread_id"])
+            else:
+                active[r["thread_id"]] = dict(r)
+        if expired_ids:
+            c.execute(
+                "delete from auto_reply_thread_state where tenant_id=%s and thread_id = any(%s)",
+                (str(tenant_id), expired_ids),
+            )
+    return active
+
+
+def thread_has_activity_other_than_bot_question(
+    tenant_id,
+    thread_id,
+    *,
+    asked_comment_id,
+    bot_reply_id="",
+    now_ts=None,
+):
+    """True nếu hội thoại có phản hồi Page/nhân viên hoặc nháp nhân viên NGOÀI đúng câu hỏi chờ của bot."""
+    tid = str(thread_id or "").strip()
+    if not tid:
+        return True
+    ref_dt, _ = _ref_time(now_ts)
+    allowed_client_id = "auto:" + str(asked_comment_id or "")
+    allowed_page_ids = set()
+    if bot_reply_id:
+        allowed_page_ids.add(str(bot_reply_id))
+
+    with connect() as c:
+        tree_rows = _thread_tree_rows_in_conn(c, tenant_id, tid)
+        tree_ids = [r["id"] for r in tree_rows] or [tid]
+        draft_rows = c.execute(
+            "select status, edited_text, sent_by, client_id, fb_reply_id, attempt_token, created_at, updated_at "
+            "from comment_draft where tenant_id=%s and comment_id = any(%s)",
+            (tenant_id, tree_ids),
+        ).fetchall()
+        for dr in draft_rows:
+            st = dr.get("status") or ""
+            if st == "sending" and not _is_stale_sending(dr, ref_dt):
+                return True
+            if st == "draft" and (dr.get("edited_text") or "").strip():
+                return True
+            if st == "sent":
+                if str(dr.get("client_id") or "") == allowed_client_id and dr.get("sent_by") == "auto":
+                    if dr.get("fb_reply_id"):
+                        allowed_page_ids.add(str(dr["fb_reply_id"]))
+                    continue
+                return True
+        for r in tree_rows:
+            if r["status"] != "deleted" and r["is_from_page"]:
+                if str(r["id"]) in allowed_page_ids:
+                    continue
+                return True
+    return False

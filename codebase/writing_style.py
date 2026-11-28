@@ -12,12 +12,16 @@ across layers and always unioned with the immutable global banned list.
 """
 from __future__ import annotations
 
+import copy
 import json
+import math
+import re
 import unicodedata
 from typing import Any, Iterable, Optional
 
 from psycopg import sql as pg_sql
 
+import rules
 import store
 import tools
 
@@ -85,7 +89,44 @@ WRITING_STYLE_SCHEMA_STATEMENTS = (
       primary key (tenant_id, scope)
     )
     """,
+    """
+    create table if not exists size_chart(
+      tenant_id text not null,
+      category_key text not null,
+      category_label text not null default '',
+      chart json not null default '{}'::json,
+      updated_by text not null default '',
+      updated_at text not null default '',
+      primary key (tenant_id, category_key)
+    )
+    """,
 )
+
+# ---------------- Size Chart (Bảng size mặc định & theo loại sản phẩm) ----------------
+
+DEFAULT_SIZE_CHART_KEY = ""
+SIZE_CHART_WEIGHT_MIN = 30
+SIZE_CHART_WEIGHT_MAX = 150
+SIZE_CHART_HEIGHT_MIN = 120
+SIZE_CHART_HEIGHT_MAX = 210
+SIZE_CHART_MAX_ROWS = 12
+SIZE_CHART_MAX_SIZE_CHARS = 20
+SIZE_CHART_MAX_NOTE_CHARS = 300
+SIZE_CHART_MAX_CATEGORY_CHARS = 80
+FREESIZE_WEIGHT_RANGE = (40, 55)
+_SIZE_CHART_KEYS = frozenset(("rows", "note"))
+_SIZE_CHART_ROW_KEYS = frozenset(("size", "weightKg", "heightCm"))
+
+DEFAULT_SIZE_CHART: dict[str, Any] = {
+    "rows": [
+        {"size": "S", "weightKg": [40, 46], "heightCm": [145, 155]},
+        {"size": "M", "weightKg": [46, 52], "heightCm": [150, 160]},
+        {"size": "L", "weightKg": [52, 58], "heightCm": [155, 165]},
+        {"size": "XL", "weightKg": [58, 65], "heightCm": [158, 168]},
+        {"size": "2XL", "weightKg": [65, 72], "heightCm": [160, 170]},
+    ],
+    "note": None,
+}
 
 
 class ValidationError(ValueError):
@@ -612,3 +653,304 @@ def apply_preview(
     else:
         effective, configured = merge_styles(page, clean_unsaved, None)
     return apply_resolved(page, effective, configured)
+
+
+# ---------------- Size Chart Validation, Storage & Resolution ----------------
+
+def default_size_chart() -> dict[str, Any]:
+    """Return a fresh copy of the seeded default Vietnamese women's apparel size chart."""
+    return copy.deepcopy(DEFAULT_SIZE_CHART)
+
+
+def normalize_size_chart_category(category: Optional[str]) -> tuple[str, str]:
+    """Return `(category_key, category_label)` for a product category (`loai`). Empty -> `("", "")`."""
+    label = re.sub(r"\s+", " ", unicodedata.normalize("NFC", str(category or "").strip()))
+    return label.lower(), label
+
+
+def _canonical_chart_size(raw: str) -> str:
+    s = re.sub(r"\s+", " ", unicodedata.normalize("NFC", str(raw or "").strip()))
+    if not s:
+        return ""
+    parsed = rules.parse_sizes(s)
+    if len(parsed) == 1:
+        return parsed[0]
+    return s.upper()
+
+
+def _is_finite_number(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+
+def _clean_number(v: float) -> int | float:
+    f = float(v)
+    return int(f) if f.is_integer() else round(f, 2)
+
+
+def _validate_range(
+    val: Any,
+    *,
+    field: str,
+    label: str,
+    lo_bound: float,
+    hi_bound: float,
+    unit: str,
+    required: bool,
+) -> list[dict[str, str]]:
+    if val is None:
+        if required:
+            return [{"field": field, "message": "thiếu khoảng %s" % label}]
+        return []
+    if not isinstance(val, (list, tuple)) or len(val) != 2:
+        return [{"field": field, "message": "%s phải là mảng [từ, đến]" % label}]
+    lo, hi = val[0], val[1]
+    if not _is_finite_number(lo) or not _is_finite_number(hi):
+        return [{"field": field, "message": "%s phải là hai số hợp lệ" % label}]
+    if lo < lo_bound or lo > hi_bound or hi < lo_bound or hi > hi_bound:
+        return [{
+            "field": field,
+            "message": "%s phải nằm trong khoảng %g–%g %s" % (label, lo_bound, hi_bound, unit),
+        }]
+    if not (lo < hi):
+        return [{"field": field, "message": "%s tối thiểu phải nhỏ hơn tối đa (min < max)" % label}]
+    return []
+
+
+def validate_size_chart(chart: Any) -> list[dict[str, str]]:
+    """Validate a SizeChart payload (`{rows, note}`); returns `[{field, message}]` (empty = valid)."""
+    if not isinstance(chart, dict):
+        return [{"field": "chart", "message": "bảng size phải là một object"}]
+
+    errors: list[dict[str, str]] = []
+    for k in chart:
+        if k not in _SIZE_CHART_KEYS:
+            errors.append({"field": str(k), "message": "trường không được hỗ trợ"})
+
+    if "note" in chart and chart["note"] is not None:
+        note = chart["note"]
+        if not isinstance(note, str):
+            errors.append({"field": "note", "message": "ghi chú phải là chuỗi ký tự"})
+        elif len(note.strip()) > SIZE_CHART_MAX_NOTE_CHARS:
+            errors.append({
+                "field": "note",
+                "message": "ghi chú tối đa %d ký tự" % SIZE_CHART_MAX_NOTE_CHARS,
+            })
+
+    rows = chart.get("rows")
+    if not isinstance(rows, list):
+        errors.append({"field": "rows", "message": "rows phải là danh sách các dòng size"})
+        return errors
+
+    if len(rows) == 0:
+        errors.append({"field": "rows", "message": "bảng size cần ít nhất 1 dòng"})
+        return errors
+
+    if len(rows) > SIZE_CHART_MAX_ROWS:
+        errors.append({"field": "rows", "message": "bảng size tối đa %d dòng" % SIZE_CHART_MAX_ROWS})
+
+    seen_sizes: set[str] = set()
+    for idx, row in enumerate(rows):
+        prefix = "rows[%d]" % idx
+        if not isinstance(row, dict):
+            errors.append({"field": prefix, "message": "mỗi dòng size phải là một object"})
+            continue
+        for rk in row:
+            if rk not in _SIZE_CHART_ROW_KEYS:
+                errors.append({"field": "%s.%s" % (prefix, rk), "message": "trường không được hỗ trợ"})
+
+        raw_size = row.get("size")
+        if not isinstance(raw_size, str) or not raw_size.strip():
+            errors.append({"field": "%s.size" % prefix, "message": "tên size không được để trống"})
+        else:
+            trimmed = raw_size.strip()
+            if len(trimmed) > SIZE_CHART_MAX_SIZE_CHARS:
+                errors.append({
+                    "field": "%s.size" % prefix,
+                    "message": "tên size tối đa %d ký tự" % SIZE_CHART_MAX_SIZE_CHARS,
+                })
+            else:
+                canon = _canonical_chart_size(trimmed)
+                key = canon.lower()
+                if key in seen_sizes:
+                    errors.append({"field": "%s.size" % prefix, "message": "size '%s' bị trùng lặp" % canon})
+                else:
+                    seen_sizes.add(key)
+
+        errors.extend(_validate_range(
+            row.get("weightKg"),
+            field="%s.weightKg" % prefix,
+            label="cân nặng",
+            lo_bound=SIZE_CHART_WEIGHT_MIN,
+            hi_bound=SIZE_CHART_WEIGHT_MAX,
+            unit="kg",
+            required=True,
+        ))
+        errors.extend(_validate_range(
+            row.get("heightCm"),
+            field="%s.heightCm" % prefix,
+            label="chiều cao",
+            lo_bound=SIZE_CHART_HEIGHT_MIN,
+            hi_bound=SIZE_CHART_HEIGHT_MAX,
+            unit="cm",
+            required=False,
+        ))
+
+    return errors
+
+
+def normalize_size_chart(chart: dict) -> dict[str, Any]:
+    """Normalize a validated SizeChart dict into canonical storage/response shape."""
+    rows_out: list[dict[str, Any]] = []
+    for row in chart.get("rows") or ():
+        size_canon = _canonical_chart_size(row["size"])
+        w_lo, w_hi = row["weightKg"]
+        h_raw = row.get("heightCm")
+        height_out = (
+            [_clean_number(h_raw[0]), _clean_number(h_raw[1])]
+            if h_raw is not None
+            else None
+        )
+        rows_out.append({
+            "size": size_canon,
+            "weightKg": [_clean_number(w_lo), _clean_number(w_hi)],
+            "heightCm": height_out,
+        })
+    raw_note = chart.get("note")
+    note_out = raw_note.strip() if isinstance(raw_note, str) and raw_note.strip() else None
+    return {"rows": rows_out, "note": note_out}
+
+
+def _decode_size_chart(raw: Any) -> Optional[dict[str, Any]]:
+    obj = raw
+    if isinstance(raw, str) and raw.strip():
+        try:
+            obj = json.loads(raw)
+        except ValueError:
+            return None
+    if not isinstance(obj, dict) or not isinstance(obj.get("rows"), list) or not obj["rows"]:
+        return None
+    return normalize_size_chart(obj)
+
+
+def _decode_size_chart_row(row: Any) -> Optional[dict[str, Any]]:
+    if not row:
+        return None
+    d = dict(row)
+    chart = _decode_size_chart(d.get("chart"))
+    if chart is None:
+        return None
+    return {
+        "tenant_id": d["tenant_id"],
+        "category_key": d["category_key"],
+        "category": d.get("category_label") or d["category_key"],
+        "chart": chart,
+        "updated_by": d.get("updated_by") or "",
+        "updated_at": d.get("updated_at") or "",
+    }
+
+
+def get_size_chart_row(tenant_id: str, category: Optional[str] = None) -> Optional[dict[str, Any]]:
+    if not tenant_id:
+        return None
+    cat_key, _ = normalize_size_chart_category(category)
+    with store.connect() as c:
+        r = c.execute(
+            "select tenant_id, category_key, category_label, chart, updated_by, updated_at "
+            "from size_chart where tenant_id=%s and category_key=%s",
+            (tenant_id, cat_key),
+        ).fetchone()
+    return _decode_size_chart_row(r) if r else None
+
+
+def list_size_chart_rows(tenant_id: str) -> list[dict[str, Any]]:
+    if not tenant_id:
+        return []
+    with store.connect() as c:
+        rows = c.execute(
+            "select tenant_id, category_key, category_label, chart, updated_by, updated_at "
+            "from size_chart where tenant_id=%s order by category_key asc",
+            (tenant_id,),
+        ).fetchall()
+    out = []
+    for r in rows:
+        dec = _decode_size_chart_row(r)
+        if dec is not None:
+            out.append(dec)
+    return out
+
+
+def upsert_size_chart(
+    tenant_id: str,
+    chart: dict,
+    *,
+    category: Optional[str] = None,
+    updated_by: str = "operator",
+    updated_at: Optional[str] = None,
+) -> dict[str, Any]:
+    errors = validate_size_chart(chart)
+    if errors:
+        raise ValidationError(errors)
+    clean = normalize_size_chart(chart)
+    cat_key, cat_label = normalize_size_chart_category(category)
+    ts = updated_at or store._ts()
+    payload = json.dumps(clean, ensure_ascii=False)
+    with store.connect() as c:
+        row = c.execute(
+            """insert into size_chart(tenant_id, category_key, category_label, chart, updated_by, updated_at)
+               values(%s, %s, %s, %s::json, %s, %s)
+               on conflict(tenant_id, category_key) do update set
+                 category_label = excluded.category_label,
+                 chart = excluded.chart,
+                 updated_by = excluded.updated_by,
+                 updated_at = excluded.updated_at
+               returning tenant_id, category_key, category_label, chart, updated_by, updated_at""",
+            (tenant_id, cat_key, cat_label, payload, updated_by or "", ts),
+        ).fetchone()
+    return _decode_size_chart_row(row)
+
+
+def delete_size_chart(tenant_id: str, category: Optional[str] = None) -> bool:
+    if not tenant_id:
+        return False
+    cat_key, _ = normalize_size_chart_category(category)
+    with store.connect() as c:
+        cur = c.execute(
+            "delete from size_chart where tenant_id=%s and category_key=%s",
+            (tenant_id, cat_key),
+        )
+    return cur.rowcount > 0
+
+
+def resolve_size_chart(tenant_id: str, category: Optional[str] = None) -> tuple[dict[str, Any], str]:
+    """Resolve effective SizeChart for `(tenant_id, category)` -> `(chart, source_label)`.
+
+    Precedence: per-category override (keyed by product `loai`) -> company default -> seeded default chart.
+    """
+    if not tenant_id:
+        return default_size_chart(), "default_seed"
+    cat_key, cat_label = normalize_size_chart_category(category)
+    keys = [DEFAULT_SIZE_CHART_KEY]
+    if cat_key:
+        keys.append(cat_key)
+    try:
+        with store.connect() as c:
+            rows = c.execute(
+                "select tenant_id, category_key, category_label, chart, updated_by, updated_at "
+                "from size_chart where tenant_id=%s and category_key = any(%s)",
+                (tenant_id, keys),
+            ).fetchall()
+    except Exception:
+        return default_size_chart(), "default_seed"
+
+    by_key: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        dec = _decode_size_chart_row(r)
+        if dec is not None:
+            by_key[dec["category_key"]] = dec
+
+    if cat_key and cat_key in by_key:
+        rec = by_key[cat_key]
+        return rec["chart"], "category:%s" % (rec["category"] or cat_label)
+    if DEFAULT_SIZE_CHART_KEY in by_key:
+        return by_key[DEFAULT_SIZE_CHART_KEY]["chart"], "company_default"
+    return default_size_chart(), "default_seed"

@@ -6,6 +6,7 @@ import {
   HStack,
   Stack,
   Text,
+  Token,
   VisuallyHidden,
 } from "@astryxdesign/core";
 import {
@@ -14,6 +15,7 @@ import {
   ChevronRight,
   Loader2,
   Minus,
+  Ruler,
   X,
 } from "lucide-react";
 import { useId } from "react";
@@ -25,8 +27,10 @@ import {
   AGENT_RUN_OUTCOME_LABELS,
   AGENT_RUN_STEP_STATUS_LABELS,
   AGENT_RUN_TRACE_TOGGLE_LABEL,
+  extractTraceMeasurements,
   formatAgentStepLabel,
   formatAgentStepTime,
+  formatTraceMeasurementTokens,
   resolveCanBanBlockingStepIndices,
 } from "@/ui/components/inbox/agent-run-state";
 import {
@@ -82,7 +86,7 @@ function renderStepStatusIcon(status: AgentRunStepStatus) {
 function outcomeBadgeVariant(
   outcome: AgentRunOutcome | null,
   status: AgentRun["status"],
-): "green" | "purple" | "red" | "gray" {
+): "green" | "purple" | "red" | "blue" | "gray" {
   if (status === "running") return "purple";
   switch (outcome) {
     case "sent":
@@ -90,6 +94,8 @@ function outcomeBadgeVariant(
       return "green";
     case "would_send":
       return "purple";
+    case "awaiting_measurements":
+      return "blue";
     case "can_ban":
     case "failed":
       return "red";
@@ -244,6 +250,10 @@ export function AgentRunTrace({
   onRetry,
 }: AgentRunTraceProps) {
   const panelId = useId();
+  const parsedMeasurements = extractTraceMeasurements(run);
+  const measurementTokens = parsedMeasurements
+    ? formatTraceMeasurementTokens(parsedMeasurements)
+    : [];
   const outcomeLabel =
     run === null
       ? null
@@ -316,6 +326,49 @@ export function AgentRunTrace({
                   />
                 ) : null}
               </HStack>
+
+              {parsedMeasurements ? (
+                <div
+                  className="inbox-trace-measurements"
+                  data-inbox="agent-trace-measurements"
+                >
+                  <Stack direction="vertical" gap={1.5}>
+                    <HStack gap={1.5} align="center" wrap="wrap">
+                      <Ruler
+                        className="size-4 shrink-0 inbox-trace-step-detail"
+                        aria-hidden="true"
+                      />
+                      <Text
+                        type="supporting"
+                        size="xsm"
+                        weight="medium"
+                        color="inherit"
+                        className="inbox-trace-step-label"
+                      >
+                        Số đo đã đọc
+                      </Text>
+                      {measurementTokens.map((tokenLabel) => (
+                        <Token
+                          key={tokenLabel}
+                          label={tokenLabel}
+                          color="blue"
+                          size="sm"
+                        />
+                      ))}
+                    </HStack>
+                    {parsedMeasurements.chartRowLabel ? (
+                      <Text
+                        type="supporting"
+                        size="xsm"
+                        color="inherit"
+                        className="inbox-trace-step-detail"
+                      >
+                        Dòng bảng size: {parsedMeasurements.chartRowLabel}
+                      </Text>
+                    ) : null}
+                  </Stack>
+                </div>
+              ) : null}
 
               {run.steps.length > 0 ? (
                 <AgentRunStepsList steps={run.steps} outcome={run.outcome} />

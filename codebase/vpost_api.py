@@ -210,7 +210,8 @@ def channel_groups():
 # ---------------- file sản phẩm ----------------
 @router.post("/vpost/catalog")
 async def upload_catalog(file: UploadFile = File(...)):
-    """Tải file Excel/CSV sản phẩm — thay toàn bộ danh sách mã đang dùng."""
+    """Tải file Excel/CSV sản phẩm — thay toàn bộ danh sách mã đang dùng.
+    Dòng thiếu giá/size/ảnh… vẫn nhập; chỉ bị chặn lúc soạn bài (compose). Chỉ bỏ dòng không có mã hoặc trùng mã."""
     data = await file.read()
     if len(data) > 10 * 1024 * 1024:
         raise ApiError(413, "INVALID_INPUT", "File lớn hơn 10MB")
@@ -219,6 +220,29 @@ async def upload_catalog(file: UploadFile = File(...)):
     except ValueError as e:
         raise ApiError(400, "INVALID_INPUT", str(e))
     return load_catalog(rows)
+
+
+# File mẫu: tên cột tiếng Việt mà rules.ALIASES nhận được + 2 dòng ví dụ (đủ thông tin / chỉ mã + giá)
+TEMPLATE_COLUMNS = [
+    ("Mã sản phẩm", "VAY001", "VAY002"), ("Tên sản phẩm", "Váy voan hoa nhí", ""), ("Loại", "Váy", ""),
+    ("Giá bán", "890.000đ", "450000"), ("Giá tệ", "45", ""), ("Size", "S, M, L", ""), ("Màu", "Đen, Trắng", ""),
+    ("Chất liệu", "Voan", ""), ("Mô tả", "Váy 2 lớp, kéo khoá sau", ""),
+    ("Ảnh", "https://drive.google.com/file/d/THAY_BANG_ID_ANH_DRIVE/view", ""), ("Page", "", ""),
+    ("Prompt", "Giọng nhẹ nhàng, hợp đi làm", ""),
+]
+
+
+@router.get("/vpost/catalog/template")
+def catalog_template():
+    """File CSV mẫu để nhập sản phẩm (UTF-8 có BOM để Excel mở đúng dấu)."""
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    for i in range(3):
+        w.writerow([c[i] for c in TEMPLATE_COLUMNS])
+    return Response(("﻿" + buf.getvalue()).encode("utf-8"), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="mau-nhap-san-pham.csv"'})
 
 
 def load_catalog(rows):
@@ -232,8 +256,6 @@ def load_catalog(rows):
         keep.append(dict(r, ma_sp=code))
     if not keep:
         raise ApiError(400, "INVALID_INPUT", "File không có dòng nào có mã sản phẩm")
-    if len(keep) > 500:
-        raise ApiError(400, "INVALID_INPUT", "File có %d mã — tối đa 500" % len(keep))
     store.replace_catalog(keep)
     return {"rows": len(keep), "codes": [r["ma_sp"] for r in keep], "skipped": skipped}
 
@@ -1122,6 +1144,7 @@ def _serialize_thread(
     tags_by_from,
     auto_replies=None,
     latest_runs=None,
+    thread_states=None,
 ):
     root = rec["root"]
     ch_info = chans.get(root["channel_id"]) or {}
@@ -1150,6 +1173,8 @@ def _serialize_thread(
         if ar
         else None
     )
+    t_state = (thread_states or {}).get(rec["id"])
+    awaiting_measurements = bool(t_state and t_state.get("state") == "awaiting_measurements")
     return {
         "id": rec["id"],
         "channelId": root["channel_id"],
@@ -1183,6 +1208,7 @@ def _serialize_thread(
         "attention": attention_view,
         "autoReply": auto_reply_view,
         "agentRun": (latest_runs or {}).get(rec["id"]),
+        "awaitingMeasurements": awaiting_measurements,
         "updatedAt": rec["updated_at"],
     }
 
@@ -1281,7 +1307,9 @@ def _thread_view(thread_id: str, *, rec=None, chans=None, tenant_id=None):
     active_drafts = store.active_thread_drafts(tid, [thread_id])
     tags_by_from = inbox_store.tags_for(tid, [rec["customer_id"]]) if rec["customer_id"] else {}
     auto_replies = store.latest_auto_reply_for_threads(tid, [thread_id])
-    latest_runs = agent_runs.latest_runs_for_threads(tid, [thread_id], now_dt=now())
+    now_dt = now()
+    latest_runs = agent_runs.latest_runs_for_threads(tid, [thread_id], now_dt=now_dt)
+    thread_states = store.get_active_thread_states(tid, [thread_id], now_dt=now_dt)
     return _serialize_thread(
         rec,
         chans=chans,
@@ -1291,6 +1319,7 @@ def _thread_view(thread_id: str, *, rec=None, chans=None, tenant_id=None):
         tags_by_from=tags_by_from,
         auto_replies=auto_replies,
         latest_runs=latest_runs,
+        thread_states=thread_states,
     )
 
 
@@ -1851,6 +1880,13 @@ def run_comment_sync(
                         new_customer_comment_ids.append(cid)
                 else:
                     post_upd += 1
+                if is_from_page and parent_id:
+                    saved_row = store.get_comment(TENANT_ID, cid)
+                    if saved_row and saved_row.get("sent_by") != "auto":
+                        root_tid = store.resolve_thread_root_id(TENANT_ID, saved_row)
+                        cur_state = store.get_thread_state(TENANT_ID, root_tid, now_dt=sync_now)
+                        if cur_state and str(cur_state.get("bot_reply_id") or "") != cid:
+                            store.clear_thread_state(TENANT_ID, root_tid)
 
             store.reconcile_replied_comments(TENANT_ID, fb_post_id, sync_ts)
             new_comments += post_new
@@ -2102,7 +2138,9 @@ def list_comment_threads(
     page_ids = [r["id"] for r in page_recs]
     active_drafts = store.active_thread_drafts(TENANT_ID, page_ids) if page_ids else {}
     auto_replies = store.latest_auto_reply_for_threads(TENANT_ID, page_ids) if page_ids else {}
-    latest_runs = agent_runs.latest_runs_for_threads(TENANT_ID, page_ids, now_dt=now()) if page_ids else {}
+    now_dt = now()
+    latest_runs = agent_runs.latest_runs_for_threads(TENANT_ID, page_ids, now_dt=now_dt) if page_ids else {}
+    thread_states = store.get_active_thread_states(TENANT_ID, page_ids, now_dt=now_dt) if page_ids else {}
     from_ids = list(dict.fromkeys(r["customer_id"] for r in page_recs if r["customer_id"]))
     tags_by_from = inbox_store.tags_for(TENANT_ID, from_ids) if from_ids else {}
 
@@ -2116,6 +2154,7 @@ def list_comment_threads(
             tags_by_from=tags_by_from,
             auto_replies=auto_replies,
             latest_runs=latest_runs,
+            thread_states=thread_states,
         )
         for rec in page_recs
     ]
@@ -2288,6 +2327,7 @@ def send_thread_reply(
     sent_by: str = "operator",
     clear_attention: bool = True,
     agent_run_id: Optional[str] = None,
+    allow_pending_size_advice_id: Optional[str] = None,
 ) -> dict:
     """Đường gửi trả lời dùng chung cho người vận hành và auto-reply (cùng kiểm tra nội dung, fencing, idempotency)."""
     if sent_by != "auto" and str(client_id or "").strip().lower().startswith("auto:"):
@@ -2338,6 +2378,7 @@ def send_thread_reply(
             ts,
             attempt_token=attempt_token,
             sent_by=sent_by,
+            allow_pending_asked_comment_id=allow_pending_size_advice_id,
         )
         if claim_err == "ALREADY_SENT" and existing_sent:
             chans = _channel_map()
@@ -2423,6 +2464,7 @@ def send_thread_reply(
             attempt_token=attempt_token,
             clear_attention=clear_attention,
             attention_thread_id=thread_id,
+            clear_thread_state=(sent_by != "auto"),
         )
     if not completed:
         current = store.get_draft_by_client_id(tid, client_id, now_ts=sent_ts)
@@ -2483,6 +2525,7 @@ def reply_comment_thread(thread_id: str, body: ThreadReplyIn):
 def ignore_comment_thread(thread_id: str, body: Optional[EmptyIn] = None):
     _load_thread_record(thread_id)
     store.update_fb_comment(TENANT_ID, thread_id, status="ignored", updated_at=z(now()))
+    store.clear_thread_state(TENANT_ID, thread_id)
     return {"tenantId": TENANT_ID, "thread": _thread_view(thread_id)}
 
 
@@ -2725,6 +2768,7 @@ def reply_comment(comment_id: str, body: CommentTextIn):
             attempt_token=attempt_token,
             clear_attention=True,
             attention_thread_id=target_id,
+            clear_thread_state=True,
         )
     if not completed:
         latest = store.latest_comment_draft(TENANT_ID, comment_id, now_ts=sent_ts)

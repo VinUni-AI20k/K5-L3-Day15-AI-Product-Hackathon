@@ -6,21 +6,22 @@ import {
   AUTO_REPLY_INTENTS,
   type AutoReplyIntent,
   type AutoReplyLogFilter,
-  type AutoReplyMode,
   type AutoReplySetting,
   type AutoReplySettingUpdateInput,
 } from "@/ui/schemas/auto-reply.schema";
+import {
+  formatCommentAbsoluteTime,
+  type InboxThread,
+} from "@/ui/schemas/inbox.schema";
 
 /**
- * Pure draft state, validation, live-mode confirmation gate, and log filter
- * helpers for `AutoReplySettingsPanel` and `AutoReplyLogPanel`.
+ * Pure draft state, validation, and log filter helpers for
+ * `AutoReplySettingsPanel` and `AutoReplyLogPanel`.
  */
 
 const VALID_INTENT_SET = new Set<string>(AUTO_REPLY_INTENTS);
 
 export interface AutoReplySettingDraft {
-  readonly enabled: boolean;
-  readonly mode: AutoReplyMode;
   readonly intents: readonly AutoReplyIntent[];
   readonly hourlyCap: number | null;
   readonly dailyCap: number | null;
@@ -34,7 +35,7 @@ export interface AutoReplyDraftValidation {
   readonly capMismatchWarning: string | null;
 }
 
-/** Keeps only valid v1 intents (`price | size | color`) in canonical order. */
+/** Keeps only valid auto-reply intents (`price | size | color | size_advice`) in canonical order. */
 export function sanitizeAutoReplyIntents(
   intents: readonly string[],
 ): AutoReplyIntent[] {
@@ -52,8 +53,6 @@ export function settingToAutoReplyDraft(
   setting: AutoReplySetting,
 ): AutoReplySettingDraft {
   return {
-    enabled: setting.enabled,
-    mode: setting.mode,
     intents: sanitizeAutoReplyIntents(setting.intents),
     hourlyCap: setting.hourlyCap,
     dailyCap: setting.dailyCap,
@@ -65,8 +64,6 @@ export function isAutoReplyDraftDirty(
   draft: AutoReplySettingDraft,
 ): boolean {
   const baseline = settingToAutoReplyDraft(serverSetting);
-  if (baseline.enabled !== draft.enabled) return true;
-  if (baseline.mode !== draft.mode) return true;
   if (baseline.hourlyCap !== draft.hourlyCap) return true;
   if (baseline.dailyCap !== draft.dailyCap) return true;
   const nextIntents = sanitizeAutoReplyIntents(draft.intents);
@@ -75,16 +72,16 @@ export function isAutoReplyDraftDirty(
 }
 
 /**
- * Validates intents (at least one required when enabled) and hourly/daily caps
- * (`1..200` and `1..2000`, integer only).
+ * Validates intents (at least one required since auto-reply is always active)
+ * and hourly/daily caps (`1..200` and `1..2000`, integer only).
  */
 export function validateAutoReplyDraft(
   draft: AutoReplySettingDraft,
 ): AutoReplyDraftValidation {
   const cleanIntents = sanitizeAutoReplyIntents(draft.intents);
   const intentsError =
-    draft.enabled && cleanIntents.length === 0
-      ? "Chọn ít nhất một loại câu hỏi (Giá, Size hoặc Màu) khi bật tự động trả lời."
+    cleanIntents.length === 0
+      ? "Chọn ít nhất một loại câu hỏi (Giá, Size, Màu hoặc Tư vấn size)."
       : null;
 
   const hourlyValid =
@@ -124,33 +121,19 @@ export function validateAutoReplyDraft(
 }
 
 /**
- * True whenever saving `draft` transitions a Page into live public auto-replying:
- * - switching `mode` from `dry_run` to `live`, OR
- * - turning `enabled` from `false` to `true` while `mode === "live"`.
- */
-export function needsLiveModeConfirm(
-  serverSetting: Pick<AutoReplySetting, "enabled" | "mode">,
-  draft: Pick<AutoReplySettingDraft, "enabled" | "mode">,
-): boolean {
-  if (draft.mode !== "live") return false;
-  return serverSetting.mode !== "live" || (!serverSetting.enabled && draft.enabled);
-}
-
-/**
  * Builds the `PUT /api/comments/auto-reply-settings/{pageId}` body from a validated draft.
- * Includes `confirmLive: true` ONLY when `draft.mode === "live"` AND `confirmedLive === true`.
+ * Always targets active live mode (`enabled: true, mode: "live", confirmLive: true`).
  */
 export function buildAutoReplyUpdatePayload(
   draft: AutoReplySettingDraft,
-  options: { readonly confirmedLive: boolean },
 ): AutoReplySettingUpdateInput {
   return {
-    enabled: draft.enabled,
-    mode: draft.mode,
+    enabled: true,
+    mode: "live",
     intents: sanitizeAutoReplyIntents(draft.intents),
     ...(typeof draft.hourlyCap === "number" ? { hourlyCap: draft.hourlyCap } : {}),
     ...(typeof draft.dailyCap === "number" ? { dailyCap: draft.dailyCap } : {}),
-    ...(draft.mode === "live" && options.confirmedLive ? { confirmLive: true } : {}),
+    confirmLive: true,
   };
 }
 
@@ -222,4 +205,79 @@ export function resolveAutoReplyLogEmptyKind(
   filter: AutoReplyLogFilter,
 ): "first-run" | "no-result" {
   return hasActiveAutoReplyLogFilters(filter) ? "no-result" : "first-run";
+}
+
+// --- Size advice: awaiting measurements thread state ------------------------
+
+export const AWAITING_MEASUREMENTS_STATE = "awaiting_measurements" as const;
+export const AWAITING_MEASUREMENTS_BADGE_LABEL = "Đang chờ số đo" as const;
+
+export interface AwaitingMeasurementsInfo {
+  readonly productCode: string | null;
+  readonly askedCommentId: string | null;
+  readonly expiresAt: string | null;
+}
+
+function isExpiredIso(expiresAt: string | null, nowMs: number | undefined): boolean {
+  if (!expiresAt || nowMs === undefined) return false;
+  const parsed = Date.parse(expiresAt);
+  if (Number.isNaN(parsed)) return false;
+  return parsed <= nowMs;
+}
+
+/**
+ * Resolves whether a thread is currently awaiting the customer's height/weight
+ * measurements (`awaiting_measurements`). Supports all plausible parallel
+ * backend wire fields (`threadState`, `sizeAdvice`, `autoReply.state`,
+ * `awaitingMeasurements`) and respects `expiresAt` when `nowMs` is supplied.
+ */
+export function resolveAwaitingMeasurements(
+  thread: Pick<
+    InboxThread,
+    "threadState" | "sizeAdvice" | "awaitingMeasurements" | "autoReply"
+  >,
+  nowMs?: number,
+): AwaitingMeasurementsInfo | null {
+  const structured = thread.threadState ?? thread.sizeAdvice ?? null;
+  if (structured && structured.state === AWAITING_MEASUREMENTS_STATE) {
+    if (isExpiredIso(structured.expiresAt, nowMs)) return null;
+    return {
+      productCode: structured.productCode,
+      askedCommentId: structured.askedCommentId,
+      expiresAt: structured.expiresAt,
+    };
+  }
+
+  if (thread.autoReply?.state === AWAITING_MEASUREMENTS_STATE) {
+    const expiresAt = thread.autoReply.expiresAt ?? null;
+    if (isExpiredIso(expiresAt, nowMs)) return null;
+    return {
+      productCode: null,
+      askedCommentId: null,
+      expiresAt,
+    };
+  }
+
+  if (thread.awaitingMeasurements === true) {
+    return {
+      productCode: null,
+      askedCommentId: null,
+      expiresAt: null,
+    };
+  }
+
+  return null;
+}
+
+export function formatAwaitingMeasurementsTooltip(
+  info: AwaitingMeasurementsInfo,
+): string {
+  const parts = ["Đang chờ khách gửi chiều cao và cân nặng để tư vấn size"];
+  if (info.productCode && info.productCode.trim().length > 0) {
+    parts.push(`Mã ${info.productCode.trim()}`);
+  }
+  if (info.expiresAt) {
+    parts.push(`Hết hạn lúc ${formatCommentAbsoluteTime(info.expiresAt)}`);
+  }
+  return parts.join(" · ");
 }

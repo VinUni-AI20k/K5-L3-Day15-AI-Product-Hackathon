@@ -322,7 +322,9 @@ def test_scrub_pii_positive_and_negative():
 
 
 # ---------------- 3. Sync: upserts, pagination stop, is_from_page, missing from, isolation ----------------
-def test_sync_upserts_replied_detection_and_missing_from():
+def test_sync_upserts_replied_detection_and_missing_from(monkeypatch):
+    # Isolate sync reconciliation assertions from default-on live auto-reply (avoids outbound Graph reply call)
+    monkeypatch.setenv("VPOST_AUTO_REPLY_DISABLED", "1")
     seed_post_job(job_id="job-1", fb_post_id="123_1001")
     t1 = iso_ago(hours=3)
     t2 = iso_ago(hours=2)
@@ -1606,7 +1608,9 @@ def test_req09_store_comment_read_helpers():
 
 
 # ---------------- 10. Moderation wiring: sync auto-moderation, list filter/fields/counts, 422 reasons ----------------
-def test_sync_triggers_auto_moderation_dry_run_live_and_only_new_customer_comments(monkeypatch):
+def test_sync_triggers_auto_moderation_live_by_default_and_only_new_customer_comments(monkeypatch):
+    # Isolate sync auto-moderation assertions from default-on live auto-reply
+    monkeypatch.setenv("VPOST_AUTO_REPLY_DISABLED", "1")
     seed_post_job(job_id="job-1", fb_post_id="123_1001")
     vpost_api.MODEL = FakeModel({"category": "neutral", "confidence": 0.6, "reasons": ["hỏi mua hàng"]})
 
@@ -1623,21 +1627,25 @@ def test_sync_triggers_auto_moderation_dry_run_live_and_only_new_customer_commen
     fb_hide_calls = []
     facebook.hide_comment = lambda cid, hidden, token: (fb_hide_calls.append((cid, hidden, token)), True)[1]
 
-    # 1. Dry-run mode enabled for PAGE_ID
-    r_cfg = client.put(
+    # dry_run and disabled are rejected with 400; moderation runs live by default with no settings row
+    assert client.put(
         f"/api/comments/moderation-settings/{PAGE_ID}",
         json={"enabled": True, "mode": "dry_run", "categories": ["spam", "pii"], "threshold": 0.85},
-    )
-    assert r_cfg.status_code == 200, r_cfg.text
+    ).status_code == 400
+    assert client.put(
+        f"/api/comments/moderation-settings/{PAGE_ID}",
+        json={"enabled": False, "mode": "live", "categories": ["spam", "pii"], "threshold": 0.85},
+    ).status_code == 400
 
+    # 1. No settings row -> live by default for all categories (spam hidden, complaint flagged-only, normal skipped)
     batch1 = [
         {"id": "c_page_hotline", "message": "Hotline 0912345678", "created_time": iso_ago(hours=4),
          "from": {"id": PAGE_ID, "name": "WorkHardToday"}},
-        {"id": "c_spam_dry", "message": "Follow chéo tương tác chéo nha!", "created_time": iso_ago(hours=3),
+        {"id": "c_spam_def", "message": "Follow chéo tương tác chéo nha!", "created_time": iso_ago(hours=3),
          "from": {"id": "u1", "name": "A"}},
-        {"id": "c_cmp_dry", "message": "Hàng lỗi bung chỉ, shop giao chậm quá", "created_time": iso_ago(hours=2),
+        {"id": "c_cmp_def", "message": "Hàng lỗi bung chỉ, shop giao chậm quá", "created_time": iso_ago(hours=2),
          "from": {"id": "u2", "name": "B"}},
-        {"id": "c_ok_dry", "message": "Mẫu này có màu đen không shop?", "created_time": iso_ago(hours=1),
+        {"id": "c_ok_def", "message": "Mẫu này có màu đen không shop?", "created_time": iso_ago(hours=1),
          "from": {"id": "u3", "name": "C"}},
     ]
     facebook.list_comments = lambda fb_post_id, token, since=None: list(batch1)
@@ -1646,14 +1654,13 @@ def test_sync_triggers_auto_moderation_dry_run_live_and_only_new_customer_commen
     assert r1.status_code == 200, r1.text
     b1 = r1.json()
     assert b1["newComments"] == 4 and b1["errors"] == []
-    assert b1["moderation"] == {"autoHidden": 0, "wouldHide": 1, "flagged": 1, "skipped": 1}
+    assert b1["moderation"] == {"autoHidden": 1, "wouldHide": 0, "flagged": 1, "skipped": 1}
     # Called once at end with newly created customer comment IDs only (Page-own excluded) and model=vpost_api.MODEL
     assert len(run_calls) == 1
     assert run_calls[0][0] == vpost_api.TENANT_ID
-    assert run_calls[0][1] == ["c_spam_dry", "c_cmp_dry", "c_ok_dry"]
+    assert run_calls[0][1] == ["c_spam_def", "c_cmp_def", "c_ok_def"]
     assert run_calls[0][2] is vpost_api.MODEL
-    # Dry-run never calls Facebook hide
-    assert fb_hide_calls == []
+    assert fb_hide_calls == [("c_spam_def", True, PAGE_TOKEN)]
 
     # Re-sync same comments -> updated only, auto-moderation gets [] and does not re-hide
     r_resync = client.post("/api/comments/sync", json={})
@@ -1661,15 +1668,16 @@ def test_sync_triggers_auto_moderation_dry_run_live_and_only_new_customer_commen
     assert r_resync.json()["newComments"] == 0 and r_resync.json()["updatedComments"] == 4
     assert r_resync.json()["moderation"] == {"autoHidden": 0, "wouldHide": 0, "flagged": 0, "skipped": 0}
     assert len(run_calls) == 2 and run_calls[1][1] == []
-    assert fb_hide_calls == []
+    assert fb_hide_calls == [("c_spam_def", True, PAGE_TOKEN)]
 
-    # 2. Switch to live mode -> hides PII via tools.hide_fb_comment; complaint stays flag-only (v1 DECIDED)
+    # 2. Custom categories in live mode -> hides PII via tools.hide_fb_comment; complaint stays flag-only (v1 DECIDED)
     r_live = client.put(
         f"/api/comments/moderation-settings/{PAGE_ID}",
         json={"enabled": True, "mode": "live", "categories": ["spam", "pii"], "threshold": 0.85},
     )
     assert r_live.status_code == 200
 
+    fb_hide_calls.clear()
     batch2 = [
         {"id": "c_pii_live", "message": "Gọi mình 0987 654 321 nha shop", "created_time": iso_ago(minutes=20),
          "from": {"id": "u4", "name": "D"}},

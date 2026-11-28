@@ -9,7 +9,8 @@ import tools  # noqa: E402
 
 INV = {"T1": [{"mau": "Đen", "size": s, "ton": 3, "trang_thai": "Còn hàng"} for s in "SML"]}
 ROW = {"ma_sp": "T1", "ten_sp": "Đầm Test", "loai": "Váy xoè", "gia_ban": "890.000đ", "gia_te": "50", "size": "S-L",
-       "mau": "Đen", "chat_lieu": "Voan", "mo_ta": "Váy xoè 2 lớp, kéo khoá sau.", "page": "diu-may", "prompt": "Viết nhẹ nhàng"}
+       "mau": "Đen", "chat_lieu": "Voan", "mo_ta": "Váy xoè 2 lớp, kéo khoá sau.",
+       "anh": "https://example.com/image.jpg", "page": "diu-may", "prompt": "Viết nhẹ nhàng"}
 GOOD = {"decision": "write", "flag_reasons": [], "hook": "Một chiếc đầm voan cho buổi hẹn cuối tuần.",
         "body": "Đầm Test dáng xoè 2 lớp, màu đen, size S, M, L. Giá 890.000đ.", "cta": "Bình luận size để shop tư vấn nhé.",
         "hashtags": ["damxoe"], "facts_used": ["F1", "F3"]}

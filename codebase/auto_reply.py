@@ -9,8 +9,8 @@ Nguyên tắc cốt lõi:
   khớp TRỌN VẸN một mẫu trong `allow` của `data/auto_reply_rules.json` (tối đa 80 ký tự, đúng 1 câu).
 - Mọi trường hợp khác (châm biếm, khen, cảm ơn, khiếu nại, câu hỏi hỗn hợp, số đo, sản phẩm/mã khác, trích dẫn,
   chỉ emoji, bình luận phản hồi trong chuỗi...) đều gắn nhãn 'Cần bạn' cho nhân viên xử lý.
-- Các lớp bảo vệ an toàn được giữ nguyên và mở rộng cho khách thật (Facebook ẩn `from.id`): kill switch, chế độ dry-run,
-  trần giờ/ngày theo Page, idempotency theo bình luận (`auto:<comment_id>`), cooldown theo hội thoại (1 lần/10 phút),
+- Các lớp bảo vệ an toàn được giữ nguyên và mở rộng cho khách thật (Facebook ẩn `from.id`): công tắc khẩn cấp toàn hệ thống (`VPOST_AUTO_REPLY_DISABLED`),
+  trần giờ/ngày theo Page (mặc định tối đa 200/giờ, 2000/ngày), idempotency theo bình luận (`auto:<comment_id>`), cooldown theo hội thoại (1 lần/10 phút),
   giới hạn tốc độ theo bài đăng (tối đa 10 lần/bài/10 phút), chống spam lặp nguyên văn theo bài đăng trong 10 phút
   không phân biệt tác giả, giữ thêm lớp cooldown/spam theo khách khi có `from_id`, khoá tư vấn theo Page (kiểm tra lại
   cả danh sách intents dưới khoá), kiểm tra đầu ra (`verify_post`), cùng lớp phát hiện URL và prompt-injection bổ sung.
@@ -43,10 +43,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
 DEFAULT_RULES_PATH = os.path.join(DATA, "auto_reply_rules.json")
 
-VALID_INTENTS = ("price", "size", "color")
+VALID_INTENTS = ("price", "size", "color", "size_advice")
 _VALID_INTENT_SET = frozenset(VALID_INTENTS)
-_INTENT_ORDER = {"price": 0, "size": 1, "color": 2}
-_INTENT_LABELS = {"price": "giá", "size": "size", "color": "màu"}
+_INTENT_ORDER = {"price": 0, "size": 1, "color": 2, "size_advice": 3}
+_INTENT_LABELS = {"price": "giá", "size": "size", "color": "màu", "size_advice": "tư vấn size"}
+
+MEASUREMENT_HEIGHT_MIN_CM = 130
+MEASUREMENT_HEIGHT_MAX_CM = 200
+MEASUREMENT_WEIGHT_MIN_KG = 30
+MEASUREMENT_WEIGHT_MAX_KG = 120
+SIZE_ADVICE_STATE_TTL_HOURS = 24
 
 DEFAULT_MAX_CHARS = 300
 DEFAULT_MAX_ALLOW_CHARS = 80
@@ -175,6 +181,7 @@ _VI_LOWER_LETTERS = (
 _ALLOWED_LETTER_DIGIT_SET = frozenset(_VI_LOWER_LETTERS + "0123456789")
 _ALLOWED_CASE_LETTER_DIGIT_SET = frozenset(_VI_LOWER_LETTERS + _VI_LOWER_LETTERS.upper() + "0123456789")
 _ALLOWED_BASIC_PUNCT = frozenset(" .,?!-")
+_ALLOWED_BASIC_PUNCT_SLASH = _ALLOWED_BASIC_PUNCT | frozenset("/")
 _TRAILING_PUNCT = frozenset("?!.")
 _NEWLINE_OR_BREAK_CHARS = frozenset("\n\r\v\f\x85\u2028\u2029")
 # Đúng 8 dấu tổ hợp NFD của tiếng Việt (chấp nhận trước NFC, sau NFC phải tổ hợp hoàn toàn thành chữ tiếng Việt)
@@ -191,8 +198,15 @@ _ALLOWED_RAW_PRE_NFC_SET = (
     | _VI_COMBINING_MARKS
     | frozenset(("\ufe0f",))
 )
+_ALLOWED_RAW_PRE_NFC_SET_SLASH = _ALLOWED_RAW_PRE_NFC_SET | frozenset("/")
 
 _INTERNAL_SENTENCE_RE = re.compile(r"[.!?]\s*[" + _VI_LOWER_LETTERS + r"0-9]")
+_DECIMAL_DOT_RE = re.compile(r"(?<=\d)\.(?=\d)")
+
+
+def _mask_decimal_dots(text: str) -> str:
+    """Thay dấu chấm thập phân giữa 2 chữ số (vd '1.6m', '50.5kg') bằng '_' khi kiểm tra tách câu."""
+    return _DECIMAL_DOT_RE.sub("_", text)
 
 # Các từ không bao giờ là tên màu hợp lệ trong nhóm `color_named`
 _INVALID_COLOR_TOKENS_VI = frozenset((
@@ -429,21 +443,23 @@ def _fold_hoi_nga(token: str) -> str:
     return unicodedata.normalize("NFC", nfd.replace("\u0309", "\u0303"))
 
 
-def normalize_text(text: str) -> dict:
+def normalize_text(text: str, *, allow_slash: bool = False) -> dict:
     """Kiểm tra tập ký tự allowlist trực tiếp trên NFC(văn bản gốc) rồi chuẩn hoá chữ thường/khoảng trắng (R2, R4).
 
     KHÔNG dùng NFKC, KHÔNG bỏ ký tự vô hình/Bidi/Unicode Tag và KHÔNG quy đổi homoglyph trước khi kiểm tra
     `charset_ok`, để mọi ký tự giả mạo/điều hướng/vô hình/emoji ngoài danh sách lành tính bị từ chối ngay.
     Chỉ chấp nhận:
     - Chữ cái tiếng Việt NFC (thường/hoa), chữ số ASCII 0-9
-    - Dấu câu cơ bản ` .,?!-`
+    - Dấu câu cơ bản ` .,?!-` (và `/` chỉ khi `allow_slash=True` cho phân tích số đo sau bước chặn URL)
     - Emoji trong danh sách `_BENIGN_TRAILING_EMOJIS` (kèm tối đa 1 `U+FE0F` ngay sau chính emoji đó)
     """
     raw = str(text or "")
     has_newline = any(ch in _NEWLINE_OR_BREAK_CHARS for ch in raw)
     raw_stripped = raw.strip(" ")
+    pre_nfc_allowed = _ALLOWED_RAW_PRE_NFC_SET_SLASH if allow_slash else _ALLOWED_RAW_PRE_NFC_SET
+    punct_allowed = _ALLOWED_BASIC_PUNCT_SLASH if allow_slash else _ALLOWED_BASIC_PUNCT
     # Chặn cả ký tự phân rã đơn nhất chuẩn tắc Unicode (vd Kelvin K U+212A → K khi qua NFC) trước khi gọi NFC
-    if any(ch not in _ALLOWED_RAW_PRE_NFC_SET for ch in raw_stripped):
+    if any(ch not in pre_nfc_allowed for ch in raw_stripped):
         return {
             "raw": raw,
             "raw_stripped": raw_stripped,
@@ -468,7 +484,7 @@ def normalize_text(text: str) -> dict:
             cleaned_chars.append(ch.lower())
             prev_ch = ch
             continue
-        if ch in _ALLOWED_BASIC_PUNCT or ch in _BENIGN_TRAILING_EMOJIS:
+        if ch in punct_allowed or ch in _BENIGN_TRAILING_EMOJIS:
             cleaned_chars.append(ch)
             prev_ch = ch
             continue
@@ -611,9 +627,37 @@ def _normalize_polite_list(items: Iterable[str]) -> list[str]:
     return out
 
 
+def _known_color_lists() -> tuple[list[str], list[str]]:
+    """Dựng danh sách tên màu hợp lệ (có dấu NFC và không dấu ASCII) trực tiếp từ `rules.COLORS`, dài trước ngắn sau."""
+    vi_seen: set[str] = set()
+    vi_list: list[str] = []
+    ascii_seen: set[str] = set()
+    ascii_list: list[str] = []
+    for raw in rules.COLORS:
+        c_vi = re.sub(r"\s+", " ", unicodedata.normalize("NFC", str(raw or "").strip().lower()))
+        if c_vi and c_vi not in vi_seen:
+            vi_seen.add(c_vi)
+            vi_list.append(c_vi)
+        c_ascii = re.sub(r"\s+", " ", _strip_diacritics(c_vi)).strip()
+        if c_ascii and c_ascii not in ascii_seen:
+            ascii_seen.add(c_ascii)
+            ascii_list.append(c_ascii)
+    vi_list.sort(key=len, reverse=True)
+    ascii_list.sort(key=len, reverse=True)
+    return vi_list, ascii_list
+
+
+def _color_alternation_regex(items: Iterable[str]) -> str:
+    parts = [r"\s+".join(re.escape(tok) for tok in item.split()) for item in items if item]
+    return "(?:" + "|".join(parts) + ")"
+
+
 def _compile_rules(raw: dict) -> dict:
     pl = raw.get("polite_leading") if isinstance(raw.get("polite_leading"), dict) else {}
     pt = raw.get("polite_trailing") if isinstance(raw.get("polite_trailing"), dict) else {}
+    known_colors_vi_list, known_colors_ascii_list = _known_color_lists()
+    color_vi_re_str = _color_alternation_regex(known_colors_vi_list)
+    color_ascii_re_str = _color_alternation_regex(known_colors_ascii_list)
 
     compiled_allow: list[dict] = []
     for entry in raw.get("allow") or ():
@@ -626,6 +670,10 @@ def _compile_rules(raw: dict) -> dict:
         ascii_pat = str(entry.get("ascii") or "").strip()
         if not vi_pat and not ascii_pat:
             continue
+        if "__COLOR_VI__" in vi_pat:
+            vi_pat = vi_pat.replace("__COLOR_VI__", color_vi_re_str)
+        if "__COLOR_ASCII__" in ascii_pat:
+            ascii_pat = ascii_pat.replace("__COLOR_ASCII__", color_ascii_re_str)
         compiled_allow.append({
             "id": str(entry.get("id") or "allow"),
             "intents": tuple(intents),
@@ -648,6 +696,8 @@ def _compile_rules(raw: dict) -> dict:
         "polite_leading_ascii": _normalize_polite_list(pl.get("ascii") or ()),
         "polite_trailing_vi": _normalize_polite_list(pt.get("vi") or ()),
         "polite_trailing_ascii": _normalize_polite_list(pt.get("ascii") or ()),
+        "known_colors_vi": frozenset(known_colors_vi_list),
+        "known_colors_ascii": frozenset(known_colors_ascii_list),
         "allow": compiled_allow,
     }
 
@@ -837,12 +887,33 @@ def _strip_polite_trailing(text: str, compiled: dict) -> str:
     return core
 
 
-def _is_invalid_color_capture(color_text: str, *, is_ascii_only: bool) -> bool:
-    tokens = color_text.split()
+def _is_invalid_color_capture(
+    color_text: str,
+    *,
+    is_ascii_only: bool,
+    has_item_ref: bool = False,
+    known_colors_vi: Optional[frozenset[str]] = None,
+    known_colors_ascii: Optional[frozenset[str]] = None,
+) -> bool:
+    norm = re.sub(r"\s+", " ", unicodedata.normalize("NFC", str(color_text or "").strip().lower()))
+    tokens = norm.split()
     if not tokens or len(tokens) > 4:
         return True
-    invalid_set = _INVALID_COLOR_TOKENS_ASCII if is_ascii_only else _INVALID_COLOR_TOKENS_VI
-    return any(tok in invalid_set for tok in tokens)
+    if known_colors_vi is None or known_colors_ascii is None:
+        vi_list, ascii_list = _known_color_lists()
+        known_colors_vi = frozenset(vi_list)
+        known_colors_ascii = frozenset(ascii_list)
+    if is_ascii_only:
+        if norm not in known_colors_ascii:
+            return True
+        # R3: không dấu 'co mau do khong' / 'mau do con khong' dễ nhầm với 'mẫu đó';
+        # chỉ nhận 'do' khi đã có cụm chỉ định sản phẩm hiện tại (vd 'ma nay co mau do khong').
+        if norm == "do" and not has_item_ref:
+            return True
+        return any(tok in _INVALID_COLOR_TOKENS_ASCII and tok != "do" for tok in tokens)
+    if norm not in known_colors_vi:
+        return True
+    return any(tok in _INVALID_COLOR_TOKENS_VI for tok in tokens)
 
 
 # ---------------- Quantity ("lấy 2 bộ giá bao nhiêu", "size M còn 2 cái không") ----------------
@@ -863,6 +934,8 @@ _QTY_PREFIX_RES = [
     re.compile(r"^%s%s\s+%s\s+%s%s\s+" % (_QTY_BUYER, _QTY_VERB, _QTY_NUM, _QTY_UNIT, _QTY_LINK)),
     re.compile(r"^%s\s+%s%s\s+" % (_QTY_NUM, _QTY_UNIT, _QTY_LINK)),
 ]
+# "giá 2 cái bao nhiêu" -> "giá bao nhiêu"
+_QTY_MID_PRICE_RE = re.compile(r"^(?P<g>giá|gía|gia)\s+%s\s+%s(?:\s+(?:thì|thi|là|la))?\s+" % (_QTY_NUM, _QTY_UNIT))
 _QTY_SUFFIX_RE = re.compile(r"\s+(?:cho|lấy|lay|mua|đặt|dat)\s+%s\s+%s$" % (_QTY_NUM, _QTY_UNIT))
 # "size M còn 2 cái không" -> "size M còn không"
 _QTY_AVAIL_RE = re.compile(r"\s+(?P<v>còn|con|có|co)\s+%s\s+%s\s+(?P<neg>không|ko|k)$" % (_QTY_NUM, _QTY_UNIT))
@@ -893,6 +966,11 @@ def extract_quantity(core: str) -> tuple[Optional[int], Optional[str], str]:
             q = _qty_value(m.group("q"))
             if q:
                 return q, _unit_label(m.group("u")), core[m.end():].strip()
+    m = _QTY_MID_PRICE_RE.match(core)
+    if m:
+        q = _qty_value(m.group("q"))
+        if q:
+            return q, _unit_label(m.group("u")), ("%s %s" % (m.group("g"), core[m.end():])).strip()
     m = _QTY_SUFFIX_RE.search(core)
     if m:
         q = _qty_value(m.group("q"))
@@ -927,6 +1005,748 @@ def available_quantity(stock: dict, *, asked_size: Optional[str], asked_color: O
     return total
 
 
+# ---------------- Size advice: Measurement parsing, deterministic recommendation, templates ----------------
+
+_VI_WORD_CLASS = _VI_LOWER_LETTERS + "0123456789"
+_WB_L = r"(?<![" + _VI_WORD_CLASS + r"])"
+_WB_R = r"(?![" + _VI_WORD_CLASS + r"])"
+
+_WEIGHT_UNIT_RE = re.compile(
+    _WB_L
+    + r"(?:(?:cân\s+nặng|can\s+nang|nặng|nang)\s+)?"
+    + r"(?P<w>\d{1,4}(?:[.,]\d)?)\s*(?:kg|ký|kí|ki|ky|cân|can)"
+    + _WB_R
+)
+_HEIGHT_DEC_METER_RE = re.compile(
+    _WB_L
+    + r"(?:(?:chiều\s+cao|chieu\s+cao|cao)\s+)?"
+    + r"(?P<m>\d{1,2})[.,](?P<frac>\d{1,2})\s*(?:m|mét|met)"
+    + _WB_R
+)
+_HEIGHT_METER_SHORT_RE = re.compile(
+    _WB_L
+    + r"(?:(?:chiều\s+cao|chieu\s+cao|cao)\s+)?"
+    + r"(?P<m>\d{1,2})\s*(?:m|mét|met)"
+    + r"(?:\s*(?P<cm>\d{1,2})(?!\s*(?:kg|ký|kí|ki|ky|cân|can|cm|mm)))?"
+    + r"(?!\s*cm)"
+    + _WB_R
+)
+_HEIGHT_CM_RE = re.compile(
+    _WB_L
+    + r"(?:(?:chiều\s+cao|chieu\s+cao|cao)\s+)?"
+    + r"(?P<cm>\d{1,4}(?:[.,]\d)?)\s*cm"
+    + _WB_R
+)
+_HEIGHT_LABELLED_RE = re.compile(
+    _WB_L
+    + r"(?:chiều\s+cao|chieu\s+cao|cao)\s+(?P<val>\d{1,4}(?:[.,]\d{1,2})?)"
+    + _WB_R
+)
+_WEIGHT_LABELLED_RE = re.compile(
+    _WB_L
+    + r"(?:cân\s+nặng|can\s+nang|nặng|nang)\s+(?P<w>\d{1,4}(?:[.,]\d)?)"
+    + _WB_R
+)
+_BARE_NUM_RE = re.compile(_WB_L + r"(?P<num>\d{1,4}(?:[.,]\d{1,2})?)" + _WB_R)
+
+_ITEM_REF_PREFIX_VI_RE = re.compile(r"^(?:(?:mã|mẫu|bộ|váy|đầm|cái|set|chiếc)\s+này)(?:\s+|,\s*)")
+_ITEM_REF_PREFIX_ASCII_RE = re.compile(r"^(?:(?:ma|mau|bo|vay|dam|cai|set|chiec)\s+nay)(?:\s+|,\s*)")
+_THI_PREFIX_RE = re.compile(r"^(?:thì|thi)\s+")
+
+_FOLLOWUP_POLITE_PHRASES_VI = tuple(sorted((
+    "cảm ơn shop nhiều",
+    "cảm ơn shop",
+    "cảm ơn ạ",
+    "cảm ơn",
+    "tư vấn giúp em",
+    "tư vấn giúp e",
+    "tư vấn giúp mình",
+    "tư vấn giúp chị",
+    "tư vấn giúp",
+    "tư vấn size",
+    "tư vấn",
+    "giúp em ạ",
+    "giúp e ạ",
+    "giúp mình ạ",
+    "giúp chị ạ",
+    "giúp em",
+    "giúp e",
+    "giúp mình",
+    "giúp chị",
+    "dạ shop ơi",
+    "dạ ad ơi",
+    "dạ shop",
+    "dạ ad",
+    "chào shop",
+    "shop ơi",
+    "ad ơi",
+    "chị ơi",
+    "em ơi",
+    "bạn ơi",
+    "nhé ạ",
+    "nha ạ",
+    "với ạ",
+    "em với",
+    "e với",
+    "mình với",
+), key=len, reverse=True))
+
+_FOLLOWUP_POLITE_PHRASES_ASCII = tuple(sorted((
+    "cam on shop nhieu",
+    "cam on shop",
+    "cam on a",
+    "cam on",
+    "tu van giup em",
+    "tu van giup e",
+    "tu van giup minh",
+    "tu van giup chi",
+    "tu van giup",
+    "tu van size",
+    "tu van",
+    "giup em a",
+    "giup e a",
+    "giup minh a",
+    "giup chi a",
+    "giup em",
+    "giup e",
+    "giup minh",
+    "giup chi",
+    "da shop oi",
+    "da ad oi",
+    "da shop",
+    "da ad",
+    "chao shop",
+    "shop oi",
+    "ad oi",
+    "chi oi",
+    "em oi",
+    "ban oi",
+    "nhe a",
+    "nha a",
+    "voi a",
+    "em voi",
+    "e voi",
+    "minh voi",
+), key=len, reverse=True))
+
+_FOLLOWUP_POLITE_TOKENS_VI = frozenset((
+    "dạ", "vâng", "em", "e", "chị", "c", "mình", "mk", "tớ", "tôi",
+    "shop", "ad", "ạ", "nhé", "nha", "ơi", "với", "và", "là", "nhờ", "giúp",
+))
+_FOLLOWUP_POLITE_TOKENS_ASCII = frozenset((
+    "da", "vang", "em", "e", "chi", "c", "minh", "mk", "to", "toi",
+    "shop", "ad", "a", "nhe", "nha", "oi", "voi", "va", "la", "nho", "giup",
+))
+
+
+def _clean_measure_num(val: float) -> int | float:
+    f = float(val)
+    return int(round(f)) if abs(f - round(f)) < 1e-9 else round(f, 1)
+
+
+def _fmt_height(height_cm: float) -> str:
+    n = _clean_measure_num(height_cm)
+    if isinstance(n, int) and 100 <= n < 300:
+        return "%dm%02d" % (n // 100, n % 100)
+    return "%gcm" % n
+
+
+def _fmt_weight(weight_kg: float) -> str:
+    n = _clean_measure_num(weight_kg)
+    if isinstance(n, int):
+        return "%dkg" % n
+    return ("%gkg" % n).replace(".", ",")
+
+
+def _fmt_measurement_summary(height_cm: Optional[float], weight_kg: Optional[float]) -> str:
+    parts: list[str] = []
+    if height_cm is not None:
+        parts.append("chiều cao %s" % _fmt_height(height_cm))
+    if weight_kg is not None:
+        parts.append("cân nặng %s" % _fmt_weight(weight_kg))
+    return ", ".join(parts)
+
+
+def _fmt_chart_row(row: dict) -> str:
+    w = row["weightKg"]
+    h = row.get("heightCm")
+    if h is not None:
+        return "%s (%g–%gkg, %g–%gcm)" % (row["size"], w[0], w[1], h[0], h[1])
+    return "%s (%g–%gkg)" % (row["size"], w[0], w[1])
+
+
+def _mask_span_str(s: str, start: int, end: int) -> str:
+    return s[:start] + (" " * (end - start)) + s[end:]
+
+
+def parse_measurements(
+    text: str,
+    *,
+    allow_bare_single: bool = True,
+    rules_cfg: Optional[dict] = None,
+) -> dict:
+    """Phân tích chiều cao (130–200cm) và cân nặng (30–120kg) thuần luật; từ chối mọi nội dung lạ hoặc vô lý."""
+    compiled = _get_compiled_rules(rules_cfg)
+    max_allow_chars = compiled["max_allow_chars"]
+
+    def _fail(reason: str, *, implausible: bool = False, ambiguous: bool = False, has_extra_text: bool = False) -> dict:
+        return {
+            "ok": False,
+            "height_cm": None,
+            "weight_kg": None,
+            "implausible": implausible,
+            "ambiguous": ambiguous,
+            "has_extra_text": has_extra_text,
+            "reason": reason,
+        }
+
+    norm = normalize_text(text, allow_slash=True)
+    if not norm["raw"].strip():
+        return _fail("Phản hồi không có nội dung số đo — cần nhân viên xử lý")
+    if norm["has_newline"]:
+        return _fail("Phản hồi có nhiều dòng — cần nhân viên xử lý", has_extra_text=True)
+    if not norm["charset_ok"]:
+        return _fail("Phản hồi chứa ký tự hoặc biểu tượng ngoài phạm vi cho phép — cần nhân viên xử lý", has_extra_text=True)
+    if len(norm["raw_stripped"]) > max_allow_chars or len(norm["normalized"]) > max_allow_chars:
+        return _fail("Phản hồi dài hơn %d ký tự — cần nhân viên xử lý" % max_allow_chars, has_extra_text=True)
+    if _INTERNAL_SENTENCE_RE.search(_mask_decimal_dots(norm["normalized"])):
+        return _fail("Phản hồi có nhiều câu — cần nhân viên xử lý", has_extra_text=True)
+
+    core = _strip_trailing_punct_emoji(norm["normalized"], max_count=2)
+    if not core:
+        return _fail("Phản hồi không có nội dung số đo — cần nhân viên xử lý")
+    if any(ch in _BENIGN_TRAILING_EMOJIS or ch in _TRAILING_PUNCT for ch in _mask_decimal_dots(core)):
+        return _fail("Phản hồi chứa ký tự kết câu không hợp lệ — cần nhân viên xử lý", has_extra_text=True)
+
+    is_ascii_only = (core == _strip_diacritics(core))
+    work = core
+    heights: list[float] = []
+    weights: list[float] = []
+    explicit_count = 0
+    bare_count = 0
+
+    # 1. Cân nặng có đơn vị rõ ràng (ưu tiên trước để "2m 50 kg" không ăn nhầm "50" vào chiều cao)
+    for m in list(_WEIGHT_UNIT_RE.finditer(work)):
+        w_val = float(m.group("w").replace(",", "."))
+        weights.append(_clean_measure_num(w_val))
+        explicit_count += 1
+        work = _mask_span_str(work, m.start(), m.end())
+
+    # 2. Chiều cao mét thập phân ("1.6m", "1,58m", "cao 1.60 mét")
+    for m in list(_HEIGHT_DEC_METER_RE.finditer(work)):
+        m_int = int(m.group("m"))
+        frac = m.group("frac")
+        h_val = m_int * 100 + (int(frac) * 10 if len(frac) == 1 else int(frac))
+        heights.append(_clean_measure_num(h_val))
+        explicit_count += 1
+        work = _mask_span_str(work, m.start(), m.end())
+
+    # 3. Chiều cao dạng viết gọn ("1m6", "1m60", "1m58", "cao 1 mét 6", "2m")
+    for m in list(_HEIGHT_METER_SHORT_RE.finditer(work)):
+        m_int = int(m.group("m"))
+        cm_raw = m.group("cm")
+        if cm_raw is None:
+            h_val = m_int * 100
+        elif len(cm_raw) == 1:
+            h_val = m_int * 100 + int(cm_raw) * 10
+        else:
+            h_val = m_int * 100 + int(cm_raw)
+        heights.append(_clean_measure_num(h_val))
+        explicit_count += 1
+        work = _mask_span_str(work, m.start(), m.end())
+
+    # 4. Chiều cao có đơn vị cm ("160cm", "cao 160 cm", "250cm")
+    for m in list(_HEIGHT_CM_RE.finditer(work)):
+        cm_val = float(m.group("cm").replace(",", "."))
+        heights.append(_clean_measure_num(cm_val))
+        explicit_count += 1
+        work = _mask_span_str(work, m.start(), m.end())
+
+    # 5. Chiều cao có nhãn "cao 160", "chiều cao 158", "cao 1.6"
+    for m in list(_HEIGHT_LABELLED_RE.finditer(work)):
+        raw_v = m.group("val")
+        f_val = float(raw_v.replace(",", "."))
+        if ("." in raw_v or "," in raw_v) and f_val < 3.0:
+            h_val = f_val * 100.0
+        else:
+            h_val = f_val
+        heights.append(_clean_measure_num(h_val))
+        explicit_count += 1
+        work = _mask_span_str(work, m.start(), m.end())
+
+    # 6. Cân nặng có nhãn "nặng 50", "cân nặng 52"
+    for m in list(_WEIGHT_LABELLED_RE.finditer(work)):
+        w_val = float(m.group("w").replace(",", "."))
+        weights.append(_clean_measure_num(w_val))
+        explicit_count += 1
+        work = _mask_span_str(work, m.start(), m.end())
+
+    # 7. Số trần không kèm đơn vị ("160 50", "160", "50", "1m60 50")
+    for m in list(_BARE_NUM_RE.finditer(work)):
+        raw_num = m.group("num")
+        val = float(raw_num.replace(",", "."))
+        clean_v = _clean_measure_num(val)
+        bare_count += 1
+        work = _mask_span_str(work, m.start(), m.end())
+        if MEASUREMENT_HEIGHT_MIN_CM <= val <= MEASUREMENT_HEIGHT_MAX_CM:
+            heights.append(clean_v)
+        elif MEASUREMENT_WEIGHT_MIN_KG <= val <= MEASUREMENT_WEIGHT_MAX_KG:
+            weights.append(clean_v)
+        else:
+            return _fail(
+                "Số đo %s nằm ngoài khoảng hợp lệ (cao %d–%dcm, nặng %d–%dkg) — cần nhân viên tư vấn"
+                % (raw_num, MEASUREMENT_HEIGHT_MIN_CM, MEASUREMENT_HEIGHT_MAX_CM, MEASUREMENT_WEIGHT_MIN_KG, MEASUREMENT_WEIGHT_MAX_KG),
+                implausible=True,
+            )
+
+    # Kiểm tra phần chữ còn lại: CHỈ cho phép dấu phân tách (,, -, /) và từ lịch sự / xưng hô cho phép
+    residual = re.sub(r"[,/\-]+", " ", work)
+    residual = re.sub(r"\s+", " ", residual).strip()
+    if residual:
+        phrases = _FOLLOWUP_POLITE_PHRASES_ASCII if is_ascii_only else _FOLLOWUP_POLITE_PHRASES_VI
+        for ph in phrases:
+            residual = re.sub(_WB_L + re.escape(ph) + _WB_R, " ", residual)
+        residual = re.sub(r"\s+", " ", residual).strip()
+
+    if residual:
+        allowed_tokens = _FOLLOWUP_POLITE_TOKENS_ASCII if is_ascii_only else _FOLLOWUP_POLITE_TOKENS_VI
+        leftover = [tok for tok in residual.split() if tok not in allowed_tokens]
+        if leftover:
+            return _fail(
+                "Nội dung có thêm câu hỏi hoặc thông tin ngoài số đo — cần nhân viên xử lý",
+                has_extra_text=True,
+            )
+
+    if len(heights) > 1 or len(weights) > 1:
+        return _fail(
+            "Số đo có nhiều mức chiều cao hoặc cân nặng không rõ ràng — cần nhân viên tư vấn",
+            ambiguous=True,
+        )
+
+    if not heights and not weights:
+        return _fail("Không tìm thấy chiều cao hoặc cân nặng — cần nhân viên tư vấn")
+
+    if not allow_bare_single and explicit_count == 0 and bare_count == 1:
+        return _fail(
+            "Số đo chưa rõ đơn vị (kg/cm) — cần nhân viên tư vấn",
+            ambiguous=True,
+        )
+
+    h_out: Optional[float] = heights[0] if heights else None
+    w_out: Optional[float] = weights[0] if weights else None
+
+    if h_out is not None and not (MEASUREMENT_HEIGHT_MIN_CM <= h_out <= MEASUREMENT_HEIGHT_MAX_CM):
+        return _fail(
+            "Chiều cao %gcm nằm ngoài khoảng hợp lệ (%d–%dcm) — cần nhân viên tư vấn"
+            % (h_out, MEASUREMENT_HEIGHT_MIN_CM, MEASUREMENT_HEIGHT_MAX_CM),
+            implausible=True,
+        )
+    if w_out is not None and not (MEASUREMENT_WEIGHT_MIN_KG <= w_out <= MEASUREMENT_WEIGHT_MAX_KG):
+        return _fail(
+            "Cân nặng %gkg nằm ngoài khoảng hợp lệ (%d–%dkg) — cần nhân viên tư vấn"
+            % (w_out, MEASUREMENT_WEIGHT_MIN_KG, MEASUREMENT_WEIGHT_MAX_KG),
+            implausible=True,
+        )
+
+    return {
+        "ok": True,
+        "height_cm": h_out,
+        "weight_kg": w_out,
+        "implausible": False,
+        "ambiguous": False,
+        "has_extra_text": False,
+        "reason": "",
+    }
+
+
+def _match_size_advice_pattern(candidate: str, compiled: dict, *, is_ascii_only: bool) -> Optional[dict]:
+    if not candidate:
+        return None
+    for pat in compiled["allow"]:
+        if pat["intents"] != ("size_advice",):
+            continue
+        m = pat["vi_re"].fullmatch(candidate) if pat["vi_re"] is not None else None
+        if m is None and is_ascii_only and pat["ascii_re"] is not None:
+            m = pat["ascii_re"].fullmatch(candidate)
+        if m is not None:
+            return pat
+    return None
+
+
+def _match_size_advice_with_measurements(
+    core: str,
+    compiled: dict,
+    *,
+    is_ascii_only: bool,
+    rules_cfg: Optional[dict] = None,
+) -> Optional[dict]:
+    """Tách câu hỏi tư vấn size có kèm số đo trong cùng 1 câu (vd 'cao 1m60 nặng 50kg mặc size nào')."""
+    body = core
+    if is_ascii_only:
+        body = _ITEM_REF_PREFIX_ASCII_RE.sub("", body).strip()
+    else:
+        body = _ITEM_REF_PREFIX_VI_RE.sub("", body).strip()
+    if not body:
+        return None
+
+    split_positions = [m.start() for m in re.finditer(r"[\s,]+", body)]
+    if not split_positions:
+        return None
+
+    # Chiến lược A: <số đo> <mẫu hỏi tư vấn size> (ưu tiên vế phải dài nhất khớp allowlist size_advice)
+    for pos in split_positions:
+        left = body[:pos].rstrip(" ,")
+        right = body[pos:].lstrip(" ,")
+        if not left or not right:
+            continue
+        right_clean = _THI_PREFIX_RE.sub("", right).strip()
+        pat = _match_size_advice_pattern(right_clean, compiled, is_ascii_only=is_ascii_only)
+        if pat is None:
+            continue
+        meas = parse_measurements(left, allow_bare_single=False, rules_cfg=rules_cfg)
+        if meas["ok"]:
+            return {
+                "ok": True,
+                "intents": {"size_advice"},
+                "source": "rule",
+                "reason": "",
+                "pattern_id": pat["id"] + "+measurements",
+                "asked_size": None,
+                "asked_color": None,
+                "asked_qty": None,
+                "asked_unit": None,
+                "height_cm": meas["height_cm"],
+                "weight_kg": meas["weight_kg"],
+            }
+        if meas["implausible"] or meas["ambiguous"]:
+            return {
+                "ok": False,
+                "intents": {"size_advice"},
+                "source": "rule",
+                "reason": meas["reason"],
+                "pattern_id": None,
+                "asked_size": None,
+                "asked_color": None,
+                "asked_qty": None,
+                "asked_unit": None,
+                "height_cm": None,
+                "weight_kg": None,
+            }
+
+    # Chiến lược B: <mẫu hỏi tư vấn size>[,] <số đo> (vd "tư vấn size giúp em, cao 1m60 nặng 50kg")
+    for pos in reversed(split_positions):
+        left = body[:pos].rstrip(" ,")
+        right = body[pos:].lstrip(" ,")
+        if not left or not right:
+            continue
+        left_clean = _strip_polite_trailing(left, compiled)
+        pat = _match_size_advice_pattern(left_clean, compiled, is_ascii_only=is_ascii_only)
+        if pat is None:
+            continue
+        meas = parse_measurements(right, allow_bare_single=False, rules_cfg=rules_cfg)
+        if meas["ok"]:
+            return {
+                "ok": True,
+                "intents": {"size_advice"},
+                "source": "rule",
+                "reason": "",
+                "pattern_id": pat["id"] + "+measurements",
+                "asked_size": None,
+                "asked_color": None,
+                "asked_qty": None,
+                "asked_unit": None,
+                "height_cm": meas["height_cm"],
+                "weight_kg": meas["weight_kg"],
+            }
+        if meas["implausible"] or meas["ambiguous"]:
+            return {
+                "ok": False,
+                "intents": {"size_advice"},
+                "source": "rule",
+                "reason": meas["reason"],
+                "pattern_id": None,
+                "asked_size": None,
+                "asked_color": None,
+                "asked_qty": None,
+                "asked_unit": None,
+                "height_cm": None,
+                "weight_kg": None,
+            }
+
+    return None
+
+
+def recommend_size(
+    *,
+    weight_kg: float,
+    height_cm: Optional[float],
+    chart: dict,
+    in_stock_sizes: Iterable[str],
+    product_code: str,
+) -> dict:
+    """Đề xuất size xác định từ bảng size và danh sách size đang còn hàng của sản phẩm.
+
+    Luật:
+    - Freesize (Free/Freesize/FS): mặc định vừa 40–55 kg (hoặc dùng dòng Freesize nếu bảng có cấu hình).
+    - Theo cân nặng trước; nếu có chiều cao và lệch hơn 1 cỡ → ưu tiên cỡ lớn hơn và nói rõ.
+    - Nếu trùng 2 cỡ liền kề (overlap) và cả 2 còn hàng → trả cả 2 cỡ; chỉ còn 1 cỡ trong 2 → chọn cỡ còn hàng.
+    - Ngoài bảng size, không rõ ràng hoặc cỡ phù hợp đã hết hàng → `ok=False` kèm lý do (Cần bạn).
+    """
+    stock_list = [str(s).strip() for s in in_stock_sizes if str(s).strip()]
+    if not stock_list:
+        return {
+            "ok": False,
+            "sizes": [],
+            "rows_used": [],
+            "overlap": False,
+            "conflict_prefer_larger": False,
+            "conflict_detail": "",
+            "is_freesize": False,
+            "reason": "Sản phẩm mã %s hiện chưa có thông tin size còn hàng — cần nhân viên tư vấn" % product_code,
+        }
+
+    instock_map = {_canonical_size(s): s for s in stock_list}
+    raw_rows = list(chart.get("rows") or ())
+
+    # Trường hợp sản phẩm Freesize
+    if set(instock_map.keys()) == {"Freesize"}:
+        fs_row = next((r for r in raw_rows if _canonical_size(r.get("size") or "") == "Freesize"), None)
+        if fs_row is not None:
+            w_lo, w_hi = fs_row["weightKg"]
+            h_rng = fs_row.get("heightCm")
+            used_row = fs_row
+        else:
+            w_lo, w_hi = writing_style.FREESIZE_WEIGHT_RANGE
+            h_rng = None
+            used_row = {"size": "Freesize", "weightKg": [w_lo, w_hi], "heightCm": None}
+
+        if not (w_lo <= weight_kg <= w_hi):
+            return {
+                "ok": False,
+                "sizes": [],
+                "rows_used": [used_row],
+                "overlap": False,
+                "conflict_prefer_larger": False,
+                "conflict_detail": "",
+                "is_freesize": True,
+                "reason": "Cân nặng %s nằm ngoài khoảng Freesize (%g–%gkg) — cần nhân viên tư vấn"
+                % (_fmt_weight(weight_kg), w_lo, w_hi),
+            }
+        if height_cm is not None and h_rng is not None and not (h_rng[0] <= height_cm <= h_rng[1]):
+            return {
+                "ok": False,
+                "sizes": [],
+                "rows_used": [used_row],
+                "overlap": False,
+                "conflict_prefer_larger": False,
+                "conflict_detail": "",
+                "is_freesize": True,
+                "reason": "Chiều cao %s nằm ngoài khoảng Freesize (%g–%gcm) — cần nhân viên tư vấn"
+                % (_fmt_height(height_cm), h_rng[0], h_rng[1]),
+            }
+        return {
+            "ok": True,
+            "sizes": [instock_map["Freesize"]],
+            "rows_used": [used_row],
+            "overlap": False,
+            "conflict_prefer_larger": False,
+            "conflict_detail": "",
+            "is_freesize": True,
+            "reason": "",
+        }
+
+    # Sản phẩm theo size thường: sắp xếp dòng bảng size từ nhỏ đến lớn theo khoảng cân nặng
+    rows = sorted(
+        [r for r in raw_rows if _canonical_size(r.get("size") or "") != "Freesize"],
+        key=lambda r: (float(r["weightKg"][0]), float(r["weightKg"][1])),
+    )
+    if not rows:
+        return {
+            "ok": False,
+            "sizes": [],
+            "rows_used": [],
+            "overlap": False,
+            "conflict_prefer_larger": False,
+            "conflict_detail": "",
+            "is_freesize": False,
+            "reason": "Bảng size chưa có dòng phù hợp — cần nhân viên tư vấn",
+        }
+
+    w_idxs = [i for i, r in enumerate(rows) if r["weightKg"][0] <= weight_kg <= r["weightKg"][1]]
+    if not w_idxs:
+        return {
+            "ok": False,
+            "sizes": [],
+            "rows_used": [],
+            "overlap": False,
+            "conflict_prefer_larger": False,
+            "conflict_detail": "",
+            "is_freesize": False,
+            "reason": "Cân nặng %s nằm ngoài bảng size của shop — cần nhân viên tư vấn" % _fmt_weight(weight_kg),
+        }
+    if len(w_idxs) > 2 or (len(w_idxs) == 2 and (w_idxs[1] - w_idxs[0]) != 1):
+        return {
+            "ok": False,
+            "sizes": [],
+            "rows_used": [rows[i] for i in w_idxs],
+            "overlap": False,
+            "conflict_prefer_larger": False,
+            "conflict_detail": "",
+            "is_freesize": False,
+            "reason": "Bảng size có nhiều khoảng cân nặng chồng chéo cho %s — cần nhân viên tư vấn" % _fmt_weight(weight_kg),
+        }
+
+    conflict_prefer_larger = False
+    conflict_detail = ""
+    has_any_height = any(r.get("heightCm") is not None for r in rows)
+
+    if height_cm is not None and has_any_height:
+        h_idxs = [
+            i for i, r in enumerate(rows)
+            if r.get("heightCm") is not None and r["heightCm"][0] <= height_cm <= r["heightCm"][1]
+        ]
+        if not h_idxs:
+            return {
+                "ok": False,
+                "sizes": [],
+                "rows_used": [rows[i] for i in w_idxs],
+                "overlap": False,
+                "conflict_prefer_larger": False,
+                "conflict_detail": "",
+                "is_freesize": False,
+                "reason": "Chiều cao %s nằm ngoài bảng size của shop — cần nhân viên tư vấn" % _fmt_height(height_cm),
+            }
+        both = [i for i in w_idxs if i in h_idxs]
+        if both:
+            chosen_idxs = both
+        else:
+            best_pair = min(
+                ((abs(wi - hi), -max(wi, hi), wi, hi) for wi in w_idxs for hi in h_idxs)
+            )
+            min_dist, _, wi, hi = best_pair
+            if min_dist > 1:
+                larger_idx = max(wi, hi)
+                chosen_idxs = [larger_idx]
+                conflict_prefer_larger = True
+                conflict_detail = "%s theo cân nặng, %s theo chiều cao → ưu tiên cỡ lớn hơn %s" % (
+                    rows[wi]["size"],
+                    rows[hi]["size"],
+                    rows[larger_idx]["size"],
+                )
+            else:
+                chosen_idxs = w_idxs
+    else:
+        chosen_idxs = w_idxs
+
+    matched_rows = [rows[i] for i in chosen_idxs]
+    available_pairs: list[tuple[str, dict]] = []
+    for r in matched_rows:
+        canon = _canonical_size(r["size"])
+        if canon in instock_map:
+            available_pairs.append((instock_map[canon], r))
+
+    if not available_pairs:
+        wanted = "/".join(r["size"] for r in matched_rows)
+        return {
+            "ok": False,
+            "sizes": [],
+            "rows_used": matched_rows,
+            "overlap": False,
+            "conflict_prefer_larger": conflict_prefer_larger,
+            "conflict_detail": conflict_detail,
+            "is_freesize": False,
+            "reason": "Size %s phù hợp với số đo nhưng mã %s hiện hết hàng hoặc không có size này — cần nhân viên tư vấn"
+            % (wanted, product_code),
+        }
+
+    chosen_sizes = [sz for sz, _ in available_pairs]
+    used_rows = [r for _, r in available_pairs]
+    return {
+        "ok": True,
+        "sizes": chosen_sizes,
+        "rows_used": used_rows,
+        "overlap": len(chosen_sizes) == 2,
+        "conflict_prefer_larger": conflict_prefer_larger,
+        "conflict_detail": conflict_detail,
+        "is_freesize": False,
+        "reason": "",
+    }
+
+
+def render_size_advice_ask(*, style: Optional[dict] = None) -> str:
+    """Mẫu câu hỏi xin chiều cao và cân nặng khi khách hỏi tư vấn size (KHÔNG gọi LLM)."""
+    st = style or {}
+    xung_ho = str(st.get("xungHo") or "").strip() or "bạn"
+    self_ref = str(st.get("selfReference") or "").strip() or "shop"
+    try:
+        max_emoji = max(0, int(st.get("maxEmoji", 1)))
+    except (TypeError, ValueError):
+        max_emoji = 0
+
+    sentence = "Dạ %s cho %s xin chiều cao và cân nặng để tư vấn size chuẩn ạ." % (xung_ho, self_ref)
+    if max_emoji >= 1:
+        sentence = sentence + " 🌸"
+    return sentence
+
+
+def render_size_advice_recommendation(
+    product_code: str,
+    rec: dict,
+    *,
+    weight_kg: float,
+    height_cm: Optional[float] = None,
+    style: Optional[dict] = None,
+) -> str:
+    """Mẫu câu tư vấn size xác định từ bảng size và tồn kho (KHÔNG gọi LLM, không bình luận vóc dáng, không hứa hẹn)."""
+    st = style or {}
+    xung_ho = str(st.get("xungHo") or "").strip() or "bạn"
+    self_ref = str(st.get("selfReference") or "").strip() or "shop"
+    try:
+        max_emoji = max(0, int(st.get("maxEmoji", 1)))
+    except (TypeError, ValueError):
+        max_emoji = 0
+
+    code = str(product_code).strip()
+    if height_cm is not None:
+        meas_phrase = "với chiều cao %s và cân nặng %s" % (_fmt_height(height_cm), _fmt_weight(weight_kg))
+    else:
+        meas_phrase = "với cân nặng %s" % _fmt_weight(weight_kg)
+
+    sizes = list(rec.get("sizes") or ())
+    if not sizes:
+        raise ValueError("Cần ít nhất một size còn hàng để ghép câu tư vấn size")
+
+    if rec.get("is_freesize") or sizes == ["Freesize"]:
+        sentence = "Dạ %s, %s mặc Freesize là vừa ạ. Mẫu %s hiện còn Freesize." % (meas_phrase, xung_ho, code)
+    elif len(sizes) == 2:
+        s1, s2 = sizes[0], sizes[1]
+        sentence = (
+            "Dạ %s, %s có thể mặc size %s hoặc %s tuỳ %s thích mặc ôm hay thoải mái ạ. "
+            "Mẫu %s hiện còn size %s và %s."
+            % (meas_phrase, xung_ho, s1, s2, xung_ho, code, s1, s2)
+        )
+    elif rec.get("conflict_prefer_larger"):
+        sz = sizes[0]
+        sentence = (
+            "Dạ %s, chiều cao và cân nặng lệch hơn 1 cỡ nên %s ưu tiên chọn size lớn hơn là size %s "
+            "để %s mặc thoải mái ạ. Mẫu %s hiện còn size %s."
+            % (meas_phrase, self_ref, sz, xung_ho, code, sz)
+        )
+    else:
+        sz = sizes[0]
+        sentence = "Dạ %s, %s mặc size %s là vừa ạ. Mẫu %s hiện còn size %s." % (
+            meas_phrase,
+            xung_ho,
+            sz,
+            code,
+            sz,
+        )
+
+    if max_emoji >= 1:
+        sentence = sentence + " 🌸"
+    return sentence
+
+
 def classify_intent_rules(
     text: str,
     *,
@@ -936,161 +1756,114 @@ def classify_intent_rules(
     """Đối chiếu bình luận theo allowlist trong `data/auto_reply_rules.json` (khớp trọn vẹn, tối đa 80 ký tự, 1 câu)."""
     compiled = _get_compiled_rules(rules_cfg)
     norm = normalize_text(text)
+    slash_fallback = False
+    if not norm["charset_ok"] and "/" in str(text or "") and not has_url(text):
+        alt = normalize_text(text, allow_slash=True)
+        if alt["charset_ok"]:
+            norm = alt
+            slash_fallback = True
+
+    def _reject_res(reason: str) -> dict:
+        return {
+            "ok": False,
+            "intents": set(),
+            "source": "rule",
+            "reason": reason,
+            "pattern_id": None,
+            "asked_size": None,
+            "asked_color": None,
+            "height_cm": None,
+            "weight_kg": None,
+        }
 
     if not norm["raw"].strip():
-        return {
-            "ok": False,
-            "intents": set(),
-            "source": "rule",
-            "reason": "Bình luận không có nội dung chữ — cần nhân viên xem trực tiếp",
-            "pattern_id": None,
-            "asked_size": None,
-            "asked_color": None,
-        }
+        return _reject_res("Bình luận không có nội dung chữ — cần nhân viên xem trực tiếp")
 
     if norm["has_newline"]:
-        return {
-            "ok": False,
-            "intents": set(),
-            "source": "rule",
-            "reason": "Bình luận có nhiều câu hoặc nhiều dòng — cần nhân viên xử lý",
-            "pattern_id": None,
-            "asked_size": None,
-            "asked_color": None,
-        }
+        return _reject_res("Bình luận có nhiều câu hoặc nhiều dòng — cần nhân viên xử lý")
 
     if not norm["charset_ok"]:
-        return {
-            "ok": False,
-            "intents": set(),
-            "source": "rule",
-            "reason": "Bình luận chứa ký tự hoặc biểu tượng ngoài phạm vi cho phép — cần nhân viên xử lý",
-            "pattern_id": None,
-            "asked_size": None,
-            "asked_color": None,
-        }
+        return _reject_res("Bình luận chứa ký tự hoặc biểu tượng ngoài phạm vi cho phép — cần nhân viên xử lý")
 
     if not norm["normalized"]:
-        return {
-            "ok": False,
-            "intents": set(),
-            "source": "rule",
-            "reason": "Bình luận không có nội dung chữ — cần nhân viên xem trực tiếp",
-            "pattern_id": None,
-            "asked_size": None,
-            "asked_color": None,
-        }
+        return _reject_res("Bình luận không có nội dung chữ — cần nhân viên xem trực tiếp")
 
     max_allow_chars = compiled["max_allow_chars"]
     if len(norm["raw_stripped"]) > max_allow_chars or len(norm["normalized"]) > max_allow_chars:
-        return {
-            "ok": False,
-            "intents": set(),
-            "source": "rule",
-            "reason": "Bình luận dài hơn %d ký tự — cần nhân viên xử lý" % max_allow_chars,
-            "pattern_id": None,
-            "asked_size": None,
-            "asked_color": None,
-        }
+        return _reject_res("Bình luận dài hơn %d ký tự — cần nhân viên xử lý" % max_allow_chars)
 
-    if _INTERNAL_SENTENCE_RE.search(norm["normalized"]):
-        return {
-            "ok": False,
-            "intents": set(),
-            "source": "rule",
-            "reason": "Bình luận có nhiều câu hoặc nhiều dòng — cần nhân viên xử lý",
-            "pattern_id": None,
-            "asked_size": None,
-            "asked_color": None,
-        }
+    if _INTERNAL_SENTENCE_RE.search(_mask_decimal_dots(norm["normalized"])):
+        return _reject_res("Bình luận có nhiều câu hoặc nhiều dòng — cần nhân viên xử lý")
 
     core = _strip_trailing_punct_emoji(norm["normalized"], max_count=2)
     if not core:
-        return {
-            "ok": False,
-            "intents": set(),
-            "source": "rule",
-            "reason": "Bình luận chỉ có ký tự/biểu tượng — cần nhân viên xử lý",
-            "pattern_id": None,
-            "asked_size": None,
-            "asked_color": None,
-        }
+        return _reject_res("Bình luận chỉ có ký tự/biểu tượng — cần nhân viên xử lý")
 
     # Không chấp nhận emoji đứng đầu/giữa hoặc hơn 2 dấu câu/emoji ở cuối
-    if any(ch in _BENIGN_TRAILING_EMOJIS or ch in _TRAILING_PUNCT for ch in core):
-        return {
-            "ok": False,
-            "intents": set(),
-            "source": "rule",
-            "reason": "Bình luận không khớp mẫu câu hỏi được phép tự động trả lời",
-            "pattern_id": None,
-            "asked_size": None,
-            "asked_color": None,
-        }
+    if any(ch in _BENIGN_TRAILING_EMOJIS or ch in _TRAILING_PUNCT for ch in _mask_decimal_dots(core)):
+        return _reject_res("Bình luận không khớp mẫu câu hỏi được phép tự động trả lời")
 
     core = _strip_polite_leading(core, compiled)
     core, stripped_trailing = _strip_polite_trailing_tokens(core, compiled)
     # Quét lại 1 lượt đầu câu phòng trường hợp mở đầu đứng trước/sau cấu trúc ngắn
     core = _strip_polite_leading(core, compiled)
     if not core:
-        return {
-            "ok": False,
-            "intents": set(),
-            "source": "rule",
-            "reason": "Bình luận không phải câu hỏi giá/size/màu rõ ràng",
-            "pattern_id": None,
-            "asked_size": None,
-            "asked_color": None,
-        }
+        return _reject_res("Bình luận không phải câu hỏi giá/size/màu rõ ràng")
 
     asked_qty, asked_unit, core = extract_quantity(core)
     if not core:
-        return {
-            "ok": False,
-            "intents": set(),
-            "source": "rule",
-            "reason": "Bình luận không phải câu hỏi giá/size/màu rõ ràng",
-            "pattern_id": None,
-            "asked_size": None,
-            "asked_color": None,
-        }
+        return _reject_res("Bình luận không phải câu hỏi giá/size/màu rõ ràng")
 
     is_ascii_only = (core == _strip_diacritics(core))
-    for pat in compiled["allow"]:
-        m = pat["vi_re"].fullmatch(core) if pat["vi_re"] is not None else None
-        if m is None and is_ascii_only and pat["ascii_re"] is not None:
-            m = pat["ascii_re"].fullmatch(core)
-        if m is None:
-            continue
-        forbid_trailing = pat.get("forbid_trailing")
-        if forbid_trailing and any(tok in forbid_trailing for tok in stripped_trailing):
-            continue
-        gd = m.groupdict()
-        asked_size = (gd.get("size") or "").strip() or None
-        asked_color = (gd.get("color") or "").strip() or None
-        if asked_color is not None and _is_invalid_color_capture(asked_color, is_ascii_only=is_ascii_only):
-            continue
-        return {
-            "ok": True,
-            "intents": set(pat["intents"]),
-            "source": "rule",
-            "reason": "",
-            "pattern_id": pat["id"],
-            "asked_size": asked_size,
-            "asked_color": asked_color,
-            "asked_qty": asked_qty,
-            "asked_unit": asked_unit,
-        }
+    if not slash_fallback:
+        for pat in compiled["allow"]:
+            if asked_qty is not None and "size_advice" in pat["intents"]:
+                continue
+            m = pat["vi_re"].fullmatch(core) if pat["vi_re"] is not None else None
+            if m is None and is_ascii_only and pat["ascii_re"] is not None:
+                m = pat["ascii_re"].fullmatch(core)
+            if m is None:
+                continue
+            forbid_trailing = pat.get("forbid_trailing")
+            if forbid_trailing and any(tok in forbid_trailing for tok in stripped_trailing):
+                continue
+            gd = m.groupdict()
+            asked_size = (gd.get("size") or "").strip() or None
+            asked_color = re.sub(r"\s+", " ", (gd.get("color") or "").strip()) or None
+            has_item_ref = bool((gd.get("item_ref") or "").strip())
+            if asked_color is not None and _is_invalid_color_capture(
+                asked_color,
+                is_ascii_only=is_ascii_only,
+                has_item_ref=has_item_ref,
+                known_colors_vi=compiled["known_colors_vi"],
+                known_colors_ascii=compiled["known_colors_ascii"],
+            ):
+                continue
+            return {
+                "ok": True,
+                "intents": set(pat["intents"]),
+                "source": "rule",
+                "reason": "",
+                "pattern_id": pat["id"],
+                "asked_size": asked_size,
+                "asked_color": asked_color,
+                "asked_qty": asked_qty,
+                "asked_unit": asked_unit,
+                "height_cm": None,
+                "weight_kg": None,
+            }
 
-    return {
-        "ok": False,
-        "intents": set(),
-        "source": "rule",
-        "reason": "Bình luận không khớp mẫu câu hỏi giá/size/màu được phép tự động trả lời",
-        "pattern_id": None,
-        "asked_size": None,
-        "asked_color": None,
-    }
+    if asked_qty is None:
+        sa_hit = _match_size_advice_with_measurements(
+            core,
+            compiled,
+            is_ascii_only=is_ascii_only,
+            rules_cfg=rules_cfg,
+        )
+        if sa_hit is not None:
+            return sa_hit
+
+    return _reject_res("Bình luận không khớp mẫu câu hỏi giá/size/màu được phép tự động trả lời")
 
 
 def classify_intent(
@@ -1117,11 +1890,20 @@ def render_template(
     style: Optional[dict] = None,
     qty: Optional[int] = None,
     unit: str = "cái",
+    unavailable_color_status: Optional[str] = None,
+    unavailable_color_label: Optional[str] = None,
+    unavailable_size_status: Optional[str] = None,
+    unavailable_size_label: Optional[str] = None,
 ) -> str:
     """Sinh câu trả lời xác định hoàn toàn từ dữ liệu sản phẩm và phong cách viết (KHÔNG gọi LLM).
 
     qty > 1: giá nêu theo đơn vị ("giá X mỗi bộ") và xác nhận còn đủ số lượng — không tự tính tổng
     hay hứa giảm giá (bộ kiểm tra đầu ra chỉ chấp nhận đúng giá bán).
+    unavailable_*_status:
+    - "oos": biến thể có trong danh mục nhưng hết tồn (`dropped_*`) → nêu rõ "hiện hết màu/size {label}"
+      (khớp luật phủ định của `rules.verify_post(..., is_comment=True)`).
+    - "not_offered": mẫu không có màu/size đó → nêu "hiện không có màu này" / "hiện không có size này"
+      và liệt kê màu/size đang còn hàng từ dữ liệu sản phẩm.
     """
     intent_set = {i for i in intents if i in _VALID_INTENT_SET}
     if not intent_set:
@@ -1137,6 +1919,16 @@ def render_template(
         max_emoji = 0
 
     parts: list[str] = []
+    if unavailable_color_status == "oos" and str(unavailable_color_label or "").strip():
+        parts.append("hiện hết màu %s" % str(unavailable_color_label).strip())
+    elif unavailable_color_status in ("oos", "not_offered"):
+        parts.append("hiện không có màu này")
+
+    if unavailable_size_status == "oos" and str(unavailable_size_label or "").strip():
+        parts.append("hiện hết size %s" % str(unavailable_size_label).strip())
+    elif unavailable_size_status in ("oos", "not_offered"):
+        parts.append("hiện không có size này")
+
     if "price" in intent_set:
         if price is None:
             raise ValueError("Thiếu giá bán để ghép mẫu trả lời")
@@ -1164,7 +1956,7 @@ def render_template(
         parts.append("còn size %s" % ", ".join(size_list))
     elif "color" in intent_set:
         parts.append("còn màu %s" % ", ".join(color_list))
-    if qty and qty > 1:
+    if qty and qty > 1 and not unavailable_color_status and not unavailable_size_status:
         parts.append("còn đủ %d %s" % (qty, unit))
 
     fact_str = ", ".join(parts)
@@ -1305,6 +2097,63 @@ def _build_stock_matrix(
     return instock_pairs, pairs_by_color, is_full
 
 
+def _resolve_named_variant(
+    *,
+    asked_size: Optional[str],
+    asked_color: Optional[str],
+    in_stock_colors: list[str],
+    in_stock_sizes: list[str],
+    dropped_colors: list[str],
+    dropped_sizes: list[str],
+    has_color: bool,
+) -> dict[str, Optional[str]]:
+    """Phân loại trạng thái size/màu định danh khách hỏi (khớp chính xác, không substring):
+    in_stock / oos (nằm trong dropped_*) / not_offered (không có trong danh mục).
+    """
+    out: dict[str, Optional[str]] = {
+        "size_status": None,
+        "size_label": None,
+        "color_status": None,
+        "color_label": None,
+    }
+    if asked_size:
+        asked_canon = _canonical_size(asked_size)
+        asked_fold = _fold_exact(asked_size)
+        in_sizes_canon = {_canonical_size(s) for s in in_stock_sizes}
+        in_sizes_fold = {_fold_exact(s) for s in in_stock_sizes}
+        if asked_canon in in_sizes_canon or asked_fold in in_sizes_fold:
+            out["size_status"] = "in_stock"
+        else:
+            matched_dropped = next(
+                (s for s in dropped_sizes if _canonical_size(s) == asked_canon or _fold_exact(s) == asked_fold),
+                None,
+            )
+            if matched_dropped is not None:
+                out["size_status"] = "oos"
+                out["size_label"] = matched_dropped
+            else:
+                out["size_status"] = "not_offered"
+
+    if asked_color:
+        asked_fold = _fold_exact(asked_color)
+        in_colors_fold = {_fold_exact(c) for c in in_stock_colors}
+        if has_color and asked_fold in in_colors_fold:
+            out["color_status"] = "in_stock"
+        else:
+            matched_dropped = (
+                next((c for c in dropped_colors if _fold_exact(c) == asked_fold), None)
+                if has_color
+                else None
+            )
+            if matched_dropped is not None:
+                out["color_status"] = "oos"
+                out["color_label"] = matched_dropped
+            else:
+                out["color_status"] = "not_offered"
+
+    return out
+
+
 def _check_named_variant_in_stock(
     product_code: str,
     *,
@@ -1400,6 +2249,7 @@ def _evaluate_comment(
     ts: str,
     check_cooldown: bool = True,
     allow_child_for_lookahead: bool = False,
+    pending_state: Optional[dict] = None,
     step_cb=None,
 ) -> dict:
     """Đánh giá thuần đọc Steps 1–5 (KHÔNG ghi DB nghiệp vụ, KHÔNG gọi Facebook; chỉ gọi `step_cb` nếu có).
@@ -1413,16 +2263,32 @@ def _evaluate_comment(
         if step_cb is not None:
             step_cb(key, status, detail, label=label)
 
-    def _reject(stage: str, reason: str, intents_val: Iterable[str] = ()) -> dict:
-        _emit(stage, "blocked", reason)
+    def _reject(
+        stage: str,
+        reason: str,
+        intents_val: Iterable[str] = (),
+        *,
+        label: Optional[str] = None,
+    ) -> dict:
+        _emit(stage, "blocked", reason, label=label)
         return {"status": "reject", "reason": reason, "intents": list(intents_val)}
 
     page_id = _comment_page_id(comment)
     channel_id = _comment_channel_id(comment)
     from_id = str(comment.get("from_id") or "").strip()
     message = str(comment.get("message") or "")
+    cid = str(comment.get("id") or "").strip()
 
-    # ---------- BƯỚC 1: Input guard & Thread scope (N2) ----------
+    is_followup_measurement = bool(
+        not allow_child_for_lookahead
+        and pending_state
+        and pending_state.get("state") == "awaiting_measurements"
+        and str(pending_state.get("asked_comment_id") or "") != cid
+    )
+    pending_asked_id = str(pending_state.get("asked_comment_id") or "") if is_followup_measurement else ""
+    pending_bot_reply_id = str(pending_state.get("bot_reply_id") or "") if is_followup_measurement else ""
+
+    # ---------- BƯỚC 1: Input guard & Thread scope (N2 + ngoại lệ 1 lượt cho câu hỏi chờ số đo của bot) ----------
     if is_kill_switch_enabled():
         return _reject("safety", "Tự động trả lời đang tạm tắt toàn hệ thống")
 
@@ -1432,14 +2298,48 @@ def _evaluate_comment(
             "Tạm dừng tự động trả lời trên Fanpage trong lượt này do lỗi Facebook trước đó",
         )
 
-    if not setting["enabled"]:
+    if not setting.get("enabled", True):
         return _reject("safety", "Chưa bật tự động trả lời cho Fanpage này")
 
     enabled_intents = set(setting.get("intents") or ()) & _VALID_INTENT_SET
     if not enabled_intents:
         return _reject("safety", "Chưa chọn nhóm câu hỏi được phép tự động trả lời")
 
-    if not allow_child_for_lookahead:
+    if is_followup_measurement:
+        if "size_advice" not in enabled_intents:
+            return _reject(
+                "safety",
+                "Fanpage chưa bật tự động trả lời cho nhóm câu hỏi: tư vấn size",
+                ["size_advice"],
+            )
+        asked_comment = store.get_comment(tenant_id, pending_asked_id) if pending_asked_id else None
+        if asked_comment is not None:
+            asked_from_id = str(asked_comment.get("from_id") or "").strip()
+            if asked_from_id and from_id and asked_from_id != from_id:
+                return _reject(
+                    "safety",
+                    "Bình luận trong chuỗi đến từ tài khoản khách khác — cần nhân viên xử lý",
+                    ["size_advice"],
+                )
+            if _comment_sort_key(comment) <= _comment_sort_key(asked_comment):
+                return _reject(
+                    "safety",
+                    "Bình luận cũ hơn câu hỏi chờ số đo — cần nhân viên xử lý",
+                    ["size_advice"],
+                )
+        if store.thread_has_activity_other_than_bot_question(
+            tenant_id,
+            thread_id,
+            asked_comment_id=pending_asked_id,
+            bot_reply_id=pending_bot_reply_id,
+            now_ts=ts,
+        ):
+            return _reject(
+                "safety",
+                "Hội thoại đã có phản hồi của Fanpage hoặc thao tác nhân viên — cần nhân viên xử lý",
+                ["size_advice"],
+            )
+    elif not allow_child_for_lookahead:
         if (comment.get("parent_id") or "").strip():
             return _reject(
                 "safety",
@@ -1521,10 +2421,12 @@ def _evaluate_comment(
     post_rate_window = compiled["post_rate_window_minutes"]
     if check_cooldown:
         # 1. Cooldown theo hội thoại: tối đa 1 câu tự động trả lời mỗi hội thoại trong 10 phút
+        #    (ngoại lệ duy nhất: bỏ qua chính câu hỏi chờ số đo vừa gửi của bot trên hội thoại này)
         if store.has_recent_auto_reply_for_thread(
             tenant_id,
             thread_id,
             ref_dt - timedelta(minutes=cooldown_minutes),
+            exclude_comment_id=(pending_asked_id if is_followup_measurement else None),
         ):
             return _reject(
                 "safety",
@@ -1543,49 +2445,100 @@ def _evaluate_comment(
                 % (post_rate_limit, post_rate_window),
             )
 
-        # 3. Lớp bảo vệ bổ sung theo khách hàng khi có from_id
-        if from_id and store.has_recent_auto_reply_for_customer(
+    if is_followup_measurement:
+        _emit("safety", "ok", "Đạt kiểm tra an toàn (phản hồi số đo cho câu hỏi đang chờ của bot)")
+    else:
+        _emit("safety", "ok", "Đạt kiểm tra an toàn, phạm vi hội thoại và chống spam")
+
+    # ---------- BƯỚC 2: Allowlist Intent (hoặc phân tích số đo phản hồi) ----------
+    height_cm: Optional[float] = None
+    weight_kg: Optional[float] = None
+    asked_size: Optional[str] = None
+    asked_color: Optional[str] = None
+    asked_qty: Optional[int] = None
+    asked_unit: str = "cái"
+    specific_question = False
+
+    if is_followup_measurement:
+        meas = parse_measurements(message, allow_bare_single=True, rules_cfg=rules_cfg)
+        if not meas["ok"]:
+            return _reject("intent", meas["reason"], ["size_advice"], label="Đọc số đo")
+        height_cm = meas["height_cm"]
+        weight_kg = meas["weight_kg"]
+        if weight_kg is None:
+            h_desc = _fmt_height(height_cm) if height_cm is not None else "không rõ"
+            return _reject(
+                "intent",
+                "Khách chỉ cung cấp chiều cao (%s), chưa có cân nặng — cần nhân viên tư vấn" % h_desc,
+                ["size_advice"],
+                label="Đọc số đo",
+            )
+        intents = {"size_advice"}
+        sorted_ints = ["size_advice"]
+        specific_question = True
+        _emit(
+            "intent",
+            "ok",
+            "Đọc số đo phản hồi: %s" % _fmt_measurement_summary(height_cm, weight_kg),
+            label="Đọc số đo",
+        )
+    else:
+        intent_res = classify_intent(message, rules_cfg=rules_cfg)
+        if not intent_res["ok"]:
+            return _reject("intent", intent_res["reason"], intent_res.get("intents") or ())
+
+        intents = intent_res["intents"]
+        sorted_ints = _sorted_intents(intents)
+        asked_size = intent_res.get("asked_size")
+        asked_color = intent_res.get("asked_color")
+        asked_qty = intent_res.get("asked_qty")
+        asked_unit = intent_res.get("asked_unit") or "cái"
+        height_cm = intent_res.get("height_cm")
+        weight_kg = intent_res.get("weight_kg")
+
+        # Lớp bảo vệ theo khách khi có from_id: chỉ chặn khi khách hỏi lại ĐÚNG loại câu chung chung đã được trả lời
+        # gần đây. Câu cụ thể hơn (có số lượng, size, màu cụ thể hoặc kèm số đo) là câu hỏi mới nên vẫn trả lời.
+        specific_question = bool(
+            asked_qty or asked_size or asked_color or (height_cm is not None) or (weight_kg is not None)
+        )
+        if check_cooldown and from_id and not specific_question and store.has_recent_auto_reply_for_customer(
             tenant_id,
             page_id,
             from_id,
             ref_dt - timedelta(minutes=cooldown_minutes),
+            intents=sorted_ints,
         ):
             return _reject(
                 "safety",
-                "Khách hàng này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes,
+                "Khách hàng này vừa được tự động trả lời đúng câu hỏi này trong vòng %d phút" % cooldown_minutes,
+                sorted_ints,
+            )
+        disabled_ints = [i for i in sorted_ints if i not in enabled_intents]
+        if disabled_ints:
+            labels = ", ".join(_INTENT_LABELS[i] for i in disabled_ints)
+            return _reject(
+                "intent",
+                "Fanpage chưa bật tự động trả lời cho nhóm câu hỏi: %s" % labels,
+                sorted_ints,
             )
 
-    _emit("safety", "ok", "Đạt kiểm tra an toàn, phạm vi hội thoại và chống spam")
-
-    # ---------- BƯỚC 2: Allowlist Intent ----------
-    intent_res = classify_intent(message, rules_cfg=rules_cfg)
-    if not intent_res["ok"]:
-        return _reject("intent", intent_res["reason"])
-
-    intents = intent_res["intents"]
-    sorted_ints = _sorted_intents(intents)
-    disabled_ints = [i for i in sorted_ints if i not in enabled_intents]
-    if disabled_ints:
-        labels = ", ".join(_INTENT_LABELS[i] for i in disabled_ints)
-        return _reject(
-            "intent",
-            "Fanpage chưa bật tự động trả lời cho nhóm câu hỏi: %s" % labels,
-            sorted_ints,
-        )
-
-    intent_desc = ", ".join(_INTENT_LABELS[i] for i in sorted_ints)
-    intent_extras: list[str] = []
-    if intent_res.get("asked_size"):
-        intent_extras.append("size %s" % str(intent_res["asked_size"]).upper())
-    if intent_res.get("asked_color"):
-        intent_extras.append("màu %s" % str(intent_res["asked_color"]))
-    intent_detail = "Nhận diện câu hỏi: %s" % intent_desc
-    if intent_extras:
-        intent_detail += " (%s)" % ", ".join(intent_extras)
-    _emit("intent", "ok", intent_detail)
+        intent_desc = ", ".join(_INTENT_LABELS[i] for i in sorted_ints)
+        intent_extras: list[str] = []
+        if asked_size:
+            intent_extras.append("size %s" % str(asked_size).upper())
+        if asked_color:
+            intent_extras.append("màu %s" % str(asked_color))
+        if height_cm is not None or weight_kg is not None:
+            intent_extras.append(_fmt_measurement_summary(height_cm, weight_kg))
+        intent_detail = "Nhận diện câu hỏi: %s" % intent_desc
+        if intent_extras:
+            intent_detail += " (%s)" % ", ".join(intent_extras)
+        _emit("intent", "ok", intent_detail)
 
     # ---------- BƯỚC 3: Facts ----------
     product_code = _resolve_product_code(tenant_id, comment, thread_id, job=post_job)
+    if not product_code and is_followup_measurement:
+        product_code = str(pending_state.get("product_code") or "").strip()
     if not product_code:
         return _reject("facts", "Bài đăng chưa gắn mã sản phẩm", sorted_ints)
 
@@ -1613,7 +2566,7 @@ def _evaluate_comment(
     styled_page = writing_style.apply(base_page, tenant_id, channel_id)
     allowed = vpost_api._allowed_for_comment(row, stock, styled_page)
 
-    # R1 / N7: Kiểm tra dữ liệu dòng sản phẩm vô điều kiện cho mọi ý định (giá/size/màu)
+    # R1 / N7: Kiểm tra dữ liệu dòng sản phẩm vô điều kiện cho mọi ý định (giá/size/màu/tư vấn size)
     prod_check = tools.check_product(row, base_page)
     all_hard = [m for _, m in prod_check.get("hard", [])]
     if all_hard:
@@ -1632,7 +2585,7 @@ def _evaluate_comment(
         )
 
     in_stock_sizes = list(allowed.get("sizes") or [])
-    if "size" in intents and not in_stock_sizes:
+    if ("size" in intents or "size_advice" in intents) and not in_stock_sizes:
         return _reject(
             "facts",
             "Sản phẩm mã %s chưa có thông tin size còn hàng" % product_code,
@@ -1640,6 +2593,8 @@ def _evaluate_comment(
         )
 
     in_stock_colors = list(allowed.get("colors") or [])
+    dropped_colors = list(allowed.get("dropped_colors") or [])
+    dropped_sizes = list(allowed.get("dropped_sizes") or [])
     has_color = bool(allowed.get("has_color"))
     if "color" in intents and (not has_color or not in_stock_colors):
         return _reject(
@@ -1648,20 +2603,29 @@ def _evaluate_comment(
             sorted_ints,
         )
 
-    # Kiểm tra size/màu định danh khớp CHÍNH XÁC với giá trị còn hàng của sản phẩm bài đăng (không substring)
-    named_err = _check_named_variant_in_stock(
-        product_code,
-        asked_size=intent_res.get("asked_size"),
-        asked_color=intent_res.get("asked_color"),
+    # Đối chiếu size/màu định danh chính xác (không substring): còn hàng / hết tồn (dropped_*) / không có
+    named_variant = _resolve_named_variant(
+        asked_size=asked_size,
+        asked_color=asked_color,
         in_stock_colors=in_stock_colors,
         in_stock_sizes=in_stock_sizes,
+        dropped_colors=dropped_colors,
+        dropped_sizes=dropped_sizes,
         has_color=has_color,
     )
-    if named_err:
-        return _reject("facts", named_err, sorted_ints)
+    unavailable_color_status = (
+        named_variant["color_status"]
+        if named_variant["color_status"] in ("oos", "not_offered")
+        else None
+    )
+    unavailable_color_label = named_variant["color_label"] if unavailable_color_status == "oos" else None
+    unavailable_size_status = (
+        named_variant["size_status"]
+        if named_variant["size_status"] in ("oos", "not_offered")
+        else None
+    )
+    unavailable_size_label = named_variant["size_label"] if unavailable_size_status == "oos" else None
 
-    asked_qty = intent_res.get("asked_qty")
-    asked_unit = intent_res.get("asked_unit") or "cái"
     if asked_qty is not None:
         if asked_qty < 1:
             return _reject("facts", "Số lượng khách hỏi không hợp lệ — cần nhân viên xem", sorted_ints)
@@ -1672,7 +2636,7 @@ def _evaluate_comment(
                 sorted_ints,
             )
         avail = available_quantity(
-            stock, asked_size=intent_res.get("asked_size"), asked_color=intent_res.get("asked_color")
+            stock, asked_size=asked_size, asked_color=asked_color
         )
         if avail is None or avail < asked_qty:
             return _reject(
@@ -1703,19 +2667,77 @@ def _evaluate_comment(
     _emit("facts", "ok", facts_detail)
 
     # ---------- BƯỚC 4: Deterministic template answer (NO LLM) ----------
-    use_pairs = (not is_full_matrix) and bool(pairs_by_color) and ("size" in intents or "color" in intents)
-    reply_text = render_template(
-        product_code,
-        sorted_ints,
-        price=price_val,
-        sizes=in_stock_sizes,
-        colors=in_stock_colors,
-        variant_pairs=pairs_by_color if use_pairs else None,
-        style=resolved_style,
-        qty=asked_qty,
-        unit=asked_unit,
-    )
-    _emit("compose", "ok", "Soạn từ mẫu dữ liệu sản phẩm (%d ký tự, không dùng AI)" % len(reply_text))
+    size_advice_mode: Optional[str] = None
+    if "size_advice" in intents:
+        if weight_kg is None:
+            size_advice_mode = "ask"
+            reply_text = render_size_advice_ask(style=resolved_style)
+            _emit("compose", "ok", "Soạn câu hỏi xin chiều cao, cân nặng (%d ký tự, không dùng AI)" % len(reply_text))
+        else:
+            chart, chart_source = writing_style.resolve_size_chart(tenant_id, row.get("loai"))
+            rec = recommend_size(
+                weight_kg=weight_kg,
+                height_cm=height_cm,
+                chart=chart,
+                in_stock_sizes=in_stock_sizes,
+                product_code=product_code,
+            )
+            meas_txt = _fmt_measurement_summary(height_cm, weight_kg)
+            source_label = (
+                "bảng %s" % chart_source.split(":", 1)[1]
+                if chart_source.startswith("category:")
+                else ("bảng shop" if chart_source == "company_default" else "bảng mẫu")
+            )
+            if not rec["ok"]:
+                rows_note = (
+                    " · dòng %s" % ", ".join(_fmt_chart_row(r) for r in rec["rows_used"])
+                    if rec.get("rows_used")
+                    else ""
+                )
+                return _reject(
+                    "size_chart",
+                    rec["reason"],
+                    sorted_ints,
+                    label="Tra bảng size (%s%s)" % (meas_txt, rows_note),
+                )
+            rows_desc = ", ".join(_fmt_chart_row(r) for r in rec["rows_used"])
+            chart_detail = "Số đo: %s → %s [%s] → chọn %s" % (
+                meas_txt,
+                rows_desc,
+                source_label,
+                " hoặc ".join(rec["sizes"]),
+            )
+            if rec.get("conflict_detail"):
+                chart_detail += " (%s)" % rec["conflict_detail"]
+            _emit("size_chart", "ok", chart_detail, label="Tra bảng size")
+
+            size_advice_mode = "followup_recommend" if is_followup_measurement else "recommend"
+            reply_text = render_size_advice_recommendation(
+                product_code,
+                rec,
+                weight_kg=weight_kg,
+                height_cm=height_cm,
+                style=resolved_style,
+            )
+            _emit("compose", "ok", "Soạn tư vấn size từ bảng size và tồn kho (%d ký tự, không dùng AI)" % len(reply_text))
+    else:
+        use_pairs = (not is_full_matrix) and bool(pairs_by_color) and ("size" in intents or "color" in intents)
+        reply_text = render_template(
+            product_code,
+            sorted_ints,
+            price=price_val,
+            sizes=in_stock_sizes,
+            colors=in_stock_colors,
+            variant_pairs=pairs_by_color if use_pairs else None,
+            style=resolved_style,
+            qty=asked_qty,
+            unit=asked_unit,
+            unavailable_color_status=unavailable_color_status,
+            unavailable_color_label=unavailable_color_label,
+            unavailable_size_status=unavailable_size_status,
+            unavailable_size_label=unavailable_size_label,
+        )
+        _emit("compose", "ok", "Soạn từ mẫu dữ liệu sản phẩm (%d ký tự, không dùng AI)" % len(reply_text))
 
     # ---------- BƯỚC 5: Output guard ----------
     check = vpost_api._check_reply_text(reply_text, row, styled_page)
@@ -1728,10 +2750,14 @@ def _evaluate_comment(
 
     return {
         "status": "ready",
+        "specific_question": specific_question,
         "intents": sorted_ints,
         "reply_text": reply_text,
         "product_code": product_code,
         "fb_post_id": fb_post_id,
+        "size_advice_mode": size_advice_mode,
+        "pending_asked_comment_id": pending_asked_id or None,
+        "pending_bot_reply_id": pending_bot_reply_id or None,
     }
 
 
@@ -1836,6 +2862,9 @@ def process_comment(
 
     # Chính bình luận này đã có trả lời của Page (gốc FB hoặc nhân viên) hay thao tác nhân viên → bỏ qua không gắn can_ban
     if store.has_thread_reply_or_operator_activity(tenant_id, comment, now_ts=ts):
+        cur_state = store.get_thread_state(tenant_id, thread_id, now_dt=ref_dt)
+        if cur_state and str(cur_state.get("asked_comment_id") or "") != cid:
+            store.clear_thread_state(tenant_id, thread_id)
         return {
             "action": "ignored",
             "tagged": False,
@@ -1871,12 +2900,24 @@ def process_comment(
             now_dt=_step_now(),
         )
 
+    pending_state = store.get_thread_state(tenant_id, thread_id, now_dt=ref_dt)
+    is_followup_candidate = bool(
+        pending_state
+        and pending_state.get("state") == "awaiting_measurements"
+        and str(pending_state.get("asked_comment_id") or "") != cid
+    )
+
+    def _clear_pending_if_followup() -> None:
+        if is_followup_candidate:
+            store.clear_thread_state(tenant_id, thread_id)
+
     def _finish_can_ban(
         res: dict,
         *,
         action_status: str = "ok",
         action_detail: Optional[str] = None,
     ) -> dict:
+        _clear_pending_if_followup()
         detail = action_detail
         if detail is None:
             detail = (
@@ -1889,18 +2930,8 @@ def process_comment(
         res["agentRunId"] = run_id
         return res
 
-    def _finish_would_send(res: dict) -> dict:
-        _add_step(
-            "action",
-            "ok",
-            "Chế độ chạy thử — đã tạo câu trả lời mẫu, chưa gửi lên Facebook",
-            label="Chạy thử",
-        )
-        agent_runs.finish_run(tenant_id, run_id, status="done", outcome="would_send", now_dt=_step_now())
-        res["agentRunId"] = run_id
-        return res
-
     def _finish_failed(res: dict) -> dict:
+        _clear_pending_if_followup()
         _add_step("action", "error", res.get("reason") or "Gửi tự động lên Facebook thất bại", label="Gửi")
         agent_runs.finish_run(tenant_id, run_id, status="error", outcome="failed", now_dt=_step_now())
         res["agentRunId"] = run_id
@@ -1951,6 +2982,7 @@ def process_comment(
             ref_dt=ref_dt,
             ts=ts,
             check_cooldown=True,
+            pending_state=(pending_state if is_followup_candidate else None),
             step_cb=_add_step,
         )
         if ev["status"] == "reject":
@@ -1971,10 +3003,19 @@ def process_comment(
         sorted_ints = ev["intents"]
         reply_text = ev["reply_text"]
         fb_post_id = ev.get("fb_post_id") or fb_post_id
+        size_advice_mode = ev.get("size_advice_mode")
+        is_followup_send = size_advice_mode == "followup_recommend"
+        pending_asked_id = ev.get("pending_asked_comment_id") if is_followup_send else None
+        pending_bot_reply_id = ev.get("pending_bot_reply_id") if is_followup_send else None
 
         # Nếu hội thoại đang mang nhãn 'can_ban' chưa được nhân viên xử lý → không tự động trả lời đè lên
+        # (ngoại lệ duy nhất: nhãn cũ chỉ gắn do Fanpage trước đó chưa bật tự động trả lời)
         existing_att = store.get_thread_attentions(tenant_id, [thread_id]).get(thread_id)
-        if existing_att and existing_att.get("tag") == "can_ban":
+        if (
+            existing_att
+            and existing_att.get("tag") == "can_ban"
+            and not store.is_disabled_auto_reply_reason(existing_att.get("reason"))
+        ):
             reason = "Hội thoại đang gắn nhãn 'Cần bạn' chờ nhân viên xử lý"
             return _finish_can_ban(
                 _record_rejection(
@@ -2047,39 +3088,7 @@ def process_comment(
                 action_detail=reason,
             )
 
-        if setting["mode"] != "live":
-            store.append_auto_reply_log(
-                tenant_id,
-                page_id=page_id,
-                fb_post_id=fb_post_id,
-                thread_id=thread_id,
-                comment_id=cid,
-                from_id=from_id,
-                intents=sorted_ints,
-                action="would_send",
-                reason="",
-                text=reply_text,
-                created_at=ts,
-            )
-            log.info(
-                "comment_auto_reply tenant=%s page_id=%s thread_id=%s comment_id=%s action=would_send intents=%s",
-                tenant_id,
-                page_id,
-                thread_id,
-                cid,
-                ",".join(sorted_ints),
-            )
-            return _finish_would_send({
-                "action": "would_send",
-                "tagged": False,
-                "threadId": thread_id,
-                "commentId": cid,
-                "intents": sorted_ints,
-                "reason": None,
-                "text": reply_text,
-            })
-
-        # Mode live: giữ khoá tư vấn theo (tenant_id, page_id) để tuần tự hoá kiểm tra đã trả lời,
+        # Luôn chạy thật (live): giữ khoá tư vấn theo (tenant_id, page_id) để tuần tự hoá kiểm tra đã trả lời,
         # phạm vi hội thoại, intents đang bật (N11), cooldown hội thoại/bài đăng/khách, trần giờ/ngày, gửi FB và ghi log.
         cooldown_minutes = compiled["cooldown_minutes"]
         post_rate_limit = compiled["post_rate_limit"]
@@ -2100,6 +3109,7 @@ def process_comment(
                 }
 
             if store.has_thread_reply_or_operator_activity(tenant_id, comment, now_ts=ts):
+                _clear_pending_if_followup()
                 _add_step("action", "skipped", "Hội thoại đã có phản hồi của Fanpage hoặc thao tác nhân viên", label="Cần bạn")
                 agent_runs.finish_run(tenant_id, run_id, status="done", outcome=None, now_dt=_step_now())
                 return {
@@ -2110,7 +3120,53 @@ def process_comment(
                     "agentRunId": run_id,
                 }
 
-            if store.thread_has_any_page_reply_or_operator_activity(tenant_id, thread_id, now_ts=ts):
+            if is_followup_send:
+                live_state = store.get_thread_state(tenant_id, thread_id, now_dt=ref_dt)
+                if (
+                    not live_state
+                    or live_state.get("state") != "awaiting_measurements"
+                    or str(live_state.get("asked_comment_id") or "") != str(pending_asked_id or "")
+                ):
+                    reason = "Trạng thái chờ số đo đã hết hạn hoặc đã được xử lý — cần nhân viên xử lý"
+                    return _finish_can_ban(
+                        _record_rejection(
+                            tenant_id,
+                            page_id=page_id,
+                            fb_post_id=fb_post_id,
+                            thread_id=thread_id,
+                            comment_id=cid,
+                            from_id=from_id,
+                            intents=sorted_ints,
+                            reason=reason,
+                            ts=ts,
+                        ),
+                        action_status="blocked",
+                        action_detail=reason,
+                    )
+                if store.thread_has_activity_other_than_bot_question(
+                    tenant_id,
+                    thread_id,
+                    asked_comment_id=pending_asked_id,
+                    bot_reply_id=pending_bot_reply_id or "",
+                    now_ts=ts,
+                ):
+                    reason = "Hội thoại đã có phản hồi của Fanpage hoặc thao tác nhân viên — cần nhân viên xử lý"
+                    return _finish_can_ban(
+                        _record_rejection(
+                            tenant_id,
+                            page_id=page_id,
+                            fb_post_id=fb_post_id,
+                            thread_id=thread_id,
+                            comment_id=cid,
+                            from_id=from_id,
+                            intents=sorted_ints,
+                            reason=reason,
+                            ts=ts,
+                        ),
+                        action_status="blocked",
+                        action_detail=reason,
+                    )
+            elif store.thread_has_any_page_reply_or_operator_activity(tenant_id, thread_id, now_ts=ts):
                 reason = "Hội thoại đã có phản hồi của Fanpage hoặc thao tác nhân viên — cần nhân viên xử lý"
                 return _finish_can_ban(
                     _record_rejection(
@@ -2129,7 +3185,12 @@ def process_comment(
                 )
 
             att_now = store.get_thread_attentions(tenant_id, [thread_id]).get(thread_id)
-            if att_now and att_now.get("tag") == "can_ban":
+            att_now_is_disabled_skip = bool(
+                att_now
+                and att_now.get("tag") == "can_ban"
+                and store.is_disabled_auto_reply_reason(att_now.get("reason"))
+            )
+            if att_now and att_now.get("tag") == "can_ban" and not att_now_is_disabled_skip:
                 reason = "Hội thoại đang gắn nhãn 'Cần bạn' chờ nhân viên xử lý"
                 return _finish_can_ban(
                     _record_rejection(
@@ -2171,7 +3232,8 @@ def process_comment(
                 if page_id
                 else setting
             )
-            if not live_setting["enabled"]:
+
+            if not live_setting.get("enabled", True):
                 reason = "Chưa bật tự động trả lời cho Fanpage này"
                 return _finish_can_ban(
                     _record_rejection(
@@ -2211,35 +3273,12 @@ def process_comment(
                     action_detail=reason,
                 )
 
-            if live_setting["mode"] != "live":
-                store.append_auto_reply_log(
-                    tenant_id,
-                    page_id=page_id,
-                    fb_post_id=fb_post_id,
-                    thread_id=thread_id,
-                    comment_id=cid,
-                    from_id=from_id,
-                    intents=sorted_ints,
-                    action="would_send",
-                    reason="",
-                    text=reply_text,
-                    created_at=ts,
-                )
-                return _finish_would_send({
-                    "action": "would_send",
-                    "tagged": False,
-                    "threadId": thread_id,
-                    "commentId": cid,
-                    "intents": sorted_ints,
-                    "reason": None,
-                    "text": reply_text,
-                })
-
             # Kiểm tra lại cooldown theo hội thoại, tốc độ theo bài đăng và (khi có from_id) cooldown theo khách dưới khoá
             if store.has_recent_auto_reply_for_thread(
                 tenant_id,
                 thread_id,
                 ref_dt - timedelta(minutes=cooldown_minutes),
+                exclude_comment_id=(pending_asked_id if is_followup_send else None),
             ):
                 reason = "Hội thoại này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes
                 return _finish_can_ban(
@@ -2283,13 +3322,19 @@ def process_comment(
                     action_detail=reason,
                 )
 
-            if from_id and store.has_recent_auto_reply_for_customer(
-                tenant_id,
-                page_id,
-                from_id,
-                ref_dt - timedelta(minutes=cooldown_minutes),
+            if (
+                not is_followup_send
+                and from_id
+                and not ev.get("specific_question")
+                and store.has_recent_auto_reply_for_customer(
+                    tenant_id,
+                    page_id,
+                    from_id,
+                    ref_dt - timedelta(minutes=cooldown_minutes),
+                    intents=sorted_ints,
+                )
             ):
-                reason = "Khách hàng này đã được tự động trả lời trong vòng %d phút gần đây" % cooldown_minutes
+                reason = "Khách hàng này vừa được tự động trả lời đúng câu hỏi này trong vòng %d phút" % cooldown_minutes
                 return _finish_can_ban(
                     _record_rejection(
                         tenant_id,
@@ -2337,8 +3382,9 @@ def process_comment(
                     client_id,
                     tenant_id=tenant_id,
                     sent_by="auto",
-                    clear_attention=False,
+                    clear_attention=att_now_is_disabled_skip,
                     agent_run_id=run_id,
+                    allow_pending_size_advice_id=pending_asked_id,
                 )
             except vpost_api.ApiError as e:
                 detail = e.detail if isinstance(e.detail, dict) else {}
@@ -2491,6 +3537,8 @@ def process_comment(
                 return _finish_failed(res)
 
             if send_res.get("alreadySent"):
+                if is_followup_send:
+                    store.clear_thread_state(tenant_id, thread_id)
                 reply_msg_id = str((send_res.get("message") or {}).get("id") or "")
                 _add_step("action", "skipped", "Bình luận này đã được tự động trả lời trước đó", label="Gửi")
                 agent_runs.finish_run(
@@ -2514,6 +3562,20 @@ def process_comment(
 
             reply_msg = send_res.get("message") or {}
             reply_msg_id = str(reply_msg.get("id") or "")
+            if size_advice_mode == "ask":
+                expires_ts = schedule.iso_z(ref_dt + timedelta(hours=SIZE_ADVICE_STATE_TTL_HOURS))
+                store.set_thread_state(
+                    tenant_id,
+                    thread_id,
+                    product_code=ev["product_code"],
+                    state="awaiting_measurements",
+                    asked_comment_id=cid,
+                    bot_reply_id=reply_msg_id,
+                    expires_at=expires_ts,
+                    now_ts=ts,
+                )
+            elif is_followup_send:
+                store.clear_thread_state(tenant_id, thread_id)
             store.append_auto_reply_log(
                 tenant_id,
                 page_id=page_id,
@@ -2528,7 +3590,16 @@ def process_comment(
                 fb_reply_id=reply_msg_id,
                 created_at=ts,
             )
-            _add_step("action", "ok", "Đã gửi trả lời tự động lên Facebook", label="Gửi")
+            action_msg = (
+                "Đã hỏi chiều cao và cân nặng trên Facebook (chờ phản hồi 24h)"
+                if size_advice_mode == "ask"
+                else (
+                    "Đã gửi tư vấn size lên Facebook"
+                    if size_advice_mode in ("recommend", "followup_recommend")
+                    else "Đã gửi trả lời tự động lên Facebook"
+                )
+            )
+            _add_step("action", "ok", action_msg, label="Gửi")
             agent_runs.finish_run(
                 tenant_id,
                 run_id,
@@ -2564,6 +3635,48 @@ def process_comment(
         except Exception:
             pass
         raise
+
+
+AUTO_REPLY_DISABLED_RETRY_MAX_AGE_HOURS = 24
+
+
+def find_retryable_disabled_comments(
+    tenant_id: str,
+    *,
+    now_dt: Optional[datetime] = None,
+    max_age_hours: int = AUTO_REPLY_DISABLED_RETRY_MAX_AGE_HOURS,
+) -> list[str]:
+    """Trả danh sách `comment_id` đủ điều kiện đánh giá lại đúng 1 lần khi Fanpage đã bật tự động trả lời.
+
+    Điều kiện:
+    - Hệ thống tự động trả lời đang bật (không bật công tắc khẩn cấp) và Page đang bật chế độ `live` có ít nhất 1 intent.
+    - Bình luận trước đó bị bỏ qua DUY NHẤT vì lý do 'Chưa bật tự động trả lời…', dưới 24 giờ tuổi,
+      chưa bị ẩn/bỏ qua/xoá, chưa từng tự động trả lời và chưa có phản hồi của Page/nhân viên.
+    """
+    if is_kill_switch_enabled():
+        return []
+    ref_dt = now_dt or _now()
+    candidates = store.list_retryable_disabled_auto_reply_comments(
+        tenant_id,
+        now_dt=ref_dt,
+        max_age_hours=max_age_hours,
+    )
+    setting_cache: dict[str, dict] = {}
+    out: list[str] = []
+    for c in candidates:
+        pid = _comment_page_id(c)
+        if pid not in setting_cache:
+            setting_cache[pid] = (
+                store.get_auto_reply_setting_or_default(tenant_id, pid)
+                if pid
+                else store.default_auto_reply_setting(tenant_id, "")
+            )
+        st = setting_cache[pid]
+        enabled_intents = set(st.get("intents") or ()) & _VALID_INTENT_SET
+        if not st.get("enabled", True) or st.get("mode") != "live" or not enabled_intents:
+            continue
+        out.append(c["id"])
+    return out
 
 
 def run_auto_reply(

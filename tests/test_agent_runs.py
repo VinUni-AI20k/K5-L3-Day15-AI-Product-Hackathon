@@ -369,21 +369,31 @@ def test_auto_reply_live_sent_records_ordered_steps_and_links_messages():
     assert [x["id"] for x in rb["items"]] == [run_id]
 
 
-def test_auto_reply_dry_run_records_would_send():
-    enable_page(mode="dry_run", intents=("price",))
+def test_auto_reply_default_live_ignores_legacy_dry_run_row_and_records_sent():
+    # Legacy row with enabled=0, mode='dry_run' is ignored; auto-reply runs live and records outcome='sent'
+    with store.connect() as conn:
+        conn.execute(
+            """insert into auto_reply_setting(
+                 tenant_id, page_id, enabled, mode, intents, hourly_cap, daily_cap, updated_by, updated_at
+               ) values(%s,%s,0,'dry_run','["price"]',30,200,'legacy','2026-01-01T00:00:00.000Z')""",
+            (vpost_api.TENANT_ID, PAGE_ID),
+        )
+    fb_calls = []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), "fb_rep_legacy_1")[1]
     c = seed_comment("c_dry_1", message="Giá bao nhiêu ạ?")
     res = auto_reply.process_comment(vpost_api.TENANT_ID, c)
-    assert res["action"] == "would_send"
+    assert res["action"] == "sent"
+    assert len(fb_calls) == 1
 
     run = client.get("/api/comments/threads/c_dry_1").json()["thread"]["agentRun"]
     assert_run_contract_shape(run)
     assert run["kind"] == "auto_reply"
     assert run["status"] == "done"
-    assert run["outcome"] == "would_send"
+    assert run["outcome"] == "sent"
     assert [s["key"] for s in run["steps"]] == [
         "read", "safety", "intent", "facts", "compose", "output_check", "action"
     ]
-    assert run["steps"][-1]["label"] == "Chạy thử"
+    assert run["steps"][-1]["label"] == "Gửi"
     assert run["steps"][-1]["status"] == "ok"
 
 
@@ -418,8 +428,8 @@ def test_early_stop_on_can_ban_at_each_stage():
     assert [s["key"] for s in run_intent["steps"]] == ["read", "safety", "intent", "action"]
     assert [s["status"] for s in run_intent["steps"]] == ["ok", "ok", "blocked", "ok"]
 
-    # C) Blocked at facts (asked color Trắng is OOS) -> stops before compose/output_check
-    c_facts = seed_comment("c_cb_facts", from_id="u3", message="Màu trắng còn không ạ?")
+    # C) Blocked at facts (unknown product code) -> stops before compose/output_check
+    c_facts = seed_comment("c_cb_facts", from_id="u3", product_code="NOPE999", message="Giá bao nhiêu ạ?")
     r_facts = auto_reply.process_comment(vpost_api.TENANT_ID, c_facts)
     assert r_facts["tagged"] is True
     run_facts = client.get("/api/comments/threads/c_cb_facts").json()["thread"]["agentRun"]
@@ -427,7 +437,7 @@ def test_early_stop_on_can_ban_at_each_stage():
     assert run_facts["outcome"] == "can_ban"
     assert [s["key"] for s in run_facts["steps"]] == ["read", "safety", "intent", "facts", "action"]
     assert [s["status"] for s in run_facts["steps"]] == ["ok", "ok", "ok", "blocked", "ok"]
-    assert "trắng" in (run_facts["steps"][3]["detail"] or "").lower()
+    assert "nope999" in (run_facts["steps"][3]["detail"] or "").lower()
 
     # D) Blocked at action (hourly cap = 1 reached)
     enable_page(mode="live", intents=("price",), hourly_cap=1, daily_cap=10)

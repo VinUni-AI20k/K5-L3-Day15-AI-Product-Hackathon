@@ -11,17 +11,15 @@ import {
   HStack,
   Heading,
   Link,
-  RadioList,
-  RadioListItem,
   Section,
   Skeleton,
   Slider,
   Stack,
   StackItem,
-  Switch,
+  StatusDot,
   Text,
 } from "@astryxdesign/core";
-import { RotateCcw, Save, ShieldCheck } from "lucide-react";
+import { History, RotateCcw, Save, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { ApiErrorNotice } from "@/ui/components/feedback/ApiErrorNotice";
@@ -38,11 +36,9 @@ import { formatCommentAbsoluteTime } from "@/ui/schemas/comment.schema";
 import {
   AUTO_HIDE_CATEGORY_META,
   COMPLAINT_POLICY_INFO,
-  MODERATION_MODE_LABELS,
   MODERATION_THRESHOLD_MAX,
   MODERATION_THRESHOLD_MIN,
   MODERATION_THRESHOLD_STEP,
-  type ModerationMode,
   type ModerationSetting,
   type ModerationSettingUpdateInput,
 } from "@/ui/schemas/moderation.schema";
@@ -97,6 +93,7 @@ interface PageModerationSettingCardProps {
   readonly savedMessage: string | null;
   readonly onSave: (pageId: string, input: ModerationSettingUpdateInput) => void;
   readonly onDismissSaved?: (pageId: string) => void;
+  readonly onOpenLog?: () => void;
 }
 
 function PageModerationSettingCard({
@@ -107,8 +104,9 @@ function PageModerationSettingCard({
   savedMessage,
   onSave,
   onDismissSaved,
+  onOpenLog,
 }: PageModerationSettingCardProps) {
-  const serverKey = `${setting.pageId}:${setting.enabled}:${setting.mode}:${setting.categories.join(",")}:${setting.threshold}:${setting.updatedAt ?? ""}`;
+  const serverKey = `${setting.pageId}:${setting.categories.join(",")}:${setting.threshold}:${setting.updatedAt ?? ""}`;
   const [lastSyncedKey, setLastSyncedKey] = useState(serverKey);
   const [draft, setDraft] = useState<ModerationSettingDraft>(() =>
     settingToDraft(setting),
@@ -128,11 +126,6 @@ function PageModerationSettingCard({
   });
 
   const pageLabel = setting.pageName.trim() || setting.pageId;
-  const statusBadge = !setting.enabled
-    ? { variant: "neutral" as const, label: "Đang tắt" }
-    : setting.mode === "dry_run"
-      ? { variant: "info" as const, label: `Đang bật · ${MODERATION_MODE_LABELS.dry_run}` }
-      : { variant: "success" as const, label: `Đang bật · ${MODERATION_MODE_LABELS.live}` };
 
   function handleSave() {
     if (!gate.canSave) return;
@@ -147,13 +140,13 @@ function PageModerationSettingCard({
   return (
     <Card padding={5} data-moderation-page={setting.pageId}>
       <Stack direction="vertical" gap={4}>
-        {/* Page heading & active status */}
+        {/* Page heading & always-active live status */}
         <HStack gap={3} align="start" justify="between" wrap="wrap">
           <StackItem size="fill">
             <Stack direction="vertical" gap={0.5}>
               <HStack gap={2} align="center" wrap="wrap">
                 <Heading level={3}>{pageLabel}</Heading>
-                <Badge variant={statusBadge.variant} label={statusBadge.label} />
+                <Badge variant="success" label="Đang bật · chạy thật" />
               </HStack>
               <Text
                 type="supporting"
@@ -164,7 +157,7 @@ function PageModerationSettingCard({
                 Page ID: {setting.pageId}
                 {setting.updatedAt
                   ? ` · Cập nhật lúc ${formatCommentAbsoluteTime(setting.updatedAt)}`
-                  : " · Đang dùng cấu hình mặc định (tắt)"}
+                  : " · Đang dùng cấu hình mặc định"}
               </Text>
             </Stack>
           </StackItem>
@@ -172,50 +165,38 @@ function PageModerationSettingCard({
 
         <Divider />
 
-        {/* Enabled toggle */}
-        <Switch
-          label="Bật tự kiểm duyệt bình luận mới"
-          description="Chạy tự động sau mỗi lần đồng bộ bình luận. Hệ thống chỉ ẩn bình luận (có thể hiện lại), không bao giờ tự xoá hay tự trả lời."
-          value={draft.enabled}
-          isDisabled={!gate.canEdit}
-          disabledMessage={gate.editDisabledReason ?? undefined}
-          onChange={(checked) =>
-            setDraft((prev) => ({ ...prev, enabled: checked }))
-          }
-        />
-
-        {/* Mode selection */}
-        <RadioList
-          label="Chế độ hoạt động"
-          description="Mặc định dùng Chạy thử khi mới bật để kiểm tra độ chính xác trước khi ẩn thật trên Facebook."
-          value={draft.mode}
-          isDisabled={!gate.canEdit}
-          disabledMessage={gate.editDisabledReason ?? undefined}
-          onChange={(nextMode) => {
-            if (nextMode === "dry_run" || nextMode === "live") {
-              setDraft((prev) => ({ ...prev, mode: nextMode as ModerationMode }));
-            }
-          }}
-        >
-          <RadioListItem
-            value="dry_run"
-            label="Chạy thử"
-            description="Chỉ ghi nhận “Sẽ ẩn (chạy thử)” vào nhật ký và hiển thị nhãn trên VPOST — hoàn toàn không gọi hay thay đổi gì trên Facebook."
-          />
-          <RadioListItem
-            value="live"
-            label="Chạy thật"
-            description="Tự động ẩn bình luận đạt tiêu chí ngay trên Facebook (giới hạn 20 bình luận/lần đồng bộ và 100 bình luận/ngày mỗi Page). Có thể Hiện lại bất kỳ lúc nào."
-          />
-        </RadioList>
-
-        {draft.mode === "dry_run" ? (
-          <Banner
-            status="info"
-            title="Chế độ Chạy thử không tác động lên Facebook"
-            description="Bình luận khớp tiêu chí chỉ được gắn nhãn “Sẽ ẩn (chạy thử)” và ghi nhật ký kiểm duyệt để bạn đánh giá trước khi chuyển sang Chạy thật."
-          />
-        ) : null}
+        {/* Always-active live status explanation & log pointer */}
+        <Section variant="muted" padding={3} data-moderation-status="active">
+          <Stack direction="vertical" gap={1.5}>
+            <HStack gap={2} align="center" justify="between" wrap="wrap">
+              <HStack gap={2} align="center">
+                <StatusDot
+                  variant="success"
+                  label="Đang bật · chạy thật"
+                  aria-hidden="true"
+                />
+                <Text type="label">Đang bật · chạy thật</Text>
+              </HStack>
+              {onOpenLog ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="inbox-touch-target"
+                  icon={<History className="size-4" aria-hidden="true" />}
+                  label="Xem nhật ký kiểm duyệt"
+                  onClick={onOpenLog}
+                />
+              ) : null}
+            </HStack>
+            <Text type="supporting" color="secondary">
+              Hệ thống tự động ẩn các bình luận vi phạm thuộc nhóm đã chọn khi đạt ngưỡng độ
+              tin cậy (tối đa 20 bình luận/lần đồng bộ và 100 bình luận/ngày mỗi Fanpage; có
+              thể Hiện lại bất kỳ lúc nào). Xem lịch sử và hoàn tác tại mục “Nhật ký kiểm
+              duyệt” trên thanh công cụ hộp thư.
+            </Text>
+          </Stack>
+        </Section>
 
         {/* Selectable auto-hide categories (spam, scam, abusive, pii) */}
         <CheckboxList
@@ -242,7 +223,7 @@ function PageModerationSettingCard({
           ))}
         </CheckboxList>
 
-        {draft.enabled && draft.categories.length === 0 ? (
+        {draft.categories.length === 0 ? (
           <Banner
             status="warning"
             title="Chưa chọn nhóm tự ẩn nào"
@@ -374,6 +355,7 @@ export interface ModerationSettingsViewProps {
   readonly onRetry: () => void;
   readonly onSave: (pageId: string, input: ModerationSettingUpdateInput) => void;
   readonly onDismissSaved?: (pageId: string) => void;
+  readonly onOpenLog?: () => void;
 }
 
 /**
@@ -393,6 +375,7 @@ export function ModerationSettingsView({
   onRetry,
   onSave,
   onDismissSaved,
+  onOpenLog,
 }: ModerationSettingsViewProps) {
   return (
     <Stack direction="vertical" gap={5} data-moderation="settings-panel">
@@ -405,8 +388,9 @@ export function ModerationSettingsView({
           <Heading level={2}>Cài đặt tự kiểm duyệt theo Fanpage</Heading>
         </HStack>
         <Text type="supporting" color="secondary">
-          Tự kiểm duyệt tắt mặc định cho mọi Page. Khi bật, hệ thống chỉ ẩn bình luận vi phạm
-          (không tự xoá, không tự trả lời) và bỏ qua bình luận của chính Page hoặc đã có trả lời.
+          Tự kiểm duyệt đang bật ở chế độ chạy thật cho mọi Fanpage đã kết nối. Hệ thống chỉ
+          tự động ẩn bình luận vi phạm (không tự xoá, không tự trả lời; có thể hiện lại bất
+          kỳ lúc nào) và bỏ qua bình luận của chính Page hoặc đã có trả lời.
         </Text>
       </Stack>
 
@@ -445,6 +429,7 @@ export function ModerationSettingsView({
               savedMessage={savedMessageByPageId[setting.pageId] ?? null}
               onSave={onSave}
               onDismissSaved={onDismissSaved}
+              onOpenLog={onOpenLog}
             />
           ))}
         </Stack>
@@ -456,6 +441,8 @@ export function ModerationSettingsView({
 export interface ModerationSettingsPanelProps {
   /** Optional override for read-only reason (defaults to `useReadOnlyReason()`). */
   readonly readOnlyReason?: string | null;
+  /** Optional callback to switch directly to the moderation log panel. */
+  readonly onOpenLog?: () => void;
 }
 
 /**
@@ -464,6 +451,7 @@ export interface ModerationSettingsPanelProps {
  */
 export function ModerationSettingsPanel({
   readOnlyReason: readOnlyReasonProp,
+  onOpenLog,
 }: ModerationSettingsPanelProps = {}) {
   const hookReadOnlyReason = useReadOnlyReason();
   const readOnlyReason =
@@ -524,6 +512,7 @@ export function ModerationSettingsPanel({
       onDismissSaved={(pageId) =>
         setSavedMessageByPageId((prev) => ({ ...prev, [pageId]: undefined }))
       }
+      onOpenLog={onOpenLog}
     />
   );
 }

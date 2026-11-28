@@ -25,6 +25,17 @@ Lượt mô phỏng: `cost/simulate-__.csv` · run ID __ · __ phiên · seed __
 
 Chi phí / task thành công = chi phí trung bình mỗi phiên ÷ tỉ lệ đạt — **không coi như đạt 100%**.
 
+### Mô phỏng mới nhất
+
+`cost/simulate-2.csv` · `simulate-2@20261128-144044` · 50 phiên · seed 42 · tỉ lệ đạt 12/30 (40%) từ `eval/run-3.csv`.
+
+| Model | Chi phí / phiên | Chi phí / task thành công | Chi phí / câu hỏi đạt | Chi phí / tháng — thấp | Chi phí / tháng — cơ sở | Chi phí / tháng — cao | Chi phí / người / tháng (cơ sở) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| gemini-3.1-flash-lite | $0.00012 | $0.00031 | $0.00013 | $0.4560 | $1.06 | $1.52 | $0.0015 |
+| gemini-4-hydrogen | $0.00069 | $0.0017 | $0.00071 | $2.55 | $5.95 | $8.49 | $0.0085 |
+
+Token đo trên `gpt-4o-mini`; chi phí tính theo giá model trong bảng. Các persona và giá còn cần nguồn xác thực; xem cảnh báo trong `cost/simulate-2-summary.md`.
+
 ## 3. So với impact
 
 - Impact / người / tháng (`spec.md` §2): __

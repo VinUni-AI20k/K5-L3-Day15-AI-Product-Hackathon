@@ -188,7 +188,7 @@ def _block_network(*args, **kwargs):
 def setup_function(_):
     store.init()
     moderation_store.init_moderation()
-    for k in ("FB_APP_ID", "FB_APP_SECRET", "FB_PAGE_ID", "FB_PAGE_TOKEN"):
+    for k in ("FB_APP_ID", "FB_APP_SECRET", "FB_PAGE_ID", "FB_PAGE_TOKEN", "VPOST_AUTO_MODERATION_DISABLED"):
         os.environ.pop(k, None)
     with store.connect() as c:
         for t in (
@@ -227,6 +227,7 @@ def teardown_function(_):
     vpost_api.MODEL = _ORIG_VPOST_MODEL
     moderation_api.FB_WRITE_PAUSE_SEC = _ORIG_PAUSE
     moderation_api._sleep = _ORIG_SLEEP
+    os.environ.pop("VPOST_AUTO_MODERATION_DISABLED", None)
     client.cookies.clear()
 
 
@@ -298,18 +299,16 @@ def test_moderation_settings_defaults_put_and_strict_validation():
     assert body["tenantId"] == vpost_api.TENANT_ID
     assert [i["pageId"] for i in body["items"]] == [PAGE_A, PAGE_B]
     for item in body["items"]:
-        assert item["enabled"] is False
-        assert item["mode"] == "dry_run"
-        assert item["categories"] == []
+        assert item["enabled"] is True
+        assert item["mode"] == "live"
+        assert item["categories"] == ["spam", "scam", "abusive", "pii"]
         assert item["threshold"] == 0.85
         assert item["updatedAt"] is None
 
-    # Cập nhật hợp lệ (nhận cả threshold = 1 nguyên lẫn float trong 0.5..1.0)
+    # Cập nhật hợp lệ (nhận cả threshold = 1 nguyên lẫn float trong 0.5..1.0; không cần gửi enabled/mode)
     put_r = client.put(
         f"/api/comments/moderation-settings/{PAGE_A}",
         json={
-            "enabled": True,
-            "mode": "live",
             "categories": ["spam", "scam", "abusive", "pii", "spam"],
             "threshold": 0.9,
         },
@@ -323,26 +322,41 @@ def test_moderation_settings_defaults_put_and_strict_validation():
     assert setting["threshold"] == 0.9
     assert Z_RE.match(setting["updatedAt"])
 
+    # Dòng cũ trong DB lưu enabled=0, mode='dry_run' vẫn được trả ra là enabled=True, mode='live'
+    with store.connect() as c:
+        c.execute(
+            """insert into moderation_setting(
+                 tenant_id, page_id, enabled, mode, categories, threshold, updated_by, updated_at
+               ) values(%s,%s,0,'dry_run','["spam","pii"]',0.85,'legacy','2026-01-01T00:00:00.000Z')""",
+            (vpost_api.TENANT_ID, PAGE_B),
+        )
+    pb = next(i for i in client.get("/api/comments/moderation-settings").json()["items"] if i["pageId"] == PAGE_B)
+    assert pb["enabled"] is True and pb["mode"] == "live" and pb["categories"] == ["spam", "pii"]
+
     # Page không tồn tại -> 404
     assert (
         client.put(
             "/api/comments/moderation-settings/unknown-page",
-            json={"enabled": True, "mode": "dry_run", "categories": ["spam"], "threshold": 0.85},
+            json={"enabled": True, "mode": "live", "categories": ["spam"], "threshold": 0.85},
         ).status_code
         == 404
     )
 
-    # Validation nghiêm ngặt (extra="forbid", strict=True, threshold 0.5..1, mode, category hợp lệ)
+    # Validation nghiêm ngặt (extra="forbid", strict=True, threshold 0.5..1, cấm enabled=False/mode=dry_run, category hợp lệ)
     bad_payloads = [
-        {"enabled": "true", "mode": "dry_run", "categories": [], "threshold": 0.85},
+        {"enabled": False, "mode": "live", "categories": ["spam"], "threshold": 0.85},
+        {"enabled": False, "categories": ["spam"], "threshold": 0.85},
+        {"enabled": True, "mode": "dry_run", "categories": ["spam"], "threshold": 0.85},
+        {"mode": "dry_run", "categories": ["spam"], "threshold": 0.85},
+        {"enabled": "true", "mode": "live", "categories": [], "threshold": 0.85},
         {"enabled": True, "mode": "auto", "categories": [], "threshold": 0.85},
-        {"enabled": True, "mode": "dry_run", "categories": ["spam"], "threshold": 0.49},
-        {"enabled": True, "mode": "dry_run", "categories": ["spam"], "threshold": 1.01},
-        {"enabled": True, "mode": "dry_run", "categories": ["spam"], "threshold": True},
-        {"enabled": True, "mode": "dry_run", "categories": ["neutral"], "threshold": 0.85},
-        {"enabled": True, "mode": "dry_run", "categories": ["positive"], "threshold": 0.85},
-        {"enabled": True, "mode": "dry_run", "categories": ["unknown"], "threshold": 0.85},
-        {"enabled": True, "mode": "dry_run", "categories": [], "threshold": 0.85, "extra": 1},
+        {"enabled": True, "mode": "live", "categories": ["spam"], "threshold": 0.49},
+        {"enabled": True, "mode": "live", "categories": ["spam"], "threshold": 1.01},
+        {"enabled": True, "mode": "live", "categories": ["spam"], "threshold": True},
+        {"enabled": True, "mode": "live", "categories": ["neutral"], "threshold": 0.85},
+        {"enabled": True, "mode": "live", "categories": ["positive"], "threshold": 0.85},
+        {"enabled": True, "mode": "live", "categories": ["unknown"], "threshold": 0.85},
+        {"enabled": True, "mode": "live", "categories": [], "threshold": 0.85, "extra": 1},
     ]
     for payload in bad_payloads:
         resp = client.put(f"/api/comments/moderation-settings/{PAGE_A}", json=payload)
@@ -449,35 +463,46 @@ def test_classify_ai_failure_returns_neutral_and_auth_checks():
 
 # ---------------- 4. run_auto_moderation ----------------
 
-def test_auto_moderation_off_by_default_and_dry_run_never_calls_facebook(monkeypatch):
+def test_auto_moderation_live_by_default_legacy_row_and_kill_switch(monkeypatch):
     fb_calls = []
-    monkeypatch.setattr(tools, "hide_fb_comment", lambda *a, **kw: fb_calls.append(a) or True)
+    monkeypatch.setattr(tools, "hide_fb_comment", lambda cid, hidden, ch: fb_calls.append((cid, hidden, ch)) or True)
 
+    # 1. Mặc định không có dòng cài đặt -> chạy live ngay cho cả 4 nhóm (spam, scam, abusive, pii)
     seed_comment("c1", message="Đ.m shop lừa đảo vcl")
-    # Mặc định tắt -> bỏ qua, không gọi Facebook
     s0 = moderation_api.run_auto_moderation(vpost_api.TENANT_ID, ["c1"])
-    assert s0["evaluated"] == 0 and s0["autoHidden"] == 0 and s0["wouldHide"] == 0 and s0["skipped"] == 1
-    assert fb_calls == []
-
-    # Bật dry_run
-    r = client.put(
-        f"/api/comments/moderation-settings/{PAGE_A}",
-        json={"enabled": True, "mode": "dry_run", "categories": ["abusive", "spam"], "threshold": 0.85},
-    )
-    assert r.status_code == 200
-
-    s1 = moderation_api.run_auto_moderation(vpost_api.TENANT_ID, ["c1"])
-    assert s1["evaluated"] == 1 and s1["wouldHide"] == 1 and s1["autoHidden"] == 0
-    assert fb_calls == []  # dry_run tuyệt đối không gọi Facebook
+    assert s0["evaluated"] == 1 and s0["autoHidden"] == 1 and s0["wouldHide"] == 0 and s0["skipped"] == 0
+    assert fb_calls == [("c1", True, CHANNEL_A)]
 
     c1 = moderation_store.get_comment(vpost_api.TENANT_ID, "c1")
-    assert c1["is_hidden"] == 0
+    assert c1["is_hidden"] == 1
     assert c1["moderation_category"] == "abusive"
-    assert c1["moderation_action"] == "would_hide"
+    assert c1["moderation_action"] == "auto_hidden"
 
-    logs = client.get("/api/comments/moderation-log?action=would_hide&actor=auto").json()["items"]
+    logs = client.get("/api/comments/moderation-log?action=hide&actor=auto").json()["items"]
     assert len(logs) == 1
     assert logs[0]["commentId"] == "c1" and logs[0]["result"] == "ok" and logs[0]["category"] == "abusive"
+
+    # 2. Dòng cũ trong DB lưu enabled=0, mode='dry_run' vẫn chạy live (không bị tắt âm thầm)
+    with store.connect() as c:
+        c.execute(
+            """insert into moderation_setting(
+                 tenant_id, page_id, enabled, mode, categories, threshold, updated_by, updated_at
+               ) values(%s,%s,0,'dry_run','["spam","abusive"]',0.85,'legacy','2026-01-01T00:00:00.000Z')""",
+            (vpost_api.TENANT_ID, PAGE_B),
+        )
+    seed_comment("c_leg", page_id=PAGE_B, message="Follow chéo tương tác chéo nha!")
+    s_leg = moderation_api.run_auto_moderation(vpost_api.TENANT_ID, ["c_leg"])
+    assert s_leg["evaluated"] == 1 and s_leg["autoHidden"] == 1 and s_leg["wouldHide"] == 0
+    assert fb_calls == [("c1", True, CHANNEL_A), ("c_leg", True, CHANNEL_B)]
+
+    # 3. Công tắc khẩn cấp VPOST_AUTO_MODERATION_DISABLED=1 dừng toàn bộ tự kiểm duyệt
+    monkeypatch.setenv("VPOST_AUTO_MODERATION_DISABLED", "1")
+    seed_comment("c_kill", message="Gọi mình 0912345678 nha")
+    s_kill = moderation_api.run_auto_moderation(vpost_api.TENANT_ID, ["c_kill"])
+    assert s_kill["evaluated"] == 0 and s_kill["autoHidden"] == 0 and s_kill["skipped"] == 1
+    assert len(fb_calls) == 2
+    c_kill = moderation_store.get_comment(vpost_api.TENANT_ID, "c_kill")
+    assert c_kill["is_hidden"] == 0 and (c_kill.get("moderation_action") or "") == ""
 
 
 def test_auto_moderation_live_threshold_categories_and_ai_failure(monkeypatch):
@@ -1004,7 +1029,7 @@ def test_other_tenant_cookie_403_and_cross_tenant_404():
         (
             "PUT",
             f"/api/comments/moderation-settings/{PAGE_A}",
-            {"enabled": True, "mode": "dry_run", "categories": ["spam"], "threshold": 0.85},
+            {"enabled": True, "mode": "live", "categories": ["spam"], "threshold": 0.85},
         ),
         ("GET", "/api/comments/moderation-log", None),
         ("POST", "/api/comments/c_mine/classify", None),
@@ -1055,7 +1080,7 @@ def test_real_server_app_exposes_all_moderation_routes_without_shadowing(monkeyp
 
     r_put = real_client.put(
         f"/api/comments/moderation-settings/{PAGE_A}",
-        json={"enabled": True, "mode": "dry_run", "categories": ["spam"], "threshold": 0.85},
+        json={"enabled": True, "mode": "live", "categories": ["spam"], "threshold": 0.85},
     )
     assert r_put.status_code == 200 and r_put.json()["setting"]["enabled"] is True
 

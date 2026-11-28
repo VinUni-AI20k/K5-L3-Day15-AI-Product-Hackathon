@@ -1,0 +1,84 @@
+/**
+ * Token-only layout & accessible table styling for the "Bảng size" section
+ * on `/writing-style`. Zero raw hex/rgb/hsl/oklch values, zero arbitrary
+ * Tailwind sizes, dark-mode safe via VPOST / Astryx semantic custom properties.
+ */
+
+@layer components {
+  .size-chart-tab-scroller {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .size-chart-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background-color: var(--bg-page);
+  }
+
+  .size-chart-table {
+    width: 100%;
+    min-width: 40rem;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .size-chart-table thead th {
+    background-color: var(--bg-subtle);
+    color: var(--text-secondary);
+    font-size: var(--text-label-size);
+    font-weight: var(--text-label-weight);
+    line-height: var(--text-label-leading);
+    text-align: start;
+    padding-block: var(--spacing-3);
+    padding-inline: var(--spacing-3);
+    border-bottom: 1px solid var(--border-default);
+    white-space: nowrap;
+  }
+
+  .size-chart-table tbody td {
+    padding-block: var(--spacing-2);
+    padding-inline: var(--spacing-3);
+    border-bottom: 1px solid var(--border-default);
+    vertical-align: top;
+  }
+
+  .size-chart-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .size-chart-table tbody tr {
+    transition: var(--transition-interactive);
+  }
+
+  .size-chart-table tbody tr:hover {
+    background-color: var(--state-hover-bg);
+  }
+
+  .size-chart-col-size {
+    width: 8rem;
+  }
+
+  .size-chart-col-num {
+    width: 10rem;
+  }
+
+  .size-chart-col-action {
+    width: 3.5rem;
+    text-align: end;
+  }
+
+  .size-chart-cell-action {
+    text-align: end;
+  }
+
+  .size-chart-empty-cell {
+    padding-block: var(--spacing-6);
+    padding-inline: var(--spacing-4);
+    text-align: center;
+  }
+}

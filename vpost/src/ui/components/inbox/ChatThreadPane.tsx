@@ -405,6 +405,7 @@ export function ChatThreadPane({
         <ChatHeader
           thread={thread}
           firstMessageAt={firstMessageAt}
+          nowMs={nowMs}
           readOnlyReason={readOnlyReason}
           isTogglingIgnore={isTogglingIgnore}
           showBackButton={showBackButton}
@@ -555,7 +556,7 @@ export function ChatThreadPane({
                     color="inherit"
                     className="inbox-meta-text"
                   >
-                    Chưa đăng lên Facebook vì Fanpage đang ở chế độ Chạy thử.
+                    Bản ghi chạy thử cũ — câu trả lời này chưa được đăng lên Facebook.
                   </Text>
                 </Stack>
               </Card>

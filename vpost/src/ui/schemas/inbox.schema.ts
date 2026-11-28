@@ -157,9 +157,75 @@ export const AGENT_RUN_OUTCOMES = [
   "can_ban",
   "draft_saved",
   "failed",
+  "awaiting_measurements",
 ] as const;
 export const AgentRunOutcomeSchema = z.enum(AGENT_RUN_OUTCOMES);
 export type AgentRunOutcome = z.infer<typeof AgentRunOutcomeSchema>;
+
+/**
+ * Optional structured measurements payload attached to an agent run or step
+ * (`.swarm/specs/size-advice.md`). Accepts camelCase or snake_case keys and
+ * normalizes to a clean shape while staying completely optional in zod.
+ */
+export interface ParsedMeasurements {
+  readonly heightCm: number | null;
+  readonly weightKg: number | null;
+  readonly size: string | null;
+  readonly category: string | null;
+  readonly chartRowLabel: string | null;
+}
+
+const SizeChartRangeLikeSchema = z.tuple([z.number().finite(), z.number().finite()]);
+
+const RawChartRowLikeSchema = z.object({
+  size: z.string().trim().min(1).optional(),
+  weightKg: SizeChartRangeLikeSchema.nullable().optional(),
+  weight_kg: SizeChartRangeLikeSchema.nullable().optional(),
+  heightCm: SizeChartRangeLikeSchema.nullable().optional(),
+  height_cm: SizeChartRangeLikeSchema.nullable().optional(),
+});
+
+function formatChartRowLike(
+  raw: z.infer<typeof RawChartRowLikeSchema> | string | null | undefined,
+): string | null {
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (!raw || typeof raw !== "object") return null;
+  const parts: string[] = [];
+  if (raw.size) parts.push(`Size ${raw.size}`);
+  const w = raw.weightKg ?? raw.weight_kg;
+  if (w) parts.push(`${w[0]}–${w[1]} kg`);
+  const h = raw.heightCm ?? raw.height_cm;
+  if (h) parts.push(`${h[0]}–${h[1]} cm`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+export const ParsedMeasurementsSchema: z.ZodType<ParsedMeasurements> = z
+  .object({
+    heightCm: z.number().finite().nullable().optional(),
+    height_cm: z.number().finite().nullable().optional(),
+    weightKg: z.number().finite().nullable().optional(),
+    weight_kg: z.number().finite().nullable().optional(),
+    size: z.string().nullable().optional(),
+    recommendedSize: z.string().nullable().optional(),
+    recommended_size: z.string().nullable().optional(),
+    category: z.string().nullable().optional(),
+    loai: z.string().nullable().optional(),
+    chartRow: z.union([RawChartRowLikeSchema, z.string()]).nullable().optional(),
+    chart_row: z.union([RawChartRowLikeSchema, z.string()]).nullable().optional(),
+  })
+  .transform((raw): ParsedMeasurements => {
+    const heightCm = raw.heightCm ?? raw.height_cm ?? null;
+    const weightKg = raw.weightKg ?? raw.weight_kg ?? null;
+    const rawSize = raw.size ?? raw.recommendedSize ?? raw.recommended_size ?? null;
+    const size = rawSize && rawSize.trim().length > 0 ? rawSize.trim() : null;
+    const rawCat = raw.category ?? raw.loai ?? null;
+    const category = rawCat && rawCat.trim().length > 0 ? rawCat.trim() : null;
+    const chartRowLabel = formatChartRowLike(raw.chartRow ?? raw.chart_row);
+    return { heightCm, weightKg, size, category, chartRowLabel };
+  });
 
 export const AgentRunStepSchema = z.object({
   key: z.string().min(1),
@@ -171,6 +237,10 @@ export const AgentRunStepSchema = z.object({
     .optional()
     .transform((value) => value ?? null),
   at: z.iso.datetime({ offset: true }),
+  // Optional structured measurement fields for parallel backend rollout.
+  parsedMeasurements: ParsedMeasurementsSchema.nullable().optional(),
+  measurements: ParsedMeasurementsSchema.nullable().optional(),
+  data: ParsedMeasurementsSchema.nullable().optional(),
 });
 export type AgentRunStep = z.infer<typeof AgentRunStepSchema>;
 
@@ -194,6 +264,9 @@ export const AgentRunSchema = z.object({
     .nullable()
     .optional()
     .transform((value) => value ?? null),
+  // Optional structured measurement fields for parallel backend rollout.
+  parsedMeasurements: ParsedMeasurementsSchema.nullable().optional(),
+  measurements: ParsedMeasurementsSchema.nullable().optional(),
 });
 export type AgentRun = z.infer<typeof AgentRunSchema>;
 
@@ -231,6 +304,46 @@ export const InboxLastMessageSchema = z.object({
 });
 export type InboxLastMessage = z.infer<typeof InboxLastMessageSchema>;
 
+export interface InboxThreadStateInfo {
+  readonly state: string;
+  readonly productCode: string | null;
+  readonly askedCommentId: string | null;
+  readonly expiresAt: string | null;
+}
+
+const InboxThreadStateObjectSchema = z
+  .object({
+    state: z.string().min(1),
+    productCode: z.string().nullable().optional(),
+    product_code: z.string().nullable().optional(),
+    askedCommentId: z.string().nullable().optional(),
+    asked_comment_id: z.string().nullable().optional(),
+    expiresAt: z.iso.datetime({ offset: true }).nullable().optional(),
+    expires_at: z.iso.datetime({ offset: true }).nullable().optional(),
+  })
+  .transform((raw): InboxThreadStateInfo => ({
+    state: raw.state,
+    productCode: raw.productCode ?? raw.product_code ?? null,
+    askedCommentId: raw.askedCommentId ?? raw.asked_comment_id ?? null,
+    expiresAt: raw.expiresAt ?? raw.expires_at ?? null,
+  }));
+
+export const InboxThreadStateFieldSchema: z.ZodType<InboxThreadStateInfo | null> = z
+  .union([InboxThreadStateObjectSchema, z.string().trim().min(1)])
+  .nullable()
+  .transform((value): InboxThreadStateInfo | null => {
+    if (value === null) return null;
+    if (typeof value === "string") {
+      return {
+        state: value,
+        productCode: null,
+        askedCommentId: null,
+        expiresAt: null,
+      };
+    }
+    return value;
+  });
+
 export const InboxThreadSchema = z.object({
   id: z.string().min(1),
   channelId: z.string().min(1),
@@ -266,6 +379,10 @@ export const InboxThreadSchema = z.object({
   agentRun: AgentRunSchema.nullable()
     .optional()
     .transform((value) => value ?? null),
+  // Optional size-advice thread state fields (`awaiting_measurements`) for parallel backend rollout.
+  threadState: InboxThreadStateFieldSchema.optional(),
+  sizeAdvice: InboxThreadStateFieldSchema.optional(),
+  awaitingMeasurements: z.boolean().nullable().optional(),
   updatedAt: z.iso.datetime({ offset: true }),
 });
 export type InboxThread = z.infer<typeof InboxThreadSchema>;

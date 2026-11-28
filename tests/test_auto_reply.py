@@ -161,7 +161,14 @@ def seed_comment(
     return store.get_comment(tenant_id or vpost_api.TENANT_ID, cid)
 
 
-def enable_page(page_id=PAGE_ID, *, mode="live", intents=("price", "size", "color"), hourly_cap=30, daily_cap=200):
+def enable_page(
+    page_id=PAGE_ID,
+    *,
+    mode="live",
+    intents=("price", "size", "color", "size_advice"),
+    hourly_cap=200,
+    daily_cap=2000,
+):
     store.upsert_auto_reply_setting(
         vpost_api.TENANT_ID,
         page_id,
@@ -334,8 +341,7 @@ def test_rule_table_accepts_price_size_color_variants(text, expected, asked_size
         "So sánh mẫu này với mẫu kia, giá sao ạ?",
         "Giao hàng mấy ngày tới ạ, còn size L không?",
         "Phí vận chuyển bao nhiêu, mẫu này giá sao?",
-        # Body measurements / fit advice -> human needed
-        "55kg cao 1m60 mặc vừa size nào shop?",
+        # Garment specs / fit questions outside height+weight size advice -> human needed
         "Cho em xin số đo size M với ạ",
         "Form rộng hay ôm ạ? có size L ko",
         "Eo 72 mặc vừa không shop?",
@@ -416,17 +422,18 @@ def test_input_guard_blocks_prompt_injection(msg):
     assert att and att["tag"] == "can_ban"
 
 
-def test_input_guard_blocks_url_long_text_hidden_moderated_abusive_and_disabled_setting():
+def test_input_guard_blocks_url_long_text_hidden_moderated_abusive_and_disabled_intent():
     fb_calls = []
     facebook.reply_comment = lambda *a, **kw: (fb_calls.append(a), "fb_never")[1]
 
-    # Setting off (default) -> can_ban, no FB call
-    c_off = seed_comment("c_off", message="Giá bao nhiêu ạ?")
-    r_off = auto_reply.process_comment(vpost_api.TENANT_ID, c_off)
-    assert r_off["action"] == "skipped" and r_off["tagged"] is True
-    assert "chưa bật" in r_off["reason"].lower()
+    # Empty intents list -> can_ban, no FB call
+    enable_page(intents=())
+    c_no_int = seed_comment("c_no_int", message="Giá bao nhiêu ạ?")
+    r_no_int = auto_reply.process_comment(vpost_api.TENANT_ID, c_no_int)
+    assert r_no_int["action"] == "skipped" and r_no_int["tagged"] is True
+    assert "nhóm câu hỏi" in r_no_int["reason"].lower()
 
-    enable_page(mode="live", intents=("price",))
+    enable_page(intents=("price",))
 
     # Intent not enabled on this Page (asking size when only price enabled) -> can_ban
     c_dis_int = seed_comment("c_dis_int", message="Còn size gì ạ?")
@@ -434,7 +441,7 @@ def test_input_guard_blocks_url_long_text_hidden_moderated_abusive_and_disabled_
     assert r_dis_int["action"] == "skipped" and r_dis_int["tagged"] is True
     assert "size" in r_dis_int["reason"].lower()
 
-    enable_page(mode="live")
+    enable_page()
 
     # URL -> can_ban
     c_url = seed_comment("c_url", message="Giá bn? xem ở https://example.com/x")
@@ -490,10 +497,10 @@ def test_customer_ten_minute_cooldown(monkeypatch):
     r1 = auto_reply.process_comment(vpost_api.TENANT_ID, c1, now_dt=t0)
     assert r1["action"] == "sent" and len(fb_calls) == 1
 
-    # 5 minutes later, same customer -> blocked by 10-minute cooldown -> can_ban
+    # 5 minutes later, same customer asks the SAME kind of question again -> blocked by 10-minute cooldown
     t1 = t0 + timedelta(minutes=5)
     clock[0] = t1
-    c2 = seed_comment("c_cd_2", from_id="u_cool", message="Còn size nào ạ?", created_time="2026-11-28T10:05:00.000Z")
+    c2 = seed_comment("c_cd_2", from_id="u_cool", message="Giá sao vậy shop", created_time="2026-11-28T10:05:00.000Z")
     r2 = auto_reply.process_comment(vpost_api.TENANT_ID, c2, now_dt=t1)
     assert r2["action"] == "skipped" and r2["tagged"] is True
     assert "10 phút" in r2["reason"]
@@ -502,7 +509,7 @@ def test_customer_ten_minute_cooldown(monkeypatch):
     # 11 minutes later -> allowed again
     t2 = t0 + timedelta(minutes=11)
     clock[0] = t2
-    c3 = seed_comment("c_cd_3", from_id="u_cool", message="Còn màu nào ạ?", created_time="2026-11-28T10:11:00.000Z")
+    c3 = seed_comment("c_cd_3", from_id="u_cool", message="Giá bao nhiêu vậy ạ?", created_time="2026-11-28T10:11:00.000Z")
     r3 = auto_reply.process_comment(vpost_api.TENANT_ID, c3, now_dt=t2)
     assert r3["action"] == "sent" and len(fb_calls) == 2
 
@@ -568,10 +575,13 @@ def test_template_matches_facts_uses_writing_style_and_passes_verify_post():
         CHANNEL_ID,
         {"xungHo": "chị", "selfReference": "em", "maxEmoji": 0},
     )
-    enable_page(mode="dry_run")
-    c = seed_comment("c_tpl", message="Mẫu này giá bao nhiêu, còn size nào và màu gì ạ?")
+    fb_calls = []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_tpl_{len(fb_calls)}")[1]
+
+    # No settings row needed: live by default with all intents enabled
+    c = seed_comment("c_tpl", from_id="u_tpl1", message="Mẫu này giá bao nhiêu, còn size nào và màu gì ạ?")
     res = auto_reply.process_comment(vpost_api.TENANT_ID, c)
-    assert res["action"] == "would_send" and res["tagged"] is False
+    assert res["action"] == "sent" and res["tagged"] is False
     txt = res["text"]
     assert "G1" in txt
     assert "1.950.000đ" in txt
@@ -592,11 +602,12 @@ def test_template_matches_facts_uses_writing_style_and_passes_verify_post():
         CHANNEL_ID,
         {"xungHo": "nàng", "maxEmoji": 3},
     )
-    c2 = seed_comment("c_tpl2", message="Giá bao nhiêu ạ?")
+    c2 = seed_comment("c_tpl2", from_id="u_tpl2", message="Giá bao nhiêu ạ?")
     res2 = auto_reply.process_comment(vpost_api.TENANT_ID, c2)
-    assert res2["action"] == "would_send"
+    assert res2["action"] == "sent"
     assert len(rules.EMOJI.findall(res2["text"])) == 1
     assert "nàng" in res2["text"]
+    assert len(fb_calls) == 2
 
 
 def test_output_guard_blocks_and_tags_can_ban_with_kiem_tra_chan():
@@ -617,23 +628,43 @@ def test_output_guard_blocks_and_tags_can_ban_with_kiem_tra_chan():
     assert fb_calls == []
 
 
-# ---------------- 6 & 7. Dry-run, Live Idempotency, Caps, Kill Switch, Error Stop, Poller ----------------
+# ---------------- 6 & 7. Default Live, Legacy Row Override, Idempotency, Caps, Kill Switch, Error Stop, Poller ----------------
 
-def test_dry_run_never_calls_facebook_and_logs_would_send():
-    enable_page(mode="dry_run")
+def test_default_live_without_settings_row_and_legacy_disabled_row_ignored():
     fb_calls = []
-    facebook.reply_comment = lambda *a, **kw: (fb_calls.append(a), "fb_never")[1]
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_def_{len(fb_calls)}")[1]
 
-    c = seed_comment("c_dry", message="Giá bao nhiêu ạ?")
-    res = auto_reply.process_comment(vpost_api.TENANT_ID, c)
-    assert res["action"] == "would_send" and res["tagged"] is False
-    assert "1.950.000đ" in res["text"]
-    assert fb_calls == []
+    # 1. No row in auto_reply_setting -> enabled + live by default with all intents and max caps
+    s_default = store.get_auto_reply_setting_or_default(vpost_api.TENANT_ID, PAGE_ID)
+    assert s_default["enabled"] is True and s_default["mode"] == "live"
+    assert s_default["hourly_cap"] == 200 and s_default["daily_cap"] == 2000
+    assert s_default["intents"] == ["price", "size", "color", "size_advice"]
+
+    c_def = seed_comment("c_def_live", from_id="u_def1", message="Giá bao nhiêu ạ?")
+    res_def = auto_reply.process_comment(vpost_api.TENANT_ID, c_def)
+    assert res_def["action"] == "sent" and res_def["tagged"] is False
+    assert "1.950.000đ" in res_def["text"]
+    assert len(fb_calls) == 1
+
+    # 2. Legacy DB row stored with enabled=0 and mode='dry_run' MUST be treated as enabled + live
+    with store.connect() as conn:
+        conn.execute(
+            """insert into auto_reply_setting(
+                 tenant_id, page_id, enabled, mode, intents, hourly_cap, daily_cap, updated_by, updated_at
+               ) values(%s,%s,0,'dry_run','["price","size","color"]',30,200,'legacy','2026-01-01T00:00:00.000Z')""",
+            (vpost_api.TENANT_ID, PAGE_ID),
+        )
+    s_legacy = store.get_auto_reply_setting_or_default(vpost_api.TENANT_ID, PAGE_ID)
+    assert s_legacy["enabled"] is True and s_legacy["mode"] == "live"
+
+    c_leg = seed_comment("c_leg_live", from_id="u_def2", message="Còn size gì ạ?")
+    res_leg = auto_reply.process_comment(vpost_api.TENANT_ID, c_leg)
+    assert res_leg["action"] == "sent" and res_leg["tagged"] is False
+    assert len(fb_calls) == 2
 
     logs, _ = store.list_auto_reply_logs(vpost_api.TENANT_ID, page_id=PAGE_ID)
-    assert len(logs) == 1
-    assert logs[0]["action"] == "would_send"
-    assert logs[0]["text"] == res["text"]
+    assert len(logs) == 2
+    assert all(entry["action"] == "sent" for entry in logs)
 
 
 def test_live_sends_once_idempotent_across_ticks_and_marks_sent_by_auto(caplog):
@@ -893,7 +924,7 @@ def test_finding01_skips_already_replied_native_page_and_operator_activity_and_r
     facebook.list_comments = lambda fb_post_id, token, since=None: [
         {
             "id": "c_order_1",
-            "message": "Giá bao nhiêu ạ?",
+            "message": "Mẫu này giá bao nhiêu ạ?",
             "created_time": iso_ago(minutes=2),
             "from": {"id": "u_ord1", "name": "Hân"},
         },
@@ -1001,8 +1032,6 @@ def test_finding03_blocks_bare_tokens_compliments_thanks_and_complaints(msg):
         "Giá bao nhiêu ạ, đặt hôm nay mấy hôm nhận được?",
         "Size M dài bn cm vậy shop?",
         "Size M rộng bn vậy shop?",
-        "Em 50kí mặc sz gì ạ?",
-        "Cao 1.6m mặc size nào shop?",
         "Vải có nhăn ko shop, giá bn?",
         "Vải có xù k shop, giá bao nhiêu?",
         "Màu đen này mặc có bị nóng không shop?",
@@ -1176,7 +1205,7 @@ def test_finding07_serializes_caps_and_cooldown_per_page_and_conflict_skips_with
     enable_page(mode="live", hourly_cap=30, daily_cap=200)
     fb_calls.clear()
     c3 = seed_comment("c_f7_cd1", from_id="u_same_race", message="Giá bao nhiêu ạ?")
-    c4 = seed_comment("c_f7_cd2", from_id="u_same_race", message="Còn size nào ạ?")
+    c4 = seed_comment("c_f7_cd2", from_id="u_same_race", message="Giá sao vậy shop")
     results_cd = []
     barrier2 = threading.Barrier(2)
 
@@ -1450,7 +1479,7 @@ def test_per_customer_rules_remain_extra_layer_when_from_id_exists(monkeypatch):
         post_job_id="job-cust2",
         fb_post_id="123_cust2",
         from_id="u_repeat",
-        message="Còn size nào ạ?",
+        message="Giá sao vậy shop",
         created_time="2026-11-28T10:03:00.000Z",
     )
     r2 = auto_reply.process_comment(vpost_api.TENANT_ID, c2, now_dt=t1)
@@ -1615,7 +1644,9 @@ def test_n02_thread_scope_blocks_reply_chains_page_roots_3lvl_and_unpublished_po
     facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_n2_{len(fb_calls)}")[1]
 
     # Repro 1: Follow-up under operator reply (even with plain allowlisted question!) -> can_ban, zero sends
-    seed_comment("c_n2_op1", from_id="u1", message="Em 55kg mặc size nào, ship HN bao nhiêu?", created_time="2026-11-28T10:00:00.000Z")
+    # Thời điểm theo đồng hồ thật: send_thread_reply đóng dấu sent_at = giờ thật, nên bình luận hỏi tiếp
+    # phải đến SAU câu trả lời của nhân viên (giờ cố định sẽ hỏng khi đồng hồ thật vượt qua mốc đó).
+    seed_comment("c_n2_op1", from_id="u1", message="Em 55kg mặc size nào, ship HN bao nhiêu?", created_time=iso_ago(minutes=10))
     vpost_api.send_thread_reply(
         "c_n2_op1",
         "Dạ Đầm Voan Hoa G1 giá 1.950.000đ bạn nhé!",
@@ -1623,8 +1654,8 @@ def test_n02_thread_scope_blocks_reply_chains_page_roots_3lvl_and_unpublished_po
         sent_by="operator",
     )
     fb_calls.clear()
-    c_op_fu1 = seed_comment("c_n2_op2", parent_id="c_n2_op1", from_id="u1", message="Mẫu đó giá bao nhiêu ạ?", created_time="2026-11-28T10:05:00.000Z")
-    c_op_fu2 = seed_comment("c_n2_op3", parent_id="c_n2_op1", from_id="u1", message="Giá bao nhiêu ạ?", created_time="2026-11-28T10:06:00.000Z")
+    c_op_fu1 = seed_comment("c_n2_op2", parent_id="c_n2_op1", from_id="u1", message="Mẫu đó giá bao nhiêu ạ?", created_time=iso_ago(seconds=-2))
+    c_op_fu2 = seed_comment("c_n2_op3", parent_id="c_n2_op1", from_id="u1", message="Giá bao nhiêu ạ?", created_time=iso_ago(seconds=-3))
     for c_fu in (c_op_fu1, c_op_fu2):
         r = auto_reply.process_comment(vpost_api.TENANT_ID, c_fu)
         assert r["action"] == "skipped" and r["tagged"] is True and r["threadId"] == "c_n2_op1", r
@@ -1700,26 +1731,40 @@ def test_n03_oos_variant_checks_and_exact_color_equality_no_substring():
     fb_calls = []
     facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_n3_{len(fb_calls)}")[1]
 
-    # All exact N3 repros must end as can_ban with zero FB calls
-    n3_cases = [
+    # Non-allowlisted N3 repros (unprefixed color/size, price+OOS, combined color+size) still tag can_ban with zero FB calls
+    n3_blocked_cases = [
         ("G1", "Trắng còn size S không shop?"),
         ("G1", "Màu trắng giá bao nhiêu ạ?"),
         ("G1", "Size XL giá bao nhiêu ạ?"),
         ("G_M", "Size S màu trắng giá bao nhiêu ạ?"),
         ("G1", "Còn màu đen XL không shop?"),
         ("G1", "Còn màu đen 2XL không shop?"),
-        ("G1", "Còn size XL không shop?"),
-        ("G1", "Màu trắng còn không shop?"),
-        ("GX", "Còn màu xanh lá không shop?"),
         ("GX", "Còn màu xanh lá size S không shop?"),
         ("GX", "Còn màu xanh dương size S không shop?"),
-        ("GX", "mau xanh la con khong"),
     ]
-    for idx, (code, msg) in enumerate(n3_cases):
+    for idx, (code, msg) in enumerate(n3_blocked_cases):
         c = seed_comment(f"c_n3_bad_{idx}", from_id=f"u_n3_{idx}", product_code=code, message=msg)
         res = auto_reply.process_comment(vpost_api.TENANT_ID, c)
         assert res["action"] == "skipped" and res["tagged"] is True, (code, msg, res)
     assert fb_calls == []
+
+    # Single-named unavailable color/size availability questions reply with negative-but-helpful template
+    # (never claiming the OOS/unoffered variant is available, exact color equality preserved — no substring match!)
+    n3_negative_cases = [
+        ("G1", "Còn size XL không shop?", "hiện không có size này", "S, M, L"),
+        ("G1", "Màu trắng còn không shop?", "hiện hết màu Trắng", "còn màu Đen"),
+        ("GX", "Còn màu xanh lá không shop?", "hiện hết màu Xanh lá", "còn màu Xanh"),
+        ("GX", "mau xanh la con khong", "hiện hết màu Xanh lá", "còn màu Xanh"),
+    ]
+    for idx, (code, msg, expect_neg, expect_avail) in enumerate(n3_negative_cases):
+        c = seed_comment(f"c_n3_neg_{idx}", from_id=f"u_n3_neg_{idx}", product_code=code, message=msg)
+        res = auto_reply.process_comment(vpost_api.TENANT_ID, c)
+        assert res["action"] == "sent" and res["tagged"] is False, (code, msg, res)
+        assert expect_neg in res["text"], (code, msg, res["text"])
+        assert expect_avail in res["text"], (code, msg, res["text"])
+        _, row_ctx, page_ctx = vpost_api._comment_context(c)
+        assert vpost_api._check_reply_text(res["text"], row_ctx, page_ctx)["block"] == []
+    assert len(fb_calls) == len(n3_negative_cases)
 
     # Positive controls: exact case/diacritic-insensitive in-stock named color & named size succeed
     c_gx_ok = seed_comment("c_n3_gx_ok", from_id="u_n3_ok1", product_code="GX", message="Còn màu xanh không shop?")
@@ -1733,7 +1778,7 @@ def test_n03_oos_variant_checks_and_exact_color_equality_no_substring():
     c_g1_sz = seed_comment("c_n3_g1_sz", from_id="u_n3_ok3", product_code="G1", message="size L con khong")
     r_g1_sz = auto_reply.process_comment(vpost_api.TENANT_ID, c_g1_sz)
     assert r_g1_sz["action"] == "sent", r_g1_sz
-    assert len(fb_calls) == 3
+    assert len(fb_calls) == len(n3_negative_cases) + 3
 
 
 @pytest.mark.parametrize(
@@ -2488,10 +2533,12 @@ def test_quantity_with_other_topics_stays_can_ban(text):
 
 
 def test_quantity_answers_with_unit_price_and_stock_and_passes_output_check():
-    enable_page(mode="dry_run")
-    c = seed_comment("c_qty2", message="Lấy 2 bộ giá bao nhiêu ạ?")
+    fb_calls = []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_qty_{len(fb_calls)}")[1]
+
+    c = seed_comment("c_qty2", from_id="u_q1", message="Lấy 2 bộ giá bao nhiêu ạ?")
     res = auto_reply.process_comment(vpost_api.TENANT_ID, c)
-    assert res["action"] == "would_send" and res["tagged"] is False, res
+    assert res["action"] == "sent" and res["tagged"] is False, res
     assert "1.950.000đ mỗi bộ" in res["text"] and "còn đủ 2 bộ" in res["text"]
     _, row, page = vpost_api._comment_context(c)
     assert vpost_api._check_reply_text(res["text"], row, page)["block"] == []
@@ -2499,12 +2546,15 @@ def test_quantity_answers_with_unit_price_and_stock_and_passes_output_check():
     # Named size with quantity within stock (Đen M has 4)
     c2 = seed_comment("c_qty_m", from_id="u_qm", message="size M còn 3 cái không")
     r2 = auto_reply.process_comment(vpost_api.TENANT_ID, c2)
-    assert r2["action"] == "would_send", r2
+    assert r2["action"] == "sent", r2
     assert "còn đủ 3 cái" in r2["text"]
+    assert len(fb_calls) == 2
 
 
 def test_quantity_over_stock_or_bulk_is_tagged_can_ban():
-    enable_page(mode="dry_run")
+    fb_calls = []
+    facebook.reply_comment = lambda *a, **kw: (fb_calls.append(a), "fb_never")[1]
+
     # Đen L has only 2 in stock
     c = seed_comment("c_qty_l", from_id="u_ql", message="size L còn 3 cái không")
     r = auto_reply.process_comment(vpost_api.TENANT_ID, c)
@@ -2515,3 +2565,459 @@ def test_quantity_over_stock_or_bulk_is_tagged_can_ban():
     rb = auto_reply.process_comment(vpost_api.TENANT_ID, c_bulk)
     assert rb["action"] == "skipped" and rb["tagged"] is True
     assert "số lượng lớn" in rb["reason"]
+    assert fb_calls == []
+
+
+# ---------------- Follow-up questions from the same customer ----------------
+
+def test_same_customer_different_questions_are_all_answered_but_repeat_is_not():
+    fb_calls = []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_reply_{len(fb_calls)}")[1]
+    c1 = seed_comment("c_fu1", from_id="u_fu", message="Giá bao nhiêu ạ?")
+    r1 = auto_reply.process_comment(vpost_api.TENANT_ID, c1)
+    assert r1["action"] == "sent", r1
+
+    # Different topics from the same customer right after -> still answered
+    for cid, msg in (("c_fu2", "Có màu gì ạ?"), ("c_fu3", "size M còn không"), ("c_fu4", "giá 2 bộ bao nhiêu")):
+        r = auto_reply.process_comment(vpost_api.TENANT_ID, seed_comment(cid, from_id="u_fu", message=msg))
+        assert r["action"] == "sent", (msg, r)
+
+    # Asking the very same kind of question again within the window -> not repeated
+    r5 = auto_reply.process_comment(vpost_api.TENANT_ID, seed_comment("c_fu5", from_id="u_fu", message="Có màu gì vậy shop"))
+    assert r5["action"] == "skipped"
+
+
+@pytest.mark.parametrize("text, qty", [("gia 2 cai bao nhieu", 2), ("giá 3 bộ bao nhiêu tiền", 3), ("giá 2 cái thì bao nhiêu", 2)])
+def test_quantity_inside_price_question(text, qty):
+    r = auto_reply.classify_intent_rules(text)
+    assert r["ok"] is True and r["intents"] == {"price"} and r["asked_qty"] == qty
+
+
+# ---------------- Named colour/size availability (incl. "no") & disabled-skip retry ----------------
+
+@pytest.mark.parametrize(
+    "text,expected,asked_size,asked_color",
+    [
+        ("Mã này có màu đỏ không shop", {"color"}, None, "đỏ"),
+        ("Mã này có màu đỏ không ạ?", {"color"}, None, "đỏ"),
+        ("Mẫu này có màu đỏ không vậy shop?", {"color"}, None, "đỏ"),
+        ("Có màu đỏ không", {"color"}, None, "đỏ"),
+        ("Còn màu đỏ không vậy ạ?", {"color"}, None, "đỏ"),
+        ("Màu đỏ có không shop?", {"color"}, None, "đỏ"),
+        ("Mã này màu đỏ có không vậy?", {"color"}, None, "đỏ"),
+        ("Mã này, có màu xanh dương không shop?", {"color"}, None, "xanh dương"),
+        ("Shop ơi mã này có màu xanh lá không vậy ạ?", {"color"}, None, "xanh lá"),
+        ("ma nay co mau do khong shop", {"color"}, None, "do"),
+        ("mau nay co mau do khong vay", {"color"}, None, "do"),
+        ("ma nay mau do co khong", {"color"}, None, "do"),
+        ("co mau xanh la khong shop", {"color"}, None, "xanh la"),
+        ("mau den co khong a", {"color"}, None, "den"),
+        ("con mau hong khong vay", {"color"}, None, "hong"),
+        ("Có size XL không", {"size"}, "xl", None),
+        ("Size XL có không shop?", {"size"}, "xl", None),
+        ("Mã này có size M không shop", {"size"}, "m", None),
+        ("Mẫu này size 2XL có không vậy ạ?", {"size"}, "2xl", None),
+        ("co size xl khong shop", {"size"}, "xl", None),
+        ("size xl co khong vay", {"size"}, "xl", None),
+        ("ma nay co size s khong a", {"size"}, "s", None),
+        ("ma nay size m co khong shop", {"size"}, "m", None),
+    ],
+)
+def test_allowlist_named_color_and_size_availability_patterns(text, expected, asked_size, asked_color):
+    res = auto_reply.classify_intent(text)
+    assert res["ok"] is True, (text, res)
+    assert res["intents"] == expected
+    assert res["asked_size"] == asked_size
+    assert res["asked_color"] == asked_color
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Có màu đẹp không shop?",
+        "Màu lạ có không?",
+        "Mã này có màu abcxyz không shop",
+        "Mã này có màu người yêu cũ không shop",
+        "Mã này có màu như ảnh không shop",
+        "Còn màu khác không shop?",
+        "Có màu đỏ đậm hơn ảnh không shop?",
+        "ma nay co mau dep khong shop",
+        "co mau random khong shop",
+        "mau xyz co khong",
+    ],
+)
+def test_allowlist_rejects_arbitrary_non_color_text_in_color_patterns(text):
+    res = auto_reply.classify_intent(text)
+    assert res["ok"] is False, (text, res)
+
+
+def test_named_color_not_offered_ma_nay_co_mau_do_khong_shop_passes_reply_check():
+    """Production repro: 'Mã này có màu đỏ không shop' when product has in-stock Xanh lá, Đen replies from data and passes reply check."""
+    row_g_green = dict(ROW_G1, ma_sp="G_XD", mau="Xanh lá, Đen", size="S-L")
+    vpost_api.load_catalog([dict(ROW_G1), row_g_green])
+    tools.inventory = lambda: {
+        **INV_DEFAULT,
+        "G_XD": [
+            {"mau": "Xanh lá", "size": s, "ton": 3, "trang_thai": "Còn hàng"} for s in ("S", "M", "L")
+        ] + [
+            {"mau": "Đen", "size": s, "ton": 3, "trang_thai": "Còn hàng"} for s in ("S", "M", "L")
+        ],
+    }
+    seed_post_job(job_id="job-xd", fb_post_id="123_xd", product_code="G_XD")
+    writing_style.upsert_scope(
+        vpost_api.TENANT_ID,
+        CHANNEL_ID,
+        {"xungHo": "chị", "selfReference": "", "maxEmoji": 0},
+    )
+    fb_calls = []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_xd_{len(fb_calls)}")[1]
+
+    c = seed_comment(
+        "c_xd_red",
+        from_id="u_xd1",
+        post_job_id="job-xd",
+        fb_post_id="123_xd",
+        product_code="G_XD",
+        message="Mã này có màu đỏ không shop",
+    )
+    res = auto_reply.process_comment(vpost_api.TENANT_ID, c)
+    assert res["action"] == "sent" and res["tagged"] is False, res
+    txt = res["text"]
+    assert "G_XD" in txt
+    assert "hiện không có màu này" in txt
+    assert "còn màu Xanh lá, Đen" in txt
+    assert "chị" in txt
+    _, row_ctx, page_ctx = vpost_api._comment_context(c)
+    assert vpost_api._check_reply_text(txt, row_ctx, page_ctx)["block"] == []
+    assert len(fb_calls) == 1
+
+    # Positive control on same product: asking an in-stock colour answers positively
+    c_in = seed_comment(
+        "c_xd_green",
+        from_id="u_xd2",
+        post_job_id="job-xd",
+        fb_post_id="123_xd",
+        product_code="G_XD",
+        message="Mã này có màu xanh lá không shop",
+    )
+    res_in = auto_reply.process_comment(vpost_api.TENANT_ID, c_in)
+    assert res_in["action"] == "sent" and res_in["tagged"] is False, res_in
+    assert "không có" not in res_in["text"] and "hiện hết" not in res_in["text"]
+    assert "còn màu Xanh lá, Đen" in res_in["text"]
+    assert len(fb_calls) == 2
+
+
+def test_named_unavailable_oos_and_not_offered_color_and_size_pass_reply_check():
+    """OOS named color/size ('hiện hết màu Đỏ' / 'hiện hết size XL') and unoffered size/color all pass _check_reply_text."""
+    row_oos = dict(ROW_G1, ma_sp="G_VAR", mau="Xanh lá, Đen, Đỏ", size="S-XL")
+    row_sparse = dict(ROW_G1, ma_sp="G_SP", mau="Đen, Trắng", size="S, L")
+    vpost_api.load_catalog([dict(ROW_G1), row_oos, row_sparse])
+    tools.inventory = lambda: {
+        **INV_DEFAULT,
+        "G_VAR": [
+            {"mau": "Xanh lá", "size": "S", "ton": 3, "trang_thai": "Còn hàng"},
+            {"mau": "Xanh lá", "size": "M", "ton": 3, "trang_thai": "Còn hàng"},
+            {"mau": "Xanh lá", "size": "L", "ton": 3, "trang_thai": "Còn hàng"},
+            {"mau": "Xanh lá", "size": "XL", "ton": 0, "trang_thai": "HẾT HÀNG"},
+            {"mau": "Đen", "size": "S", "ton": 3, "trang_thai": "Còn hàng"},
+            {"mau": "Đen", "size": "M", "ton": 3, "trang_thai": "Còn hàng"},
+            {"mau": "Đen", "size": "L", "ton": 3, "trang_thai": "Còn hàng"},
+            {"mau": "Đen", "size": "XL", "ton": 0, "trang_thai": "HẾT HÀNG"},
+            {"mau": "Đỏ", "size": "S", "ton": 0, "trang_thai": "HẾT HÀNG"},
+            {"mau": "Đỏ", "size": "M", "ton": 0, "trang_thai": "HẾT HÀNG"},
+            {"mau": "Đỏ", "size": "L", "ton": 0, "trang_thai": "HẾT HÀNG"},
+            {"mau": "Đỏ", "size": "XL", "ton": 0, "trang_thai": "HẾT HÀNG"},
+        ],
+        "G_SP": [
+            {"mau": "Đen", "size": "S", "ton": 3, "trang_thai": "Còn hàng"},
+            {"mau": "Đen", "size": "L", "ton": 0, "trang_thai": "HẾT HÀNG"},
+            {"mau": "Trắng", "size": "S", "ton": 0, "trang_thai": "HẾT HÀNG"},
+            {"mau": "Trắng", "size": "L", "ton": 3, "trang_thai": "Còn hàng"},
+        ],
+    }
+    seed_post_job(job_id="job-var", fb_post_id="123_var", product_code="G_VAR")
+    seed_post_job(job_id="job-sp", fb_post_id="123_sp", product_code="G_SP")
+    writing_style.upsert_scope(
+        vpost_api.TENANT_ID,
+        CHANNEL_ID,
+        {"xungHo": "chị", "selfReference": "", "maxEmoji": 0},
+    )
+    fb_calls = []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_var_{len(fb_calls)}")[1]
+
+    # 1. Dropped (OOS) colour Đỏ -> negation-aware mention "hiện hết màu Đỏ, còn màu Xanh lá, Đen"
+    c_col_oos = seed_comment(
+        "c_var_col_oos",
+        from_id="u_v1",
+        post_job_id="job-var",
+        fb_post_id="123_var",
+        product_code="G_VAR",
+        message="Mã này có màu đỏ không shop",
+    )
+    r_col_oos = auto_reply.process_comment(vpost_api.TENANT_ID, c_col_oos)
+    assert r_col_oos["action"] == "sent" and r_col_oos["tagged"] is False, r_col_oos
+    assert "hiện hết màu Đỏ" in r_col_oos["text"]
+    assert "còn màu Xanh lá, Đen" in r_col_oos["text"]
+    _, row_ctx, page_ctx = vpost_api._comment_context(c_col_oos)
+    assert vpost_api._check_reply_text(r_col_oos["text"], row_ctx, page_ctx)["block"] == []
+
+    # 2. Dropped (OOS) size XL -> negation-aware mention "hiện hết size XL, còn size S, M, L"
+    c_sz_oos = seed_comment(
+        "c_var_sz_oos",
+        from_id="u_v2",
+        post_job_id="job-var",
+        fb_post_id="123_var",
+        product_code="G_VAR",
+        message="Có size XL không shop?",
+    )
+    r_sz_oos = auto_reply.process_comment(vpost_api.TENANT_ID, c_sz_oos)
+    assert r_sz_oos["action"] == "sent" and r_sz_oos["tagged"] is False, r_sz_oos
+    assert "hiện hết size XL" in r_sz_oos["text"]
+    assert "còn size S, M, L" in r_sz_oos["text"]
+    assert vpost_api._check_reply_text(r_sz_oos["text"], row_ctx, page_ctx)["block"] == []
+
+    # 3. Unoffered size 2XL -> "hiện không có size này, còn size S, M, L"
+    c_sz_no = seed_comment(
+        "c_var_sz_no",
+        from_id="u_v3",
+        post_job_id="job-var",
+        fb_post_id="123_var",
+        product_code="G_VAR",
+        message="Size 2XL có không vậy?",
+    )
+    r_sz_no = auto_reply.process_comment(vpost_api.TENANT_ID, c_sz_no)
+    assert r_sz_no["action"] == "sent" and r_sz_no["tagged"] is False, r_sz_no
+    assert "hiện không có size này" in r_sz_no["text"]
+    assert "còn size S, M, L" in r_sz_no["text"]
+    assert "2XL" not in r_sz_no["text"]
+    assert vpost_api._check_reply_text(r_sz_no["text"], row_ctx, page_ctx)["block"] == []
+
+    # 4. Sparse matrix with unoffered color -> quotes exact in-stock pairs only and passes reply check
+    c_sp_no = seed_comment(
+        "c_sp_red",
+        from_id="u_v4",
+        post_job_id="job-sp",
+        fb_post_id="123_sp",
+        product_code="G_SP",
+        message="Có màu đỏ không shop?",
+    )
+    r_sp_no = auto_reply.process_comment(vpost_api.TENANT_ID, c_sp_no)
+    assert r_sp_no["action"] == "sent" and r_sp_no["tagged"] is False, r_sp_no
+    assert "hiện không có màu này" in r_sp_no["text"]
+    assert "màu Đen (size S)" in r_sp_no["text"]
+    assert "màu Trắng (size L)" in r_sp_no["text"]
+    _, row_sp, page_sp = vpost_api._comment_context(c_sp_no)
+    assert vpost_api._check_reply_text(r_sp_no["text"], row_sp, page_sp)["block"] == []
+    assert len(fb_calls) == 4
+
+
+def test_poller_retries_once_when_skipped_only_due_to_disabled_page_setting(monkeypatch):
+    """Comments skipped ONLY with 'Chưa bật tự động trả lời…' (<24h) are re-evaluated once when auto-reply is on."""
+    t0 = datetime(2026, 11, 28, 12, 0, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(vpost_api, "now", lambda: t0)
+    monkeypatch.setenv("VPOST_AUTO_DRAFT_MAX_PER_TICK", "0")
+    with store.connect() as c:
+        c.execute(
+            "update post_job set published_at=%s, created_at=%s where id='job-1'",
+            ("2026-11-28T06:00:00.000Z", "2026-11-28T05:00:00.000Z"),
+        )
+
+    fb_calls = []
+    facebook.list_comments = lambda fb_post_id, token, since=None: []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_retry_{len(fb_calls)}")[1]
+
+    disabled_reason = "Chưa bật tự động trả lời cho Fanpage này"
+    ts_2h = (t0 - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    ts_1h = (t0 - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    # Eligible qualifying comment skipped earlier because Page setting was off
+    seed_comment("c_retry_ok", from_id="u_r1", message="Giá bao nhiêu ạ?", created_time=ts_2h)
+    store.set_thread_attention(vpost_api.TENANT_ID, "c_retry_ok", disabled_reason, tag="can_ban", since=ts_2h)
+    store.append_auto_reply_log(
+        vpost_api.TENANT_ID,
+        page_id=PAGE_ID,
+        fb_post_id="123_1001",
+        thread_id="c_retry_ok",
+        comment_id="c_retry_ok",
+        from_id="u_r1",
+        action="skipped",
+        reason=disabled_reason,
+        created_at=ts_2h,
+    )
+
+    # Eligible non-allowlist comment skipped earlier because Page setting was off -> re-evaluated once then tagged with real reason
+    seed_comment("c_retry_ship", from_id="u_r2", message="Ship về Đà Nẵng bao nhiêu shop?", created_time=ts_1h)
+    store.set_thread_attention(vpost_api.TENANT_ID, "c_retry_ship", disabled_reason, tag="can_ban", since=ts_1h)
+    store.append_auto_reply_log(
+        vpost_api.TENANT_ID,
+        page_id=PAGE_ID,
+        fb_post_id="123_1001",
+        thread_id="c_retry_ship",
+        comment_id="c_retry_ship",
+        from_id="u_r2",
+        action="skipped",
+        reason=disabled_reason,
+        created_at=ts_1h,
+    )
+
+    # Tick 1 (no new FB comments): poller picks up both retryable comments
+    tick1 = comment_poller.run_tick()
+    assert tick1["locked"] is True
+    assert tick1["autoReplied"] == 1
+    assert tick1["autoTagged"] == 1
+    assert len(fb_calls) == 1 and fb_calls[0][0] == "c_retry_ok"
+    assert "1.950.000đ" in fb_calls[0][1]
+
+    # Stale 'Chưa bật...' attention on c_retry_ok is cleared; c_retry_ship gets updated with real allowlist reason
+    atts = store.get_thread_attentions(vpost_api.TENANT_ID, ["c_retry_ok", "c_retry_ship"])
+    assert "c_retry_ok" not in atts
+    assert "c_retry_ship" in atts and atts["c_retry_ship"]["tag"] == "can_ban"
+    assert not store.is_disabled_auto_reply_reason(atts["c_retry_ship"]["reason"])
+
+    # Idempotency client_id='auto:c_retry_ok' stays intact
+    draft = store.get_draft_by_client_id(vpost_api.TENANT_ID, "auto:c_retry_ok")
+    assert draft is not None and draft["status"] == "sent"
+
+    logs_after_t1, _ = store.list_auto_reply_logs(vpost_api.TENANT_ID, page_id=PAGE_ID, limit=50)
+    count_after_t1 = len(logs_after_t1)
+
+    # Tick 2: NEITHER comment is re-evaluated again!
+    ar_calls = []
+    orig_run = auto_reply.run_auto_reply
+    monkeypatch.setattr(auto_reply, "run_auto_reply", lambda *a, **kw: (ar_calls.append(a), orig_run(*a, **kw))[1])
+    tick2 = comment_poller.run_tick()
+    assert tick2["autoReplied"] == 0 and tick2["autoTagged"] == 0
+    assert ar_calls == []
+    assert len(fb_calls) == 1
+    logs_after_t2, _ = store.list_auto_reply_logs(vpost_api.TENANT_ID, page_id=PAGE_ID, limit=50)
+    assert len(logs_after_t2) == count_after_t1
+
+
+def test_poller_never_retries_excluded_or_other_reason_skipped_comments(monkeypatch):
+    """Retry excludes >=24h, Page/operator replied, ignored, hidden, other skip reasons, already retried/sent, and waits while disabled."""
+    import uuid as _uuid
+
+    t0 = datetime(2026, 11, 28, 12, 0, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(vpost_api, "now", lambda: t0)
+    monkeypatch.setenv("VPOST_AUTO_DRAFT_MAX_PER_TICK", "0")
+    with store.connect() as c:
+        c.execute(
+            "update post_job set published_at=%s, created_at=%s where id='job-1'",
+            ("2026-11-27T00:00:00.000Z", "2026-11-26T23:00:00.000Z"),
+        )
+
+    fb_calls = []
+    facebook.list_comments = lambda fb_post_id, token, since=None: []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_ex_{len(fb_calls)}")[1]
+
+    disabled_reason = "Chưa bật tự động trả lời cho Fanpage này"
+
+    def _seed_skipped(cid, *, hours_ago=2, reason=disabled_reason, status="unreplied", is_hidden=0, msg="Giá bao nhiêu ạ?"):
+        ts = (t0 - timedelta(hours=hours_ago)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        seed_comment(cid, from_id="u_" + cid, message=msg, created_time=ts, status=status, is_hidden=is_hidden)
+        store.set_thread_attention(vpost_api.TENANT_ID, cid, reason, tag="can_ban", since=ts)
+        store.append_auto_reply_log(
+            vpost_api.TENANT_ID,
+            page_id=PAGE_ID,
+            fb_post_id="123_1001",
+            thread_id=cid,
+            comment_id=cid,
+            from_id="u_" + cid,
+            action="skipped",
+            reason=reason,
+            created_at=ts,
+        )
+        return ts
+
+    # 1. Older than 24h & exactly 24h -> excluded
+    _seed_skipped("c_ex_old", hours_ago=25)
+    _seed_skipped("c_ex_24h", hours_ago=24)
+
+    # 2. Has native Page reply -> excluded
+    _seed_skipped("c_ex_page_rep", hours_ago=2)
+    seed_comment(
+        "p_ex_rep",
+        parent_id="c_ex_page_rep",
+        from_id=PAGE_ID,
+        from_name="WorkHardToday",
+        is_from_page=1,
+        message="Dạ giá 1.950.000đ ạ",
+        created_time=(t0 - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        status="replied",
+    )
+
+    # 3. Has operator-edited draft -> excluded
+    _seed_skipped("c_ex_op_draft", hours_ago=2)
+    store.patch_comment_draft(
+        vpost_api.TENANT_ID,
+        "c_ex_op_draft",
+        str(_uuid.uuid4()),
+        "Dạ em đang kiểm tra cho chị ạ",
+        (t0 - timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        allow_any_root=True,
+        target_comment_id="c_ex_op_draft",
+    )
+
+    # 4. Ignored and hidden -> excluded
+    _seed_skipped("c_ex_ignored", hours_ago=2, status="ignored")
+    _seed_skipped("c_ex_hidden", hours_ago=2, is_hidden=1)
+
+    # 5. Skipped for ANY OTHER reason -> NEVER re-evaluated
+    _seed_skipped("c_ex_other_allow", hours_ago=2, reason="Bình luận không khớp mẫu câu hỏi giá/size/màu được phép tự động trả lời")
+    _seed_skipped("c_ex_other_intent", hours_ago=2, reason="Fanpage chưa bật tự động trả lời cho nhóm câu hỏi: giá")
+    _seed_skipped("c_ex_other_cap", hours_ago=2, reason="vượt trần tự trả lời")
+    _seed_skipped("c_ex_other_kill", hours_ago=2, reason="Tự động trả lời đang tạm tắt toàn hệ thống")
+
+    # 6. Previously skipped for disabled, then already re-evaluated with another reason -> excluded
+    _seed_skipped("c_ex_retried", hours_ago=3, reason=disabled_reason)
+    store.append_auto_reply_log(
+        vpost_api.TENANT_ID,
+        page_id=PAGE_ID,
+        fb_post_id="123_1001",
+        thread_id="c_ex_retried",
+        comment_id="c_ex_retried",
+        from_id="u_c_ex_retried",
+        action="skipped",
+        reason="vượt trần tự trả lời",
+        created_at=(t0 - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+    )
+
+    # 7. Already sent via idempotent auto:<cid> draft -> excluded
+    _seed_skipped("c_ex_sent_draft", hours_ago=2, reason=disabled_reason)
+    store.create_comment_draft(
+        vpost_api.TENANT_ID,
+        {
+            "id": str(_uuid.uuid4()),
+            "comment_id": "c_ex_sent_draft",
+            "status": "sent",
+            "ai_text": "",
+            "edited_text": "Dạ mẫu G1 giá 1.950.000đ ạ.",
+            "client_id": "auto:c_ex_sent_draft",
+            "sent_by": "auto",
+            "fb_reply_id": "fb_prev_sent",
+            "created_at": (t0 - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "updated_at": (t0 - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "sent_at": (t0 - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        },
+    )
+
+    # 8. One genuinely eligible comment (<24h, only disabled reason) -> waits while kill switch is ON, runs once when OFF
+    _seed_skipped("c_ex_valid", hours_ago=23, reason=disabled_reason)
+
+    # While global kill switch is ON, nothing is retried and c_ex_valid is NOT burned
+    monkeypatch.setenv("VPOST_AUTO_REPLY_DISABLED", "1")
+    t_off = comment_poller.run_tick()
+    assert t_off["autoReplied"] == 0 and t_off["autoTagged"] == 0
+    assert fb_calls == []
+
+    # Turn kill switch OFF -> ONLY c_ex_valid is evaluated and answered!
+    monkeypatch.delenv("VPOST_AUTO_REPLY_DISABLED", raising=False)
+    logs_before, _ = store.list_auto_reply_logs(vpost_api.TENANT_ID, page_id=PAGE_ID, limit=100)
+    t_on = comment_poller.run_tick()
+    assert t_on["autoReplied"] == 1 and t_on["autoTagged"] == 0
+    assert [target for target, _ in fb_calls] == ["c_ex_valid"]
+
+    # Exactly 1 new log entry was added (only for c_ex_valid) — none of the excluded comments were evaluated
+    logs_after, _ = store.list_auto_reply_logs(vpost_api.TENANT_ID, page_id=PAGE_ID, limit=100)
+    assert len(logs_after) == len(logs_before) + 1
+    assert logs_after[0]["comment_id"] == "c_ex_valid" and logs_after[0]["action"] == "sent"

@@ -38,10 +38,13 @@
 | Lượt | Run ID | Model | Cấu hình (prompt / công cụ / thay đổi) | Đạt / tổng | % | Đạt chuẩn? |
 |---|---|---|---|---|---|---|
 | 1 | `run-1@20261128-095827` | `gpt-4o-mini` | Luồng `check_product → check_stock → write_or_flag → verify_post` | 8/30 | 27% | chưa |
-| 2 | | | | __/__ | | |
+| 2 | `run-2@20261128-141751` | `gpt-4o-mini` | Luồng `check_product → check_stock → write_or_flag → verify_post`; thêm alias cột `ma_hang`, `don gia`, `kichco` | 9/30 | 30% | chưa |
+| 3 | `run-3@20261128-143901` | `gpt-4o-mini` | Giữ `Dịu Mây`; chặn thiếu ảnh, mâu thuẫn tay áo, lệnh bỏ qua kiểm tra và claim/brand bị cấm | 12/30 | 40% | chưa |
 
 Lượt chạy lại vì lỗi kỹ thuật, lượt sau CP4: ghi thêm dòng, không sửa dòng cũ.
 
 ## 6. Lỗi chính
 
 - Lượt 1 (`run-1@20261128-095827`, `gpt-4o-mini`): đạt `8/30 (27%)` — chặn chính xác các ca dữ liệu thật (`B27` giá sàn tệ, `B28` mâu thuẫn chất liệu, `B29` mâu thuẫn giá, `B30` prompt injection) và viết đạt `B26`; nhóm lỗi lớn nhất là `19/30` câu tự viết cũ dùng giá `< 540.000đ` nên bị luật giá sàn `Dịu Mây` chặn sớm, `B17` chưa chuẩn hóa tên cột lệch chuẩn dạng text trong `answer()`, và `B25` bỏ sót chất liệu `Polyester`.
+- Lượt 2 (`run-2@20261128-141751`, `gpt-4o-mini`): đạt `9/30 (30%)`, tăng 1 câu so với Lượt 1 nhờ `B25` (biến thiên LLM, không do alias). `B17` vẫn trượt vì giá 160.000đ dưới giá sàn `Dịu Mây` 540.000đ. Nhóm 19 câu bị chặn bởi giá sàn/page vẫn là lỗi chính.
+- Lượt 3 (`run-3@20261128-143901`, `gpt-4o-mini`): đạt `12/30 (40%)`, tăng 3 câu so với Lượt 2. `B02`, `B13`, `B22`, `B23` được chặn theo lỗi ảnh thiếu, mâu thuẫn tay áo, injection bỏ qua kiểm tra và claim/brand không được phép; `B25` trượt do output không nêu chất liệu. Giá sàn và cấu hình Page `Dịu Mây` không thay đổi; benchmark và tiêu chí chấm được giữ nguyên. Vẫn chưa đạt chuẩn chung.

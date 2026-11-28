@@ -274,7 +274,7 @@ def test_captions_applies_company_default_and_per_page_writing_style():
     assert 'Xưng hô với khách: "nàng thơ"' in m3.calls[0]["system"]
 
 
-def test_comment_draft_thread_draft_and_poller_use_configured_writing_style():
+def test_comment_draft_thread_draft_and_poller_use_configured_writing_style(monkeypatch):
     # Company default + per-Page override for CHANNEL_A
     assert client.put(
         "/api/writing-style",
@@ -332,6 +332,8 @@ def test_comment_draft_thread_draft_and_poller_use_configured_writing_style():
     assert 'Xưng hô với khách: "nàng"' in sys_ta
 
     # 4. Background comment_poller.run_tick() auto-draft also uses configured writing style
+    # Isolate auto-draft model call from default-on AI moderation classification
+    monkeypatch.setenv("VPOST_AUTO_MODERATION_DISABLED", "1")
     m_poller = CapturingModel(COMMENT_REPLY)
     vpost_api.MODEL = m_poller
     facebook.list_comments = lambda fb_post_id, token, since=None: [
