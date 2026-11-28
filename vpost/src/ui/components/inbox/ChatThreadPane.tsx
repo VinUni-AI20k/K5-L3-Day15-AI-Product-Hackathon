@@ -34,6 +34,7 @@ import {
 } from "@/ui/components/inbox/ChatComposer";
 import { ChatHeader } from "@/ui/components/inbox/ChatHeader";
 import { ChatMessageItem } from "@/ui/components/inbox/ChatMessageItem";
+import { resolveThreadFirstMessageAt } from "@/ui/components/inbox/inbox-customer-label";
 import {
   isScrolledNearBottom,
   isScrolledNearTop,
@@ -394,6 +395,7 @@ export function ChatThreadPane({
   }
 
   const canComment = resolveThreadCanComment(thread, messages);
+  const firstMessageAt = resolveThreadFirstMessageAt(thread, messages);
 
   return (
     <Layout
@@ -402,6 +404,7 @@ export function ChatThreadPane({
       header={
         <ChatHeader
           thread={thread}
+          firstMessageAt={firstMessageAt}
           readOnlyReason={readOnlyReason}
           isTogglingIgnore={isTogglingIgnore}
           showBackButton={showBackButton}
@@ -478,6 +481,7 @@ export function ChatThreadPane({
                     key={message.clientId ? `${message.id}:${message.clientId}` : message.id}
                     message={message}
                     channelName={thread.channelName}
+                    threadFirstMessageAt={firstMessageAt}
                     nowMs={nowMs}
                     readOnlyReason={readOnlyReason}
                     isCoarsePointer={isCoarsePointer}

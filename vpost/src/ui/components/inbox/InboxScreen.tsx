@@ -35,6 +35,11 @@ import {
   persistBlockedDraftIfEmpty,
 } from "@/ui/components/inbox/inbox-composer-state";
 import {
+  formatInboxCustomerName,
+  formatInboxThreadAccessibleContext,
+  resolveThreadFirstMessageAt,
+} from "@/ui/components/inbox/inbox-customer-label";
+import {
   DEFAULT_INBOX_LIST_FILTER,
   EMPTY_INBOX_COUNTS,
   buildInboxListFilterKey,
@@ -85,7 +90,6 @@ import { useReadOnlyReason } from "@/ui/hooks/useReadOnlyReason";
 import type { CommentSyncResponse } from "@/ui/schemas/comment.schema";
 import {
   formatSyncSummary,
-  formatThreadAccessibleContext,
   type InboxListFilter,
   type InboxMessage,
   type InboxThread,
@@ -144,6 +148,12 @@ export function InboxWorkspaceView({
 }: InboxWorkspaceViewProps) {
   const isMobile = layoutMode === "mobile";
   const isDesktop = layoutMode === "desktop";
+  const activeFirstMessageAt = activeThread
+    ? resolveThreadFirstMessageAt(activeThread, chatProps.messages)
+    : null;
+  const activeCustomerFallbackName = activeThread
+    ? formatInboxCustomerName(activeThread.customer.name, activeFirstMessageAt)
+    : null;
 
   // Mobile (<768px): strictly one column driven by `?thread=`.
   if (isMobile) {
@@ -172,6 +182,7 @@ export function InboxWorkspaceView({
           isOpen={isCustomerSheetOpen}
           isMobile
           thread={activeThread}
+          firstMessageAt={activeFirstMessageAt}
           onClose={onCloseCustomerSheet}
         />
 
@@ -260,7 +271,7 @@ export function InboxWorkspaceView({
                   <LayoutContent padding={0} isScrollable className="inbox-surface-page">
                     <CustomerPanel
                       fromId={activeThread.customer.id}
-                      fallbackName={activeThread.customer.name}
+                      fallbackName={activeCustomerFallbackName}
                       threadId={activeThread.id}
                     />
                   </LayoutContent>
@@ -276,6 +287,7 @@ export function InboxWorkspaceView({
           isOpen={isCustomerSheetOpen}
           isMobile={false}
           thread={activeThread}
+          firstMessageAt={activeFirstMessageAt}
           onClose={onCloseCustomerSheet}
         />
       ) : null}
@@ -563,13 +575,24 @@ export function InboxScreen() {
   );
   const selection = useCommentSelection({ pageIds, filterKey: listFilterKey });
 
+  const firstMessageAtByThread = useMemo<
+    Readonly<Record<string, string | undefined>> | undefined
+  >(() => {
+    if (!activeThread || serverMessages.length === 0) return undefined;
+    const firstAt = resolveThreadFirstMessageAt(activeThread, serverMessages);
+    return firstAt ? { [activeThread.id]: firstAt } : undefined;
+  }, [activeThread, serverMessages]);
+
   const bulkCommentLabelsById = useMemo(() => {
     const labels: Record<string, string> = {};
     for (const item of visibleThreads) {
-      labels[item.id] = formatThreadAccessibleContext(item);
+      labels[item.id] = formatInboxThreadAccessibleContext(
+        item,
+        firstMessageAtByThread?.[item.id],
+      );
     }
     return labels;
-  }, [visibleThreads]);
+  }, [firstMessageAtByThread, visibleThreads]);
 
   const bulkPageSelection: BulkPageSelectionControl = useMemo(
     () => ({
@@ -877,6 +900,7 @@ export function InboxScreen() {
         counts,
         hasCounts,
         items: syncedVisibleThreads,
+        firstMessageAtByThread,
         selectedThreadId,
         nowMs,
         readOnlyReason,

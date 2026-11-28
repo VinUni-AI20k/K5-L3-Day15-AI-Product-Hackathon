@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import secrets
+import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -33,15 +34,91 @@ import tools
 import writing_style
 from ai import MODEL_NAME, MODEL_PROVIDER, call_model
 
-# Một shop = một tenant. Phiên + tenant do Next (Postgres) giữ; VPOST_TENANT_ID = id tenant đó.
-TENANT_ID = os.environ.get("VPOST_TENANT_ID", "").strip() or "00000000-0000-4000-8000-000000000001"
+# Một shop = một tenant. Phiên + tenant do Next (Postgres, public.tenant) giữ; VPOST_TENANT_ID = id tenant đó.
+# Nếu VPOST_TENANT_ID để trống: lúc khởi động tự đọc public.tenant; đúng 1 công ty active thì tự nhận diện,
+# 0 công ty thì giữ id mặc định và thử lại lười (khi người dùng tạo công ty sau), ≥2 công ty thì không đoán.
+DEFAULT_TENANT_ID = "00000000-0000-4000-8000-000000000001"
+TENANT_ID = os.environ.get("VPOST_TENANT_ID", "").strip() or DEFAULT_TENANT_ID
 TENANT_COOKIE = "vpost_active_tenant"   # Next đặt, rewrite /api chuyển tiếp nguyên cookie
+
+tenant_log = logging.getLogger("vpost.tenant")
+_tenant_lock = threading.Lock()
+_tenant_resolution_state = "uninitialized"  # uninitialized | env | single | none | multiple
+
+
+def _resolve_tenant_locked(*, startup: bool = False) -> str:
+    global TENANT_ID, _tenant_resolution_state
+    prev_state = _tenant_resolution_state
+    env_tid = os.environ.get("VPOST_TENANT_ID", "").strip()
+    if env_tid:
+        TENANT_ID = env_tid
+        _tenant_resolution_state = "env"
+        if startup or prev_state != "env":
+            tenant_log.info("Dùng VPOST_TENANT_ID từ biến môi trường: tenant_id=%s", TENANT_ID)
+        return TENANT_ID
+
+    active = store.list_active_public_tenants()
+    if active is None:
+        TENANT_ID = DEFAULT_TENANT_ID
+        _tenant_resolution_state = "none"
+        if startup or prev_state != "none":
+            tenant_log.warning(
+                "Không đọc được bảng public.tenant để tự nhận diện công ty; tạm dùng tenant mặc định %s. "
+                "Vui lòng kiểm tra PostgreSQL hoặc đặt VPOST_TENANT_ID trong .env.",
+                DEFAULT_TENANT_ID,
+            )
+        return TENANT_ID
+
+    if len(active) == 1:
+        TENANT_ID = active[0]["id"]
+        _tenant_resolution_state = "single"
+        tenant_log.info(
+            "Đã tự động nhận diện công ty (active tenant) từ public.tenant: tenant_id=%s",
+            TENANT_ID,
+        )
+        return TENANT_ID
+
+    TENANT_ID = DEFAULT_TENANT_ID
+    if len(active) == 0:
+        _tenant_resolution_state = "none"
+        if startup or prev_state != "none":
+            tenant_log.warning(
+                "Chưa có công ty đang hoạt động (active tenant) trong public.tenant; tạm dùng tenant mặc định %s "
+                "(sẽ tự kiểm tra lại khi có công ty mới, hoặc đặt VPOST_TENANT_ID trong .env).",
+                DEFAULT_TENANT_ID,
+            )
+    else:
+        _tenant_resolution_state = "multiple"
+        if startup or prev_state != "multiple":
+            tenant_log.warning(
+                "Tìm thấy %d công ty đang hoạt động trong public.tenant — không tự đoán giữa nhiều công ty; "
+                "giữ tenant mặc định %s. Vui lòng đặt VPOST_TENANT_ID trong .env.",
+                len(active),
+                DEFAULT_TENANT_ID,
+            )
+    return TENANT_ID
+
+
+def resolve_tenant_id(*, startup: bool = False) -> str:
+    """Xác định TENANT_ID từ VPOST_TENANT_ID hoặc tự nhận diện từ public.tenant khi VPOST_TENANT_ID trống."""
+    with _tenant_lock:
+        return _resolve_tenant_locked(startup=startup)
+
+
+def get_tenant_id() -> str:
+    """Trả TENANT_ID hiện hành; tự kiểm tra lại lười từ public.tenant nếu lần đọc đầu không thấy công ty nào."""
+    if _tenant_resolution_state == "none":
+        with _tenant_lock:
+            if _tenant_resolution_state == "none":
+                _resolve_tenant_locked(startup=False)
+    return TENANT_ID
 
 
 def _same_tenant(request: Request):
     """Tenant khác đang chọn trên giao diện thì không được đọc dữ liệu shop này. Không có cookie = gọi thẳng/test."""
+    tid = get_tenant_id()
     active = request.cookies.get(TENANT_COOKIE)
-    if active and active != TENANT_ID:
+    if active and active != tid:
         raise ApiError(403, "FORBIDDEN", "Công ty đang chọn không có quyền với dữ liệu shop này.")
 
 
@@ -120,7 +197,7 @@ def page_credentials(ch_id):
 
 @router.get("/channels")
 def channels():
-    # Page tokens live in PostgreSQL (schema shop), so the backend can always store them.
+    # Page tokens are stored in PostgreSQL (schema shop, table fb_page), so the backend can always persist them.
     return {"tenantId": TENANT_ID, "channels": channels_list(), "secretsConfigured": True}
 
 
@@ -1227,6 +1304,7 @@ def generate_thread_draft(thread_id: str):
 
     Trả (draft_status, error_code|None). Dùng chung cho API `POST /threads/{id}/draft` và `comment_poller`.
     """
+    get_tenant_id()
     rec = _load_thread_record(thread_id)
     now_ts = z(now())
     if store.has_sending_draft(TENANT_ID, thread_id, now_ts=now_ts):
@@ -1279,7 +1357,8 @@ def threads_needing_auto_draft(limit: int) -> list[str]:
     """Danh sách tối đa `limit` threadId cần trả lời và chưa có nháp phủ tới tin nhắn khách gần nhất."""
     if limit <= 0:
         return []
-    rows = store.list_all_tenant_comments(TENANT_ID)
+    tid = get_tenant_id()
+    rows = store.list_all_tenant_comments(tid)
     if not rows:
         return []
     recs = _build_thread_records(rows, {})
@@ -1378,6 +1457,7 @@ def run_comment_sync(
     out_new_ids: Optional[list[str]] = None,
 ):
     """Đồng bộ bình luận từ Facebook và chạy tự kiểm duyệt (dùng chung cho API và poller nền)."""
+    get_tenant_id()
     cutoff = now() - timedelta(days=lookback_days)
 
     where, params = ["status='published'", "fb_post_id is not null", "trim(fb_post_id)!=''"], []
@@ -1878,7 +1958,7 @@ def send_thread_reply(
     """Đường gửi trả lời dùng chung cho người vận hành và auto-reply (cùng kiểm tra nội dung, fencing, idempotency)."""
     if sent_by != "auto" and str(client_id or "").strip().lower().startswith("auto:"):
         raise ApiError(400, "INVALID_INPUT", "clientId bắt đầu bằng 'auto:' chỉ dành cho hệ thống tự động trả lời")
-    tid = tenant_id or TENANT_ID
+    tid = tenant_id or get_tenant_id()
     rec = _load_thread_record(thread_id, tenant_id=tid)
     root = rec["root"]
 

@@ -601,3 +601,53 @@ def test_n02_three_level_reply_tags_root_thread_visible_in_can_ban_api():
 
     det = client.get("/api/comments/threads/c_api_3lvl").json()
     assert [m["id"] for m in det["messages"]] == ["c_api_3lvl", "p_api_3lvl", "c_api_3lvl_q"]
+
+
+def test_sync_auto_replies_real_customer_without_from_field():
+    """Real Facebook Graph comment payload (no 'from' key -> empty from_id) auto-replies live via POST /api/comments/sync."""
+    assert client.put(
+        f"/api/comments/auto-reply-settings/{PAGE_ID}",
+        json={"enabled": True, "mode": "live", "intents": ["price", "size", "color"], "confirmLive": True},
+    ).status_code == 200
+
+    fb_calls = []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_anon_{len(fb_calls)}")[1]
+    facebook.list_comments = lambda fb_post_id, token, since=None: [
+        {
+            "id": "c_real_price",
+            "message": "Giá bao nhiêu ạ?",
+            "created_time": iso_ago(minutes=3),
+            "is_hidden": False,
+            "can_comment": True,
+        },
+        {
+            "id": "c_real_ship",
+            "message": "Ship về Đà Nẵng bao nhiêu shop?",
+            "created_time": iso_ago(minutes=2),
+            "is_hidden": False,
+            "can_comment": True,
+        },
+    ]
+
+    r_sync = client.post("/api/comments/sync", json={})
+    assert r_sync.status_code == 200, r_sync.text
+    assert r_sync.json()["newComments"] == 2
+
+    # Price comment without 'from' auto-replied live; shipping comment tagged can_ban
+    assert len(fb_calls) == 1 and fb_calls[0][0] == "c_real_price"
+    assert "890.000đ" in fb_calls[0][1]
+
+    det = client.get("/api/comments/threads/c_real_price").json()
+    assert det["thread"]["customer"]["id"] == ""
+    assert det["thread"]["customer"]["name"] is None
+    assert det["thread"]["attention"] is None
+    assert det["thread"]["autoReply"]["lastAction"] == "sent"
+    assert det["messages"][1]["sentBy"] == "auto"
+
+    cb = client.get("/api/comments/threads?filter=can_ban").json()
+    assert [x["id"] for x in cb["items"]] == ["c_real_ship"]
+
+    # Idempotent on subsequent poller tick
+    tick = comment_poller.run_tick()
+    assert tick["autoReplied"] == 0
+    assert len(fb_calls) == 1

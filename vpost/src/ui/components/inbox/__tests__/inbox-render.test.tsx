@@ -362,6 +362,7 @@ describe("ConversationListPane states & row content", () => {
     const fallbackAndPageLast = renderToStaticMarkup(
       <ConversationListItem
         thread={sampleThread({
+          id: "root-anon-1",
           customer: { id: "", name: null, tags: [] },
           unread: false,
           unreadCount: 0,
@@ -381,13 +382,129 @@ describe("ConversationListPane states & row content", () => {
         onToggleBulkSelect={() => {}}
       />,
     );
-    expect(fallbackAndPageLast).toContain("Khách hàng Facebook");
+    expect(fallbackAndPageLast).toContain("Khách Facebook · 18:45 27/11");
+    expect(fallbackAndPageLast).not.toContain("Khách hàng Facebook");
+    expect(fallbackAndPageLast).toContain(">KF<");
+    expect(fallbackAndPageLast).toContain(
+      `data-avatar-tone="${resolveCustomerAvatarTone("root-anon-1")}"`,
+    );
     expect(fallbackAndPageLast).toContain("Bạn: Dạ shop đã inbox ạ");
 
     const tokenHtml = renderToStaticMarkup(
       <InboxPostJobFilterToken postJobId="job-42" onRemove={() => {}} />,
     );
     expect(tokenHtml).toContain('aria-label="Bỏ Bài đăng: job-42"');
+  });
+
+  it("distinguishes anonymous Facebook threads across list row, chat header, messages, and customer panel using first message time, KF initials, and thread-id avatar tone", () => {
+    const anonThread = sampleThread({
+      id: "thread-fb-anon-a",
+      customer: { id: "", name: null, tags: [] },
+      lastMessage: {
+        id: "m-page-reply",
+        fromPage: true,
+        text: "Dạ shop đã kiểm tra kho ạ",
+        createdAt: "2026-11-27T14:30:00+07:00",
+      },
+      updatedAt: "2026-11-27T14:30:00+07:00",
+    });
+    const anonMessages = [
+      sampleMessage({
+        id: "thread-fb-anon-a",
+        threadId: "thread-fb-anon-a",
+        fromPage: false,
+        fromId: "",
+        fromName: null,
+        text: "Còn size M không shop?",
+        createdAt: "2026-11-27T09:15:00+07:00",
+      }),
+      sampleMessage({
+        id: "m-page-reply",
+        threadId: "thread-fb-anon-a",
+        fromPage: true,
+        fromId: "123",
+        fromName: "WorkHardToday",
+        text: "Dạ shop đã kiểm tra kho ạ",
+        createdAt: "2026-11-27T14:30:00+07:00",
+      }),
+    ];
+
+    const expectedLabel = "Khách Facebook · 09:15 27/11";
+    const expectedTone = resolveCustomerAvatarTone("thread-fb-anon-a");
+
+    // List row uses firstMessageAt + KF initials + thread-id tone
+    const rowHtml = renderToStaticMarkup(
+      <ConversationListItem
+        thread={anonThread}
+        firstMessageAt="2026-11-27T09:15:00+07:00"
+        nowMs={NOW_MS}
+        isSelected={false}
+        isBulkMode
+        isBulkSelected={false}
+        onSelect={() => {}}
+        onToggleBulkSelect={() => {}}
+      />,
+    );
+    expect(rowHtml).toContain(expectedLabel);
+    expect(rowHtml).toContain(">KF<");
+    expect(rowHtml).toContain(`aria-label="${expectedLabel}"`);
+    expect(rowHtml).toContain(`data-avatar-tone="${expectedTone}"`);
+    expect(rowHtml).toContain(`Chọn hội thoại của ${expectedLabel}:`);
+
+    // ChatThreadPane derives first message time from root message for ChatHeader & customer bubbles
+    const chatHtml = renderMarkup(
+      <ChatThreadPane
+        {...makeChatProps({
+          threadId: anonThread.id,
+          thread: anonThread,
+          messages: anonMessages,
+        })}
+      />,
+    );
+    expect(chatHtml).toContain(expectedLabel);
+    expect(chatHtml).not.toContain("Khách Facebook · 14:30 27/11");
+    expect(chatHtml).not.toContain("Khách hàng Facebook");
+    expect(chatHtml).toContain(">KF<");
+    expect(chatHtml).toContain(`data-avatar-tone="${expectedTone}"`);
+
+    // Desktop workspace passes fallback label into CustomerPanel alongside Advanced Access message
+    const desktopHtml = renderMarkup(
+      <InboxWorkspaceView
+        layoutMode="desktop"
+        selectedThreadId={anonThread.id}
+        activeThread={anonThread}
+        isDesktopCustomerPanelOpen
+        isCustomerSheetOpen={false}
+        activeModerationPanel={null}
+        readOnlyReason={null}
+        listProps={makeListProps({
+          items: [anonThread],
+          firstMessageAtByThread: { [anonThread.id]: "2026-11-27T09:15:00+07:00" },
+          selectedThreadId: anonThread.id,
+        })}
+        chatProps={makeChatProps({
+          threadId: anonThread.id,
+          thread: anonThread,
+          messages: anonMessages,
+        })}
+        onCollapseDesktopCustomerPanel={() => {}}
+        onCloseCustomerSheet={() => {}}
+        onCloseModerationPanel={() => {}}
+      />,
+    );
+    expect(desktopHtml).toContain(expectedLabel);
+    expect(desktopHtml).toContain(
+      "Facebook ẩn thông tin người dùng khi app chưa có quyền nâng cao (Advanced Access)",
+    );
+    expect(desktopHtml).not.toContain("Khách hàng Facebook");
+
+    // Different anonymous thread IDs hash to thread-specific tones (not a single shared constant)
+    const tones = new Set(
+      ["thread-1", "thread-2", "thread-3", "thread-4", "thread-5", "thread-6"].map((id) =>
+        resolveCustomerAvatarTone(id),
+      ),
+    );
+    expect(tones.size).toBeGreaterThan(1);
   });
 });
 

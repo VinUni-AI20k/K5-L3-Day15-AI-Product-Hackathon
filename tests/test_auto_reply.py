@@ -1208,24 +1208,262 @@ def test_finding07_serializes_caps_and_cooldown_per_page_and_conflict_skips_with
     assert store.get_thread_attentions(vpost_api.TENANT_ID, ["c_f7_conf"]) == {}
 
 
-def test_finding08_empty_from_id_tags_can_ban_and_never_sends():
-    """#8: Comments with empty from_id (privacy-restricted FB user) tag can_ban and never auto-reply."""
+def test_finding08_empty_from_id_auto_replies_and_guards_against_post_spam():
+    """#8 (updated): Empty from_id (ordinary FB users) auto-replies with idempotency, while identical-text spam bursts still tag can_ban."""
     enable_page(mode="live")
     fb_calls = []
-    facebook.reply_comment = lambda *a, **kw: (fb_calls.append(a), "fb_never")[1]
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_f8_{len(fb_calls)}")[1]
 
+    # Single real customer comment with empty from_id -> auto-replies live!
+    c_real = seed_comment("c_f8_real", from_id="", from_name="", message="Giá bao nhiêu ạ?")
+    r_real = auto_reply.process_comment(vpost_api.TENANT_ID, c_real)
+    assert r_real["action"] == "sent" and r_real["tagged"] is False, r_real
+    assert len(fb_calls) == 1 and fb_calls[0][0] == "c_f8_real"
+    draft = store.get_draft_by_client_id(vpost_api.TENANT_ID, "auto:c_f8_real")
+    assert draft is not None and draft["status"] == "sent"
+
+    # Re-processing the same comment is idempotent (auto:<comment_id>)
+    r_dup = auto_reply.process_comment(vpost_api.TENANT_ID, store.get_comment(vpost_api.TENANT_ID, "c_f8_real"))
+    assert r_dup["action"] == "already_sent"
+    assert len(fb_calls) == 1
+
+    # Identical-text spam burst (5 identical comments with empty from_id on a post within 10 min) -> all tagged can_ban as spam, zero sends
+    seed_post_job(job_id="job-f8-spam", fb_post_id="123_f8_spam", product_code="G1")
     cids = []
     for i in range(5):
         cid = f"c_f8_{i}"
-        seed_comment(cid, from_id="", from_name="", message="Giá bao nhiêu ạ?")
+        seed_comment(
+            cid,
+            post_job_id="job-f8-spam",
+            fb_post_id="123_f8_spam",
+            from_id="",
+            from_name="",
+            message="Giá bao nhiêu ạ?",
+        )
         cids.append(cid)
 
     res = auto_reply.run_auto_reply(vpost_api.TENANT_ID, cids)
     assert res["sent"] == 0
     assert res["tagged"] == 5
-    assert fb_calls == []
+    assert len(fb_calls) == 1  # only c_f8_real was sent
     atts = store.get_thread_attentions(vpost_api.TENANT_ID, cids)
     assert len(atts) == 5
+    assert all("spam" in att["reason"].lower() for att in atts.values())
+
+
+def test_empty_from_id_per_thread_ten_minute_cooldown(monkeypatch):
+    """Per-thread cooldown: at most 1 auto-reply per thread per 10 minutes even when from_id is empty."""
+    enable_page(mode="live")
+    fb_calls = []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_tcd_{len(fb_calls)}")[1]
+
+    t0 = datetime(2026, 11, 28, 10, 0, 0, tzinfo=timezone.utc)
+    clock = [t0]
+    monkeypatch.setattr(vpost_api, "now", lambda: clock[0])
+
+    # Simulate an existing auto-reply sent on thread c_tcd_root at t0 (without a Page reply row blocking N2)
+    c1 = seed_comment("c_tcd_root", from_id="", from_name="", message="Giá bao nhiêu ạ?", created_time="2026-11-28T10:00:00.000Z")
+    store.append_auto_reply_log(
+        vpost_api.TENANT_ID,
+        page_id=PAGE_ID,
+        fb_post_id="123_1001",
+        thread_id="c_tcd_root",
+        comment_id="c_tcd_prev",
+        from_id="",
+        intents=["price"],
+        action="sent",
+        text="Dạ mẫu G1 giá 1.950.000đ ạ.",
+        created_at="2026-11-28T10:00:00.000Z",
+    )
+
+    # 5 minutes later on same thread -> blocked by per-thread 10-minute cooldown
+    t1 = t0 + timedelta(minutes=5)
+    clock[0] = t1
+    r1 = auto_reply.process_comment(vpost_api.TENANT_ID, c1, now_dt=t1)
+    assert r1["action"] == "skipped" and r1["tagged"] is True
+    assert "hội thoại" in r1["reason"].lower() and "10 phút" in r1["reason"]
+    assert fb_calls == []
+
+    # Clear attention tag and advance to +11 minutes -> cooldown expired, thread allowed again
+    store.clear_thread_attention(vpost_api.TENANT_ID, "c_tcd_root")
+    t2 = t0 + timedelta(minutes=11)
+    clock[0] = t2
+    r2 = auto_reply.process_comment(vpost_api.TENANT_ID, c1, now_dt=t2)
+    assert r2["action"] == "sent" and len(fb_calls) == 1
+
+
+def test_empty_from_id_per_post_rate_limit_ten_per_ten_minutes(monkeypatch):
+    """Per-post rate: max 10 auto replies per post per 10 minutes (other posts unaffected, resets after 10 min)."""
+    enable_page(mode="live", hourly_cap=50, daily_cap=200)
+    seed_post_job(job_id="job-post2", fb_post_id="123_2002", product_code="G1")
+    fb_calls = []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_pr_{len(fb_calls)}")[1]
+
+    t0 = datetime(2026, 11, 28, 10, 0, 0, tzinfo=timezone.utc)
+    clock = [t0]
+    monkeypatch.setattr(vpost_api, "now", lambda: clock[0])
+
+    distinct_msgs = [
+        "Giá bao nhiêu ạ?",
+        "Mẫu này giá sao shop?",
+        "Váy này bao nhiêu tiền ạ?",
+        "Xin giá ạ",
+        "Còn size gì ạ?",
+        "Có size nào shop?",
+        "Có màu gì ạ?",
+        "Còn màu nào không ạ?",
+        "Còn size M không shop?",
+        "Size L còn không ạ?",
+        "Màu đen còn không ạ?",
+        "Đầm này giá thế nào ạ?",
+    ]
+    cids = []
+    for i, msg in enumerate(distinct_msgs[:11]):
+        cid = f"c_pr_{i}"
+        seed_comment(
+            cid,
+            from_id="",
+            from_name="",
+            message=msg,
+            created_time=(t0 + timedelta(seconds=i)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        )
+        cids.append(cid)
+
+    res = auto_reply.run_auto_reply(vpost_api.TENANT_ID, cids, now_dt=t0 + timedelta(minutes=1))
+    assert res["sent"] == 10
+    assert res["skipped"] == 1
+    assert res["tagged"] == 1
+    assert len(fb_calls) == 10
+
+    att = store.get_thread_attentions(vpost_api.TENANT_ID, ["c_pr_10"]).get("c_pr_10")
+    assert att and att["tag"] == "can_ban"
+    assert "10" in att["reason"] and "bài đăng" in att["reason"].lower()
+
+    # Different post on the same Page is NOT affected by post 1's per-post limit
+    c_other_post = seed_comment(
+        "c_pr_other",
+        post_job_id="job-post2",
+        fb_post_id="123_2002",
+        from_id="",
+        from_name="",
+        message="Giá bao nhiêu ạ?",
+        created_time=(t0 + timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+    )
+    r_other = auto_reply.process_comment(vpost_api.TENANT_ID, c_other_post, now_dt=t0 + timedelta(minutes=2))
+    assert r_other["action"] == "sent" and len(fb_calls) == 11
+
+    # 12 minutes later on post 1 -> window expired, post 1 allows auto-reply again
+    t_later = t0 + timedelta(minutes=12)
+    clock[0] = t_later
+    c_after = seed_comment(
+        "c_pr_after",
+        from_id="",
+        from_name="",
+        message=distinct_msgs[11],
+        created_time=t_later.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+    )
+    r_after = auto_reply.process_comment(vpost_api.TENANT_ID, c_after, now_dt=t_later)
+    assert r_after["action"] == "sent" and len(fb_calls) == 12
+
+
+def test_identical_text_spam_across_post_within_ten_minutes_regardless_of_author(monkeypatch):
+    """Identical-text spam across the post within 10 minutes catches mixed/empty authors & obfuscation, and resets after 10 min."""
+    enable_page(mode="live", hourly_cap=50, daily_cap=200)
+    seed_post_job(job_id="job-p2", fb_post_id="123_p2", product_code="G1")
+    fb_calls = []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_ps_{len(fb_calls)}")[1]
+
+    t0 = datetime(2026, 11, 28, 10, 0, 0, tzinfo=timezone.utc)
+    clock = [t0]
+    monkeypatch.setattr(vpost_api, "now", lambda: clock[0])
+
+    # 5 identical-after-normalization comments from DIFFERENT authors (including empty from_id & invisible/homoglyph chars) on post 1
+    variants = [
+        ("c_ps_1", "u_a", "Giá bao nhiêu ạ?"),
+        ("c_ps_2", "u_b", "gia bao nhieu a"),
+        ("c_ps_3", "", "Giá  bao  nhiêu ạ??"),
+        ("c_ps_4", "", "G\u200biá bao nhiêu ạ?"),
+        ("c_ps_5", "u_c", "Gi\u0430 bao nhiêu ạ"),
+    ]
+    for idx, (cid, fid, msg) in enumerate(variants):
+        seed_comment(
+            cid,
+            from_id=fid,
+            from_name="" if not fid else f"User {idx}",
+            message=msg,
+            created_time=(t0 + timedelta(seconds=idx * 10)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        )
+
+    res = auto_reply.run_auto_reply(vpost_api.TENANT_ID, [v[0] for v in variants], now_dt=t0 + timedelta(minutes=1))
+    assert res["sent"] == 0 and res["tagged"] == 5
+    assert fb_calls == []
+    atts = store.get_thread_attentions(vpost_api.TENANT_ID, [v[0] for v in variants])
+    assert len(atts) == 5 and all("spam" in a["reason"].lower() for a in atts.values())
+
+    # Same text on a DIFFERENT post is unaffected
+    c_p2 = seed_comment(
+        "c_ps_other_post",
+        post_job_id="job-p2",
+        fb_post_id="123_p2",
+        from_id="",
+        from_name="",
+        message="Giá bao nhiêu ạ?",
+        created_time=(t0 + timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+    )
+    r_p2 = auto_reply.process_comment(vpost_api.TENANT_ID, c_p2, now_dt=t0 + timedelta(minutes=1))
+    assert r_p2["action"] == "sent" and len(fb_calls) == 1
+
+    # 11 minutes later on post 1 -> old burst outside 10-minute window, single fresh comment succeeds
+    t_later = t0 + timedelta(minutes=12)
+    clock[0] = t_later
+    c_fresh = seed_comment(
+        "c_ps_fresh",
+        from_id="",
+        from_name="",
+        message="Giá bao nhiêu ạ?",
+        created_time=t_later.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+    )
+    r_fresh = auto_reply.process_comment(vpost_api.TENANT_ID, c_fresh, now_dt=t_later)
+    assert r_fresh["action"] == "sent" and len(fb_calls) == 2
+
+
+def test_per_customer_rules_remain_extra_layer_when_from_id_exists(monkeypatch):
+    """When from_id is present, per-customer 24h 3x repeat spam and 10-minute cross-post cooldown still apply."""
+    enable_page(mode="live", hourly_cap=50, daily_cap=200)
+    seed_post_job(job_id="job-cust2", fb_post_id="123_cust2", product_code="G1")
+    fb_calls = []
+    facebook.reply_comment = lambda target, msg, tok: (fb_calls.append((target, msg)), f"fb_cl_{len(fb_calls)}")[1]
+
+    t0 = datetime(2026, 11, 28, 10, 0, 0, tzinfo=timezone.utc)
+    clock = [t0]
+    monkeypatch.setattr(vpost_api, "now", lambda: clock[0])
+
+    # Per-customer cooldown applies across DIFFERENT posts on the same Page when from_id exists
+    c1 = seed_comment("c_cl_1", from_id="u_repeat", message="Giá bao nhiêu ạ?", created_time="2026-11-28T10:00:00.000Z")
+    r1 = auto_reply.process_comment(vpost_api.TENANT_ID, c1, now_dt=t0)
+    assert r1["action"] == "sent" and len(fb_calls) == 1
+
+    t1 = t0 + timedelta(minutes=3)
+    clock[0] = t1
+    c2 = seed_comment(
+        "c_cl_2",
+        post_job_id="job-cust2",
+        fb_post_id="123_cust2",
+        from_id="u_repeat",
+        message="Còn size nào ạ?",
+        created_time="2026-11-28T10:03:00.000Z",
+    )
+    r2 = auto_reply.process_comment(vpost_api.TENANT_ID, c2, now_dt=t1)
+    assert r2["action"] == "skipped" and r2["tagged"] is True and "khách hàng" in r2["reason"].lower()
+    assert len(fb_calls) == 1
+
+    # Per-customer 24h repeat spam (3 identical comments spaced 30 min apart -> outside 10-min post window, still caught!)
+    seed_comment("c_cl_sp1", from_id="u_slow_spam", message="Còn màu gì ạ?", created_time="2026-11-28T08:00:00.000Z")
+    seed_comment("c_cl_sp2", from_id="u_slow_spam", message="Còn màu gì ạ?", created_time="2026-11-28T09:00:00.000Z")
+    c_sp3 = seed_comment("c_cl_sp3", from_id="u_slow_spam", message="Còn màu gì ạ?", created_time="2026-11-28T10:03:00.000Z")
+    r_sp = auto_reply.process_comment(vpost_api.TENANT_ID, c_sp3, now_dt=t1)
+    assert r_sp["action"] == "skipped" and r_sp["tagged"] is True and "spam" in r_sp["reason"].lower()
+    assert len(fb_calls) == 1
 
 
 @pytest.mark.parametrize(
